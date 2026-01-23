@@ -46,13 +46,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     // Disable source maps for production (smaller bundle)
     sourcemap: false,
-    // Minify with terser for better compression
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console.log statements in production
-      },
-    },
+    // Minify with esbuild (built-in, faster than terser)
+    minify: 'esbuild',
   },
   server: {
     proxy: {
