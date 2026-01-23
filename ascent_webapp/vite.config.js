@@ -14,6 +14,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Ensure React is always resolved from the same location
+      'react': path.resolve(__dirname, './node_modules/react'),
+      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
     },
     // CRITICAL: Ensure React is resolved as a singleton to prevent duplicate instances
     dedupe: ['react', 'react-dom'],
@@ -24,15 +27,14 @@ export default defineConfig({
       output: {
         manualChunks: (id) => {
           // Split vendor chunks for better caching
-          // CRITICAL: Do NOT manually chunk React - let Vite handle it automatically
-          // This ensures React is always available when needed
           if (id.includes('node_modules')) {
-            // Skip React packages - let Vite handle them automatically
+            // CRITICAL: Keep React in the entry chunk or a dedicated chunk that loads first
+            // Don't split React - it must be available before other chunks
             if (id.includes('react-dom') || 
                 /[\\/]react[\\/]/.test(id) || 
                 id.includes('react-router')) {
-              // Return undefined to let Vite handle React chunking automatically
-              return;
+              // Put React in a dedicated chunk that will be loaded first
+              return 'react-vendor';
             }
             // Other vendor chunks
             if (id.includes('@radix-ui')) {
@@ -64,6 +66,8 @@ export default defineConfig({
   optimizeDeps: {
     // Pre-bundle React to ensure it's available and deduplicated
     include: ['react', 'react-dom', 'react/jsx-runtime'],
+    // Force re-optimization to ensure React is properly bundled
+    force: true,
   },
   server: {
     proxy: {
