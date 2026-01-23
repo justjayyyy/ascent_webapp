@@ -12,6 +12,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Ensure React is resolved as a singleton to prevent duplicate instances
+    dedupe: ['react', 'react-dom'],
   },
   build: {
     // Optimize build output
@@ -20,7 +22,16 @@ export default defineConfig({
         manualChunks: (id) => {
           // Split vendor chunks for better caching
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            // CRITICAL: Keep React and React-DOM together in the same chunk
+            // Check react-dom first, then react package specifically, then react-router
+            if (id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            // Match react package specifically (not @radix-ui/react-* or other react-* packages)
+            if (id.includes('node_modules/react/') || id.includes('node_modules\\react\\')) {
+              return 'react-vendor';
+            }
+            if (id.includes('react-router')) {
               return 'react-vendor';
             }
             if (id.includes('@radix-ui')) {
