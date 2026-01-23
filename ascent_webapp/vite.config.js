@@ -24,20 +24,15 @@ export default defineConfig({
       output: {
         manualChunks: (id) => {
           // Split vendor chunks for better caching
+          // CRITICAL: Do NOT manually chunk React - let Vite handle it automatically
+          // This ensures React is always available when needed
           if (id.includes('node_modules')) {
-            // CRITICAL: React and React-DOM MUST stay together in the same chunk
-            // Match react-dom first (most specific)
-            if (id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            // Match react package root specifically (use regex for better matching)
-            // This matches /react/ or \react\ but not @radix-ui/react-*
-            if (/[\\/]react[\\/]/.test(id) && !id.includes('@radix-ui')) {
-              return 'react-vendor';
-            }
-            // React Router should also be with React
-            if (id.includes('react-router')) {
-              return 'react-vendor';
+            // Skip React packages - let Vite handle them automatically
+            if (id.includes('react-dom') || 
+                /[\\/]react[\\/]/.test(id) || 
+                id.includes('react-router')) {
+              // Return undefined to let Vite handle React chunking automatically
+              return;
             }
             // Other vendor chunks
             if (id.includes('@radix-ui')) {
