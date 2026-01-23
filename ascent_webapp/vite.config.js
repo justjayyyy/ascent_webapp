@@ -66,8 +66,6 @@ export default defineConfig({
   optimizeDeps: {
     // Pre-bundle React to ensure it's available and deduplicated
     include: ['react', 'react-dom', 'react/jsx-runtime'],
-    // Force re-optimization to ensure React is properly bundled
-    force: true,
   },
   server: {
     proxy: {
