@@ -6,13 +6,16 @@ import path from 'path'
 export default defineConfig({
   logLevel: 'error', // Suppress warnings, only show errors
   plugins: [
-    react(),
+    react({
+      // Ensure React is properly handled
+      jsxRuntime: 'automatic',
+    }),
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-    // Ensure React is resolved as a singleton to prevent duplicate instances
+    // CRITICAL: Ensure React is resolved as a singleton to prevent duplicate instances
     dedupe: ['react', 'react-dom'],
   },
   build: {
@@ -22,18 +25,21 @@ export default defineConfig({
         manualChunks: (id) => {
           // Split vendor chunks for better caching
           if (id.includes('node_modules')) {
-            // CRITICAL: Keep React and React-DOM together in the same chunk
-            // Check react-dom first, then react package specifically, then react-router
+            // CRITICAL: React and React-DOM MUST stay together in the same chunk
+            // Match react-dom first (most specific)
             if (id.includes('react-dom')) {
               return 'react-vendor';
             }
-            // Match react package specifically (not @radix-ui/react-* or other react-* packages)
-            if (id.includes('node_modules/react/') || id.includes('node_modules\\react\\')) {
+            // Match react package root specifically (use regex for better matching)
+            // This matches /react/ or \react\ but not @radix-ui/react-*
+            if (/[\\/]react[\\/]/.test(id) && !id.includes('@radix-ui')) {
               return 'react-vendor';
             }
+            // React Router should also be with React
             if (id.includes('react-router')) {
               return 'react-vendor';
             }
+            // Other vendor chunks
             if (id.includes('@radix-ui')) {
               return 'ui-vendor';
             }
@@ -55,10 +61,14 @@ export default defineConfig({
     },
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
-    // Disable source maps for production (smaller bundle)
-    sourcemap: false,
+    // Enable source maps temporarily for debugging
+    sourcemap: true,
     // Minify with esbuild (built-in, faster than terser)
     minify: 'esbuild',
+  },
+  optimizeDeps: {
+    // Pre-bundle React to ensure it's available and deduplicated
+    include: ['react', 'react-dom', 'react/jsx-runtime'],
   },
   server: {
     proxy: {
