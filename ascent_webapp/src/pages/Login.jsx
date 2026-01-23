@@ -74,13 +74,16 @@ export default function Login() {
     });
 
     // Render the Google Sign-In button
+    // Note: This button is hidden and not used (we use custom button instead)
+    // But we keep it for compatibility - width must be a number, not percentage
     const buttonContainer = document.getElementById('google-signin-button');
     if (buttonContainer) {
       window.google.accounts.id.renderButton(buttonContainer, {
         type: 'standard',
         theme: 'filled_black',
         size: 'large',
-        width: '100%',
+        // width must be a number (pixels), not a percentage string
+        // Since button is hidden, we use a default width
         text: 'continue_with',
         shape: 'rectangular',
       });
