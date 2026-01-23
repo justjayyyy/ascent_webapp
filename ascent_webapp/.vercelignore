@@ -1,0 +1,17 @@
+# Ignore files that shouldn't be deployed to Vercel
+# Note: Do NOT ignore node_modules - Vercel needs it for serverless functions
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+.vscode
+.idea
+dist
+build
+coverage
+*.md
+!README.md
+scripts/
+server/scripts/
+# Do NOT ignore node_modules - Vercel needs dependencies for serverless functions
