@@ -79,16 +79,8 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Log for debugging
-    console.log('CORS check - Origin:', origin);
-    console.log('CORS check - Allowed origins:', allowedOrigins);
-    console.log('CORS check - NODE_ENV:', process.env.NODE_ENV);
-    console.log('CORS check - FRONTEND_URL:', process.env.FRONTEND_URL);
-    console.log('CORS check - VERCEL_URL:', process.env.VERCEL_URL);
-    
     // In production on Vercel, be more permissive with vercel.app domains
     if (process.env.VERCEL === '1' && origin.includes('vercel.app')) {
-      console.log('CORS: Allowing Vercel domain in production');
       return callback(null, true);
     }
     
@@ -195,6 +187,21 @@ app.options('/api/integrations/*', (req, res) => res.sendStatus(200));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// MongoDB connection test endpoint
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const connectDB = (await import('./lib/mongodb.js')).default;
+    await connectDB();
+    res.json({ status: 'ok', message: 'MongoDB connection successful' });
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'error', 
+      message: error.message,
+      code: error.code 
+    });
+  }
 });
 
 // Only start server if not in Vercel environment

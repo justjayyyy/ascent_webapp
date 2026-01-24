@@ -48,8 +48,8 @@ export default function AddTransactionDialog({
 
   useEffect(() => {
     if (editTransaction) {
-      // Check if this is a duplicate (has no id) - use today's date
-      const isDuplicate = !editTransaction.id;
+      // Check if this is a duplicate (has no id or _id) - use today's date for duplicates
+      const isDuplicate = !editTransaction.id && !editTransaction._id;
       setFormData({
         date: isDuplicate ? format(new Date(), 'yyyy-MM-dd') : editTransaction.date,
         type: editTransaction.type,
@@ -123,14 +123,14 @@ export default function AddTransactionDialog({
       <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-md max-h-[90vh] overflow-y-auto")}>
         <DialogHeader>
           <DialogTitle className={cn("text-xl font-bold", colors.accentText)}>
-            {editTransaction 
-              ? (editTransaction.id ? t('editTransaction') : t('duplicateTransaction'))
+            {editTransaction && (editTransaction.id || editTransaction._id)
+              ? t('editTransaction')
               : t('addTransactionTitle')
             }
           </DialogTitle>
           <DialogDescription className={colors.textTertiary}>
-            {editTransaction 
-              ? (editTransaction.id ? t('updateTransactionDetails') : t('duplicateTransactionDescription'))
+            {editTransaction && (editTransaction.id || editTransaction._id)
+              ? t('updateTransactionDetails')
               : t('recordNewTransaction')
             }
           </DialogDescription>
@@ -328,10 +328,10 @@ export default function AddTransactionDialog({
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {editTransaction ? t('updating') : t('adding')}
+                  {editTransaction && (editTransaction.id || editTransaction._id) ? t('updating') : t('adding')}
                 </>
               ) : (
-                editTransaction ? t('updateTransaction') : t('addTransaction')
+                editTransaction && (editTransaction.id || editTransaction._id) ? t('updateTransaction') : t('addTransaction')
               )}
             </Button>
           </div>

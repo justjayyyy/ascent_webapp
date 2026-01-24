@@ -57,8 +57,8 @@ function PeriodSelector({
     return monthsSet;
   }, [transactions, selectedYear]);
 
-  // Check if a month should be disabled (future months or no data)
-  const isMonthDisabled = (year, month) => {
+  // Check if a month should be disabled (future months or no data) - memoized
+  const isMonthDisabled = useCallback((year, month) => {
     const selectedYearNum = parseInt(year);
     // Disable future months
     if (selectedYearNum > currentYear) return true;
@@ -67,17 +67,17 @@ function PeriodSelector({
     const isCurrent = selectedYearNum === currentYear && month === currentMonth;
     if (!isCurrent && !monthsWithData.has(month)) return true;
     return false;
-  };
+  }, [currentYear, currentMonth, monthsWithData]);
 
-  // Check if this is the current month
-  const isCurrentMonth = (year, month) => {
+  // Check if this is the current month - memoized
+  const isCurrentMonth = useCallback((year, month) => {
     return parseInt(year) === currentYear && month === currentMonth;
-  };
+  }, [currentYear, currentMonth]);
 
-  // Check if month has data
-  const hasDataForMonth = (month) => {
+  // Check if month has data - memoized
+  const hasDataForMonth = useCallback((month) => {
     return monthsWithData.has(month);
-  };
+  }, [monthsWithData]);
 
   const selectedMonthData = MONTHS.find(m => m.value === parseInt(selectedMonth));
   const selectedMonthName = selectedMonthData ? t(selectedMonthData.fullLabelKey) : '';

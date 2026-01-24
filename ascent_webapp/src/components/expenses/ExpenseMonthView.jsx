@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 
 const COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
 
-export default function ExpenseMonthView({ 
+function ExpenseMonthView({ 
   transactions, 
   budgets, 
   cards,
@@ -489,3 +489,5 @@ export default function ExpenseMonthView({
     </div>
   );
 }
+
+export default memo(ExpenseMonthView);

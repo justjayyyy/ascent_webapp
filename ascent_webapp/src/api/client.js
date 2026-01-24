@@ -42,13 +42,23 @@ async function request(endpoint, options = {}, retryCount = 0) {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const url = `${API_URL}${endpoint}`;
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.log(`[API] Making request to: ${url}`, { method: options.method || 'GET', headers });
+    }
+    
+    const response = await fetch(url, {
       ...options,
       headers,
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.log(`[API] Response status: ${response.status} ${response.statusText}`, { url, contentType: response.headers.get('content-type') });
+    }
     
     // Handle rate limiting
     if (response.status === 429) {
@@ -59,10 +69,43 @@ async function request(endpoint, options = {}, retryCount = 0) {
       throw error;
     }
     
-    const data = await response.json();
+    // Check content type before parsing JSON
+    const contentType = response.headers.get('content-type');
+    let data;
+    
+    try {
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // If not JSON, try to get text for error message
+        const text = await response.text();
+        const error = new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+        error.status = response.status;
+        error.responseText = text;
+        throw error;
+      }
+    } catch (parseError) {
+      // If JSON parsing fails, provide helpful error
+      if (parseError.responseText) {
+        throw parseError; // Re-throw our custom error
+      }
+      const error = new Error(`Failed to parse server response: ${parseError.message}`);
+      error.status = response.status;
+      error.originalError = parseError;
+      throw error;
+    }
     
     if (!response.ok) {
-      const error = new Error(data.error || 'Request failed');
+      const error = new Error(data.error || `Request failed with status ${response.status}`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    
+    // Ensure data.data exists
+    if (!data || typeof data !== 'object' || !('data' in data)) {
+      console.error('[API] Invalid response format:', { data, expected: 'data.data' });
+      const error = new Error('Invalid server response format');
       error.status = response.status;
       error.data = data;
       throw error;
@@ -74,8 +117,16 @@ async function request(endpoint, options = {}, retryCount = 0) {
     
     // Handle timeout
     if (err.name === 'AbortError') {
-      const error = new Error('Request timed out');
+      const error = new Error('Request timed out. Please check if the API server is running.');
       error.status = 408;
+      throw error;
+    }
+    
+    // Handle network errors (connection refused, etc.)
+    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('ERR_CONNECTION_REFUSED'))) {
+      const error = new Error('Cannot connect to server. Please ensure the API server is running on port 3002.');
+      error.status = 0;
+      error.isNetworkError = true;
       throw error;
     }
     
@@ -93,12 +144,23 @@ async function request(endpoint, options = {}, retryCount = 0) {
 // Auth methods
 const auth = {
   async login(email, password) {
-    const result = await request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    setToken(result.token);
-    return result.user;
+    try {
+      const result = await request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+      if (!result || !result.token) {
+        throw new Error('Invalid response: missing token');
+      }
+      if (!result.user) {
+        throw new Error('Invalid response: missing user data');
+      }
+      setToken(result.token);
+      return result.user;
+    } catch (error) {
+      console.error('[Auth] Login error:', error);
+      throw error;
+    }
   },
   
   async register(email, password, full_name) {
@@ -300,7 +362,6 @@ const integrations = {
 const appLogs = {
   async logUserInApp(pageName) {
     // Can be implemented to track page views if needed
-    console.log('Page view:', pageName);
   }
 };
 

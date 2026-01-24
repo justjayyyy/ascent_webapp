@@ -12,15 +12,19 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDayTrade, isLoading, accountCurrency, editPosition = null, editDayTrade = null, cashBalance = null, hasCashPosition = false }) {
-  const { colors, t } = useTheme();
+  const { colors, t, user } = useTheme();
   const [activeTab, setActiveTab] = useState('position');
   const [deductFromCash, setDeductFromCash] = useState(true);
+  
+  // Ensure we have a valid currency code
+  const currency = accountCurrency || user?.currency || 'USD';
+  
   const [formData, setFormData] = useState(editPosition || {
     symbol: '',
     assetType: 'Stock',
     quantity: '',
     averageBuyPrice: '',
-    currency: accountCurrency,
+    currency: currency,
     date: new Date().toISOString().split('T')[0],
     strikePrice: '',
     expirationDate: '',
@@ -49,7 +53,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
         assetType: 'Stock',
         quantity: '',
         averageBuyPrice: '',
-        currency: accountCurrency,
+        currency: currency,
         date: new Date().toISOString().split('T')[0],
         strikePrice: '',
         expirationDate: '',
@@ -62,7 +66,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
       });
       setActiveTab('position');
     }
-  }, [editPosition, editDayTrade, accountCurrency, open]);
+  }, [editPosition, editDayTrade, accountCurrency, user?.currency, open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -212,7 +216,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
               />
               {hasCashPosition && cashBalance > 0 && (
                 <p className={cn("text-sm flex items-center gap-1", colors.textTertiary)}>
-                  💰 {t('currentCashBalance') || 'Current cash balance'}: <span className="font-medium text-green-400">{new Intl.NumberFormat('en-US', { style: 'currency', currency: accountCurrency }).format(cashBalance)}</span>
+                  💰 {t('currentCashBalance') || 'Current cash balance'}: <span className="font-medium text-green-400">{new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(cashBalance)}</span>
                 </p>
               )}
               <p className={cn("text-xs", colors.textTertiary)}>
@@ -342,7 +346,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                     <div className="flex justify-between">
                       <span>{t('availableCash') || 'Available cash'}:</span>
                       <span className={cn("font-medium", cashBalance > 0 ? 'text-green-400' : colors.textPrimary)}>
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: accountCurrency }).format(cashBalance)}
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(cashBalance)}
                       </span>
                     </div>
                     {purchaseCost > 0 && (
@@ -350,13 +354,13 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                         <div className="flex justify-between">
                           <span>{t('purchaseCost') || 'Purchase cost'}:</span>
                           <span className="font-medium text-amber-400">
-                            -{new Intl.NumberFormat('en-US', { style: 'currency', currency: accountCurrency }).format(purchaseCost)}
+                            -{new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(purchaseCost)}
                           </span>
                         </div>
                         <div className={cn("flex justify-between pt-1 border-t mt-1", colors.borderLight)}>
                           <span>{t('remainingCash') || 'Remaining'}:</span>
                           <span className={cn("font-medium", hasSufficientCash ? 'text-green-400' : 'text-red-400')}>
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: accountCurrency }).format(cashBalance - purchaseCost)}
+                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(cashBalance - purchaseCost)}
                           </span>
                         </div>
                       </>
@@ -417,7 +421,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
 
                 <div className="space-y-2">
                   <Label htmlFor="profitLoss" className={colors.textSecondary}>
-                    Profit/Loss ({accountCurrency}) *
+                    Profit/Loss ({currency}) *
                   </Label>
                   <Input
                     id="profitLoss"

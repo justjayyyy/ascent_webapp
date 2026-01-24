@@ -50,6 +50,14 @@ export default defineConfig({
             if (id.includes('framer-motion') || id.includes('three')) {
               return 'animation-vendor';
             }
+            // Split lucide-react into its own chunk (large icon library)
+            if (id.includes('lucide-react')) {
+              return 'icons-vendor';
+            }
+            // Split heavy libraries
+            if (id.includes('lodash') || id.includes('moment') || id.includes('date-fns')) {
+              return 'utils-vendor';
+            }
             // Default vendor chunk
             return 'vendor';
           }
@@ -58,10 +66,16 @@ export default defineConfig({
     },
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
-    // Enable source maps temporarily for debugging
-    sourcemap: true,
+    // Disable source maps in production for smaller bundle size
+    sourcemap: process.env.NODE_ENV === 'development',
     // Minify with esbuild (built-in, faster than terser)
     minify: 'esbuild',
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+    // Optimize chunk size
+    target: 'esnext',
+    // Reduce chunk size warnings
+    reportCompressedSize: false,
   },
   optimizeDeps: {
     // Pre-bundle React to ensure it's available and deduplicated

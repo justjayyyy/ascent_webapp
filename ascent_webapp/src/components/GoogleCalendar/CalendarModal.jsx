@@ -301,8 +301,6 @@ export default function CalendarModal({ open, onOpenChange }) {
       if (taskForm.due) {
         task.due = new Date(taskForm.due).toISOString();
       }
-
-      console.log('Creating task with data:', task);
       
       const response = await fetch(`/api/integrations/google-calendar?action=create-task`, {
         method: 'POST',
@@ -314,7 +312,6 @@ export default function CalendarModal({ open, onOpenChange }) {
       });
 
       const responseData = await response.json();
-      console.log('Task creation response:', response.status, responseData);
 
       if (response.ok) {
         toast.success(t('taskCreated') || 'Task created!');

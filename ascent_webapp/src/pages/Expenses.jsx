@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,18 @@ import PeriodSelector from '../components/expenses/PeriodSelector';
 import { useTheme } from '../components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-export default function Expenses() {
+function Expenses() {
   const { user, colors, t } = useTheme();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
@@ -21,56 +31,62 @@ export default function Expenses() {
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState(null);
   const queryClient = useQueryClient();
 
+  // Memoize user identifiers to prevent unnecessary query refetches
+  const userId = useMemo(() => user?.id || user?._id, [user?.id, user?._id]);
+  const userEmail = useMemo(() => user?.email, [user?.email]);
+
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['transactions', user?.id],
+    queryKey: ['transactions', userId],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.ExpenseTransaction.filter({ created_by: user.email }, '-date', 1000);
+      if (!userEmail) return [];
+      return await ascent.entities.ExpenseTransaction.filter({ created_by: userEmail }, '-date', 1000);
     },
-    enabled: !!user,
+    enabled: !!userEmail,
     staleTime: 3 * 60 * 1000, // 3 minutes
   });
 
   const { data: cards = [] } = useQuery({
-    queryKey: ['cards', user?.id],
+    queryKey: ['cards', userId],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Card.filter({ created_by: user.email });
+      if (!userEmail) return [];
+      return await ascent.entities.Card.filter({ created_by: userEmail });
     },
-    enabled: !!user,
+    enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
   });
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', user?.id],
+    queryKey: ['accounts', userId],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Account.filter({ created_by: user.email });
+      if (!userEmail) return [];
+      return await ascent.entities.Account.filter({ created_by: userEmail });
     },
-    enabled: !!user,
+    enabled: !!userEmail,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: budgets = [] } = useQuery({
-    queryKey: ['budgets', user?.id],
+    queryKey: ['budgets', userId],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Budget.filter({ created_by: user.email }, '-created_date');
+      if (!userEmail) return [];
+      return await ascent.entities.Budget.filter({ created_by: userEmail }, '-created_date');
     },
-    enabled: !!user,
+    enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
   });
 
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories', user?.id],
+    queryKey: ['categories', userId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!userEmail) return [];
       // Use list() which triggers default category creation on first access
       return await ascent.entities.Category.list('-created_date');
     },
-    enabled: !!user,
+    enabled: !!userEmail,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -175,28 +191,60 @@ export default function Expenses() {
   }, []);
 
   const handleDeleteTransaction = useCallback((id) => {
-    deleteTransactionMutation.mutate(id);
-  }, [deleteTransactionMutation]);
+    setTransactionToDelete(id);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const confirmDeleteTransaction = useCallback(() => {
+    if (transactionToDelete) {
+      deleteTransactionMutation.mutate(transactionToDelete);
+      setDeleteDialogOpen(false);
+      setTransactionToDelete(null);
+    }
+  }, [transactionToDelete, deleteTransactionMutation]);
 
   const handleDuplicateTransaction = useCallback((transaction) => {
-    // Create a duplicate with today's date
+    // Create a duplicate with today's date - remove all ID and timestamp fields
+    const {
+      id,
+      _id,
+      created_date,
+      updated_date,
+      created_by,
+      ...transactionFields
+    } = transaction;
+    
     const duplicatedTransaction = {
-      ...transaction,
+      ...transactionFields,
       date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
-      id: undefined, // Remove ID so it creates a new transaction
+      // Explicitly remove any ID fields to ensure it's treated as a new transaction
+      id: undefined,
+      _id: undefined,
     };
+    
     setEditingTransaction(duplicatedTransaction);
     setAddDialogOpen(true);
   }, []);
 
   const handleAddTransaction = useCallback(async (transactionData) => {
-    if (editingTransaction && editingTransaction.id) {
+    // Check if we're editing an existing transaction (has valid ID)
+    const isEditing = editingTransaction && editingTransaction.id && editingTransaction._id;
+    
+    if (isEditing) {
       // Editing existing transaction
       await updateTransactionMutation.mutateAsync({ id: editingTransaction.id, data: transactionData });
     } else {
       // Creating new transaction (either new or duplicate)
-      await createTransactionMutation.mutateAsync(transactionData);
+      // Remove any ID fields that might have been accidentally included to ensure it's treated as a new transaction
+      const cleanData = { ...transactionData };
+      delete cleanData.id;
+      delete cleanData._id;
+      delete cleanData.created_date;
+      delete cleanData.updated_date;
+      
+      await createTransactionMutation.mutateAsync(cleanData);
     }
+    // Note: editingTransaction and dialog are cleared in mutation onSuccess callbacks
   }, [editingTransaction, updateTransactionMutation, createTransactionMutation]);
 
   // Selected period transactions (unfiltered - filtering done in ExpenseMonthView)
@@ -327,7 +375,40 @@ export default function Expenses() {
           onDelete={deleteCategoryMutation.mutate}
           isLoading={createCategoryMutation.isPending || deleteCategoryMutation.isPending}
         />
+
+        {/* Delete Transaction Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className={cn(colors.cardBg, colors.cardBorder)}>
+            <AlertDialogHeader>
+              <AlertDialogTitle className={cn(colors.textPrimary)}>
+                {t('deleteTransaction')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className={colors.textTertiary}>
+                {t('deleteTransactionConfirmation')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setTransactionToDelete(null);
+                }}
+                className={cn(colors.border, colors.textSecondary)}
+              >
+                {t('cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteTransaction}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {t('delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
 }
+
+export default memo(Expenses);

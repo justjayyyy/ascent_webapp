@@ -333,17 +333,14 @@ export default function AccountDetail() {
     setRefreshingPrices(true);
     try {
       const symbols = [...new Set(positions.map(p => p.symbol))];
-      console.log('Fetching quotes for symbols:', symbols);
       
       // Use the new stock quote API
       const quotes = await ascent.integrations.Core.getStockQuotes(symbols);
-      console.log('Received quotes:', quotes);
       
       let updatedCount = 0;
       for (const position of positions) {
         const symbolUpper = position.symbol.toUpperCase();
         const quote = quotes[symbolUpper] || quotes[position.symbol];
-        console.log(`Position ${position.symbol}:`, quote);
         
         if (quote && quote.price && quote.price > 0 && !quote.error) {
           await ascent.entities.Position.update(position.id, {
@@ -434,8 +431,6 @@ export default function AccountDetail() {
     // Aggregate positions by symbol - include ALL positions
     const aggregated = {};
     
-    console.log(`🔍 Processing ${positions.length} positions for chart...`);
-    
     positions.forEach((position, index) => {
       // Handle Cash positions and positions with missing symbols
       let symbol = position.symbol;
@@ -459,11 +454,6 @@ export default function AccountDetail() {
       const currentPrice = position.currentPrice || position.averageBuyPrice || (position.assetType === 'Cash' ? 1 : 0);
       const marketValue = quantity * currentPrice;
       
-      // Log each position being processed
-      if (index < 10) { // Log first 10 for debugging
-        console.log(`  Position ${index + 1}: symbol="${originalSymbol}" -> "${symbol}", value=${marketValue}, qty=${quantity}, price=${currentPrice}`);
-      }
-      
       // Initialize if doesn't exist
       if (!aggregated[symbol]) {
         aggregated[symbol] = { name: symbol, value: 0 };
@@ -472,8 +462,6 @@ export default function AccountDetail() {
       // Sum values for positions with the same symbol
       aggregated[symbol].value += marketValue;
     });
-    
-    console.log(`✅ Aggregated into ${Object.keys(aggregated).length} unique symbols:`, Object.keys(aggregated));
     
     // Convert to array and calculate percentages - include ALL positions
     // Ensure minimum value of 0.01 for very small positions so they still render in pie chart
@@ -492,17 +480,8 @@ export default function AccountDetail() {
       })
       .sort((a, b) => b.value - a.value);
     
-    // Debug: Log to verify all positions are included
-    const accountCurrency = account?.baseCurrency || 'USD';
-    console.log(`📊 Chart Data Summary:`);
-    console.log(`  - Total Positions: ${positions.length}`);
-    console.log(`  - Holdings in Chart: ${chartData.length}`);
-    console.log(`  - Total Value: ${formatCurrency(metrics.totalValue, accountCurrency)}`);
-    console.log(`  - Holdings Breakdown:`, chartData.map(item => 
-      `${item.name}: ${formatCurrency(item.value, accountCurrency)} (${item.percentage}%)`
-    ));
-    
     // Verify we're not missing any positions (positions can be aggregated, so chartData can be <= positions.length)
+    const accountCurrency = account?.baseCurrency || 'USD';
     const chartSymbols = new Set(chartData.map(item => item.name));
     const positionSymbols = new Map(); // Use Map to track count of positions per symbol
     
@@ -530,28 +509,15 @@ export default function AccountDetail() {
     
     const missingSymbols = Array.from(positionSymbols.keys()).filter(s => !chartSymbols.has(s));
     if (missingSymbols.length > 0) {
-      console.error('❌ Missing symbols from chart:', missingSymbols);
-      missingSymbols.forEach(symbol => {
-        console.error(`  Symbol "${symbol}" has ${positionSymbols.get(symbol).length} position(s):`, positionSymbols.get(symbol));
-      });
+      console.error('Missing symbols from chart:', missingSymbols);
     }
     
     // Verify all positions are accounted for in the aggregated values
     const chartTotalValue = chartData.reduce((sum, item) => sum + item.value, 0);
     const positionsTotalValue = metrics.totalValue;
     if (Math.abs(chartTotalValue - positionsTotalValue) > 0.01) {
-      console.warn(`⚠️ Value mismatch: Chart total (${chartTotalValue}) vs Positions total (${positionsTotalValue})`);
-      console.warn(`  Difference: ${Math.abs(chartTotalValue - positionsTotalValue)}`);
-    } else {
-      console.log(`✅ Value check passed: Chart total matches positions total`);
+      console.warn(`Value mismatch: Chart total (${chartTotalValue}) vs Positions total (${positionsTotalValue})`);
     }
-    
-    // Log symbol mapping for debugging
-    console.log(`📋 Symbol Mapping:`);
-    positionSymbols.forEach((positionsList, symbol) => {
-      const chartItem = chartData.find(item => item.name === symbol);
-      console.log(`  "${symbol}": ${positionsList.length} position(s) -> Chart value: ${chartItem ? formatCurrency(chartItem.value, accountCurrency) : 'MISSING'}`);
-    });
     
     return chartData;
   };

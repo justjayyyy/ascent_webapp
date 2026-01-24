@@ -13,12 +13,10 @@ export default async function handler(req, res) {
 
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('[Google Calendar] Missing or invalid authorization header');
     return res.status(401).json({ error: 'Google access token required' });
   }
 
   const accessToken = authHeader.split(' ')[1];
-  console.log(`[Google Calendar] Action: ${req.query.action}, Token length: ${accessToken?.length}`);
 
   // Create OAuth2 client with access token
   const oauth2Client = new google.auth.OAuth2();
@@ -136,14 +134,14 @@ export default async function handler(req, res) {
               }));
               allTasks.push(...listTasks);
             } catch (e) {
-              console.log(`Failed to fetch tasks from list ${list.id}:`, e.message);
+              // Silently skip lists that fail
             }
           }
           
           return res.json(allTasks);
         } catch (taskError) {
-          console.log('Tasks API error (might not have permission):', taskError.message);
-          return res.json([]); // Return empty if tasks not accessible
+          // Return empty if tasks not accessible
+          return res.json([]);
         }
       }
 
@@ -152,22 +150,17 @@ export default async function handler(req, res) {
           return res.status(405).json({ error: 'POST method required' });
         }
         try {
-          console.log('[create-task] Request body:', req.body);
-          
           const tasks = google.tasks({ version: 'v1', auth: oauth2Client });
           const { tasklistId } = req.query;
           
           // Get the first task list if not specified
           let listId = tasklistId;
           if (!listId) {
-            console.log('[create-task] Fetching task lists...');
             const taskListsRes = await tasks.tasklists.list({ maxResults: 1 });
             const taskLists = taskListsRes.data.items || [];
-            console.log('[create-task] Found task lists:', taskLists.length);
             
             if (taskLists.length === 0) {
               // Create a default task list if none exists
-              console.log('[create-task] Creating default task list...');
               const newList = await tasks.tasklists.insert({ resource: { title: 'My Tasks' } });
               listId = newList.data.id;
             } else {
@@ -175,14 +168,11 @@ export default async function handler(req, res) {
             }
           }
           
-          console.log('[create-task] Using task list:', listId);
-          
           const task = req.body;
           const response = await tasks.tasks.insert({
             tasklist: listId,
             resource: task,
           });
-          console.log('[create-task] Task created:', response.data);
           return res.json(response.data);
         } catch (taskError) {
           console.error('[create-task] Error:', taskError.message, taskError.code, taskError.response?.data);

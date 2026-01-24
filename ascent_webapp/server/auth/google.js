@@ -81,13 +81,6 @@ export default async function handler(req, res) {
     // Generate token
     const token = signToken({ userId: user._id, email: user.email });
     
-    console.log('[Google Auth] User logged in with settings:', {
-      language: user.language,
-      theme: user.theme,
-      currency: user.currency,
-      blurValues: user.blurValues
-    });
-    
     return success(res, {
       user: user.toJSON(),
       token

@@ -7,8 +7,13 @@ export const queryClientInstance = new QueryClient({
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
       gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
-      refetchOnMount: true, // Refetch on mount for fresh data
+      refetchOnMount: false, // Don't refetch if data is fresh (optimize performance)
+      refetchOnReconnect: true, // Refetch when network reconnects
       networkMode: 'online',
+      // Enable structural sharing to prevent unnecessary re-renders
+      structuralSharing: true,
+      // Deduplicate requests made within 1 second
+      queryDeduplication: true,
     },
     mutations: {
       retry: 1,

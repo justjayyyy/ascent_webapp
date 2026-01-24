@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -16,10 +16,14 @@ export default function Portfolio() {
   const [editMode, setEditMode] = useState(false);
   const queryClient = useQueryClient();
   
+  // Memoize user identifiers to prevent unnecessary effect runs
+  const userId = useMemo(() => user?._id || user?.id, [user?._id, user?.id]);
+  const userEmail = useMemo(() => user?.email, [user?.email]);
+  
   // Refetch accounts when user changes (e.g., after login)
   React.useEffect(() => {
-    if (user && (user._id || user.id) && user.email) {
-      const queryKey = ['accounts', user._id || user.id, user.email];
+    if (userId && userEmail) {
+      const queryKey = ['accounts', userId, userEmail];
       
       // Remove any cached data for this query key first
       queryClient.removeQueries({ 
@@ -37,7 +41,7 @@ export default function Portfolio() {
         predicate: (query) => query.queryKey[0] === 'accounts'
       });
     }
-  }, [user?._id, user?.id, user?.email, queryClient]);
+  }, [userId, userEmail, user, queryClient]);
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['accounts', user?._id || user?.id, user?.email],
@@ -176,7 +180,7 @@ export default function Portfolio() {
     },
   });
 
-  const calculateAccountMetrics = (account) => {
+  const calculateAccountMetrics = useCallback((account) => {
     const positions = allPositions.filter(p => p.accountId === account.id);
     
     let totalValue = 0;
@@ -195,28 +199,41 @@ export default function Portfolio() {
     const totalPnLPercent = totalCostBasis > 0 ? (totalPnL / totalCostBasis) * 100 : 0;
 
     return { totalValue, totalPnL, totalPnLPercent };
-  };
+  }, [allPositions]);
 
-  const formatCurrency = (value, currency) => {
+  const formatCurrency = useCallback((value, currency) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency || user?.currency || 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value || 0);
-  };
+  }, [user?.currency]);
 
-  const overallMetrics = accounts.reduce((acc, account) => {
-    const metrics = calculateAccountMetrics(account);
-    return {
-      totalValue: acc.totalValue + metrics.totalValue,
-      totalPnL: acc.totalPnL + metrics.totalPnL,
-    };
-  }, { totalValue: 0, totalPnL: 0 });
+  // Memoize account metrics to prevent recalculation on every render
+  const accountMetricsMap = useMemo(() => {
+    const map = new Map();
+    accounts.forEach(account => {
+      map.set(account.id, calculateAccountMetrics(account));
+    });
+    return map;
+  }, [accounts, calculateAccountMetrics]);
 
-  const overallPnLPercent = overallMetrics.totalValue > 0 
-    ? ((overallMetrics.totalPnL / (overallMetrics.totalValue - overallMetrics.totalPnL)) * 100)
-    : 0;
+  const overallMetrics = useMemo(() => {
+    return accounts.reduce((acc, account) => {
+      const metrics = accountMetricsMap.get(account.id) || { totalValue: 0, totalPnL: 0 };
+      return {
+        totalValue: acc.totalValue + metrics.totalValue,
+        totalPnL: acc.totalPnL + metrics.totalPnL,
+      };
+    }, { totalValue: 0, totalPnL: 0 });
+  }, [accounts, accountMetricsMap]);
+
+  const overallPnLPercent = useMemo(() => {
+    return overallMetrics.totalValue > 0 
+      ? ((overallMetrics.totalPnL / (overallMetrics.totalValue - overallMetrics.totalPnL)) * 100)
+      : 0;
+  }, [overallMetrics]);
 
   if (!user) {
     return (
@@ -227,14 +244,14 @@ export default function Portfolio() {
   }
 
   return (
-    <div className={cn("min-h-screen p-4 md:p-8", colors.bgPrimary)}>
+    <div className={cn("min-h-screen p-3 md:p-8", colors.bgPrimary)}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mb-4 md:mb-8">
+          <div className="flex items-center justify-between mb-3 md:mb-6">
             <div>
-              <h1 className={cn("text-3xl md:text-4xl font-bold mb-2", colors.textPrimary)}>{t('portfolio')}</h1>
-              <p className={colors.textTertiary}>{t('trackAndManageAccounts')}</p>
+              <h1 className={cn("text-2xl md:text-4xl font-bold mb-1 md:mb-2", colors.textPrimary)}>{t('portfolio')}</h1>
+              <p className={cn("text-sm md:text-base", colors.textTertiary)}>{t('trackAndManageAccounts')}</p>
             </div>
             <div className="flex gap-2">
               <Button
@@ -262,26 +279,26 @@ export default function Portfolio() {
           </div>
 
           {/* Overall Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className={cn("rounded-xl p-6 border", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-sm mb-2", colors.textTertiary)}>{t('totalPortfolioValue')}</p>
-              <p className={cn("text-3xl font-bold", colors.textPrimary)}>
+          <div className="grid grid-cols-3 md:grid-cols-3 gap-1.5 md:gap-4 mb-4 md:mb-6">
+            <div className={cn("rounded-lg md:rounded-xl p-2 md:p-6 border", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-0.5 md:mb-2 truncate", colors.textTertiary)}>{t('totalPortfolioValue')}</p>
+              <p className={cn("text-sm md:text-3xl font-bold truncate", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>
                   {formatCurrency(overallMetrics.totalValue, user?.currency)}
                 </BlurValue>
               </p>
             </div>
-            <div className={cn("rounded-xl p-6 border", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-sm mb-2", colors.textTertiary)}>{t('totalPnL')}</p>
-              <p className={`text-3xl font-bold ${overallMetrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={cn("rounded-lg md:rounded-xl p-2 md:p-6 border", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-0.5 md:mb-2 truncate", colors.textTertiary)}>{t('totalPnL')}</p>
+              <p className={`text-sm md:text-3xl font-bold truncate ${overallMetrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 <BlurValue blur={user?.blurValues}>
                   {overallMetrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(overallMetrics.totalPnL, user?.currency)}
                 </BlurValue>
               </p>
             </div>
-            <div className={cn("rounded-xl p-6 border", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-sm mb-2", colors.textTertiary)}>{t('totalReturn')}</p>
-              <p className={`text-3xl font-bold ${overallPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={cn("rounded-lg md:rounded-xl p-2 md:p-6 border", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-0.5 md:mb-2 truncate", colors.textTertiary)}>{t('totalReturn')}</p>
+              <p className={`text-sm md:text-3xl font-bold truncate ${overallPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {overallPnLPercent >= 0 ? '+' : ''}{overallPnLPercent.toFixed(2)}%
               </p>
             </div>
@@ -313,9 +330,9 @@ export default function Portfolio() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6">
             {accounts.map((account) => {
-              const metrics = calculateAccountMetrics(account);
+              const metrics = accountMetricsMap.get(account.id) || { totalValue: 0, totalPnL: 0, totalPnLPercent: 0 };
               return (
                 <AccountCard
                   key={account.id}

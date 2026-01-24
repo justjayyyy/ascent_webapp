@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { Home, PieChart, Receipt, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, StickyNote, Calendar, ChevronUp, Moon, Sun, Eye, EyeOff } from 'lucide-react';
@@ -22,7 +22,7 @@ function LayoutContent({ children, currentPageName }) {
 
   useEffect(() => {
     const loadPermissions = async () => {
-      if (!user) return;
+      if (!user?.email) return;
       try {
         const shared = await ascent.entities.SharedUser.filter({ 
           invitedEmail: user.email, 
@@ -36,13 +36,13 @@ function LayoutContent({ children, currentPageName }) {
       }
     };
     loadPermissions();
-  }, [user]);
+  }, [user?.email]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await ascent.auth.logout();
-  };
+  }, []);
 
-  const handleThemeChange = async (checked) => {
+  const handleThemeChange = useCallback(async (checked) => {
     const newTheme = checked ? 'dark' : 'light';
     if (user) {
       try {
@@ -56,9 +56,9 @@ function LayoutContent({ children, currentPageName }) {
         await refreshUser();
       }
     }
-  };
+  }, [user, updateUserLocal, refreshUser]);
 
-  const handleBlurValuesChange = async (checked) => {
+  const handleBlurValuesChange = useCallback(async (checked) => {
     if (user) {
       try {
         // Update locally first for instant feedback
@@ -71,19 +71,19 @@ function LayoutContent({ children, currentPageName }) {
         await refreshUser();
       }
     }
-  };
+  }, [user, updateUserLocal, refreshUser]);
 
-  const hasPermission = (permission) => {
+  const hasPermission = useCallback((permission) => {
     if (!permissions) return true;
     return permissions[permission] === true;
-  };
+  }, [permissions]);
 
-  const navigation = [
+  const navigation = useMemo(() => [
     { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },
     // { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewDashboard' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('notes'), page: 'Notes', icon: StickyNote, permission: 'viewNotes' },
-  ].filter(item => hasPermission(item.permission));
+  ].filter(item => hasPermission(item.permission)), [t, hasPermission]);
 
   return (
     <div className={cn(
@@ -349,60 +349,46 @@ function LayoutContent({ children, currentPageName }) {
         colors.bgSecondary,
         colors.border
       )}>
-        <div className="flex items-center justify-between h-16 px-4">
-              <img 
-                src={theme === 'dark' 
-                  ? "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
-                  : "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/da2eb9289_acseend_ver1.png"
-                }
-                alt="Ascend Logo" 
-                className="w-16 h-16 object-contain"
-                style={{ filter: 'brightness(1.1) saturate(1.2)' }}
-              />
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg hover:bg-[#5C8374]/20 transition-colors"
-          >
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6 text-[#9EC8B9]" />
-            ) : (
-              <Menu className="w-6 h-6 text-[#9EC8B9]" />
-            )}
-          </button>
+        <div className="flex items-center justify-center h-16 px-4">
+          <img 
+            src={theme === 'dark' 
+              ? "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
+              : "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/da2eb9289_acseend_ver1.png"
+            }
+            alt="Ascend Logo" 
+            className="w-16 h-16 object-contain"
+            style={{ filter: 'brightness(1.1) saturate(1.2)' }}
+          />
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Backdrop */}
       {mobileMenuOpen && (
-        <div className={cn(
-          "md:hidden fixed inset-0 z-40 overflow-y-auto",
-          colors.bgSecondary
-        )} style={{ top: '64px' }}>
-          <nav className="px-4 py-4 space-y-2 pb-[280px]">
-            {navigation.map((item) => {
-              const isActive = currentPageName === item.page;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.page}
-                  to={createPageUrl(item.page)}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center px-4 py-3 text-base font-medium rounded-lg transition-all",
-                    isActive
-                      ? "bg-[#5C8374] text-white"
-                      : cn(colors.textSecondary, "hover:bg-[#5C8374]/10")
-                  )}
-                >
-                  <Icon className={cn("w-5 h-5", isRTL ? "ml-3" : "mr-3")} />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          className={cn(
+            "md:hidden fixed inset-0 z-40 bg-black/50 transition-opacity duration-300",
+            mobileMenuOpen ? "opacity-100" : "opacity-0"
+          )}
+          style={{ top: '64px', bottom: '64px' }}
+        />
+      )}
 
-          {user && (
-            <div className={cn("absolute bottom-0 left-0 right-0 p-4 border-t max-h-[280px] overflow-y-auto", colors.border, colors.bgSecondary)}>
+      {/* Mobile Menu - Only Settings (Pages are in bottom nav) */}
+      <div
+        className={cn(
+          "md:hidden fixed top-16 bottom-16 z-50 w-1/2 overflow-y-auto transition-transform duration-300 ease-out",
+          isRTL ? "left-0" : "right-0",
+          mobileMenuOpen 
+            ? (isRTL ? "translate-x-0" : "translate-x-0")
+            : (isRTL ? "-translate-x-full" : "translate-x-full"),
+          colors.bgSecondary,
+          colors.border,
+          isRTL ? "border-r" : "border-l"
+        )}
+      >
+        {user && (
+          <div className={cn("p-4", colors.bgSecondary)}>
               {/* User Info */}
               <div className="flex items-center justify-center mb-3 pb-3 border-b border-[#5C8374]/20">
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#5C8374] flex items-center justify-center text-white font-semibold">
@@ -472,8 +458,7 @@ function LayoutContent({ children, currentPageName }) {
               </button>
             </div>
           )}
-        </div>
-      )}
+      </div>
 
 
 
@@ -509,25 +494,46 @@ function LayoutContent({ children, currentPageName }) {
         colors.bgSecondary,
         colors.border
       )}>
-        <nav className="flex items-center justify-around h-16 px-2">
-          {navigation.slice(0, 4).map((item) => {
-            const isActive = currentPageName === item.page;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.page}
-                to={createPageUrl(item.page)}
-                className={cn(
-                  "flex flex-col items-center justify-center flex-1 py-2 transition-colors",
-                  isActive ? "text-[#9EC8B9]" : "text-[#5C8374]"
-                )}
-              >
-                <Icon className="w-6 h-6 mb-1" />
-                <span className="text-xs font-medium">{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="flex items-center h-16">
+          {/* Pages Navigation */}
+          <nav className="flex items-center justify-around flex-1 px-2">
+            {navigation.slice(0, 4).map((item) => {
+              const isActive = currentPageName === item.page;
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.page}
+                  to={createPageUrl(item.page)}
+                  className={cn(
+                    "flex flex-col items-center justify-center flex-1 py-2 transition-colors",
+                    isActive ? "text-[#9EC8B9]" : "text-[#5C8374]"
+                  )}
+                >
+                  <Icon className="w-6 h-6 mb-1" />
+                  <span className="text-xs font-medium">{item.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
+          
+          {/* Menu Button */}
+          <div className={cn("border-l px-2", colors.border)}>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={cn(
+                "flex flex-col items-center justify-center h-full px-3 py-2 transition-colors",
+                mobileMenuOpen ? "text-[#9EC8B9]" : "text-[#5C8374]"
+              )}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 mb-1" />
+              ) : (
+                <Menu className="w-6 h-6 mb-1" />
+              )}
+              <span className="text-xs font-medium">{t('menu')}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

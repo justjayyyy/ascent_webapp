@@ -34,7 +34,17 @@ export default async function handler(req, res) {
     try {
       await connectDB();
     } catch (dbError) {
-      console.error('[Login] MongoDB connection failed:', dbError.message);
+      console.error('[Login] MongoDB connection failed:', dbError);
+      console.error('[Login] Error code:', dbError.code);
+      console.error('[Login] Error message:', dbError.message);
+      
+      // Provide user-friendly error message
+      if (dbError.code === 'MONGODB_CONNECTION_FAILED' || 
+          dbError.message?.includes('ECONNREFUSED') ||
+          dbError.message?.includes('Cannot connect to MongoDB')) {
+        return error(res, dbError.message || 'Database connection failed. Please check your internet connection and try again.', 503);
+      }
+      
       return serverError(res, dbError);
     }
     
@@ -64,6 +74,7 @@ export default async function handler(req, res) {
     });
     
   } catch (err) {
+    console.error('[Login] Unexpected error:', err);
     return serverError(res, err);
   }
 }

@@ -37,7 +37,7 @@ export default function Login() {
     full_name: '' 
   });
 
-  const redirectUrl = searchParams.get('redirect') || '/';
+  const redirectUrl = searchParams.get('redirect') || '/Portfolio';
 
   // Initialize Google Sign-In
   useEffect(() => {

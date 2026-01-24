@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,7 +36,7 @@ const NOTE_COLORS = [
   '#6B7280', // Gray
 ];
 
-export default function Notes() {
+function Notes() {
   const { user, colors, t, theme, isRTL } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNote, setEditingNote] = useState(null);
@@ -50,13 +50,17 @@ export default function Notes() {
   const [newTag, setNewTag] = useState('');
   const queryClient = useQueryClient();
 
+  // Memoize user identifiers
+  const userId = useMemo(() => user?.id || user?._id, [user?.id, user?._id]);
+  const userEmail = useMemo(() => user?.email, [user?.email]);
+
   const { data: notes = [], isLoading } = useQuery({
-    queryKey: ['notes', user?.id],
+    queryKey: ['notes', userId],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Note.filter({ created_by: user.email });
+      if (!userEmail) return [];
+      return await ascent.entities.Note.filter({ created_by: userEmail });
     },
-    enabled: !!user,
+    enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
   });
 
@@ -151,26 +155,30 @@ export default function Notes() {
     }));
   }, []);
 
-  // Filter notes by search query
-  const filteredNotes = notes.filter(note => {
-    if (!searchQuery) return true;
+  // Filter notes by search query - memoized for performance
+  const filteredNotes = useMemo(() => {
+    if (!searchQuery) return notes;
     const query = searchQuery.toLowerCase();
-    return (
-      note.title?.toLowerCase().includes(query) ||
-      note.content?.toLowerCase().includes(query) ||
-      note.tags?.some(tag => tag.toLowerCase().includes(query))
-    );
-  });
+    return notes.filter(note => {
+      return (
+        note.title?.toLowerCase().includes(query) ||
+        note.content?.toLowerCase().includes(query) ||
+        note.tags?.some(tag => tag.toLowerCase().includes(query))
+      );
+    });
+  }, [notes, searchQuery]);
 
-  // Sort notes: pinned first, then by updated date
-  const sortedNotes = [...filteredNotes].sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-    return new Date(b.updated_date) - new Date(a.updated_date);
-  });
+  // Sort notes: pinned first, then by updated date - memoized
+  const sortedNotes = useMemo(() => {
+    return [...filteredNotes].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.updated_date) - new Date(a.updated_date);
+    });
+  }, [filteredNotes]);
 
-  const pinnedNotes = sortedNotes.filter(n => n.isPinned);
-  const unpinnedNotes = sortedNotes.filter(n => !n.isPinned);
+  const pinnedNotes = useMemo(() => sortedNotes.filter(n => n.isPinned), [sortedNotes]);
+  const unpinnedNotes = useMemo(() => sortedNotes.filter(n => !n.isPinned), [sortedNotes]);
 
   if (!user || isLoading) {
     return (
@@ -413,9 +421,28 @@ export default function Notes() {
   );
 }
 
-// Note Card Component
-function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL }) {
+export default memo(Notes);
+
+// Note Card Component - memoized for performance
+const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL }) {
   const [showActions, setShowActions] = useState(false);
+
+  const handleMouseEnter = useCallback(() => setShowActions(true), []);
+  const handleMouseLeave = useCallback(() => setShowActions(false), []);
+  const handleClick = useCallback(() => onEdit(note), [onEdit, note]);
+  const handleTogglePin = useCallback(() => onTogglePin(note.id, note.isPinned), [onTogglePin, note.id, note.isPinned]);
+  const handleDelete = useCallback(() => onDelete(note.id), [onDelete, note.id]);
+
+  // Memoize formatted dates
+  const createdDate = useMemo(() => new Date(note.created_date).toLocaleDateString(), [note.created_date]);
+  const updatedDate = useMemo(() => note.updated_date !== note.created_date ? new Date(note.updated_date).toLocaleDateString() : null, [note.updated_date, note.created_date]);
+
+  // Memoize card style
+  const cardStyle = useMemo(() => ({
+    backgroundColor: theme === 'light' ? `${note.color}15` : `${note.color}25`,
+    [isRTL ? 'borderRightWidth' : 'borderLeftWidth']: '4px',
+    [isRTL ? 'borderRightColor' : 'borderLeftColor']: note.color
+  }), [note.color, theme, isRTL]);
 
   return (
     <Card 
@@ -423,14 +450,10 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL
         "group cursor-pointer transition-all hover:shadow-lg relative overflow-hidden",
         colors.cardBorder
       )}
-      style={{ 
-        backgroundColor: theme === 'light' ? `${note.color}15` : `${note.color}25`,
-        [isRTL ? 'borderRightWidth' : 'borderLeftWidth']: '4px',
-        [isRTL ? 'borderRightColor' : 'borderLeftColor']: note.color
-      }}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-      onClick={() => onEdit(note)}
+      style={cardStyle}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
     >
       <CardContent className="p-4">
         {/* Title */}
@@ -474,9 +497,9 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL
 
         {/* Dates */}
         <div className={cn("text-xs mt-3 space-y-0.5", colors.textTertiary)}>
-          <p>{t('created') || 'Created'}: {new Date(note.created_date).toLocaleDateString()}</p>
-          {note.updated_date !== note.created_date && (
-            <p>{t('updated') || 'Updated'}: {new Date(note.updated_date).toLocaleDateString()}</p>
+          <p>{t('created') || 'Created'}: {createdDate}</p>
+          {updatedDate && (
+            <p>{t('updated') || 'Updated'}: {updatedDate}</p>
           )}
         </div>
 
@@ -490,7 +513,7 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={() => onTogglePin(note.id, note.isPinned)}
+            onClick={handleTogglePin}
             className={cn(
               "p-1.5 rounded-full transition-colors",
               note.isPinned 
@@ -502,7 +525,7 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL
             {note.isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
           </button>
           <button
-            onClick={() => onDelete(note.id)}
+            onClick={handleDelete}
             className={cn(
               "p-1.5 rounded-full transition-colors",
               colors.bgSecondary, "text-red-400 hover:bg-red-400/20"
@@ -523,5 +546,5 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL
       </CardContent>
     </Card>
   );
-}
+});
 

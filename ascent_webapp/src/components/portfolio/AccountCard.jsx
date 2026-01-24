@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,31 +26,31 @@ const accountTypeColors = {
   Other: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
 };
 
-export default function AccountCard({ account, totalValue, totalPnL, totalPnLPercent, editMode, onDelete }) {
+function AccountCard({ account, totalValue, totalPnL, totalPnLPercent, editMode, onDelete }) {
   const { user, t, colors } = useTheme();
-  const Icon = accountTypeIcons[account.type] || Coins;
-  const isPositive = totalPnL >= 0;
+  const Icon = useMemo(() => accountTypeIcons[account.type] || Coins, [account.type]);
+  const isPositive = useMemo(() => totalPnL >= 0, [totalPnL]);
 
-  const formatCurrency = (value, currency = 'USD') => {
+  const formatCurrency = useCallback((value, currency = 'USD') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value || 0);
-  };
+  }, []);
 
-  const handleEdit = (e) => {
+  const handleEdit = useCallback((e) => {
     e.preventDefault();
     window.location.href = createPageUrl(`AccountDetail?id=${account.id}`);
-  };
+  }, [account.id]);
 
-  const handleDelete = (e) => {
+  const handleDelete = useCallback((e) => {
     e.preventDefault();
     if (window.confirm(`Are you sure you want to delete "${account.name}"? This will also delete all positions in this account.`)) {
       onDelete();
     }
-  };
+  }, [account.name, onDelete]);
 
   const cardContent = (
     <Card className={cn(
@@ -58,40 +58,38 @@ export default function AccountCard({ account, totalValue, totalPnL, totalPnLPer
       colors.cardBorder,
       !editMode && "hover:border-[#5C8374] transition-all duration-300 cursor-pointer group hover:shadow-lg hover:shadow-[#5C8374]/20"
     )}>
-      <CardContent className="p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#5C8374]/20 group-hover:bg-[#5C8374]/30 transition-colors">
-                <Icon className={cn("w-5 h-5", colors.accentText)} />
+      <CardContent className="p-3 md:p-5">
+          <div className="flex items-center justify-between mb-2 md:mb-4 gap-2">
+            <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+              <div className="flex-shrink-0 p-1.5 md:p-2.5 rounded-lg md:rounded-xl bg-[#5C8374]/20 group-hover:bg-[#5C8374]/30 transition-colors">
+                <Icon className={cn("w-4 h-4 md:w-5 md:h-5", colors.accentText)} />
               </div>
-              <div>
-                <h3 className={cn("font-semibold text-base", colors.textPrimary)}>{account.name}</h3>
-                <Badge className={cn('text-xs border mt-1', accountTypeColors[account.type])}>
-                  {t(`accountType${account.type}`)}
-                </Badge>
-              </div>
+              <h3 className={cn("font-semibold text-sm md:text-base leading-tight truncate", colors.textPrimary)}>{account.name}</h3>
             </div>
+            <Badge className={cn('text-xs border leading-tight flex-shrink-0', accountTypeColors[account.type])}>
+              {t(`accountType${account.type}`)}
+            </Badge>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             <div>
-              <p className={cn("text-xs mb-1", colors.textTertiary)}>{t('totalValue')}</p>
-              <p className={cn("text-2xl font-bold", colors.textPrimary)}>
+              <p className={cn("text-xs mb-0.5 md:mb-1 leading-tight", colors.textTertiary)}>{t('totalValue')}</p>
+              <p className={cn("text-xl md:text-2xl font-bold leading-tight", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>
                   {formatCurrency(totalValue, account.baseCurrency)}
                 </BlurValue>
               </p>
             </div>
 
-            <div className={cn("flex items-center justify-between pt-3 border-t", colors.border)}>
-              <div className="flex items-center gap-2">
+            <div className={cn("flex items-center justify-between pt-2 md:pt-3 border-t", colors.border)}>
+              <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
                 {isPositive ? (
-                  <TrendingUp className="w-4 h-4 text-green-400" />
+                  <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-400 flex-shrink-0" />
                 ) : (
-                  <TrendingDown className="w-4 h-4 text-red-400" />
+                  <TrendingDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-red-400 flex-shrink-0" />
                 )}
                 <span className={cn(
-                  'text-sm font-semibold',
+                  'text-xs md:text-sm font-semibold leading-tight truncate',
                   isPositive ? 'text-green-400' : 'text-red-400'
                 )}>
                   <BlurValue blur={user?.blurValues}>
@@ -100,7 +98,7 @@ export default function AccountCard({ account, totalValue, totalPnL, totalPnLPer
                 </span>
               </div>
               <span className={cn(
-                'text-sm font-semibold',
+                'text-xs md:text-sm font-semibold leading-tight flex-shrink-0',
                 isPositive ? 'text-green-400' : 'text-red-400'
               )}>
                 <BlurValue blur={user?.blurValues}>
@@ -110,23 +108,23 @@ export default function AccountCard({ account, totalValue, totalPnL, totalPnLPer
             </div>
 
             {editMode && (
-              <div className="flex gap-2 mt-4 pt-4 border-t border-[#5C8374]/20">
+              <div className="flex gap-1.5 md:gap-2 mt-3 md:mt-4 pt-3 md:pt-4 border-t border-[#5C8374]/20">
                 <Button
                   onClick={handleEdit}
                   variant="outline"
                   size="sm"
-                  className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                  className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20 text-xs md:text-sm", colors.border, colors.textSecondary)}
                 >
-                  <Edit className="w-4 h-4 mr-1" />
+                  <Edit className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1" />
                   Edit
                 </Button>
                 <Button
                   onClick={handleDelete}
                   variant="outline"
                   size="sm"
-                  className="flex-1 bg-transparent hover:bg-red-500/20 border-red-500/30 text-red-400 hover:text-red-300"
+                  className="flex-1 bg-transparent hover:bg-red-500/20 border-red-500/30 text-red-400 hover:text-red-300 text-xs md:text-sm"
                 >
-                  <Trash2 className="w-4 h-4 mr-1" />
+                  <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1" />
                   Delete
                 </Button>
               </div>
@@ -146,3 +144,5 @@ export default function AccountCard({ account, totalValue, totalPnL, totalPnLPer
     </Link>
   );
 }
+
+export default React.memo(AccountCard);

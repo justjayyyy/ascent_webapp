@@ -31,17 +31,11 @@ export default async function handler(req, res) {
         }
       }
       
-      console.log('[Auth/me] Updating user settings:', updates);
-      
       const updatedUser = await User.findByIdAndUpdate(
         user._id,
         updates,
         { new: true, runValidators: true }
       );
-      
-      console.log('[Auth/me] Updated user:', {
-        language: updatedUser.language,
-        theme: updatedUser.theme,
         currency: updatedUser.currency,
         blurValues: updatedUser.blurValues
       });

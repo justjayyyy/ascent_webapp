@@ -54,6 +54,24 @@ export function forbidden(res, message = 'Forbidden') {
 
 export function serverError(res, err) {
   console.error('Server error:', err);
+  console.error('Error stack:', err.stack);
+  console.error('Error code:', err.code);
+  console.error('Error message:', err.message);
+  
+  // Provide more helpful error messages for common issues
+  if (err.code === 'MONGODB_CONNECTION_FAILED' || 
+      err.message?.includes('ECONNREFUSED') ||
+      err.message?.includes('Cannot connect to MongoDB') ||
+      err.message?.includes('querySrv')) {
+    return error(res, err.message || 'Database connection failed. Please check your internet connection and MongoDB settings.', 503);
+  }
+  
+  // Always show error message in development (default for local)
+  const isDevelopment = !process.env.NODE_ENV || process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
+  if (isDevelopment) {
+    return error(res, err.message || 'Internal server error', 500);
+  }
+  
   return error(res, 'Internal server error', 500);
 }
 
