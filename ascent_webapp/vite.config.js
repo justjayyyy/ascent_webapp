@@ -26,24 +26,20 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Split vendor chunks for better caching
           if (id.includes('node_modules')) {
-            // CRITICAL: Don't split React - keep it in the main entry for proper initialization
-            // React must be available synchronously before other chunks load
-            if (id.includes('react-dom') || 
-                /[\\/]react[\\/]/.test(id) || 
+            // CRITICAL: Keep React and all React-dependent libraries in main entry
+            // This ensures React is available before any vendor chunks try to use it
+            if (id.includes('react') || 
+                id.includes('react-dom') || 
                 id.includes('react-router') ||
-                id.includes('react/jsx-runtime')) {
-              // Return undefined to keep React in the main entry chunk
+                id.includes('scheduler') ||
+                id.includes('@radix-ui') ||  // Radix UI depends on React
+                id.includes('recharts')) {   // Recharts depends on React
+              // Keep in main entry chunk to ensure React is available
               return undefined;
             }
-            // Other vendor chunks
-            if (id.includes('@radix-ui')) {
-              return 'ui-vendor';
-            }
-            if (id.includes('recharts')) {
-              return 'chart-vendor';
-            }
+            
+            // Split other vendor chunks that don't directly depend on React
             if (id.includes('@tanstack/react-query')) {
               return 'query-vendor';
             }
@@ -78,7 +74,9 @@ export default defineConfig({
     // Reduce chunk size warnings
     reportCompressedSize: false,
     // Ensure proper module format
-    modulePreload: false,
+    modulePreload: {
+      polyfill: false,
+    },
   },
   optimizeDeps: {
     // Pre-bundle React to ensure it's available and deduplicated
