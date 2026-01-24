@@ -28,13 +28,14 @@ export default defineConfig({
         manualChunks: (id) => {
           // Split vendor chunks for better caching
           if (id.includes('node_modules')) {
-            // CRITICAL: Keep React in the entry chunk or a dedicated chunk that loads first
-            // Don't split React - it must be available before other chunks
+            // CRITICAL: Don't split React - keep it in the main entry for proper initialization
+            // React must be available synchronously before other chunks load
             if (id.includes('react-dom') || 
                 /[\\/]react[\\/]/.test(id) || 
-                id.includes('react-router')) {
-              // Put React in a dedicated chunk that will be loaded first
-              return 'react-vendor';
+                id.includes('react-router') ||
+                id.includes('react/jsx-runtime')) {
+              // Return undefined to keep React in the main entry chunk
+              return undefined;
             }
             // Other vendor chunks
             if (id.includes('@radix-ui')) {
@@ -67,15 +68,17 @@ export default defineConfig({
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
     // Disable source maps in production for smaller bundle size
-    sourcemap: process.env.NODE_ENV === 'development',
+    sourcemap: false,
     // Minify with esbuild (built-in, faster than terser)
     minify: 'esbuild',
     // Enable CSS code splitting
     cssCodeSplit: true,
-    // Optimize chunk size
-    target: 'esnext',
+    // Use modern target for better optimization
+    target: 'es2015',
     // Reduce chunk size warnings
     reportCompressedSize: false,
+    // Ensure proper module format
+    modulePreload: false,
   },
   optimizeDeps: {
     // Pre-bundle React to ensure it's available and deduplicated
