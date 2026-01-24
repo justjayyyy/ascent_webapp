@@ -17,7 +17,12 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'PUT' || req.method === 'PATCH') {
-      await connectDB();
+      try {
+        await connectDB();
+      } catch (dbError) {
+        console.error('[Auth/me] MongoDB connection failed:', dbError);
+        return error(res, 'Database connection failed', 503);
+      }
       
       const allowedUpdates = [
         'full_name', 'language', 'currency', 'theme',
@@ -36,9 +41,6 @@ export default async function handler(req, res) {
         updates,
         { new: true, runValidators: true }
       );
-        currency: updatedUser.currency,
-        blurValues: updatedUser.blurValues
-      });
       
       return success(res, updatedUser.toJSON());
     }
@@ -46,6 +48,7 @@ export default async function handler(req, res) {
     return error(res, 'Method not allowed', 405);
     
   } catch (err) {
+    console.error('[Auth/me] Error:', err);
     return serverError(res, err);
   }
 }
