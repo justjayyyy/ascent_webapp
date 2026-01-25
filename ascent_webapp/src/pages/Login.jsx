@@ -210,7 +210,7 @@ export default function Login() {
               {t('signInToAccount')}
             </CardDescription>
           </CardHeader>
-          <CardContent className="pb-2 sm:pb-6">
+          <CardContent className="pb-4 sm:pb-6">
             {/* Google Sign-In Button with Calendar Access */}
             {GOOGLE_CLIENT_ID && (
               <div className="mb-3 sm:mb-6">
