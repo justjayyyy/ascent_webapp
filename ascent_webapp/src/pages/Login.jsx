@@ -195,8 +195,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#092635] flex items-start sm:items-center justify-center p-4 pt-3 sm:pt-4 pb-1 sm:pb-4">
-      <div className="w-full max-w-md mt-2 sm:mt-0 mb-1 sm:mb-0">
+    <div className="h-screen sm:min-h-screen bg-[#092635] flex items-start sm:items-center justify-center p-4 pt-3 sm:pt-4 pb-0 sm:pb-4 overflow-hidden">
+      <div className="w-full max-w-md mt-2 sm:mt-0">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8">
           <h1 className="text-4xl font-bold text-[#9EC8B9] mb-1 sm:mb-2">{t('ascend')}</h1>
@@ -204,16 +204,16 @@ export default function Login() {
         </div>
 
         <Card className="bg-[#1B4242] border-[#5C8374]/30">
-          <CardHeader className="text-center">
+          <CardHeader className="text-center pb-3 sm:pb-6">
             <CardTitle className="text-[#9EC8B9]">{t('welcome')}</CardTitle>
             <CardDescription className="text-[#5C8374]">
               {t('signInToAccount')}
             </CardDescription>
           </CardHeader>
-          <CardContent className="pb-3 sm:pb-6">
+          <CardContent className="pb-2 sm:pb-6">
             {/* Google Sign-In Button with Calendar Access */}
             {GOOGLE_CLIENT_ID && (
-              <div className="mb-6">
+              <div className="mb-3 sm:mb-6">
                 <button
                   onClick={handleGoogleLoginWithCalendar}
                   disabled={isGoogleLoading}
@@ -239,7 +239,7 @@ export default function Login() {
                 />
                 
                 {/* Divider */}
-                <div className="relative my-6">
+                <div className="relative my-3 sm:my-6">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-[#5C8374]/30"></div>
                   </div>
@@ -266,8 +266,8 @@ export default function Login() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="login" className="mt-6">
-                <form onSubmit={handleLogin} className="space-y-4">
+              <TabsContent value="login" className="mt-3 sm:mt-6">
+                <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email" className="text-[#9EC8B9]">{t('email')}</Label>
                     <Input
@@ -318,8 +318,8 @@ export default function Login() {
                 </form>
               </TabsContent>
 
-              <TabsContent value="register" className="mt-6">
-                <form onSubmit={handleRegister} className="space-y-4">
+              <TabsContent value="register" className="mt-3 sm:mt-6">
+                <form onSubmit={handleRegister} className="space-y-3 sm:space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="register-name" className="text-[#9EC8B9]">{t('fullName')}</Label>
                     <Input
