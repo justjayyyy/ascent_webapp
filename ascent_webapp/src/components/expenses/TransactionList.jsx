@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCard, Banknote, ArrowLeftRight, MoreVertical, Copy } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCard, Banknote, ArrowLeftRight, MoreVertical, Copy, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTheme, translateCategory } from '../ThemeProvider';
@@ -86,6 +86,12 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                 {!isObjId && (
                   <Badge className={cn('text-xs border', categoryColors[transaction.category] || categoryColors['Other'])}>
                     {translateCategory(transaction.category, language)}
+                  </Badge>
+                )}
+                {transaction.isRecurring && (
+                  <Badge className="text-[10px] px-1.5 py-0.5 bg-[#5C8374]/20 text-[#5C8374] border-[#5C8374]/30 flex items-center gap-1">
+                    <Repeat className="w-2.5 h-2.5" />
+                    {transaction.recurringFrequency === 'monthly' ? 'Monthly' : transaction.recurringFrequency}
                   </Badge>
                 )}
                 <h3 className={cn("font-semibold truncate text-sm", colors.textPrimary)}>

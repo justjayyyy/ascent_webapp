@@ -43,6 +43,14 @@ const expenseTransactionSchema = new mongoose.Schema({
     enum: ['daily', 'weekly', 'monthly', 'yearly', null],
     default: null
   },
+  recurringStartDate: {
+    type: String,
+    default: null
+  },
+  recurringEndDate: {
+    type: String,
+    default: null
+  },
   tags: [{
     type: String
   }],

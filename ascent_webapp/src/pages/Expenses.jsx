@@ -3,7 +3,7 @@ import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
-import { startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { startOfMonth, endOfMonth, parseISO, eachMonthOfInterval, format as formatDate } from 'date-fns';
 import AddTransactionDialog from '../components/expenses/AddTransactionDialog';
 import BudgetManager from '../components/expenses/BudgetManager';
 import CategoryManager from '../components/expenses/CategoryManager';
@@ -90,16 +90,22 @@ function Expenses() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const [isCreatingRecurring, setIsCreatingRecurring] = useState(false);
+
   const createTransactionMutation = useMutation({
     mutationFn: (transactionData) => ascent.entities.ExpenseTransaction.create(transactionData),
     onSuccess: () => {
+      // Skip success message if we're creating recurring transactions (will show batch message instead)
+      if (isCreatingRecurring) {
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       setAddDialogOpen(false);
       setEditingTransaction(null);
-      toast.success(t('transactionAddedSuccessfully'));
+      toast.success(t('transactionAddedSuccessfully') || 'Transaction added successfully');
     },
     onError: () => {
-      toast.error(t('failedToAddTransaction'));
+      toast.error(t('failedToAddTransaction') || 'Failed to add transaction');
     },
   });
 
@@ -234,18 +240,76 @@ function Expenses() {
       // Editing existing transaction
       await updateTransactionMutation.mutateAsync({ id: editingTransaction.id, data: transactionData });
     } else {
-      // Creating new transaction (either new or duplicate)
-      // Remove any ID fields that might have been accidentally included to ensure it's treated as a new transaction
+      // Creating new transaction(s)
       const cleanData = { ...transactionData };
       delete cleanData.id;
       delete cleanData._id;
       delete cleanData.created_date;
       delete cleanData.updated_date;
-      
-      await createTransactionMutation.mutateAsync(cleanData);
+
+      // Handle recurring transactions
+      if (cleanData.isRecurring && cleanData.recurringFrequency === 'monthly' && cleanData.recurringStartDate && cleanData.recurringEndDate) {
+        const startDate = parseISO(cleanData.recurringStartDate);
+        const endDate = parseISO(cleanData.recurringEndDate);
+        const dayOfMonth = startDate.getDate();
+        
+        // Generate all monthly dates between start and end
+        const monthlyDates = eachMonthOfInterval({ start: startDate, end: endDate });
+        
+        // Create a transaction for each month, using the same day of month
+        const transactionsToCreate = [];
+        for (const monthDate of monthlyDates) {
+          // Use the same day of month, but handle months with fewer days (e.g., Jan 31 -> Feb 28)
+          const transactionDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayOfMonth);
+          
+          // Only add if the date is within the end date range
+          if (transactionDate <= endDate && transactionDate >= startDate) {
+            transactionsToCreate.push({
+              ...cleanData,
+              date: formatDate(transactionDate, 'yyyy-MM-dd'),
+              isRecurring: true,
+              recurringFrequency: 'monthly',
+              recurringStartDate: cleanData.recurringStartDate,
+              recurringEndDate: cleanData.recurringEndDate,
+            });
+          }
+        }
+
+        // Create all transactions sequentially without triggering individual success messages
+        setIsCreatingRecurring(true);
+        try {
+          // Create all transactions using mutation (but success message is suppressed)
+          for (const transaction of transactionsToCreate) {
+            await createTransactionMutation.mutateAsync(transaction);
+          }
+          
+          // Show single success message with count and refresh
+          queryClient.invalidateQueries({ queryKey: ['transactions'] });
+          setAddDialogOpen(false);
+          setEditingTransaction(null);
+          setIsCreatingRecurring(false);
+          const translationKey = t('recurringTransactionsCreated');
+          const successMessage = translationKey !== 'recurringTransactionsCreated' 
+            ? translationKey.replace('{count}', transactionsToCreate.length)
+            : `${transactionsToCreate.length} monthly recurring transactions created successfully`;
+          toast.success(successMessage);
+        } catch (error) {
+          setIsCreatingRecurring(false);
+          toast.error(t('failedToCreateRecurringTransactions') || 'Failed to create recurring transactions');
+        }
+      } else {
+        // Single transaction - remove recurring fields if not recurring
+        if (!cleanData.isRecurring) {
+          delete cleanData.isRecurring;
+          delete cleanData.recurringFrequency;
+          delete cleanData.recurringStartDate;
+          delete cleanData.recurringEndDate;
+        }
+        await createTransactionMutation.mutateAsync(cleanData);
+      }
     }
     // Note: editingTransaction and dialog are cleared in mutation onSuccess callbacks
-  }, [editingTransaction, updateTransactionMutation, createTransactionMutation]);
+  }, [editingTransaction, updateTransactionMutation, createTransactionMutation, queryClient, setAddDialogOpen, setEditingTransaction, toast, t]);
 
   // Selected period transactions (unfiltered - filtering done in ExpenseMonthView)
   const selectedPeriodTransactions = useMemo(() => {
@@ -275,30 +339,32 @@ function Expenses() {
   }
 
   return (
-    <div className={cn("min-h-screen p-4 md:p-8", colors.bgPrimary)}>
+    <div className={cn("min-h-screen p-2 sm:p-4 md:p-8", colors.bgPrimary)}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mb-3 sm:mb-6">
+          <div className="flex items-center justify-between mb-2 sm:mb-4">
             <div>
-              <h1 className={cn("text-3xl md:text-4xl font-bold mb-2", colors.textPrimary)}>{t('expenses')}</h1>
-              <p className={colors.textTertiary}>{t('trackYourIncomeExpenses')}</p>
+              <h1 className={cn("text-xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2", colors.textPrimary)}>{t('expenses')}</h1>
+              <p className={cn("text-xs sm:text-base", colors.textTertiary)}>{t('trackYourIncomeExpenses')}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1 sm:gap-2">
               <Button 
                 onClick={() => setCategoryDialogOpen(true)}
                 variant="outline"
-                className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                size="sm"
+                className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
               >
-                <Tag className="w-5 h-5 mr-2" />
+                <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
                 <span className="hidden md:inline">Categories</span>
               </Button>
               <Button 
                 onClick={() => setBudgetDialogOpen(true)}
                 variant="outline"
-                className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                size="sm"
+                className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
               >
-                <Target className="w-5 h-5 mr-2" />
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
                 <span className="hidden md:inline">Budgets</span>
               </Button>
               <Button 
@@ -306,9 +372,10 @@ function Expenses() {
                   setEditingTransaction(null);
                   setAddDialogOpen(true);
                 }}
-                className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                size="sm"
+                className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-8 sm:h-10 text-xs sm:text-base"
               >
-                <Plus className="w-5 h-5 mr-2" />
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
                 <span className="hidden sm:inline">{t('addTransaction')}</span>
                 <span className="sm:hidden">{t('add')}</span>
               </Button>
@@ -326,7 +393,7 @@ function Expenses() {
         />
 
         {/* Period View with integrated filters */}
-        <div className="mt-6">
+        <div className="mt-3 sm:mt-6">
           <ExpenseMonthView
             transactions={selectedPeriodTransactions}
             budgets={budgets}

@@ -115,35 +115,35 @@ export default function BudgetManager({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-2xl max-h-[90vh] overflow-y-auto")}>
-        <DialogHeader>
-          <DialogTitle className={cn("text-xl font-bold flex items-center gap-2", colors.accentText)}>
-            <Target className="w-5 h-5" />
+      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6")}>
+        <DialogHeader className="pb-2 sm:pb-4">
+          <DialogTitle className={cn("text-lg sm:text-xl font-bold flex items-center gap-2", colors.accentText)}>
+            <Target className="w-4 h-4 sm:w-5 sm:h-5" />
             {t('manageBudgets')}
           </DialogTitle>
-          <DialogDescription className={colors.textTertiary}>
+          <DialogDescription className={cn("text-xs sm:text-sm", colors.textTertiary)}>
             {t('setBudgetLimits')}
           </DialogDescription>
         </DialogHeader>
 
         {/* Add/Edit Form */}
         {availableCategories.length === 0 && !editingBudget ? (
-          <div className={cn("text-center py-6", colors.textTertiary)}>
-            <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">{t('allCategoriesHaveBudgets')}</p>
-            <p className="text-sm mt-1">{t('deleteBudgetToAddNew')}</p>
+          <div className={cn("text-center py-4 sm:py-6", colors.textTertiary)}>
+            <Target className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50" />
+            <p className={cn("text-sm sm:text-base font-medium", colors.textTertiary)}>{t('allCategoriesHaveBudgets')}</p>
+            <p className={cn("text-xs sm:text-sm mt-1", colors.textTertiary)}>{t('deleteBudgetToAddNew')}</p>
           </div>
         ) : (
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className={colors.textSecondary}>{t('category')} *</Label>
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
               <Select 
                 value={formData.category} 
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
                 disabled={editingBudget !== null}
               >
-                <SelectTrigger className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue placeholder={t('selectCategory')} />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -156,8 +156,8 @@ export default function BudgetManager({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label className={colors.textSecondary}>{t('monthlyLimit')} *</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -165,13 +165,13 @@ export default function BudgetManager({
                 placeholder="1000"
                 value={formData.monthlyLimit}
                 onChange={(e) => setFormData({ ...formData, monthlyLimit: e.target.value })}
-                className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className={colors.textSecondary}>{t('alertThreshold')} (%) *</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
             <Input
               type="number"
               min="1"
@@ -184,20 +184,20 @@ export default function BudgetManager({
                 const numValue = value === '' ? '' : Math.min(100, Math.max(1, parseInt(value) || 80));
                 setFormData({ ...formData, alertThreshold: numValue });
               }}
-              className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+              className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
             />
-            <p className={cn("text-xs", colors.textTertiary)}>
+            <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
               {t('alertThresholdHelp')}
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             {editingBudget && (
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleCancel}
-                className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
               >
                 {t('cancel')}
               </Button>
@@ -205,14 +205,14 @@ export default function BudgetManager({
             <Button
               type="submit"
               disabled={isLoading || !formData.monthlyLimit || !formData.category}
-              className={cn("flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
+              className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
             >
               {isLoading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
               ) : editingBudget ? (
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               ) : (
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               )}
               {editingBudget ? t('updateBudget') : t('addBudget')}
             </Button>
@@ -222,17 +222,17 @@ export default function BudgetManager({
 
         {/* Existing Budgets */}
         {budgets.length > 0 && (
-          <div className="mt-6 space-y-3">
-            <h3 className={cn("font-semibold", colors.textPrimary)}>{t('currentBudgets')}</h3>
+          <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
+            <h3 className={cn("text-sm sm:text-base font-semibold", colors.textPrimary)}>{t('currentBudgets')}</h3>
             {budgets.map((budget) => (
               <Card key={budget.id} className={cn(colors.bgTertiary, colors.borderLight)}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={cn("font-medium", colors.textPrimary)}>
+                <CardContent className="p-2.5 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-sm sm:text-base font-medium truncate", colors.textPrimary)}>
                         {translateCategory(budget.category, language)}
                       </p>
-                      <p className={cn("text-sm", colors.textTertiary)}>
+                      <p className={cn("text-xs sm:text-sm", colors.textTertiary)}>
                         {new Intl.NumberFormat(language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US', {
                           style: 'currency',
                           currency: budget.currency || user?.currency || 'USD',
@@ -242,22 +242,22 @@ export default function BudgetManager({
                         {' • '}{t('alertAt')} {budget.alertThreshold || 80}%
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => handleEdit(budget)}
-                        className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                        className={cn("h-7 w-7 sm:h-8 sm:w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => onDelete(budget.id)}
-                        className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                        className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                     </div>
                   </div>
