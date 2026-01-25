@@ -49,15 +49,30 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
     } catch (error) {
-      console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
       setIsAuthenticated(false);
       
-      // If user auth fails, it might be an expired token
+      // If user auth fails, it might be an expired or invalid token
       if (error.status === 401 || error.status === 403) {
+        // Clear invalid token silently - this is expected behavior
+        // Don't log as error or set authError for initial auth check
+        // Only set authError if we're already authenticated (token expired during session)
+        if (isAuthenticated) {
+          setAuthError({
+            type: 'auth_required',
+            message: 'Session expired. Please log in again.'
+          });
+        }
+        // Clear the invalid token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('ascent_access_token');
+        }
+      } else {
+        // Only log unexpected errors
+        console.error('User auth check failed:', error);
         setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
+          type: 'unknown',
+          message: error.message || 'Authentication check failed'
         });
       }
     }

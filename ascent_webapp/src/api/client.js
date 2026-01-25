@@ -187,7 +187,15 @@ const auth = {
   },
   
   async me() {
-    return request('/auth/me');
+    try {
+      return await request('/auth/me');
+    } catch (error) {
+      // Don't log 401 errors for /auth/me - they're expected when not authenticated
+      if (error.status !== 401 && error.status !== 403) {
+        console.error('[Auth] Me error:', error);
+      }
+      throw error;
+    }
   },
   
   async updateMe(data) {
