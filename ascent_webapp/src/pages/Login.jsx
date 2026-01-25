@@ -350,62 +350,66 @@ export default function Login() {
 
               <TabsContent value="register" className="mt-2 sm:mt-6">
                 <form onSubmit={handleRegister} className="space-y-2 sm:space-y-4">
-                  <div className="space-y-1 sm:space-y-2">
-                    <Label htmlFor="register-name" className="text-xs sm:text-sm text-[#9EC8B9]">{t('fullName')}</Label>
-                    <Input
-                      id="register-name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={registerData.full_name}
-                      onChange={(e) => setRegisterData({ ...registerData, full_name: e.target.value })}
-                      className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
-                    />
-                  </div>
-                  <div className="space-y-1 sm:space-y-2">
-                    <Label htmlFor="register-email" className="text-xs sm:text-sm text-[#9EC8B9]">{t('email')}</Label>
-                    <Input
-                      id="register-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={registerData.email}
-                      onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                      required
-                      className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
-                    />
-                  </div>
-                  <div className="space-y-1 sm:space-y-2">
-                    <Label htmlFor="register-password" className="text-xs sm:text-sm text-[#9EC8B9]">{t('password')}</Label>
-                    <div className="relative">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label htmlFor="register-name" className="text-xs sm:text-sm text-[#9EC8B9]">{t('fullName')}</Label>
                       <Input
-                        id="register-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={registerData.password}
-                        onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                        required
-                        minLength={6}
-                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-9 sm:pr-10"
+                        id="register-name"
+                        type="text"
+                        placeholder="John Doe"
+                        value={registerData.full_name}
+                        onChange={(e) => setRegisterData({ ...registerData, full_name: e.target.value })}
+                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[#5C8374] hover:text-[#9EC8B9]"
-                      >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                      </button>
+                    </div>
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label htmlFor="register-email" className="text-xs sm:text-sm text-[#9EC8B9]">{t('email')}</Label>
+                      <Input
+                        id="register-email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={registerData.email}
+                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                        required
+                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      />
                     </div>
                   </div>
-                  <div className="space-y-1 sm:space-y-2">
-                    <Label htmlFor="register-confirm" className="text-xs sm:text-sm text-[#9EC8B9]">{t('confirmPassword')}</Label>
-                    <Input
-                      id="register-confirm"
-                      type="password"
-                      placeholder="••••••••"
-                      value={registerData.confirmPassword}
-                      onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                      required
-                      className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label htmlFor="register-password" className="text-xs sm:text-sm text-[#9EC8B9]">{t('password')}</Label>
+                      <div className="relative">
+                        <Input
+                          id="register-password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={registerData.password}
+                          onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                          required
+                          minLength={6}
+                          className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-9 sm:pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[#5C8374] hover:text-[#9EC8B9]"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1 sm:space-y-2">
+                      <Label htmlFor="register-confirm" className="text-xs sm:text-sm text-[#9EC8B9]">{t('confirmPassword')}</Label>
+                      <Input
+                        id="register-confirm"
+                        type="password"
+                        placeholder="••••••••"
+                        value={registerData.confirmPassword}
+                        onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                        required
+                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      />
+                    </div>
                   </div>
                   <Button 
                     type="submit" 
