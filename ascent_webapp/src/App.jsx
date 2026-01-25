@@ -13,6 +13,7 @@ import Login from './pages/Login';
 import { Toaster as SonnerToaster } from 'sonner';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SkeletonPage } from '@/components/ui/skeleton-card';
+import { Analytics } from '@vercel/analytics/react';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -100,6 +101,7 @@ function App() {
         </Router>
         <Toaster />
         <SonnerToaster position="top-right" richColors />
+        <Analytics />
       </QueryClientProvider>
     </AuthProvider>
   )
