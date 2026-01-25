@@ -226,8 +226,8 @@ export default function Login() {
           <img 
             src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
             alt="Ascend Logo" 
-            className="object-contain mx-auto mb-1 sm:mb-3"
-            style={{ filter: 'brightness(1.1) saturate(1.2)', height: '60px', width: 'auto' }}
+            className="object-contain mx-auto mb-1 sm:mb-3 h-[70px] sm:h-[120px] w-auto"
+            style={{ filter: 'brightness(1.1) saturate(1.2)' }}
           />
           <h1 className="text-2xl sm:text-4xl font-bold text-[#9EC8B9] mb-1 sm:mb-2">{t('ascend')}</h1>
           <p className="text-xs sm:text-base text-[#5C8374]">{t('ascendTagline')}</p>
