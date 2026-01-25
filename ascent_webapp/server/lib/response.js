@@ -53,25 +53,18 @@ export function forbidden(res, message = 'Forbidden') {
 }
 
 export function serverError(res, err) {
-  console.error('Server error:', err);
-  console.error('Error stack:', err.stack);
-  console.error('Error code:', err.code);
-  console.error('Error message:', err.message);
-  
-  // Provide more helpful error messages for common issues
-  if (err.code === 'MONGODB_CONNECTION_FAILED' || 
-      err.message?.includes('ECONNREFUSED') ||
-      err.message?.includes('Cannot connect to MongoDB') ||
-      err.message?.includes('querySrv')) {
-    return error(res, err.message || 'Database connection failed. Please check your internet connection and MongoDB settings.', 503);
+  // Log errors only in development
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Server error:', err.message);
   }
   
-  // Always show error message in development (default for local)
-  const isDevelopment = !process.env.NODE_ENV || process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
-  if (isDevelopment) {
-    return error(res, err.message || 'Internal server error', 500);
+  // Handle MongoDB connection errors
+  if (err.code === 'MONGODB_CONNECTION_FAILED' || err.code === 'MONGODB_AUTH_FAILED') {
+    return error(res, 'Database connection failed', 503);
   }
   
-  return error(res, 'Internal server error', 500);
+  // Show error message in development, generic in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  return error(res, isDevelopment ? (err.message || 'Internal server error') : 'Internal server error', 500);
 }
 

@@ -30,26 +30,13 @@ export default async function handler(req, res) {
       return error(res, 'Invalid email format', 400);
     }
     
-    // Connect to MongoDB with error handling
+    // Connect to MongoDB
     try {
       await connectDB();
     } catch (dbError) {
-      console.error('[Login] MongoDB connection failed:', dbError);
-      console.error('[Login] Error code:', dbError.code);
-      console.error('[Login] Error message:', dbError.message);
-      
-      // Provide user-friendly error message
-      if (dbError.code === 'MONGODB_AUTH_FAILED') {
-        console.error('[Login] MongoDB authentication failed. Check MONGODB_URI credentials in Vercel.');
-        return error(res, 'Database authentication failed. Please check server configuration.', 503);
+      if (dbError.code === 'MONGODB_AUTH_FAILED' || dbError.code === 'MONGODB_CONNECTION_FAILED') {
+        return error(res, 'Database connection failed', 503);
       }
-      
-      if (dbError.code === 'MONGODB_CONNECTION_FAILED' || 
-          dbError.message?.includes('ECONNREFUSED') ||
-          dbError.message?.includes('Cannot connect to MongoDB')) {
-        return error(res, dbError.message || 'Database connection failed. Please check your internet connection and try again.', 503);
-      }
-      
       return serverError(res, dbError);
     }
     
@@ -79,7 +66,6 @@ export default async function handler(req, res) {
     });
     
   } catch (err) {
-    console.error('[Login] Unexpected error:', err);
     return serverError(res, err);
   }
 }

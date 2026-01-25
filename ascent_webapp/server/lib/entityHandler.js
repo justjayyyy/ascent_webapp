@@ -20,11 +20,13 @@ export function createEntityHandler(Model, options = {}) {
       const user = await authMiddleware(req, res);
       if (!user) return;
 
-      // Connect to MongoDB with error handling
+      // Connect to MongoDB
       try {
         await connectDB();
       } catch (dbError) {
-        console.error(`[EntityHandler] MongoDB connection failed for ${entityName}:`, dbError.message);
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[EntityHandler] MongoDB connection failed for ${entityName}:`, dbError.message);
+        }
         return serverError(res, dbError);
       }
 
@@ -252,7 +254,9 @@ export function createEntityHandler(Model, options = {}) {
           return error(res, 'Method not allowed', 405);
       }
     } catch (err) {
-      console.error(`[EntityHandler] ${req.method} ${entityName}:`, err.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`[EntityHandler] ${req.method} ${entityName}:`, err.message);
+      }
       return serverError(res, err);
     }
   };

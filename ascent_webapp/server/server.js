@@ -129,7 +129,9 @@ function wrapHandler(handlerPath) {
       
       await handler(req, res);
     } catch (error) {
-      console.error(`[Server] Handler Error ${handlerPath}:`, error.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`[Server] Handler Error ${handlerPath}:`, error.message);
+      }
       
       // Only send response if headers haven't been sent
       if (!res.headersSent) {

@@ -20,21 +20,10 @@ export default async function handler(req, res) {
       try {
         await connectDB();
       } catch (dbError) {
-        console.error('[Auth/me] MongoDB connection failed:', dbError);
-        
-        // Provide specific error messages
-        if (dbError.code === 'MONGODB_URI_MISSING') {
-          return error(res, 'Database configuration error. Please contact support.', 503);
+        if (dbError.code === 'MONGODB_URI_MISSING' || dbError.code === 'MONGODB_AUTH_FAILED') {
+          return error(res, 'Database connection failed', 503);
         }
-        
-        if (dbError.code === 'MONGODB_AUTH_FAILED') {
-          console.error('[Auth/me] MongoDB authentication failed. Check MONGODB_URI credentials in Vercel.');
-          return error(res, 'Database authentication failed. Please check server configuration.', 503);
-        }
-        
-        // Return user-friendly error
-        const errorMessage = dbError.message || 'Database connection failed. Please try again later.';
-        return error(res, errorMessage, 503);
+        return error(res, 'Database connection failed', 503);
       }
       
       const allowedUpdates = [
@@ -61,7 +50,6 @@ export default async function handler(req, res) {
     return error(res, 'Method not allowed', 405);
     
   } catch (err) {
-    console.error('[Auth/me] Error:', err);
     return serverError(res, err);
   }
 }

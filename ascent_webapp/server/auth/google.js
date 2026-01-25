@@ -49,7 +49,6 @@ export default async function handler(req, res) {
         picture = payload.picture;
         googleId = payload.sub;
       } catch (fetchError) {
-        console.error('[Google Auth] Token verification error:', fetchError);
         return error(res, 'Failed to verify Google token', 401);
       }
     } else {
@@ -60,25 +59,14 @@ export default async function handler(req, res) {
       return error(res, 'Email is required', 400);
     }
     
-    // Connect to MongoDB with error handling
+    // Connect to MongoDB
     try {
       await connectDB();
     } catch (dbError) {
-      console.error('[Google Auth] MongoDB connection failed:', dbError);
-      
-      // Provide specific error messages
-      if (dbError.code === 'MONGODB_URI_MISSING') {
-        return error(res, 'Database configuration error. Please contact support.', 503);
+      if (dbError.code === 'MONGODB_URI_MISSING' || dbError.code === 'MONGODB_AUTH_FAILED') {
+        return error(res, 'Database connection failed', 503);
       }
-      
-      if (dbError.code === 'MONGODB_AUTH_FAILED') {
-        console.error('[Google Auth] MongoDB authentication failed. Check MONGODB_URI credentials in Vercel.');
-        return error(res, 'Database authentication failed. Please check server configuration.', 503);
-      }
-      
-      // Return user-friendly error
-      const errorMessage = dbError.message || 'Database connection failed. Please try again later.';
-      return error(res, errorMessage, 503);
+      return error(res, 'Database connection failed', 503);
     }
     
     // Find or create user
@@ -111,18 +99,11 @@ export default async function handler(req, res) {
         }
       }
     } catch (userError) {
-      console.error('[Google Auth] User creation/update error:', userError);
       return serverError(res, userError);
     }
     
     // Generate token
-    let token;
-    try {
-      token = signToken({ userId: user._id, email: user.email });
-    } catch (tokenError) {
-      console.error('[Google Auth] Token generation error:', tokenError);
-      return error(res, 'Failed to generate authentication token', 500);
-    }
+    const token = signToken({ userId: user._id, email: user.email });
     
     return success(res, {
       user: user.toJSON(),
@@ -130,8 +111,6 @@ export default async function handler(req, res) {
     });
     
   } catch (err) {
-    console.error('[Google Auth] Unexpected error:', err);
-    console.error('[Google Auth] Error stack:', err.stack);
     return serverError(res, err);
   }
 }
