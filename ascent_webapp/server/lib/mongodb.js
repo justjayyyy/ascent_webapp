@@ -176,6 +176,17 @@ export async function connectDB() {
       
       cached.promise = null;
       
+      // Handle authentication errors
+      if (error.message?.includes('bad auth') || 
+          error.message?.includes('authentication failed') ||
+          error.code === 8000 || // MongoDB authentication error code
+          error.message?.includes('Authentication failed')) {
+        const helpfulError = new Error('MongoDB authentication failed. Please check: 1) MONGODB_URI has correct username and password, 2) Password is URL-encoded if it contains special characters, 3) Database user has proper permissions in MongoDB Atlas.');
+        helpfulError.originalError = error;
+        helpfulError.code = 'MONGODB_AUTH_FAILED';
+        throw helpfulError;
+      }
+      
       // Provide more helpful error messages
       if (error.code === 'ECONNREFUSED' || 
           error.message?.includes('ECONNREFUSED') ||
@@ -195,8 +206,19 @@ export async function connectDB() {
     cached.promise = null;
     
     // Provide more helpful error messages
-    if (e.code === 'MONGODB_CONNECTION_FAILED') {
+    if (e.code === 'MONGODB_CONNECTION_FAILED' || e.code === 'MONGODB_AUTH_FAILED') {
       throw e; // Already has helpful message
+    }
+    
+    // Handle authentication errors
+    if (e.message?.includes('bad auth') || 
+        e.message?.includes('authentication failed') ||
+        e.code === 8000 ||
+        e.message?.includes('Authentication failed')) {
+      const helpfulError = new Error('MongoDB authentication failed. Please check: 1) MONGODB_URI has correct username and password, 2) Password is URL-encoded if it contains special characters (@, #, %, etc.), 3) Database user has proper permissions in MongoDB Atlas.');
+      helpfulError.originalError = e;
+      helpfulError.code = 'MONGODB_AUTH_FAILED';
+      throw helpfulError;
     }
     
     if (e.message && (e.message.includes('SSL') || e.message.includes('TLS'))) {
@@ -212,11 +234,6 @@ export async function connectDB() {
       helpfulError.originalError = e;
       helpfulError.code = 'MONGODB_CONNECTION_FAILED';
       throw helpfulError;
-    }
-    
-    // If error already has MONGODB_CONNECTION_FAILED code, preserve it
-    if (e.code === 'MONGODB_CONNECTION_FAILED') {
-      throw e;
     }
     
     throw e;

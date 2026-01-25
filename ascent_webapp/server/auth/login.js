@@ -39,6 +39,11 @@ export default async function handler(req, res) {
       console.error('[Login] Error message:', dbError.message);
       
       // Provide user-friendly error message
+      if (dbError.code === 'MONGODB_AUTH_FAILED') {
+        console.error('[Login] MongoDB authentication failed. Check MONGODB_URI credentials in Vercel.');
+        return error(res, 'Database authentication failed. Please check server configuration.', 503);
+      }
+      
       if (dbError.code === 'MONGODB_CONNECTION_FAILED' || 
           dbError.message?.includes('ECONNREFUSED') ||
           dbError.message?.includes('Cannot connect to MongoDB')) {

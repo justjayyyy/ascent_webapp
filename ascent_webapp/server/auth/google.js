@@ -71,6 +71,11 @@ export default async function handler(req, res) {
         return error(res, 'Database configuration error. Please contact support.', 503);
       }
       
+      if (dbError.code === 'MONGODB_AUTH_FAILED') {
+        console.error('[Google Auth] MongoDB authentication failed. Check MONGODB_URI credentials in Vercel.');
+        return error(res, 'Database authentication failed. Please check server configuration.', 503);
+      }
+      
       // Return user-friendly error
       const errorMessage = dbError.message || 'Database connection failed. Please try again later.';
       return error(res, errorMessage, 503);
