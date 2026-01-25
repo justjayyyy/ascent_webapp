@@ -24,15 +24,34 @@ function LayoutContent({ children, currentPageName }) {
     const loadPermissions = async () => {
       if (!user?.email) return;
       try {
+        // Check if user is the owner (has created any SharedUser invitations)
+        const owned = await ascent.entities.SharedUser.filter({ 
+          created_by: user.email 
+        });
+        
+        // If user has created SharedUser records, they are definitely the owner
+        if (owned.length > 0) {
+          setPermissions(null); // Owner has full access
+          return;
+        }
+        
+        // Otherwise, check if user was invited (shared user)
         const shared = await ascent.entities.SharedUser.filter({ 
           invitedEmail: user.email, 
           status: 'accepted' 
         });
+        
         if (shared.length > 0) {
+          // User was invited - they're a shared user with limited permissions
           setPermissions(shared[0].permissions);
+        } else {
+          // No SharedUser records found - user is owner (new account or no sharing yet)
+          setPermissions(null);
         }
       } catch (error) {
-        console.error('Failed to load permissions');
+        console.error('Failed to load permissions:', error);
+        // On error, assume owner (full access)
+        setPermissions(null);
       }
     };
     loadPermissions();
@@ -74,7 +93,9 @@ function LayoutContent({ children, currentPageName }) {
   }, [user, updateUserLocal, refreshUser]);
 
   const hasPermission = useCallback((permission) => {
+    // If no permissions object exists, user is owner and has all permissions
     if (!permissions) return true;
+    // For shared users, check if the specific permission is granted
     return permissions[permission] === true;
   }, [permissions]);
 
@@ -83,6 +104,7 @@ function LayoutContent({ children, currentPageName }) {
     // { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewDashboard' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('notes'), page: 'Notes', icon: StickyNote, permission: 'viewNotes' },
+    { name: t('settings'), page: 'Settings', icon: Settings, permission: 'viewSettings' },
   ].filter(item => hasPermission(item.permission)), [t, hasPermission]);
 
   return (

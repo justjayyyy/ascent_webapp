@@ -422,7 +422,11 @@ export default function AddTransactionDialog({
                     ) : (
                       cards.map((card) => (
                         <SelectItem key={card.id} value={card.id} className={colors.textPrimary}>
-                          {card.cardName} •••• {card.lastFourDigits}
+                          {user?.blurValues ? (
+                            '••••••'
+                          ) : (
+                            `${card.name || card.cardName || ''} •••• ${card.lastFourDigits || ''}`
+                          )}
                         </SelectItem>
                       ))
                     )}

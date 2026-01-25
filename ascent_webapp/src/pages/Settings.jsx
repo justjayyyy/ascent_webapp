@@ -96,6 +96,15 @@ export default function Settings() {
     queryKey: ['myPermissions', user?.email],
     queryFn: async () => {
       if (!user) return null;
+      
+      // First check if user is owner (has created SharedUser records)
+      const owned = await ascent.entities.SharedUser.filter({ created_by: user.email });
+      if (owned.length > 0) {
+        // User is owner, return null (no permission restrictions)
+        return null;
+      }
+      
+      // Otherwise check if user was invited (shared user)
       const shared = await ascent.entities.SharedUser.filter({ invitedEmail: user.email, status: 'accepted' });
       return shared[0]?.permissions || null;
     },
@@ -104,21 +113,53 @@ export default function Settings() {
 
   const inviteUserMutation = useMutation({
     mutationFn: async (data) => {
-      const invitation = await ascent.entities.SharedUser.create(data);
-      await ascent.integrations.Core.SendEmail({
-        to: data.invitedEmail,
-        subject: `You've been invited to Ascend by ${user.full_name}`,
-        body: `Hello ${data.displayName},\n\n${user.full_name} has invited you to collaborate on their Ascend account.\n\nYou can access the account at: ${window.location.origin}\n\nBest regards,\nAscend Team`
+      const invitation = await ascent.entities.SharedUser.create({
+        ...data,
+        created_by: user.email
       });
-      return invitation;
+      try {
+        const emailResult = await ascent.integrations.Core.SendEmail({
+          to: data.invitedEmail,
+          subject: `You've been invited to Ascend by ${user.full_name}`,
+          body: `Hello ${data.displayName},\n\n${user.full_name} has invited you to collaborate on their Ascend account.\n\nYou can access the account at: ${window.location.origin}\n\nBest regards,\nAscend Team`
+        });
+        
+        // Check if email was actually sent
+        if (emailResult && emailResult.sent === false) {
+          console.warn('Email not sent - SMTP not configured');
+          // Still return invitation but with a warning
+          return { ...invitation, emailSent: false };
+        }
+        
+        return { ...invitation, emailSent: true };
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+        // Still return invitation even if email fails
+        return { ...invitation, emailSent: false, emailError: emailError.message };
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['sharedUsers'] });
       setInviteDialogOpen(false);
-      toast.success('Invitation sent successfully!');
+      if (result?.emailSent === false) {
+        const errorMsg = result?.emailError || 'SMTP configuration issue';
+        if (errorMsg.includes('BadCredentials') || errorMsg.includes('Invalid login')) {
+          toast.warning('Invitation created but email failed. Please check your Gmail App Password in .env file. Generate a new App Password at: https://myaccount.google.com/apppasswords');
+        } else {
+          toast.warning(`Invitation created but email could not be sent: ${errorMsg}`);
+        }
+      } else {
+        toast.success('Invitation sent successfully!');
+      }
     },
-    onError: () => {
-      toast.error('Failed to send invitation');
+    onError: (error) => {
+      console.error('Invitation error:', error);
+      const errorMsg = error?.message || 'Unknown error';
+      if (errorMsg.includes('BadCredentials') || errorMsg.includes('Invalid login')) {
+        toast.error('Failed to send invitation: Gmail authentication failed. Please check your App Password in .env file.');
+      } else {
+        toast.error(`Failed to send invitation: ${errorMsg}`);
+      }
     },
   });
 
@@ -344,7 +385,7 @@ export default function Settings() {
             onInvite={() => setInviteDialogOpen(true)}
             onUpdate={(id, data) => updateSharedUserMutation.mutate({ id, data })}
             onDelete={deleteSharedUserMutation.mutate}
-            canManageUsers={!myPermissions || myPermissions.manageUsers}
+            canManageUsers={!myPermissions || myPermissions.manageUsers === true}
           />
 
           {/* Import/Export */}

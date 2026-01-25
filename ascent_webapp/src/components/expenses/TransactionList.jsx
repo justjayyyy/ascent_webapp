@@ -37,7 +37,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
 
   const getCardInfo = useCallback((cardId) => {
     const card = cards.find(c => c.id === cardId);
-    return card ? `${card.cardName} •••• ${card.lastFourDigits}` : 'Card';
+    return card ? `${card.name || card.cardName || ''} •••• ${card.lastFourDigits || ''}` : 'Card';
   }, [cards]);
 
   const isObjectId = useCallback((str) => {

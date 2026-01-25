@@ -33,15 +33,29 @@ export default async function handler(req, res) {
     });
 
     // If SMTP is not configured, just log and return success (for development)
-    if (!process.env.SMTP_USER) {
-      console.log('Email would be sent:', { to, subject, body });
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn('Email not sent - SMTP not configured. Email would be sent to:', to);
+      console.warn('Subject:', subject);
+      console.warn('Body:', body);
       return success(res, { 
         sent: false, 
-        message: 'Email not sent (SMTP not configured)' 
+        message: 'Email not sent (SMTP not configured). Please configure SMTP_USER and SMTP_PASS in .env file.' 
       });
     }
 
-    await transporter.sendMail({
+    try {
+      await transporter.verify();
+    } catch (verifyError) {
+      console.error('SMTP verification failed:', verifyError);
+      // Return a more user-friendly error message
+      const errorMsg = verifyError.message || 'Unknown SMTP error';
+      if (errorMsg.includes('BadCredentials') || errorMsg.includes('Invalid login')) {
+        return error(res, `SMTP configuration error: Invalid Gmail credentials. Please generate a new App Password at https://myaccount.google.com/apppasswords and update SMTP_PASS in .env file. Error: ${errorMsg}`, 500);
+      }
+      return error(res, `SMTP configuration error: ${errorMsg}`, 500);
+    }
+
+    const mailResult = await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to,
       subject,
@@ -49,9 +63,16 @@ export default async function handler(req, res) {
       html: html || body
     });
 
-    return success(res, { sent: true });
+    console.log('Email sent successfully:', { to, messageId: mailResult.messageId });
+    return success(res, { sent: true, messageId: mailResult.messageId });
 
   } catch (err) {
+    console.error('Email sending error:', err);
+    // If it's an SMTP auth error, provide helpful message
+    const errorMsg = err.message || 'Unknown error';
+    if (errorMsg.includes('BadCredentials') || errorMsg.includes('Invalid login')) {
+      return error(res, `SMTP authentication failed: Invalid Gmail credentials. Please generate a new App Password at https://myaccount.google.com/apppasswords and update SMTP_PASS in .env file.`, 500);
+    }
     return serverError(res, err);
   }
 }

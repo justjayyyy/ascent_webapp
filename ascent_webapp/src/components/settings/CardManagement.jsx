@@ -10,21 +10,23 @@ import { CreditCard, Plus, Trash2, Edit2, X, Check } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import BlurValue from '../BlurValue';
 
-export default function CardManagement({ user }) {
-  const { colors, t } = useTheme();
+export default function CardManagement({ user: propUser }) {
+  const { colors, t, user } = useTheme();
   const [isAdding, setIsAdding] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [formData, setFormData] = useState({ name: '', lastFourDigits: '', type: 'credit' });
   const queryClient = useQueryClient();
 
   const { data: cards = [] } = useQuery({
-    queryKey: ['cards', user?.id],
+    queryKey: ['cards', propUser?.id || user?.id],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Card.filter({ created_by: user.email }, '-created_date');
+      const currentUser = propUser || user;
+      if (!currentUser) return [];
+      return await ascent.entities.Card.filter({ created_by: currentUser.email }, '-created_date');
     },
-    enabled: !!user,
+    enabled: !!(propUser || user),
   });
 
   const createCardMutation = useMutation({
@@ -179,7 +181,11 @@ export default function CardManagement({ user }) {
                   <CreditCard className={cn("w-5 h-5", colors.accentText)} />
                   <div>
                     <p className={cn("font-medium", colors.textPrimary)}>
-                      {card.name} •••• {card.lastFourDigits}
+                      {user?.blurValues ? (
+                        <BlurValue blur={true}>••••••</BlurValue>
+                      ) : (
+                        <>{card.name || ''} - {card.lastFourDigits || ''}</>
+                      )}
                     </p>
                     <p className={cn("text-sm capitalize", colors.textTertiary)}>{card.type}</p>
                   </div>
