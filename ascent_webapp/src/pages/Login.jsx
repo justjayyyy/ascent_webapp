@@ -39,6 +39,30 @@ export default function Login() {
 
   const redirectUrl = searchParams.get('redirect') || '/Portfolio';
 
+  // Prevent body scrolling on mobile
+  useEffect(() => {
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyHeight = document.body.style.height;
+    const originalHtmlHeight = document.documentElement.style.height;
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100dvh';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.height = '100dvh';
+    
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.height = originalBodyHeight;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.documentElement.style.height = originalHtmlHeight;
+    };
+  }, []);
+
   // Initialize Google Sign-In
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
@@ -195,7 +219,7 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-[#092635] flex items-center justify-center p-4 pt-3 sm:pt-4 pb-0 sm:pb-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh' }}>
+    <div className="bg-[#092635] flex items-center justify-center p-4 pt-3 sm:pt-4 pb-0 sm:pb-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
       <div className="w-full max-w-md mb-0 pb-0">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8">
