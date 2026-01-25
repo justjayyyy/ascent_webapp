@@ -116,36 +116,38 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
   const MobilePositionCard = ({ item }) => {
     if (item.itemType === 'daytrade') {
       const isPositive = item.profitLoss >= 0;
+      const dayTradeLabel = t('dayTrade') !== 'dayTrade' ? t('dayTrade') : 'Day Trade';
+      const dayTradeNotesTitle = t('dayTradeNotes') !== 'dayTradeNotes' ? t('dayTradeNotes') : 'Day Trade Notes';
       return (
-        <div className={cn("p-4 rounded-xl border", colors.cardBg, colors.cardBorder)}>
-          <div className="flex items-center justify-between mb-3">
-            <Badge className={cn('text-xs border', 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30')}>
-              Day Trade
+        <div className={cn("p-2 rounded-lg border", colors.cardBg, colors.cardBorder)}>
+          <div className="flex items-center justify-between mb-2">
+            <Badge className={cn('text-[9px] border px-1 py-0', 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30')}>
+              {dayTradeLabel}
             </Badge>
-            <span className={cn("text-xs", colors.textTertiary)}>{formatDate(item.date)}</span>
+            <span className={cn("text-[9px]", colors.textTertiary)}>{formatDate(item.date)}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className={cn("text-sm", colors.textSecondary)}>P&L</span>
-            <div className="flex items-center gap-1">
-              {isPositive ? <TrendingUp className="w-4 h-4 text-green-400" /> : <TrendingDown className="w-4 h-4 text-red-400" />}
-              <span className={cn("font-semibold", isPositive ? 'text-green-400' : 'text-red-400')}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={cn("text-[10px]", colors.textSecondary)}>{t('totalPnL') !== 'totalPnL' ? t('totalPnL') : 'P&L'}</span>
+            <div className="flex items-center gap-0.5">
+              {isPositive ? <TrendingUp className="w-3 h-3 text-green-400" /> : <TrendingDown className="w-3 h-3 text-red-400" />}
+              <span className={cn("font-semibold text-xs", isPositive ? 'text-green-400' : 'text-red-400')}>
                 <BlurValue blur={user?.blurValues}>
                   {isPositive ? '+' : ''}{formatCurrency(item.profitLoss)}
                 </BlurValue>
               </span>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-[#5C8374]/10">
+          <div className="flex items-center justify-end gap-1 pt-1.5 border-t border-[#5C8374]/10">
             {item.notes && (
-              <Button size="sm" variant="ghost" onClick={() => setNotesDialog({ open: true, notes: item.notes, title: 'Day Trade Notes' })} className={cn("h-8 px-2", colors.textSecondary)}>
-                <FileText className="w-4 h-4" />
+              <Button size="sm" variant="ghost" onClick={() => setNotesDialog({ open: true, notes: item.notes, title: dayTradeNotesTitle })} className={cn("h-6 px-1.5", colors.textSecondary)}>
+                <FileText className="w-3 h-3" />
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={() => onEditDayTrade(item)} className={cn("h-8 px-2", colors.textSecondary)}>
-              <Edit className="w-4 h-4" />
+            <Button size="sm" variant="ghost" onClick={() => onEditDayTrade(item)} className={cn("h-6 px-1.5", colors.textSecondary)}>
+              <Edit className="w-3 h-3" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => onDeleteDayTrade(item.id)} className="h-8 px-2 text-red-400">
-              <Trash2 className="w-4 h-4" />
+            <Button size="sm" variant="ghost" onClick={() => onDeleteDayTrade(item.id)} className="h-6 px-1.5 text-red-400">
+              <Trash2 className="w-3 h-3" />
             </Button>
           </div>
         </div>
@@ -172,76 +174,83 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
       }
     };
 
+    const quantityLabel = t('quantity') !== 'quantity' ? t('quantity') : 'Quantity';
+    const avgPriceLabel = t('avgPrice') !== 'avgPrice' ? t('avgPrice') : 'Avg Price';
+    const currentAmountLabel = t('currentAmount') !== 'currentAmount' ? t('currentAmount') : 'Current Price';
+    const totalValueLabel = t('totalValue') !== 'totalValue' ? t('totalValue') : 'Total Value';
+    const weightLabel = t('weight') !== 'weight' ? t('weight') : 'weight';
+    const notesTitle = t('notes') !== 'notes' ? `${item.symbol} ${t('notes')}` : `${item.symbol} Notes`;
+
     return (
-      <div className={cn("p-4 rounded-xl border", colors.cardBg, colors.cardBorder)}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className={cn("font-bold text-lg", colors.textPrimary)}>{item.symbol}</span>
+      <div className={cn("p-2 rounded-lg border", colors.cardBg, colors.cardBorder)}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className={cn("font-bold text-sm truncate", colors.textPrimary)}>{item.symbol}</span>
             {isAggregated && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-[#5C8374]/20 text-[#9EC8B9]">×{item.positionCount}</span>
+              <span className="text-[9px] px-1 py-0 rounded bg-[#5C8374]/20 text-[#9EC8B9] flex-shrink-0">×{item.positionCount}</span>
             )}
           </div>
-          <Badge className={cn('text-xs border', assetTypeColors[item.assetType])}>{item.assetType}</Badge>
+          <Badge className={cn('text-[9px] border px-1 py-0 flex-shrink-0', assetTypeColors[item.assetType])}>{item.assetType}</Badge>
         </div>
         
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <div>
-            <p className={cn("text-xs", colors.textTertiary)}>{t('quantity')}</p>
-            <p className={cn("font-medium", colors.textPrimary)}>
+            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{quantityLabel}</p>
+            <p className={cn("font-medium text-xs", colors.textPrimary)}>
               <BlurValue blur={user?.blurValues}>{item.quantity.toLocaleString()}</BlurValue>
             </p>
           </div>
           <div>
-            <p className={cn("text-xs", colors.textTertiary)}>{t('avgPrice')}</p>
-            <p className={cn("font-medium", colors.textPrimary)}>
+            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{avgPriceLabel}</p>
+            <p className={cn("font-medium text-xs", colors.textPrimary)}>
               <BlurValue blur={user?.blurValues}>{formatCurrency(item.averageBuyPrice, item.currency)}</BlurValue>
             </p>
           </div>
           <div>
-            <p className={cn("text-xs", colors.textTertiary)}>{t('currentAmount')}</p>
-            <p className={cn("font-medium", colors.textPrimary)}>
+            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{currentAmountLabel}</p>
+            <p className={cn("font-medium text-xs", colors.textPrimary)}>
               <BlurValue blur={user?.blurValues}>{formatCurrency(metrics.currentPrice, item.currency)}</BlurValue>
             </p>
           </div>
           <div>
-            <p className={cn("text-xs", colors.textTertiary)}>{t('totalValue')}</p>
-            <p className={cn("font-semibold", colors.textPrimary)}>
+            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{totalValueLabel}</p>
+            <p className={cn("font-semibold text-xs", colors.textPrimary)}>
               <BlurValue blur={user?.blurValues}>{formatCurrency(metrics.marketValue, item.currency)}</BlurValue>
             </p>
           </div>
         </div>
         
-        <div className="flex items-center justify-between py-2 border-t border-[#5C8374]/10">
-          <div className="flex items-center gap-2">
-            {isPositive ? <TrendingUp className="w-4 h-4 text-green-400" /> : <TrendingDown className="w-4 h-4 text-red-400" />}
-            <div>
-              <span className={cn("font-semibold", isPositive ? 'text-green-400' : 'text-red-400')}>
+        <div className="flex items-center justify-between py-1.5 border-t border-[#5C8374]/10 mb-1.5">
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            {isPositive ? <TrendingUp className="w-3 h-3 text-green-400 flex-shrink-0" /> : <TrendingDown className="w-3 h-3 text-red-400 flex-shrink-0" />}
+            <div className="min-w-0">
+              <span className={cn("font-semibold text-xs", isPositive ? 'text-green-400' : 'text-red-400')}>
                 <BlurValue blur={user?.blurValues}>{isPositive ? '+' : ''}{formatCurrency(metrics.pnl, item.currency)}</BlurValue>
               </span>
-              <span className={cn("text-xs ml-1", isPositive ? 'text-green-400/70' : 'text-red-400/70')}>
+              <span className={cn("text-[9px] ml-0.5", isPositive ? 'text-green-400/70' : 'text-red-400/70')}>
                 ({isPositive ? '+' : ''}{metrics.pnlPercent.toFixed(2)}%)
               </span>
             </div>
           </div>
-          <span className={cn("text-xs", colors.textTertiary)}>{metrics.weight.toFixed(1)}% weight</span>
+          <span className={cn("text-[9px] flex-shrink-0", colors.textTertiary)}>{metrics.weight.toFixed(1)}% {weightLabel}</span>
         </div>
         
-        <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-[#5C8374]/10">
+        <div className="flex items-center justify-end gap-1 pt-1.5 border-t border-[#5C8374]/10">
           {item.notes && (
-            <Button size="sm" variant="ghost" onClick={() => setNotesDialog({ open: true, notes: item.notes, title: `${item.symbol} Notes` })} className={cn("h-8 px-2", colors.textSecondary)}>
-              <FileText className="w-4 h-4" />
+            <Button size="sm" variant="ghost" onClick={() => setNotesDialog({ open: true, notes: item.notes, title: notesTitle })} className={cn("h-6 px-1.5", colors.textSecondary)}>
+              <FileText className="w-3 h-3" />
             </Button>
           )}
           {item.assetType !== 'Cash' && onSell && (
-            <Button size="sm" variant="ghost" onClick={() => onSell(item)} className="h-8 px-2 text-green-400">
-              <DollarSign className="w-4 h-4" />
+            <Button size="sm" variant="ghost" onClick={() => onSell(item)} className="h-6 px-1.5 text-green-400">
+              <DollarSign className="w-3 h-3" />
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={handleEdit} className={cn("h-8 px-2", colors.textSecondary)}>
-            <Edit className="w-4 h-4" />
+          <Button size="sm" variant="ghost" onClick={handleEdit} className={cn("h-6 px-1.5", colors.textSecondary)}>
+            <Edit className="w-3 h-3" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={handleDelete} className="h-8 px-2 text-red-400">
-            <Trash2 className="w-4 h-4" />
+          <Button size="sm" variant="ghost" onClick={handleDelete} className="h-6 px-1.5 text-red-400">
+            <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       </div>
@@ -262,7 +271,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
       </Dialog>
 
       {/* Mobile Card View */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-2">
         {combinedItems.map((item) => (
           <MobilePositionCard key={item.itemType === 'daytrade' ? `dt-${item.id}` : item.symbol} item={item} />
         ))}
@@ -273,16 +282,16 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
         <Table>
           <TableHeader>
             <TableRow className={cn(colors.bgSecondary, colors.border, "border-b")}>
-              <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('date')}</TableHead>
-              <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('symbol')}</TableHead>
-              <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('type')}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('quantity')}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('avgPrice')}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('currentAmount')}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('totalValue')}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('totalPnL')}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>Weight</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('edit')}</TableHead>
+              <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('date') !== 'date' ? t('date') : 'Date'}</TableHead>
+              <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('symbol') !== 'symbol' ? t('symbol') : 'Symbol'}</TableHead>
+              <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('type') !== 'type' ? t('type') : 'Type'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('quantity') !== 'quantity' ? t('quantity') : 'Quantity'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('avgPrice') !== 'avgPrice' ? t('avgPrice') : 'Avg Price'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('currentAmount') !== 'currentAmount' ? t('currentAmount') : 'Current Price'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('totalValue') !== 'totalValue' ? t('totalValue') : 'Total Value'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('totalPnL') !== 'totalPnL' ? t('totalPnL') : 'Total P&L'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('weight') !== 'weight' ? t('weight') : 'Weight'}</TableHead>
+              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('edit') !== 'edit' ? t('edit') : 'Edit'}</TableHead>
             </TableRow>
           </TableHeader>
         <TableBody>
@@ -302,7 +311,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                   </TableCell>
                   <TableCell>
                     <Badge className={cn('text-xs border', 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30')}>
-                      Day Trade
+                      {t('dayTrade') !== 'dayTrade' ? t('dayTrade') : 'Day Trade'}
                     </Badge>
                   </TableCell>
                   <TableCell className={cn("text-right", colors.textSecondary)}>
@@ -345,7 +354,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => setNotesDialog({ open: true, notes: item.notes, title: 'Day Trade Notes' })}
+                          onClick={() => setNotesDialog({ open: true, notes: item.notes, title: (t('dayTradeNotes') !== 'dayTradeNotes' ? t('dayTradeNotes') : 'Day Trade Notes') })}
                           className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
                         >
                           <FileText className="w-4 h-4" />
@@ -476,9 +485,9 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => setNotesDialog({ open: true, notes: item.notes, title: `${item.symbol} Notes` })}
+                          onClick={() => setNotesDialog({ open: true, notes: item.notes, title: (t('notes') !== 'notes' ? `${item.symbol} ${t('notes')}` : `${item.symbol} Notes`) })}
                           className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
-                          title={t('viewNotes') || 'View Notes'}
+                          title={t('viewNotes') !== 'viewNotes' ? t('viewNotes') : 'View Notes'}
                         >
                           <FileText className="w-4 h-4" />
                         </Button>

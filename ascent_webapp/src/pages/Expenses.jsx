@@ -339,10 +339,10 @@ function Expenses() {
   }
 
   return (
-    <div className={cn("min-h-screen p-2 sm:p-4 md:p-8", colors.bgPrimary)}>
-      <div className="max-w-7xl mx-auto">
+    <div className={cn("flex flex-col h-[calc(100vh-10rem)] md:h-auto md:min-h-screen p-2 sm:p-4 md:p-8", colors.bgPrimary)}>
+      <div className="max-w-7xl mx-auto flex flex-col flex-1 md:flex-none md:block min-h-0 w-full">
         {/* Header */}
-        <div className="mb-3 sm:mb-6">
+        <div className="mb-3 sm:mb-6 flex-shrink-0">
           <div className="flex items-center justify-between mb-2 sm:mb-4">
             <div>
               <h1 className={cn("text-xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2", colors.textPrimary)}>{t('expenses')}</h1>
@@ -384,16 +384,18 @@ function Expenses() {
         </div>
 
         {/* Period Selector */}
-        <PeriodSelector
-          transactions={transactions}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          onYearChange={setSelectedYear}
-          onMonthChange={setSelectedMonth}
-        />
+        <div className="flex-shrink-0">
+          <PeriodSelector
+            transactions={transactions}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            onYearChange={setSelectedYear}
+            onMonthChange={setSelectedMonth}
+          />
+        </div>
 
-        {/* Period View with integrated filters */}
-        <div className="mt-3 sm:mt-6">
+        {/* Period View with integrated filters - Scrollable on mobile */}
+        <div className="mt-3 sm:mt-6 flex-1 overflow-y-auto min-h-0 md:flex-none md:overflow-visible custom-scrollbar">
           <ExpenseMonthView
             transactions={selectedPeriodTransactions}
             budgets={budgets}

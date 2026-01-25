@@ -309,7 +309,7 @@ function Notes() {
         {/* Note Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent 
-            className={cn("max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-3 sm:p-6", colors.bgSecondary, colors.border)}
+            className={cn("max-w-4xl w-[95vw] sm:w-full max-h-[80vh] sm:max-h-[75vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-3 sm:p-6", colors.bgSecondary, colors.border)}
             dir={isRTL ? 'rtl' : 'ltr'}
           >
             <DialogHeader className="pb-2 sm:pb-4">
@@ -333,7 +333,7 @@ function Notes() {
                 value={noteForm.content}
                 onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
                 rows={4}
-                className={cn(colors.bgPrimary, colors.border, colors.textPrimary, "resize-y min-h-[100px] sm:min-h-[150px] max-h-[300px] sm:max-h-[400px] text-xs sm:text-sm")}
+                className={cn(colors.bgPrimary, colors.border, colors.textPrimary, "resize-y min-h-[250px] sm:min-h-[200px] max-h-[600px] sm:max-h-[400px] text-xs sm:text-sm")}
               />
 
               {/* Color Picker */}

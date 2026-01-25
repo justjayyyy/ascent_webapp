@@ -742,10 +742,10 @@ export default function AccountDetail() {
   const chartData = getChartData();
 
   return (
-    <div className={cn("min-h-screen p-4 md:p-8", colors.bgPrimary)}>
-      <div className="max-w-7xl mx-auto">
+    <div className={cn("flex flex-col h-[calc(100vh-10rem)] md:h-auto md:min-h-screen p-4 md:p-8", colors.bgPrimary)}>
+      <div className="max-w-7xl mx-auto flex flex-col flex-1 md:flex-none md:block min-h-0 w-full">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-3 sm:mb-6 flex-shrink-0">
           <Link to={createPageUrl('Portfolio')}>
             <Button variant="ghost" className={cn("mb-4 hover:bg-[#5C8374]/20", colors.textSecondary)}>
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -792,55 +792,39 @@ export default function AccountDetail() {
         </div>
 
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('totalValue')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={cn("text-2xl font-bold", colors.textPrimary)}>
+        <div className="flex-shrink-0 mb-3 md:mb-6">
+          <div className="flex flex-row flex-nowrap gap-2 md:gap-4 overflow-x-auto">
+            <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalValue')}</p>
+              <p className={cn("text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>
                   {formatCurrency(metrics.totalValue, account.baseCurrency)}
                 </BlurValue>
               </p>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('totalPnL')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                {metrics.totalPnL >= 0 ? (
-                  <TrendingUp className="w-5 h-5 text-green-400" />
-                ) : (
-                  <TrendingDown className="w-5 h-5 text-red-400" />
-                )}
-                <p className={`text-2xl font-bold ${metrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  <BlurValue blur={user?.blurValues}>
-                    {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, account.baseCurrency)}
-                  </BlurValue>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
+              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${metrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <BlurValue blur={user?.blurValues}>
+                  {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, account.baseCurrency)}
+                </BlurValue>
+              </p>
+            </div>
 
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('totalReturn')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold ${metrics.totalPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
+              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${metrics.totalPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 <BlurValue blur={user?.blurValues}>
                   {metrics.totalPnLPercent >= 0 ? '+' : ''}{metrics.totalPnLPercent.toFixed(2)}%
                 </BlurValue>
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
-        {/* Performance Charts */}
+        {/* Performance Charts - Scrollable on mobile */}
+        <div className="flex-1 overflow-y-auto min-h-0 md:overflow-visible custom-scrollbar">
         {positions.length > 0 && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -1004,29 +988,29 @@ export default function AccountDetail() {
             </div>
 
             {/* Top Holdings */}
-            <div className="mb-6">
+            <div className="mb-3 md:mb-6">
               <Card className={cn(colors.cardBg, colors.cardBorder)}>
-                <CardHeader>
-                  <CardTitle className={colors.accentText}>{t('topHoldings')}</CardTitle>
+                <CardHeader className="pb-2 md:pb-6">
+                  <CardTitle className={cn("text-base md:text-xl", colors.accentText)}>{t('topHoldings')}</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <CardContent className="p-2 md:p-6">
+                  <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                     {chartData.slice(0, 6).map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: 'rgba(92, 131, 116, 0.1)' }}>
-                        <div className="flex items-center gap-3">
+                      <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded-lg" style={{ backgroundColor: 'rgba(92, 131, 116, 0.1)' }}>
+                        <div className="flex items-center gap-1.5 md:gap-3 min-w-0 flex-1">
                           <div
-                            className="w-3 h-3 rounded-full"
+                            className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
-                          <span className={cn("font-medium", colors.textPrimary)}>{item.name}</span>
+                          <span className={cn("font-medium text-xs md:text-base truncate", colors.textPrimary)}>{item.name}</span>
                         </div>
-                        <div className="text-right">
-                          <p className={cn("font-semibold", colors.textPrimary)}>
+                        <div className="text-right flex-shrink-0 ml-1">
+                          <p className={cn("font-semibold text-xs md:text-base", colors.textPrimary)}>
                             <BlurValue blur={user?.blurValues}>
                               {formatCurrency(item.value, account.baseCurrency)}
                             </BlurValue>
                           </p>
-                          <p className={cn("text-sm", colors.textTertiary)}>
+                          <p className={cn("text-[10px] md:text-sm", colors.textTertiary)}>
                             <BlurValue blur={user?.blurValues}>
                               {item.percentage}%
                             </BlurValue>
@@ -1041,10 +1025,10 @@ export default function AccountDetail() {
 
             {/* Positions Table */}
             <Card className={cn(colors.cardBg, colors.cardBorder)}>
-              <CardHeader>
-                <CardTitle className={colors.accentText}>{t('positions')}</CardTitle>
+              <CardHeader className="pb-2 md:pb-6">
+                <CardTitle className={cn("text-base md:text-xl", colors.accentText)}>{t('positions')}</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-2 md:p-6">
                 {positionsLoading || dayTradesLoading ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className={cn("w-6 h-6 animate-spin", colors.accentText)} />
@@ -1257,6 +1241,7 @@ export default function AccountDetail() {
             editAccount={account}
           />
         )}
+        </div>
 
       </div>
     </div>

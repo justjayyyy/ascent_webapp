@@ -105,85 +105,87 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-md")}>
-        <DialogHeader>
-          <DialogTitle className={cn("text-xl font-bold", colors.accentText)}>
+      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "w-[95vw] max-w-[95vw] sm:w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-3 sm:p-6")}>
+        <DialogHeader className="pb-2 sm:pb-4">
+          <DialogTitle className={cn("text-base sm:text-xl font-bold", colors.accentText)}>
             {editPosition ? t('editPosition') : editDayTrade ? 'Edit Day Trade' : 'Add to Portfolio'}
           </DialogTitle>
-          <DialogDescription className={colors.textTertiary}>
+          <DialogDescription className={cn("text-[10px] sm:text-sm hidden sm:block", colors.textTertiary)}>
             {editPosition ? t('updatePositionDetails') : editDayTrade ? 'Update your day trade record' : 'Add a position or record day trading P&L'}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className={cn("grid w-full grid-cols-2 mb-4", colors.bgTertiary, colors.border)}>
-            <TabsTrigger value="position" disabled={!!editDayTrade}>Position</TabsTrigger>
-            <TabsTrigger value="daytrade" disabled={!!editPosition}>Day Trade</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2 sm:mt-4">
+          <TabsList className={cn("grid w-full grid-cols-2 mb-2 sm:mb-4 h-8 sm:h-10", colors.bgTertiary, colors.border)}>
+            <TabsTrigger value="position" disabled={!!editDayTrade} className="text-xs sm:text-sm">Position</TabsTrigger>
+            <TabsTrigger value="daytrade" disabled={!!editPosition} className="text-xs sm:text-sm">Day Trade</TabsTrigger>
           </TabsList>
 
           <TabsContent value="position">
-            <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="assetType" className={colors.textSecondary}>{t('type')} *</Label>
-            <Select value={formData.assetType} onValueChange={(value) => {
-              const updates = { assetType: value };
-              if (value === 'Cash') {
-                updates.symbol = 'CASH';
-                updates.averageBuyPrice = '1';
-                updates.quantity = '';
-              } else if (formData.assetType === 'Cash') {
-                updates.symbol = '';
-                updates.averageBuyPrice = '';
-              }
-              setFormData({ ...formData, ...updates });
-            }}>
-              <SelectTrigger className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                <SelectItem value="Stock" className={colors.textPrimary}>Stock</SelectItem>
-                <SelectItem value="ETF" className={colors.textPrimary}>ETF</SelectItem>
-                <SelectItem value="Option" className={colors.textPrimary}>Option</SelectItem>
-                <SelectItem value="Cash" className={colors.textPrimary}>Cash</SelectItem>
-                <SelectItem value="Crypto" className={colors.textPrimary}>Crypto</SelectItem>
-                <SelectItem value="Other" className={colors.textPrimary}>Other</SelectItem>
-              </SelectContent>
-            </Select>
+            <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4">
+          <div className={cn("grid gap-2 sm:gap-4", formData.assetType === 'Cash' ? "grid-cols-1" : "grid-cols-2")}>
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="assetType" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
+              <Select value={formData.assetType} onValueChange={(value) => {
+                const updates = { assetType: value };
+                if (value === 'Cash') {
+                  updates.symbol = 'CASH';
+                  updates.averageBuyPrice = '1';
+                  updates.quantity = '';
+                } else if (formData.assetType === 'Cash') {
+                  updates.symbol = '';
+                  updates.averageBuyPrice = '';
+                }
+                setFormData({ ...formData, ...updates });
+              }}>
+                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                  <SelectItem value="Stock" className={colors.textPrimary}>Stock</SelectItem>
+                  <SelectItem value="ETF" className={colors.textPrimary}>ETF</SelectItem>
+                  <SelectItem value="Option" className={colors.textPrimary}>Option</SelectItem>
+                  <SelectItem value="Cash" className={colors.textPrimary}>Cash</SelectItem>
+                  <SelectItem value="Crypto" className={colors.textPrimary}>Crypto</SelectItem>
+                  <SelectItem value="Other" className={colors.textPrimary}>Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.assetType !== 'Cash' && (
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="symbol" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
+                  {formData.assetType === 'Crypto' ? 'Crypto Symbol' : t('symbol')} *
+                </Label>
+                <Input
+                  id="symbol"
+                  placeholder={formData.assetType === 'Crypto' ? 'e.g., BTC, ETH' : t('symbolPlaceholder')}
+                  value={formData.symbol}
+                  onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
+                  required
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary, "uppercase")}
+                />
+              </div>
+            )}
           </div>
 
-          {formData.assetType !== 'Cash' && (
-            <div className="space-y-2">
-              <Label htmlFor="symbol" className={colors.textSecondary}>
-                {formData.assetType === 'Crypto' ? 'Crypto Symbol' : t('symbol')} *
-              </Label>
-              <Input
-                id="symbol"
-                placeholder={formData.assetType === 'Crypto' ? 'e.g., BTC, ETH' : t('symbolPlaceholder')}
-                value={formData.symbol}
-                onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
-                required
-                className={cn(colors.bgTertiary, colors.border, colors.textPrimary, "uppercase")}
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="positionDate" className={colors.textSecondary}>{t('date')} *</Label>
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="positionDate" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('date')} *</Label>
               <Input
                 id="positionDate"
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 required
-                className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="currency" className={colors.textSecondary}>{t('currency')} *</Label>
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="currency" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('currency')} *</Label>
               <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                <SelectTrigger className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -200,8 +202,8 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
           </div>
 
           {formData.assetType === 'Cash' ? (
-            <div className="space-y-2">
-              <Label htmlFor="quantity" className={colors.textSecondary}>
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="quantity" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
                 {t('depositAmount') || 'Deposit Amount'} *
               </Label>
               <Input
@@ -212,7 +214,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                 required
-                className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
               />
               {hasCashPosition && cashBalance > 0 && (
                 <p className={cn("text-sm flex items-center gap-1", colors.textTertiary)}>
@@ -225,9 +227,9 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
             </div>
           ) : formData.assetType === 'Option' ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="quantity" className={colors.textSecondary}>Contracts *</Label>
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="quantity" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Contracts *</Label>
                   <Input
                     id="quantity"
                     type="number"
@@ -236,12 +238,12 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                     required
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="averageBuyPrice" className={colors.textSecondary}>Contract Avg Price *</Label>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="averageBuyPrice" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Contract Avg Price *</Label>
                   <Input
                     id="averageBuyPrice"
                     type="number"
@@ -250,14 +252,14 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                     value={formData.averageBuyPrice}
                     onChange={(e) => setFormData({ ...formData, averageBuyPrice: e.target.value })}
                     required
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="strikePrice" className={colors.textSecondary}>Strike Price *</Label>
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="strikePrice" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Strike Price *</Label>
                   <Input
                     id="strikePrice"
                     type="number"
@@ -266,27 +268,27 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                     value={formData.strikePrice}
                     onChange={(e) => setFormData({ ...formData, strikePrice: e.target.value })}
                     required
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="expirationDate" className={colors.textSecondary}>Expiration Date *</Label>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="expirationDate" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Expiration Date *</Label>
                   <Input
                     id="expirationDate"
                     type="date"
                     value={formData.expirationDate}
                     onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
                     required
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
               </div>
             </>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity" className={colors.textSecondary}>
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="quantity" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
                   {formData.assetType === 'Crypto' ? 'Amount' : t('quantity')} *
                 </Label>
                 <Input
@@ -297,12 +299,12 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                   required
-                  className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="averageBuyPrice" className={colors.textSecondary}>Price per Unit *</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="averageBuyPrice" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Price per Unit *</Label>
                 <Input
                   id="averageBuyPrice"
                   type="number"
@@ -311,20 +313,20 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                   value={formData.averageBuyPrice}
                   onChange={(e) => setFormData({ ...formData, averageBuyPrice: e.target.value })}
                   required
-                  className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                 />
               </div>
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="notes" className={colors.textSecondary}>{t('notesOptional')}</Label>
+          <div className="space-y-1 sm:space-y-2">
+            <Label htmlFor="notes" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('notesOptional')}</Label>
             <Textarea
               id="notes"
               placeholder={t('notesPlaceholder')}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, "min-h-[60px]")}
+              className={cn("text-xs sm:text-sm min-h-[60px] sm:min-h-[80px]", colors.bgTertiary, colors.border, colors.textPrimary)}
             />
           </div>
 
@@ -376,25 +378,25 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
             </div>
           )}
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onClose}
                   disabled={isLoading}
-                  className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                  className={cn("flex-1 h-8 sm:h-10 text-xs sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
                 >
                   {t('cancel')}
                 </Button>
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                  className="flex-1 h-8 sm:h-10 text-xs sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {editPosition ? t('updating') : t('adding')}
+                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                      <span className="hidden sm:inline">{editPosition ? t('updating') : t('adding')}</span>
                     </>
                   ) : (
                     editPosition ? t('updatePositionBtn') : t('addPositionBtn')
@@ -405,22 +407,22 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
           </TabsContent>
 
           <TabsContent value="daytrade">
-            <form onSubmit={handleDayTradeSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="date" className={colors.textSecondary}>Date *</Label>
+            <form onSubmit={handleDayTradeSubmit} className="space-y-2 sm:space-y-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="date" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Date *</Label>
                   <Input
                     id="date"
                     type="date"
                     value={dayTradeData.date}
                     onChange={(e) => setDayTradeData({ ...dayTradeData, date: e.target.value })}
                     required
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="profitLoss" className={colors.textSecondary}>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="profitLoss" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
                     Profit/Loss ({currency}) *
                   </Label>
                   <Input
@@ -431,41 +433,41 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                     value={dayTradeData.profitLoss}
                     onChange={(e) => setDayTradeData({ ...dayTradeData, profitLoss: e.target.value })}
                     required
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="dayTradeNotes" className={colors.textSecondary}>{t('notesOptional')}</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="dayTradeNotes" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('notesOptional')}</Label>
                 <Textarea
                   id="dayTradeNotes"
                   placeholder="Day trading strategy, trades executed, etc."
                   value={dayTradeData.notes}
                   onChange={(e) => setDayTradeData({ ...dayTradeData, notes: e.target.value })}
-                  className={cn(colors.bgTertiary, colors.border, colors.textPrimary, "min-h-[80px]")}
+                  className={cn("text-xs sm:text-sm min-h-[60px] sm:min-h-[80px]", colors.bgTertiary, colors.border, colors.textPrimary)}
                 />
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onClose}
                   disabled={isLoading}
-                  className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                  className={cn("flex-1 h-8 sm:h-10 text-xs sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
                 >
                   {t('cancel')}
                 </Button>
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                  className="flex-1 h-8 sm:h-10 text-xs sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {t('saving')}
+                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                      <span className="hidden sm:inline">{t('saving')}</span>
                     </>
                   ) : (
                     editDayTrade ? 'Update Trade' : 'Add Trade'

@@ -323,7 +323,7 @@ export default function AddTransactionDialog({
           </div>
 
           {/* Recurring Transaction Toggle */}
-          <div className="flex items-center gap-2 p-2 rounded-md border" style={{ borderColor: colors.border }}>
+          <div className="flex items-center gap-2 p-2 rounded-md">
             <Checkbox
               id="isRecurring"
               checked={formData.isRecurring}
@@ -349,13 +349,23 @@ export default function AddTransactionDialog({
 
           {/* Recurring Transaction Date Range */}
           {formData.isRecurring && (
-            <div className="space-y-2 p-2 rounded-md" style={{ backgroundColor: colors.bgTertiary }}>
-              <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
-                {t('recurringTransactionHelp') || t('recurringHelpText') || 'Transactions will be created monthly from start to end date'}
+            <div className="space-y-0 sm:space-y-2 p-1 sm:p-2 pt-0 sm:pt-1 pb-0 sm:pb-2 rounded-md -my-2 sm:my-0" style={{ backgroundColor: colors.bgTertiary }}>
+              <p className={cn("text-[10px] sm:text-xs mb-0 pb-0", colors.textTertiary)}>
+                {(() => {
+                  const helpText = t('recurringTransactionHelp');
+                  if (helpText !== 'recurringTransactionHelp') {
+                    return helpText;
+                  }
+                  const altHelpText = t('recurringHelpText');
+                  if (altHelpText !== 'recurringHelpText') {
+                    return altHelpText;
+                  }
+                  return 'Transactions will be created monthly from start to end date';
+                })()}
               </p>
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="recurringStartDate" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
+              <div className="grid grid-cols-2 gap-0 sm:gap-4">
+                <div className="space-y-0 sm:space-y-2">
+                  <Label htmlFor="recurringStartDate" className={cn("text-[10px] sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
                     {t('fromDate') || 'From Date'} *
                   </Label>
                   <Input
@@ -367,13 +377,13 @@ export default function AddTransactionDialog({
                       setErrors({ ...errors, recurringStartDate: '' });
                     }}
                     max={formData.recurringEndDate || undefined}
-                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringStartDate && 'border-red-500')}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm mt-0 sm:mt-0", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringStartDate && 'border-red-500')}
                   />
                   {errors.recurringStartDate && <p className="text-[9px] sm:text-xs text-red-400">{errors.recurringStartDate}</p>}
                 </div>
 
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="recurringEndDate" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
+                <div className="space-y-0 sm:space-y-2">
+                  <Label htmlFor="recurringEndDate" className={cn("text-[10px] sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
                     {t('toDate') || 'To Date'} *
                   </Label>
                   <Input
@@ -385,7 +395,7 @@ export default function AddTransactionDialog({
                       setErrors({ ...errors, recurringEndDate: '' });
                     }}
                     min={formData.recurringStartDate || undefined}
-                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringEndDate && 'border-red-500')}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm mt-0 sm:mt-0", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringEndDate && 'border-red-500')}
                   />
                   {errors.recurringEndDate && <p className="text-[9px] sm:text-xs text-red-400">{errors.recurringEndDate}</p>}
                 </div>

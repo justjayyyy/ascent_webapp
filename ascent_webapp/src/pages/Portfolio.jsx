@@ -279,26 +279,26 @@ export default function Portfolio() {
           </div>
 
           {/* Overall Summary */}
-          <div className="grid grid-cols-3 md:grid-cols-3 gap-1.5 md:gap-4 mb-4 md:mb-6">
-            <div className={cn("rounded-lg md:rounded-xl p-2 md:p-6 border", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-0.5 md:mb-2 truncate", colors.textTertiary)}>{t('totalPortfolioValue')}</p>
-              <p className={cn("text-sm md:text-3xl font-bold truncate", colors.textPrimary)}>
+          <div className="flex flex-row flex-nowrap gap-2 md:gap-4 mb-3 md:mb-6 overflow-x-auto">
+            <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPortfolioValue')}</p>
+              <p className={cn("text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>
                   {formatCurrency(overallMetrics.totalValue, user?.currency)}
                 </BlurValue>
               </p>
             </div>
-            <div className={cn("rounded-lg md:rounded-xl p-2 md:p-6 border", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-0.5 md:mb-2 truncate", colors.textTertiary)}>{t('totalPnL')}</p>
-              <p className={`text-sm md:text-3xl font-bold truncate ${overallMetrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
+              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${overallMetrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 <BlurValue blur={user?.blurValues}>
                   {overallMetrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(overallMetrics.totalPnL, user?.currency)}
                 </BlurValue>
               </p>
             </div>
-            <div className={cn("rounded-lg md:rounded-xl p-2 md:p-6 border", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-0.5 md:mb-2 truncate", colors.textTertiary)}>{t('totalReturn')}</p>
-              <p className={`text-sm md:text-3xl font-bold truncate ${overallPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
+              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
+              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${overallPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {overallPnLPercent >= 0 ? '+' : ''}{overallPnLPercent.toFixed(2)}%
               </p>
             </div>
