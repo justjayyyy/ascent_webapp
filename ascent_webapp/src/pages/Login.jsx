@@ -195,8 +195,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#092635] flex items-start sm:items-center justify-center p-4 pt-3 sm:pt-4 pb-2 sm:pb-4">
-      <div className="w-full max-w-md mt-2 sm:mt-0">
+    <div className="min-h-screen bg-[#092635] flex items-start sm:items-center justify-center p-4 pt-3 sm:pt-4 pb-1 sm:pb-4">
+      <div className="w-full max-w-md mt-2 sm:mt-0 mb-1 sm:mb-0">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8">
           <h1 className="text-4xl font-bold text-[#9EC8B9] mb-1 sm:mb-2">{t('ascend')}</h1>
@@ -210,7 +210,7 @@ export default function Login() {
               {t('signInToAccount')}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3 sm:pb-6">
             {/* Google Sign-In Button with Calendar Access */}
             {GOOGLE_CLIENT_ID && (
               <div className="mb-6">
