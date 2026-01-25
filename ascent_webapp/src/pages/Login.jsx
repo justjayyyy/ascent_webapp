@@ -39,6 +39,30 @@ export default function Login() {
 
   const redirectUrl = searchParams.get('redirect') || '/Portfolio';
 
+  // Prevent body scrolling on mobile
+  useEffect(() => {
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyHeight = document.body.style.height;
+    const originalHtmlHeight = document.documentElement.style.height;
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100dvh';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.height = '100dvh';
+    
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.height = originalBodyHeight;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.documentElement.style.height = originalHtmlHeight;
+    };
+  }, []);
+
   // Initialize Google Sign-In
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
@@ -195,40 +219,40 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#092635] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="bg-[#092635] flex items-center justify-center p-1.5 sm:p-4 overflow-hidden fixed inset-0" style={{ height: '100dvh' }}>
+      <div className="w-full max-w-md flex flex-col" style={{ maxHeight: '100dvh', height: '100%' }}>
         {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-[#9EC8B9] mb-2">{t('ascend')}</h1>
-          <p className="text-[#5C8374]">{t('ascendTagline')}</p>
+        <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
+          <h1 className="text-xl sm:text-4xl font-bold text-[#9EC8B9] mb-0.5 sm:mb-2">{t('ascend')}</h1>
+          <p className="hidden sm:block text-sm sm:text-base text-[#5C8374]">{t('ascendTagline')}</p>
         </div>
 
-        <Card className="bg-[#1B4242] border-[#5C8374]/30">
-          <CardHeader className="text-center">
-            <CardTitle className="text-[#9EC8B9]">{t('welcome')}</CardTitle>
-            <CardDescription className="text-[#5C8374]">
+        <Card className="bg-[#1B4242] border-[#5C8374]/30 flex-1 flex flex-col min-h-0">
+          <CardHeader className="text-center pb-2 sm:pb-6 flex-shrink-0">
+            <CardTitle className="text-base sm:text-xl text-[#9EC8B9]">{t('welcome')}</CardTitle>
+            <CardDescription className="hidden sm:block text-xs sm:text-sm text-[#5C8374]">
               {t('signInToAccount')}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6 flex-1 overflow-y-auto custom-scrollbar min-h-0">
             {/* Google Sign-In Button with Calendar Access */}
             {GOOGLE_CLIENT_ID && (
-              <div className="mb-6">
+              <div className="mb-2 sm:mb-6">
                 <button
                   onClick={handleGoogleLoginWithCalendar}
                   disabled={isGoogleLoading}
-                  className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-medium transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-3 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg text-xs sm:text-base text-gray-700 font-medium transition-colors disabled:opacity-50"
                 >
                   {isGoogleLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-3 h-3 sm:w-5 sm:h-5 animate-spin" />
                   ) : (
                     <img 
                       src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
                       alt="Google" 
-                      className="w-5 h-5"
+                      className="w-3 h-3 sm:w-5 sm:h-5"
                     />
                   )}
-                  {isGoogleLoading ? t('signingIn') : t('continueWithGoogle')}
+                  <span className="truncate text-xs sm:text-base">{isGoogleLoading ? t('signingIn') : t('continueWithGoogle')}</span>
                 </button>
                 
                 {/* Hidden container for fallback - keep for compatibility */}
@@ -239,11 +263,11 @@ export default function Login() {
                 />
                 
                 {/* Divider */}
-                <div className="relative my-6">
+                <div className="relative my-2 sm:my-6">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-[#5C8374]/30"></div>
                   </div>
-                  <div className="relative flex justify-center text-sm">
+                  <div className="relative flex justify-center text-xs sm:text-sm">
                     <span className="px-2 bg-[#1B4242] text-[#5C8374]">{t('orContinueWithEmail')}</span>
                   </div>
                 </div>
@@ -251,25 +275,25 @@ export default function Login() {
             )}
 
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-[#092635]">
+              <TabsList className="grid w-full grid-cols-2 bg-[#092635] h-8 sm:h-10">
                 <TabsTrigger 
                   value="login" 
-                  className="data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
+                  className="text-xs sm:text-sm data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
                 >
                   {t('login')}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="register"
-                  className="data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
+                  className="text-xs sm:text-sm data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
                 >
                   {t('register')}
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="login" className="mt-6">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-[#9EC8B9]">{t('email')}</Label>
+              <TabsContent value="login" className="mt-2 sm:mt-6">
+                <form onSubmit={handleLogin} className="space-y-2 sm:space-y-4">
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="login-email" className="text-xs sm:text-sm text-[#9EC8B9]">{t('email')}</Label>
                     <Input
                       id="login-email"
                       type="email"
@@ -277,11 +301,11 @@ export default function Login() {
                       value={loginData.email}
                       onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                       required
-                      className="bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      className="h-8 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-[#9EC8B9]">{t('password')}</Label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="login-password" className="text-xs sm:text-sm text-[#9EC8B9]">{t('password')}</Label>
                     <div className="relative">
                       <Input
                         id="login-password"
@@ -290,7 +314,7 @@ export default function Login() {
                         value={loginData.password}
                         onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                         required
-                        className="bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-10"
+                        className="h-8 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-8 sm:pr-10"
                       />
                       <button
                         type="button"
@@ -303,36 +327,36 @@ export default function Login() {
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                    className="w-full h-8 sm:h-10 text-xs sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white mt-2 sm:mt-0"
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('signingIn')}
+                        <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                        <span className="text-xs sm:text-base">{t('signingIn')}</span>
                       </>
                     ) : (
-                      t('signIn')
+                      <span className="text-xs sm:text-base">{t('signIn')}</span>
                     )}
                   </Button>
                 </form>
               </TabsContent>
 
-              <TabsContent value="register" className="mt-6">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-name" className="text-[#9EC8B9]">{t('fullName')}</Label>
+              <TabsContent value="register" className="mt-2 sm:mt-6">
+                <form onSubmit={handleRegister} className="space-y-2 sm:space-y-4">
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="register-name" className="text-xs sm:text-sm text-[#9EC8B9]">{t('fullName')}</Label>
                     <Input
                       id="register-name"
                       type="text"
                       placeholder="John Doe"
                       value={registerData.full_name}
                       onChange={(e) => setRegisterData({ ...registerData, full_name: e.target.value })}
-                      className="bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      className="h-8 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email" className="text-[#9EC8B9]">{t('email')}</Label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="register-email" className="text-xs sm:text-sm text-[#9EC8B9]">{t('email')}</Label>
                     <Input
                       id="register-email"
                       type="email"
@@ -340,11 +364,11 @@ export default function Login() {
                       value={registerData.email}
                       onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
                       required
-                      className="bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      className="h-8 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password" className="text-[#9EC8B9]">{t('password')}</Label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="register-password" className="text-xs sm:text-sm text-[#9EC8B9]">{t('password')}</Label>
                     <div className="relative">
                       <Input
                         id="register-password"
@@ -354,19 +378,19 @@ export default function Login() {
                         onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                         required
                         minLength={6}
-                        className="bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-10"
+                        className="h-8 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-8 sm:pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5C8374] hover:text-[#9EC8B9]"
+                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[#5C8374] hover:text-[#9EC8B9]"
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" /> : <Eye className="w-3 h-3 sm:w-4 sm:h-4" />}
                       </button>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-confirm" className="text-[#9EC8B9]">{t('confirmPassword')}</Label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <Label htmlFor="register-confirm" className="text-xs sm:text-sm text-[#9EC8B9]">{t('confirmPassword')}</Label>
                     <Input
                       id="register-confirm"
                       type="password"
@@ -374,21 +398,21 @@ export default function Login() {
                       value={registerData.confirmPassword}
                       onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
                       required
-                      className="bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      className="h-8 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
                     />
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                    className="w-full h-8 sm:h-10 text-xs sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white mt-2 sm:mt-0"
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('creatingAccount')}
+                        <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                        <span className="text-xs sm:text-base">{t('creatingAccount')}</span>
                       </>
                     ) : (
-                      t('createAccount')
+                      <span className="text-xs sm:text-base">{t('createAccount')}</span>
                     )}
                   </Button>
                 </form>
