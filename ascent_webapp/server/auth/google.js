@@ -65,7 +65,15 @@ export default async function handler(req, res) {
       await connectDB();
     } catch (dbError) {
       console.error('[Google Auth] MongoDB connection failed:', dbError);
-      return error(res, 'Database connection failed', 503);
+      
+      // Provide specific error messages
+      if (dbError.code === 'MONGODB_URI_MISSING') {
+        return error(res, 'Database configuration error. Please contact support.', 503);
+      }
+      
+      // Return user-friendly error
+      const errorMessage = dbError.message || 'Database connection failed. Please try again later.';
+      return error(res, errorMessage, 503);
     }
     
     // Find or create user

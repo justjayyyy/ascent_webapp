@@ -14,7 +14,9 @@ const resolveSrv = promisify(dns.resolveSrv);
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable');
+  const error = new Error('MONGODB_URI environment variable is not set. Please configure it in Vercel dashboard under Settings → Environment Variables.');
+  error.code = 'MONGODB_URI_MISSING';
+  throw error;
 }
 
 // Helper function to manually resolve SRV and create direct connection
@@ -121,13 +123,15 @@ export async function connectDB() {
   }
 
   // Create new connection
+  // For Vercel serverless, use shorter timeouts to avoid function timeout
+  const isVercel = process.env.VERCEL === '1';
   const opts = {
     bufferCommands: false,
-    serverSelectionTimeoutMS: 30000, // Increased timeout
-    socketTimeoutMS: 45000,
-    connectTimeoutMS: 30000, // Add connection timeout
-    maxPoolSize: 10,
-    minPoolSize: 1,
+    serverSelectionTimeoutMS: isVercel ? 10000 : 30000, // Shorter timeout for Vercel
+    socketTimeoutMS: isVercel ? 20000 : 45000,
+    connectTimeoutMS: isVercel ? 10000 : 30000,
+    maxPoolSize: isVercel ? 5 : 10, // Smaller pool for serverless
+    minPoolSize: 0, // No minimum for serverless (cold starts)
     // Retry configuration
     retryWrites: true,
     retryReads: true,
