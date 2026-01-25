@@ -222,12 +222,18 @@ export default function Login() {
     <div className="bg-[#092635] flex items-start sm:items-center justify-center p-2 pt-0 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
       <div className="w-full max-w-md flex flex-col items-center justify-start sm:justify-center max-h-full overflow-y-auto custom-scrollbar pt-2 sm:pt-0 pb-2">
         {/* Logo */}
-        <div className="text-center mb-0 sm:mb-8 flex-shrink-0">
-          <h1 className="text-2xl sm:text-4xl font-bold text-[#9EC8B9] mb-0 sm:mb-2">{t('ascend')}</h1>
+        <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
+          <img 
+            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
+            alt="Ascend Logo" 
+            className="w-16 h-16 sm:w-20 sm:h-20 object-contain mx-auto mb-2 sm:mb-3"
+            style={{ filter: 'brightness(1.1) saturate(1.2)' }}
+          />
+          <h1 className="text-2xl sm:text-4xl font-bold text-[#9EC8B9] mb-1 sm:mb-2">{t('ascend')}</h1>
           <p className="text-xs sm:text-base text-[#5C8374]">{t('ascendTagline')}</p>
         </div>
 
-        <Card className="bg-[#1B4242] border-[#5C8374]/30 mb-0 flex-shrink-0 w-full">
+        <Card className="bg-[#1B4242] border-[#5C8374]/30 mb-2 sm:mb-0 flex-shrink-0 w-full">
           <CardHeader className="text-center pb-2 sm:pb-6">
             <CardTitle className="text-base sm:text-xl text-[#9EC8B9]">{t('welcome')}</CardTitle>
             <CardDescription className="text-xs sm:text-sm text-[#5C8374]">
