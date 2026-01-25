@@ -219,10 +219,10 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-[#092635] flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <div className="w-full max-w-md flex flex-col items-center justify-center max-h-full overflow-y-auto custom-scrollbar py-2">
+    <div className="bg-[#092635] flex items-center justify-center p-2 pt-1 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <div className="w-full max-w-md flex flex-col items-center justify-center max-h-full overflow-y-auto custom-scrollbar py-1 sm:py-2">
         {/* Logo */}
-        <div className="text-center mb-1 sm:mb-8 flex-shrink-0">
+        <div className="text-center mb-0.5 sm:mb-8 flex-shrink-0">
           <h1 className="text-2xl sm:text-4xl font-bold text-[#9EC8B9] mb-0.5 sm:mb-2">{t('ascend')}</h1>
           <p className="text-xs sm:text-base text-[#5C8374]">{t('ascendTagline')}</p>
         </div>
