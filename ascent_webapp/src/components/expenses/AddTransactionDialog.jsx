@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,8 @@ export default function AddTransactionDialog({
   });
 
   const [errors, setErrors] = useState({});
+  const dateInputRef = useRef(null);
+  const isInitialOpenRef = useRef(true);
 
   const { data: cards = [] } = useQuery({
     queryKey: ['cards', user?.id],
@@ -90,6 +92,24 @@ export default function AddTransactionDialog({
     }
     setErrors({});
   }, [editTransaction, open, user?.currency, categories]);
+
+  // Prevent date input from auto-focusing on mobile when dialog opens
+  useEffect(() => {
+    if (open) {
+      isInitialOpenRef.current = true;
+      if (dateInputRef.current && window.innerWidth < 640) {
+        // Small delay to ensure dialog is fully rendered, then blur if focused
+        setTimeout(() => {
+          if (document.activeElement === dateInputRef.current && isInitialOpenRef.current) {
+            dateInputRef.current.blur();
+            isInitialOpenRef.current = false;
+          }
+        }, 150);
+      } else {
+        isInitialOpenRef.current = false;
+      }
+    }
+  }, [open]);
 
   const validate = () => {
     const newErrors = {};
@@ -166,17 +186,28 @@ export default function AddTransactionDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4 mt-1.5 sm:mt-4">
-          <div className={cn("grid gap-2 sm:gap-4", formData.isRecurring ? "grid-cols-1" : "grid-cols-2")}>
+          <div className={cn("grid gap-2 sm:gap-4", formData.isRecurring ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
             {!formData.isRecurring && (
               <div className="space-y-1 sm:space-y-2">
                 <Label htmlFor="date" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('date')} *</Label>
                 <Input
+                  ref={dateInputRef}
                   id="date"
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   max={format(new Date(), 'yyyy-MM-dd')}
-                  className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary, errors.date && 'border-red-500')}
+                  autoFocus={false}
+                  onFocus={(e) => {
+                    // Prevent auto-opening date picker on mobile when dialog first opens
+                    if (window.innerWidth < 640 && isInitialOpenRef.current) {
+                      setTimeout(() => {
+                        e.target.blur();
+                        isInitialOpenRef.current = false;
+                      }, 0);
+                    }
+                  }}
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm w-full", colors.bgTertiary, colors.border, colors.textPrimary, errors.date && 'border-red-500')}
                 />
                 {errors.date && <p className="text-[9px] sm:text-xs text-red-400">{errors.date}</p>}
               </div>
