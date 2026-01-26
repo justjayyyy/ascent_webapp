@@ -149,18 +149,52 @@ export default function Login() {
           }
         } else if (response.error) {
           console.error('Google OAuth error:', response.error);
-          toast.error(t('googleSignInFailed'));
+          
+          // Provide more specific error messages
+          if (response.error === 'access_denied') {
+            toast.error('Access denied. Please grant permissions to sign in with Google.');
+          } else if (response.error === 'popup_closed_by_user') {
+            toast.error('Sign-in cancelled. Please try again.');
+          } else {
+            // Fallback: Try using the simpler ID token flow without calendar scopes
+            console.log('OAuth2 flow failed, falling back to ID token flow');
+            setIsGoogleLoading(false);
+            // Trigger the ID token flow instead
+            if (window.google?.accounts?.id) {
+              window.google.accounts.id.prompt((notification) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                  // User has already signed in or dismissed the prompt
+                  // Try to render the button programmatically
+                  const buttonContainer = document.getElementById('google-signin-button');
+                  if (buttonContainer) {
+                    const button = buttonContainer.querySelector('div[role="button"]');
+                    if (button) {
+                      button.click();
+                    }
+                  }
+                }
+              });
+            } else {
+              toast.error(t('googleSignInFailed') + ': ' + response.error);
+            }
+            return;
+          }
         }
         setIsGoogleLoading(false);
       },
     });
 
-    tokenClient.requestAccessToken();
+    // Request access token with prompt to ensure consent screen shows
+    tokenClient.requestAccessToken({ prompt: '' });
   };
 
   const handleGoogleCallback = async (response) => {
     if (!response.credential) {
-      toast.error(t('googleSignInFailed'));
+      setIsGoogleLoading(false);
+      if (response.select_by === 'user') {
+        // User clicked but no credential - might be an error
+        toast.error('Sign-in cancelled or failed. Please try again.');
+      }
       return;
     }
 
@@ -171,6 +205,7 @@ export default function Login() {
       toast.success(t('welcomeBack'));
       navigate(redirectUrl);
     } catch (error) {
+      console.error('Google login error:', error);
       toast.error(error.message || t('googleSignInFailed'));
     } finally {
       setIsGoogleLoading(false);
@@ -241,11 +276,29 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-3 sm:pb-6 px-3 sm:px-6">
-            {/* Google Sign-In Button with Calendar Access */}
+            {/* Google Sign-In Button - Using ID token flow (simpler, no calendar scopes required) */}
             {GOOGLE_CLIENT_ID && (
               <div className="mb-2 sm:mb-6">
                 <button
-                  onClick={handleGoogleLoginWithCalendar}
+                  onClick={() => {
+                    // Use the simpler ID token flow for login (no calendar scopes)
+                    // Calendar access will be requested separately when user accesses calendar feature
+                    setIsGoogleLoading(true);
+                    const buttonContainer = document.getElementById('google-signin-button');
+                    if (buttonContainer) {
+                      const googleButton = buttonContainer.querySelector('div[role="button"]');
+                      if (googleButton) {
+                        // Click the hidden Google button to trigger ID token flow
+                        (googleButton as HTMLElement).click();
+                      } else {
+                        setIsGoogleLoading(false);
+                        toast.error('Google Sign-In not ready. Please wait a moment and try again.');
+                      }
+                    } else {
+                      setIsGoogleLoading(false);
+                      toast.error('Google Sign-In not available');
+                    }
+                  }}
                   disabled={isGoogleLoading}
                   className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg text-xs sm:text-base text-gray-700 font-medium transition-colors disabled:opacity-50"
                 >
@@ -261,7 +314,7 @@ export default function Login() {
                   {isGoogleLoading ? t('signingIn') : t('continueWithGoogle')}
                 </button>
                 
-                {/* Hidden container for fallback - keep for compatibility */}
+                {/* Hidden Google Sign-In Button - used to trigger ID token flow */}
                 <div 
                   id="google-signin-button" 
                   className="hidden"
