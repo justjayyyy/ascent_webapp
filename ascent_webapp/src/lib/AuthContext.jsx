@@ -4,6 +4,21 @@ import { useQueryClient } from '@tanstack/react-query';
 
 const AuthContext = createContext();
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ['/login', '/privacy-policy', '/terms-of-service', '/accept-invitation'];
+
+const isPublicRoute = (pathname) => {
+  return PUBLIC_ROUTES.some(route => {
+    if (route.includes(':')) {
+      // Handle dynamic routes like /accept-invitation/:token
+      const routePattern = route.replace(/:[^/]+/g, '[^/]+');
+      const regex = new RegExp(`^${routePattern}`);
+      return regex.test(pathname);
+    }
+    return pathname.startsWith(route);
+  });
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,6 +38,14 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingAuth(true);
       setAuthError(null);
+      
+      // Skip auth check on public routes
+      const pathname = window.location.pathname;
+      if (isPublicRoute(pathname)) {
+        setIsLoadingAuth(false);
+        setIsAuthenticated(false);
+        return;
+      }
       
       // Check if user is authenticated by checking for token
       if (ascent.auth.isAuthenticated()) {
