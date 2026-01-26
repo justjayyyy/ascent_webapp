@@ -40,15 +40,30 @@ export function createEntityHandler(Model, options = {}) {
         
         const userEmail = user.email.trim().toLowerCase();
         
-        // Check if user is a shared user (invited by someone)
-        const sharedUserRecord = await SharedUser.findOne({
-          invitedEmail: userEmail,
-          status: 'accepted'
-        }).lean();
+        // Skip SharedUser lookup if we're already working with SharedUser model
+        // to avoid circular dependency issues
+        if (Model.modelName === 'SharedUser') {
+          return userEmail;
+        }
         
-        if (sharedUserRecord) {
-          // User is a shared user - return the owner's email (created_by)
-          return sharedUserRecord.created_by.trim().toLowerCase();
+        try {
+          if (!SharedUser) {
+            return userEmail;
+          }
+          
+          // Check if user is a shared user (invited by someone)
+          const sharedUserRecord = await SharedUser.findOne({
+            invitedEmail: userEmail,
+            status: 'accepted'
+          }).lean();
+          
+          if (sharedUserRecord && sharedUserRecord.created_by) {
+            // User is a shared user - return the owner's email (created_by)
+            return sharedUserRecord.created_by.trim().toLowerCase();
+          }
+        } catch (error) {
+          // If there's an error checking shared user, fall back to user's own email
+          console.error('[EntityHandler] Error checking shared user:', error.message);
         }
         
         // User is the owner - return their own email
@@ -59,19 +74,32 @@ export function createEntityHandler(Model, options = {}) {
       const buildUserFilter = async () => {
         if (!filterByUser || !user || !user.email) return {};
         
-        // Get the effective owner email (owner's email for shared users, own email for owners)
-        const effectiveEmail = await getEffectiveOwnerEmail();
-        if (!effectiveEmail) return {};
-        
-        const escapedEmail = effectiveEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
-        // Use case-insensitive regex matching AND try exact lowercase match
-        return {
-          $or: [
-            { [userField]: { $regex: `^${escapedEmail}$`, $options: 'i' } },
-            { [userField]: effectiveEmail }
-          ]
-        };
+        try {
+          // Get the effective owner email (owner's email for shared users, own email for owners)
+          const effectiveEmail = await getEffectiveOwnerEmail();
+          if (!effectiveEmail) return {};
+          
+          const escapedEmail = effectiveEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          
+          // Use case-insensitive regex matching AND try exact lowercase match
+          return {
+            $or: [
+              { [userField]: { $regex: `^${escapedEmail}$`, $options: 'i' } },
+              { [userField]: effectiveEmail }
+            ]
+          };
+        } catch (error) {
+          // Fallback to user's own email if there's an error
+          console.error('[EntityHandler] Error building user filter:', error.message);
+          const userEmail = user.email.trim().toLowerCase();
+          const escapedEmail = userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return {
+            $or: [
+              { [userField]: { $regex: `^${escapedEmail}$`, $options: 'i' } },
+              { [userField]: userEmail }
+            ]
+          };
+        }
       };
 
       switch (method) {
@@ -151,13 +179,19 @@ export function createEntityHandler(Model, options = {}) {
           const normalizedEmail = user.email.trim().toLowerCase();
           
           // Get effective owner email (for shared users, use owner's email)
-          const effectiveEmail = await getEffectiveOwnerEmail() || normalizedEmail;
+          let effectiveEmailForCreate = normalizedEmail;
+          try {
+            effectiveEmailForCreate = await getEffectiveOwnerEmail() || normalizedEmail;
+          } catch (error) {
+            console.error('[EntityHandler] Error getting effective email for create:', error.message);
+            effectiveEmailForCreate = normalizedEmail;
+          }
           
           // Check for bulk create
           if (Array.isArray(req.body)) {
             const itemsToCreate = req.body.map(item => ({
               ...item,
-              [userField]: effectiveEmail
+              [userField]: effectiveEmailForCreate
             }));
             try {
               const items = await Model.insertMany(itemsToCreate);
@@ -177,10 +211,9 @@ export function createEntityHandler(Model, options = {}) {
 
           // Single create
           // For shared users, use owner's email; for owners, use their own email
-          const effectiveEmail = await getEffectiveOwnerEmail();
           const itemData = {
             ...req.body,
-            [userField]: effectiveEmail || normalizedEmail
+            [userField]: effectiveEmailForCreate
           };
           
           try {
