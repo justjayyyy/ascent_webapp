@@ -192,10 +192,14 @@ export default function Settings() {
         ...data,
         created_by: user.email
       });
+      
+      // Get invitation token (the _id)
+      const invitationToken = invitation.id || invitation._id;
       // Send email asynchronously (don't wait for it)
       const sendEmailAsync = async () => {
         try {
           const appUrl = window.location.origin;
+          const invitationLink = `${appUrl}/accept-invitation/${invitationToken}`;
           const permissionsList = [];
           
           if (data.permissions.viewPortfolio) permissionsList.push('• View Portfolio - See investment accounts and positions');
@@ -223,9 +227,11 @@ ${user.full_name} has invited you to collaborate on their Ascent financial accou
 • Email: ${data.invitedEmail}
 • Display Name: ${data.displayName}
 
-🔗 Access Your Account:
-Visit: ${appUrl}
-Sign in with your email address to get started.
+🔗 Accept Your Invitation:
+Click the link below to sign in with Google and accept this invitation:
+${invitationLink}
+
+You must sign in with ${data.invitedEmail} to accept this invitation.
 
 ${permissionsText}
 
@@ -237,10 +243,9 @@ Ascent is a comprehensive personal finance management application that helps you
 • Personal notes and memos
 
 🔐 Getting Started:
-1. Visit ${appUrl}
-2. Click "Sign In" or "Login"
-3. Use your email address (${data.invitedEmail}) to access the account
-4. If you don't have an account yet, you can create one - your invitation will be automatically linked
+1. Click the invitation link above
+2. Sign in with Google using your email address (${data.invitedEmail})
+3. Your invitation will be automatically accepted and you'll have access to the account
 
 💡 Need Help?
 If you have any questions or need assistance, please contact ${user.full_name} at ${user.email}.
@@ -278,14 +283,14 @@ This is an automated invitation email. Please do not reply to this email.`;
     </div>
     
     <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50;">
-      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🔗 Get Started</h2>
+      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🔗 Accept Your Invitation</h2>
       <p style="margin: 10px 0;">
-        <a href="${appUrl}" style="display: inline-block; background: #5C8374; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0;">
-          Access Your Account →
+        <a href="${invitationLink}" style="display: inline-block; background: #5C8374; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0;">
+          Sign In with Google →
         </a>
       </p>
       <p style="margin: 5px 0; font-size: 14px; color: #666;">
-        Or visit: <a href="${appUrl}" style="color: #5C8374;">${appUrl}</a>
+        You must sign in with <strong>${data.invitedEmail}</strong> to accept this invitation.
       </p>
     </div>
     
@@ -318,10 +323,9 @@ This is an automated invitation email. Please do not reply to this email.`;
     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
       <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🚀 Getting Started</h2>
       <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
-        <li>Visit <a href="${appUrl}" style="color: #5C8374;">${appUrl}</a></li>
-        <li>Click "Sign In" or "Login"</li>
-        <li>Use your email address (<strong>${data.invitedEmail}</strong>) to access the account</li>
-        <li>If you don't have an account yet, you can create one - your invitation will be automatically linked</li>
+        <li>Click the invitation link above</li>
+        <li>Sign in with Google using your email address (<strong>${data.invitedEmail}</strong>)</li>
+        <li>Your invitation will be automatically accepted and you'll have access to the account</li>
       </ol>
     </div>
     

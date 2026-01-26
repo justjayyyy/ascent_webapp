@@ -172,6 +172,10 @@ entities.forEach(entity => {
   app.options(`/api/entities/${entity}`, (req, res) => res.sendStatus(200));
 });
 
+// Public invitation route (no auth required)
+app.get('/api/invitations/:token', wrapHandler('./api/get-invitation.js'));
+app.options('/api/invitations/*', (req, res) => res.sendStatus(200));
+
 // Integration routes
 app.post('/api/integrations/send-email', wrapHandler('./integrations/send-email.js'));
 app.post('/api/integrations/upload-file', wrapHandler('./integrations/upload-file.js'));

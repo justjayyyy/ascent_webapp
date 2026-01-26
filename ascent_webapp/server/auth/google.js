@@ -1,5 +1,6 @@
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
+import SharedUser from '../models/SharedUser.js';
 import { signToken } from '../lib/jwt.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
@@ -100,6 +101,22 @@ export default async function handler(req, res) {
       }
     } catch (userError) {
       return serverError(res, userError);
+    }
+    
+    // Check for pending invitations and auto-accept if email matches
+    try {
+      const pendingInvitations = await SharedUser.find({
+        invitedEmail: email.toLowerCase(),
+        status: 'pending'
+      });
+      
+      for (const invitation of pendingInvitations) {
+        invitation.status = 'accepted';
+        await invitation.save();
+      }
+    } catch (invitationError) {
+      // Don't fail login if invitation acceptance fails
+      console.error('Error accepting invitations:', invitationError);
     }
     
     // Generate token

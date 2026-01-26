@@ -2,6 +2,7 @@ import connectDB from './mongodb.js';
 import { handleCors } from './cors.js';
 import { success, error, notFound, serverError } from './response.js';
 import { authMiddleware } from '../middleware/auth.js';
+import SharedUser from '../models/SharedUser.js';
 
 // Generic CRUD handler for entities
 export function createEntityHandler(Model, options = {}) {
@@ -33,20 +34,42 @@ export function createEntityHandler(Model, options = {}) {
       const { method } = req;
       const { id, _single } = req.query;
 
+      // Helper function to get the effective owner email (for shared users, use owner's email)
+      const getEffectiveOwnerEmail = async () => {
+        if (!user || !user.email) return null;
+        
+        const userEmail = user.email.trim().toLowerCase();
+        
+        // Check if user is a shared user (invited by someone)
+        const sharedUserRecord = await SharedUser.findOne({
+          invitedEmail: userEmail,
+          status: 'accepted'
+        }).lean();
+        
+        if (sharedUserRecord) {
+          // User is a shared user - return the owner's email (created_by)
+          return sharedUserRecord.created_by.trim().toLowerCase();
+        }
+        
+        // User is the owner - return their own email
+        return userEmail;
+      };
+
       // Helper function to build user filter (case-insensitive)
-      const buildUserFilter = () => {
+      const buildUserFilter = async () => {
         if (!filterByUser || !user || !user.email) return {};
         
-        // Normalize email (lowercase, trimmed) for consistent matching
-        const userEmail = user.email.trim().toLowerCase();
-        const escapedEmail = userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Get the effective owner email (owner's email for shared users, own email for owners)
+        const effectiveEmail = await getEffectiveOwnerEmail();
+        if (!effectiveEmail) return {};
+        
+        const escapedEmail = effectiveEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
         // Use case-insensitive regex matching AND try exact lowercase match
-        // This handles both old data (might have mixed case) and new data (normalized)
         return {
           $or: [
             { [userField]: { $regex: `^${escapedEmail}$`, $options: 'i' } },
-            { [userField]: userEmail }
+            { [userField]: effectiveEmail }
           ]
         };
       };
@@ -55,7 +78,7 @@ export function createEntityHandler(Model, options = {}) {
         case 'GET': {
           // Single item lookup - ONLY when _single=true is explicitly passed
           if (_single === 'true' && id) {
-            const userFilter = buildUserFilter();
+            const userFilter = await buildUserFilter();
             const query = { _id: id, ...userFilter };
             
             const item = await Model.findOne(query).lean();
@@ -80,7 +103,7 @@ export function createEntityHandler(Model, options = {}) {
           } = req.query;
 
           // Build query from filters (case insensitive email matching)
-          let query = buildUserFilter();
+          let query = await buildUserFilter();
             
           // Add additional filters from query params
           for (const [key, value] of Object.entries(filters)) {
@@ -127,11 +150,14 @@ export function createEntityHandler(Model, options = {}) {
           // Normalize user email to ensure consistency (lowercase, trimmed)
           const normalizedEmail = user.email.trim().toLowerCase();
           
+          // Get effective owner email (for shared users, use owner's email)
+          const effectiveEmail = await getEffectiveOwnerEmail() || normalizedEmail;
+          
           // Check for bulk create
           if (Array.isArray(req.body)) {
             const itemsToCreate = req.body.map(item => ({
               ...item,
-              [userField]: normalizedEmail
+              [userField]: effectiveEmail
             }));
             try {
               const items = await Model.insertMany(itemsToCreate);
@@ -150,9 +176,11 @@ export function createEntityHandler(Model, options = {}) {
           }
 
           // Single create
+          // For shared users, use owner's email; for owners, use their own email
+          const effectiveEmail = await getEffectiveOwnerEmail();
           const itemData = {
             ...req.body,
-            [userField]: normalizedEmail
+            [userField]: effectiveEmail || normalizedEmail
           };
           
           try {
@@ -193,7 +221,7 @@ export function createEntityHandler(Model, options = {}) {
             return error(res, 'Update data is required in request body', 400);
           }
 
-          const userFilter = buildUserFilter();
+          const userFilter = await buildUserFilter();
           const updateQuery = { _id: id, ...userFilter };
 
           try {
@@ -230,7 +258,7 @@ export function createEntityHandler(Model, options = {}) {
             return error(res, 'ID is required for delete. Provide ?id=... in URL', 400);
           }
 
-          const userFilter = buildUserFilter();
+          const userFilter = await buildUserFilter();
           const deleteQuery = { _id: id, ...userFilter };
 
           try {

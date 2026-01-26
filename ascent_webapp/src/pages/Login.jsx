@@ -290,9 +290,9 @@ export default function Login() {
                     const buttonContainer = document.getElementById('google-signin-button');
                     if (buttonContainer) {
                       const googleButton = buttonContainer.querySelector('div[role="button"]');
-                      if (googleButton) {
-                        // Click the hidden Google button to trigger ID token flow
-                        (googleButton as HTMLElement).click();
+                        if (googleButton) {
+                          // Click the hidden Google button to trigger ID token flow
+                          googleButton.click();
                       } else {
                         setIsGoogleLoading(false);
                         toast.error('Google Sign-In not ready. Please wait a moment and try again.');

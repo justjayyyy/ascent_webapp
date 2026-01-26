@@ -12,6 +12,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import AcceptInvitation from './pages/AcceptInvitation';
 import { Toaster as SonnerToaster } from 'sonner';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SkeletonPage } from '@/components/ui/skeleton-card';
@@ -96,6 +97,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
             <Route path="/*" element={
               <>
                 <NavigationTracker />
