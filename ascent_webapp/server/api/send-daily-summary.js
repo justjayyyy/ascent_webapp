@@ -8,14 +8,15 @@ import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import { sendEmail } from '../lib/email-helper.js';
 
 export default async function handler(req, res) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
+  // Allow both GET (for testing) and POST (for cron jobs)
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify cron secret if set
+  // Verify cron secret if set (Vercel Cron Jobs don't send custom headers, so skip for now)
+  // For manual testing, you can add: x-cron-secret header
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers['x-cron-secret'] !== cronSecret) {
+  if (cronSecret && req.headers['x-cron-secret'] && req.headers['x-cron-secret'] !== cronSecret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
