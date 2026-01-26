@@ -43,13 +43,22 @@ export default function AcceptInvitation() {
     try {
       setIsLoading(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/invitations/${token}`);
-      const data = await response.json();
+      const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to load invitation');
+        throw new Error(result.error || result.message || 'Failed to load invitation');
       }
 
-      setInvitation(data);
+      // The API wraps data in { success: true, data: {...} }
+      const invitationData = result.data || result;
+      
+      // Ensure we have the expected structure
+      if (invitationData && invitationData.invitedEmail) {
+        setInvitation(invitationData);
+      } else {
+        console.error('Invalid invitation data structure:', result);
+        throw new Error('Invalid invitation data');
+      }
     } catch (error) {
       console.error('Error fetching invitation:', error);
       toast.error(error.message || 'Invalid or expired invitation');
@@ -202,16 +211,18 @@ export default function AcceptInvitation() {
               <Mail className="w-5 h-5 text-[#5C8374]" />
               <div>
                 <p className="text-xs text-[#5C8374]">Invited Email</p>
-                <p className="text-sm font-medium text-[#9EC8B9]">{invitation.invitedEmail}</p>
+                <p className="text-sm font-medium text-[#9EC8B9]">{invitation.invitedEmail || 'Not specified'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-[#092635] rounded-lg">
-              <User className="w-5 h-5 text-[#5C8374]" />
-              <div>
-                <p className="text-xs text-[#5C8374]">Display Name</p>
-                <p className="text-sm font-medium text-[#9EC8B9]">{invitation.displayName}</p>
+            {invitation.displayName && (
+              <div className="flex items-center gap-3 p-3 bg-[#092635] rounded-lg">
+                <User className="w-5 h-5 text-[#5C8374]" />
+                <div>
+                  <p className="text-xs text-[#5C8374]">Display Name</p>
+                  <p className="text-sm font-medium text-[#9EC8B9]">{invitation.displayName}</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {permissionsList.length > 0 && (
