@@ -33,7 +33,7 @@ export default function AcceptInvitation() {
         }
       };
     }
-  }, []);
+  }, [invitation]); // Re-initialize when invitation loads
 
   useEffect(() => {
     fetchInvitation();
@@ -67,6 +67,22 @@ export default function AcceptInvitation() {
       callback: handleGoogleCallback,
       auto_select: false,
     });
+
+    // Render the Google Sign-In button - wait a bit for DOM to be ready
+    setTimeout(() => {
+      const buttonContainer = document.getElementById('google-signin-button');
+      if (buttonContainer && window.google?.accounts?.id) {
+        // Clear any existing content
+        buttonContainer.innerHTML = '';
+        window.google.accounts.id.renderButton(buttonContainer, {
+          type: 'standard',
+          theme: 'filled_black',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+        });
+      }
+    }, 100);
   };
 
   const handleGoogleCallback = async (response) => {
@@ -115,27 +131,6 @@ export default function AcceptInvitation() {
     }
   };
 
-  const handleSignInWithGoogle = () => {
-    if (!window.google || !GOOGLE_CLIENT_ID) {
-      toast.error('Google Sign-In not available');
-      return;
-    }
-
-    setIsSigningIn(true);
-    const buttonContainer = document.getElementById('google-signin-button');
-    if (buttonContainer) {
-      const googleButton = buttonContainer.querySelector('div[role="button"]');
-      if (googleButton) {
-        googleButton.click();
-      } else {
-        setIsSigningIn(false);
-        toast.error('Google Sign-In not ready. Please wait a moment.');
-      }
-    } else {
-      setIsSigningIn(false);
-      toast.error('Google Sign-In not available');
-    }
-  };
 
   if (isLoading) {
     return (
@@ -212,38 +207,22 @@ export default function AcceptInvitation() {
           )}
 
           <div className="pt-4">
-            <Button
-              onClick={handleSignInWithGoogle}
-              disabled={isSigningIn || !GOOGLE_CLIENT_ID}
-              className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium h-11"
-            >
-              {isSigningIn ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  <img 
-                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                    alt="Google" 
-                    className="w-5 h-5 mr-2"
-                  />
-                  Sign in with Google
-                </>
-              )}
-            </Button>
+            {/* Google Sign-In Button Container - visible and ready */}
+            <div 
+              id="google-signin-button" 
+              className="w-full flex justify-center"
+              style={{ minHeight: '44px' }}
+            />
+            {isSigningIn && (
+              <div className="mt-3 text-center">
+                <Loader2 className="w-4 h-4 animate-spin text-[#5C8374] mx-auto mb-2" />
+                <p className="text-xs text-[#5C8374]">Signing in...</p>
+              </div>
+            )}
             <p className="text-xs text-[#5C8374] text-center mt-3">
               You must sign in with <strong>{invitation.invitedEmail}</strong> to accept this invitation
             </p>
           </div>
-
-          {/* Hidden Google Sign-In Button */}
-          <div 
-            id="google-signin-button" 
-            className="hidden"
-            style={{ minHeight: '44px' }}
-          />
         </CardContent>
       </Card>
     </div>
