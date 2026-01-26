@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, User, Mail, Shield, Bell, Globe, Eye, EyeOff } from 'lucide-react';
+import { Loader2, User, Mail, Shield, Bell, Globe, Eye, EyeOff, Edit2, Check, X } from 'lucide-react';
 import ImportExportSection from '../components/settings/ImportExportSection';
 import SharedUsersSection from '../components/settings/SharedUsersSection';
 import InviteUserDialog from '../components/settings/InviteUserDialog';
@@ -21,14 +21,39 @@ export default function Settings() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [editingFullName, setEditingFullName] = useState(false);
+  const [fullNameValue, setFullNameValue] = useState('');
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (themeUser) {
       setUser(themeUser);
+      setFullNameValue(themeUser?.full_name || '');
       setIsLoading(false);
     }
   }, [themeUser]);
+
+  const handleSaveFullName = async () => {
+    if (fullNameValue.trim() === (user?.full_name || '').trim()) {
+      setEditingFullName(false);
+      return;
+    }
+    
+    try {
+      await updateUserMutation.mutateAsync({ full_name: fullNameValue.trim() });
+      setEditingFullName(false);
+      toast.success(t('fullNameUpdated') || 'Full name updated successfully');
+    } catch (error) {
+      console.error('Failed to update full name:', error);
+      setFullNameValue(user?.full_name || '');
+      toast.error(t('failedToUpdateFullName') || 'Failed to update full name');
+    }
+  };
+
+  const handleCancelEditFullName = () => {
+    setFullNameValue(user?.full_name || '');
+    setEditingFullName(false);
+  };
 
   const updateUserMutation = useMutation({
     mutationFn: async (data) => {
@@ -421,11 +446,51 @@ This is an automated invitation email. Please do not reply to this email.`;
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label className={colors.textSecondary}>{t('fullName')}</Label>
-                <Input
-                  value={user?.full_name || ''}
-                  disabled
-                  className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
-                />
+                <div className="flex items-center gap-2">
+                  <User className={cn("w-4 h-4", colors.textTertiary)} />
+                  <Input
+                    value={fullNameValue}
+                    onChange={(e) => setFullNameValue(e.target.value)}
+                    disabled={!editingFullName}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && editingFullName) {
+                        handleSaveFullName();
+                      } else if (e.key === 'Escape' && editingFullName) {
+                        handleCancelEditFullName();
+                      }
+                    }}
+                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingFullName && "ring-2 ring-[#5C8374]")}
+                  />
+                  {editingFullName ? (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={handleSaveFullName}
+                        className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
+                      >
+                        <Check className="w-4 h-4 text-green-400" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={handleCancelEditFullName}
+                        className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
+                      >
+                        <X className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditingFullName(true)}
+                      className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className={colors.textSecondary}>{t('email')}</Label>
