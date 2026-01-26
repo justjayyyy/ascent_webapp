@@ -37,7 +37,10 @@ export default function Login() {
     full_name: '' 
   });
 
-  const redirectUrl = searchParams.get('redirect') || '/Portfolio';
+  // Get redirect URL, but exclude public pages (terms-of-service, privacy-policy, login)
+  const rawRedirectUrl = searchParams.get('redirect') || '/Portfolio';
+  const publicPages = ['/terms-of-service', '/privacy-policy', '/login'];
+  const redirectUrl = publicPages.includes(rawRedirectUrl) ? '/Portfolio' : rawRedirectUrl;
 
   // Prevent body scrolling on mobile
   useEffect(() => {
