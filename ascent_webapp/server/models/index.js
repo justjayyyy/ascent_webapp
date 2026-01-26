@@ -93,15 +93,19 @@ ExpenseTransactionSchema.index({ created_by: 1, category: 1, date: -1 });
 // Budget Model
 const BudgetSchema = new mongoose.Schema({
   category: { type: String, required: true },
-  amount: { type: Number, required: true },
+  monthlyLimit: { type: Number, required: true },
+  alertThreshold: { type: Number, default: 80, min: 1, max: 100 },
+  currency: { type: String, default: 'USD' },
+  year: { type: Number, required: true, index: true },
+  month: { type: Number, required: true, min: 1, max: 12, index: true },
   period: { type: String, enum: ['monthly', 'weekly', 'yearly'], default: 'monthly' },
-  startDate: { type: Date },
-  endDate: { type: Date },
+  isActive: { type: Boolean, default: true },
   created_by: { type: String, required: true, index: true },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
 BudgetSchema.index({ created_by: 1, category: 1 });
+BudgetSchema.index({ created_by: 1, year: 1, month: 1, category: 1 });
 
 // Category Model
 const CategorySchema = new mongoose.Schema({

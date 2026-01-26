@@ -9,6 +9,21 @@ import { Loader2, Plus, Trash2, Edit, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme, translateCategory } from '../ThemeProvider';
 
+const MONTHS = [
+  { value: 1, labelKey: 'january' },
+  { value: 2, labelKey: 'february' },
+  { value: 3, labelKey: 'march' },
+  { value: 4, labelKey: 'april' },
+  { value: 5, labelKey: 'may' },
+  { value: 6, labelKey: 'june' },
+  { value: 7, labelKey: 'july' },
+  { value: 8, labelKey: 'august' },
+  { value: 9, labelKey: 'september' },
+  { value: 10, labelKey: 'october' },
+  { value: 11, labelKey: 'november' },
+  { value: 12, labelKey: 'december' },
+];
+
 export default function BudgetManager({ 
   open, 
   onClose, 
@@ -17,16 +32,32 @@ export default function BudgetManager({
   onAdd, 
   onUpdate, 
   onDelete, 
-  isLoading 
+  isLoading,
+  selectedYear,
+  selectedMonths = []
 }) {
   const { colors, t, language, user } = useTheme();
   const [editingBudget, setEditingBudget] = useState(null);
   
-  // Calculate available categories
-  const usedCategories = useMemo(() => 
-    budgets.map(b => b.category), 
-    [budgets]
-  );
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const displayYear = selectedYear ? parseInt(selectedYear) : currentYear;
+  const displayMonth = selectedMonths && selectedMonths.length === 1 ? parseInt(selectedMonths[0]) : currentMonth;
+  
+  // Calculate available categories (filter by selected period)
+  const usedCategories = useMemo(() => {
+    if (selectedMonths && selectedMonths.length > 0) {
+      // Filter budgets by selected year and months
+      return budgets
+        .filter(b => b.year === displayYear && selectedMonths.includes(b.month?.toString()))
+        .map(b => b.category);
+    } else {
+      // If no months selected, show all budgets for the year
+      return budgets
+        .filter(b => b.year === displayYear)
+        .map(b => b.category);
+    }
+  }, [budgets, displayYear, selectedMonths]);
   
   const expenseCategories = useMemo(() => 
     categories.filter(cat => cat.type === 'Expense' || cat.type === 'Both'),
@@ -43,18 +74,33 @@ export default function BudgetManager({
     monthlyLimit: '',
     alertThreshold: 80,
     currency: user?.currency || 'USD',
+    year: displayYear,
+    month: displayMonth,
   });
 
-  // Set initial category when available categories change or dialog opens
+  // Set initial category and period when available categories change or dialog opens
   useEffect(() => {
     if (open && !editingBudget && availableCategories.length > 0 && !formData.category) {
       setFormData(prev => ({
         ...prev,
         category: availableCategories[0].name,
         currency: user?.currency || 'USD',
+        year: displayYear,
+        month: displayMonth,
       }));
     }
-  }, [open, availableCategories, editingBudget, user?.currency]);
+  }, [open, availableCategories, editingBudget, user?.currency, displayYear, displayMonth]);
+  
+  // Update form data when selected period changes
+  useEffect(() => {
+    if (open && !editingBudget) {
+      setFormData(prev => ({
+        ...prev,
+        year: displayYear,
+        month: displayMonth,
+      }));
+    }
+  }, [displayYear, displayMonth, open, editingBudget]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,6 +117,9 @@ export default function BudgetManager({
       ...formData,
       monthlyLimit: parseFloat(formData.monthlyLimit),
       alertThreshold: validThreshold,
+      // Ensure year and month are always set
+      year: formData.year || displayYear,
+      month: formData.month || displayMonth,
     };
 
     if (editingBudget) {
@@ -85,6 +134,8 @@ export default function BudgetManager({
       monthlyLimit: '',
       alertThreshold: 80,
       currency: user?.currency || 'USD',
+      year: displayYear,
+      month: displayMonth,
     });
   };
 
@@ -95,6 +146,8 @@ export default function BudgetManager({
       monthlyLimit: budget.monthlyLimit.toString(),
       alertThreshold: budget.alertThreshold || 80,
       currency: budget.currency,
+      year: budget.year || displayYear,
+      month: budget.month || displayMonth,
     });
   };
 
@@ -105,6 +158,8 @@ export default function BudgetManager({
       monthlyLimit: '',
       alertThreshold: 80,
       currency: user?.currency || 'USD',
+      year: displayYear,
+      month: displayMonth,
     });
   };
 
@@ -170,6 +225,40 @@ export default function BudgetManager({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
+              <Input
+                type="number"
+                min="2000"
+                max="2100"
+                placeholder={currentYear.toString()}
+                value={formData.year}
+                onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || currentYear })}
+                className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
+              <Select 
+                value={formData.month?.toString()} 
+                onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
+              >
+                <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                  <SelectValue placeholder={t('selectMonth') || 'Select month'} />
+                </SelectTrigger>
+                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                  {MONTHS.map((month) => (
+                    <SelectItem key={month.value} value={month.value.toString()} className={colors.textPrimary}>
+                      {t(month.labelKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-1.5 sm:space-y-2">
             <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
             <Input
@@ -204,7 +293,7 @@ export default function BudgetManager({
             )}
             <Button
               type="submit"
-              disabled={isLoading || !formData.monthlyLimit || !formData.category}
+              disabled={isLoading || !formData.monthlyLimit || !formData.category || !formData.year || !formData.month}
               className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
             >
               {isLoading ? (
@@ -239,7 +328,14 @@ export default function BudgetManager({
                           minimumFractionDigits: 0,
                           maximumFractionDigits: 0,
                         }).format(budget.monthlyLimit)}{t('perMonth')}
-                        {' • '}{t('alertAt')} {budget.alertThreshold || 80}%
+                        {' • '}
+                        {budget.year && budget.month ? (
+                          <>
+                            {t(MONTHS.find(m => m.value === budget.month)?.labelKey || 'month')} {budget.year}
+                            {' • '}
+                          </>
+                        ) : null}
+                        {t('alertAt')} {budget.alertThreshold || 80}%
                       </p>
                     </div>
                     <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">

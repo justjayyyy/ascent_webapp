@@ -23,7 +23,7 @@ const MONTHS = [
 function PeriodSelector({ 
   transactions = [],
   selectedYear, 
-  selectedMonth, 
+  selectedMonths = [], 
   onYearChange, 
   onMonthChange
 }) {
@@ -35,53 +35,36 @@ function PeriodSelector({
   const currentMonth = now.getMonth() + 1; // 1-indexed
 
   // Get available years from transactions (only years with data)
-  // Always include current year even if no data
   const availableYears = useMemo(() => {
     const yearsSet = new Set();
-    yearsSet.add(currentYear); // Always include current year
     transactions.forEach(t => {
       yearsSet.add(getYear(parseISO(t.date)));
     });
     return Array.from(yearsSet).sort((a, b) => b - a); // Sort descending
-  }, [transactions, currentYear]);
-
-  // Get months that have data for the selected year
-  const monthsWithData = useMemo(() => {
-    const monthsSet = new Set();
-    transactions.forEach(t => {
-      const date = parseISO(t.date);
-      if (getYear(date) === parseInt(selectedYear)) {
-        monthsSet.add(getMonth(date) + 1); // 1-indexed
-      }
-    });
-    return monthsSet;
-  }, [transactions, selectedYear]);
-
-  // Check if a month should be disabled (future months or no data) - memoized
-  const isMonthDisabled = useCallback((year, month) => {
-    const selectedYearNum = parseInt(year);
-    // Disable future months
-    if (selectedYearNum > currentYear) return true;
-    if (selectedYearNum === currentYear && month > currentMonth) return true;
-    // Disable months without data (except current month which is always accessible)
-    const isCurrent = selectedYearNum === currentYear && month === currentMonth;
-    if (!isCurrent && !monthsWithData.has(month)) return true;
-    return false;
-  }, [currentYear, currentMonth, monthsWithData]);
+  }, [transactions]);
 
   // Check if this is the current month - memoized
   const isCurrentMonth = useCallback((year, month) => {
     return parseInt(year) === currentYear && month === currentMonth;
   }, [currentYear, currentMonth]);
 
-  // Check if month has data - memoized
-  const hasDataForMonth = useCallback((month) => {
-    return monthsWithData.has(month);
-  }, [monthsWithData]);
+  const hasSelectedMonths = selectedMonths && selectedMonths.length > 0;
+  
+  // Get display text for selected months
+  const getSelectedMonthsDisplay = useMemo(() => {
+    if (!hasSelectedMonths) {
+      return `${selectedYear} (${t('all') || 'All'})`;
+    }
+    if (selectedMonths.length === 1) {
+      const monthData = MONTHS.find(m => m.value === parseInt(selectedMonths[0]));
+      return monthData ? `${t(monthData.fullLabelKey)} ${selectedYear}` : `${selectedYear}`;
+    }
+    return `${selectedMonths.length} ${t('months') || 'months'} ${selectedYear}`;
+  }, [selectedMonths, selectedYear, hasSelectedMonths, t]);
 
-  const selectedMonthData = MONTHS.find(m => m.value === parseInt(selectedMonth));
-  const selectedMonthName = selectedMonthData ? t(selectedMonthData.fullLabelKey) : '';
-  const isViewingCurrentMonth = isCurrentMonth(selectedYear, parseInt(selectedMonth));
+  const isViewingCurrentMonth = hasSelectedMonths && selectedMonths.some(m => 
+    isCurrentMonth(selectedYear, parseInt(m))
+  );
 
   return (
     <Card className={cn(colors.cardBg, colors.cardBorder)}>
@@ -103,12 +86,14 @@ function PeriodSelector({
           </div>
           <div className="text-left">
             <p className={cn("text-base sm:text-lg font-semibold", colors.textPrimary)}>
-              {`${selectedMonthName} ${selectedYear}`}
+              {getSelectedMonthsDisplay}
             </p>
             <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
               {isViewingCurrentMonth 
                 ? t('currentMonth')
-                : t('clickToChangePeriod')
+                : hasSelectedMonths
+                ? t('clickToChangePeriod')
+                : t('yearlyView') || 'Yearly view'
               }
             </p>
           </div>
@@ -141,7 +126,11 @@ function PeriodSelector({
                   return (
                     <button
                       key={year}
-                      onClick={() => onYearChange(year.toString())}
+                      onClick={() => {
+                        onYearChange(year.toString());
+                        // Reset selected months when year changes
+                        onMonthChange([]);
+                      }}
                       className={cn(
                         "px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200",
                         "border-2 min-w-[60px] sm:min-w-[70px]",
@@ -167,39 +156,33 @@ function PeriodSelector({
             <p className={cn("text-[10px] sm:text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
               {t('month')}
             </p>
-            <div className="grid grid-cols-6 md:grid-cols-12 gap-1.5 sm:gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {MONTHS.map(month => {
-                const isSelected = parseInt(selectedMonth) === month.value;
+                const monthValueStr = month.value.toString();
+                const isSelected = selectedMonths.includes(monthValueStr);
                 const isCurrent = isCurrentMonth(selectedYear, month.value);
-                const disabled = isMonthDisabled(selectedYear, month.value);
-                const hasData = hasDataForMonth(month.value);
-                
-                // Determine tooltip message
-                const isFutureMonth = (parseInt(selectedYear) === currentYear && month.value > currentMonth) || 
-                                      parseInt(selectedYear) > currentYear;
-                const tooltipMsg = isFutureMonth 
-                  ? t('futureMonth')
-                  : !hasData && !isCurrent 
-                  ? t('noTransactions')
-                  : t(month.fullLabelKey);
 
                 return (
                   <button
                     key={month.value}
                     onClick={() => {
-                      if (!disabled) {
-                        onMonthChange(month.value.toString());
-                        setIsExpanded(false); // Collapse after selection
+                      // Toggle month selection
+                      if (isSelected) {
+                        // Deselect: remove from array
+                        const newSelectedMonths = selectedMonths.filter(m => m !== monthValueStr);
+                        onMonthChange(newSelectedMonths);
+                      } else {
+                        // Select: add to array
+                        const newSelectedMonths = [...selectedMonths, monthValueStr];
+                        onMonthChange(newSelectedMonths);
                       }
+                      // Don't collapse - allow multiple selections
                     }}
-                    disabled={disabled}
-                    title={tooltipMsg}
+                    title={t(month.fullLabelKey)}
                     className={cn(
                       "px-1.5 sm:px-2 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all duration-200",
                       "border-2 relative",
-                      disabled
-                        ? cn("opacity-40 cursor-not-allowed border-transparent", colors.textTertiary, colors.bgTertiary)
-                        : isSelected
+                      isSelected
                         ? "bg-[#5C8374] text-white border-[#5C8374] shadow-md"
                         : isCurrent
                         ? cn("border-[#5C8374] bg-[#5C8374]/10", colors.textPrimary)

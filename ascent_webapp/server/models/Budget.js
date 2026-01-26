@@ -24,6 +24,18 @@ const budgetSchema = new mongoose.Schema({
     type: String,
     default: 'USD'
   },
+  year: {
+    type: Number,
+    required: true,
+    index: true
+  },
+  month: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 12,
+    index: true
+  },
   period: {
     type: String,
     enum: ['weekly', 'monthly', 'yearly'],
@@ -41,6 +53,9 @@ const budgetSchema = new mongoose.Schema({
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
 });
+
+// Compound index for efficient queries by user, year, month, and category
+budgetSchema.index({ created_by: 1, year: 1, month: 1, category: 1 });
 
 budgetSchema.virtual('id').get(function() {
   return this._id.toHexString();

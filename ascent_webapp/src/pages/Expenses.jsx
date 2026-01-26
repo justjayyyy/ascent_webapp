@@ -3,7 +3,7 @@ import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
-import { startOfMonth, endOfMonth, parseISO, eachMonthOfInterval, format as formatDate } from 'date-fns';
+import { startOfMonth, endOfMonth, parseISO, eachMonthOfInterval, format as formatDate, getYear, getMonth, startOfYear, endOfYear } from 'date-fns';
 import AddTransactionDialog from '../components/expenses/AddTransactionDialog';
 import BudgetManager from '../components/expenses/BudgetManager';
 import CategoryManager from '../components/expenses/CategoryManager';
@@ -26,7 +26,7 @@ import {
 function Expenses() {
   const { user, colors, t } = useTheme();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
+  const [selectedMonths, setSelectedMonths] = useState([(new Date().getMonth() + 1).toString()]); // Array of selected months
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -311,23 +311,50 @@ function Expenses() {
     // Note: editingTransaction and dialog are cleared in mutation onSuccess callbacks
   }, [editingTransaction, updateTransactionMutation, createTransactionMutation, queryClient, setAddDialogOpen, setEditingTransaction, toast, t]);
 
-  // Selected period transactions (unfiltered - filtering done in ExpenseMonthView)
+  // Selected period transactions (filtered by selected months/year)
   const selectedPeriodTransactions = useMemo(() => {
-    const start = startOfMonth(new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1));
-    const end = endOfMonth(start);
-    return transactions.filter(t => {
-      const d = parseISO(t.date);
-      return d >= start && d <= end;
-    });
-  }, [transactions, selectedYear, selectedMonth]);
+    const selectedYearNum = parseInt(selectedYear);
+    const hasSelectedMonths = selectedMonths && selectedMonths.length > 0;
+    
+    if (hasSelectedMonths) {
+      // Filter by selected months/year
+      const selectedMonthNums = selectedMonths.map(m => parseInt(m));
+      return transactions.filter(t => {
+        if (!t.date) return false;
+        const d = parseISO(t.date);
+        const transactionYear = getYear(d);
+        const transactionMonth = getMonth(d) + 1; // getMonth returns 0-11, we need 1-12
+        
+        return transactionYear === selectedYearNum && selectedMonthNums.includes(transactionMonth);
+      });
+    } else {
+      // Filter by year only (all months) when no months are selected
+      return transactions.filter(t => {
+        if (!t.date) return false;
+        const d = parseISO(t.date);
+        const transactionYear = getYear(d);
+        return transactionYear === selectedYearNum;
+      });
+    }
+  }, [transactions, selectedYear, selectedMonths]);
 
   // Get selected period label
   const selectedPeriodLabel = useMemo(() => {
-    const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 
-                       'july', 'august', 'september', 'october', 'november', 'december'];
-    const monthKey = monthKeys[parseInt(selectedMonth) - 1] || '';
-    return `${t(monthKey)} ${selectedYear}`;
-  }, [selectedYear, selectedMonth, t]);
+    const hasSelectedMonths = selectedMonths && selectedMonths.length > 0;
+    
+    if (hasSelectedMonths) {
+      const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 
+                         'july', 'august', 'september', 'october', 'november', 'december'];
+      if (selectedMonths.length === 1) {
+        const monthKey = monthKeys[parseInt(selectedMonths[0]) - 1] || '';
+        return `${t(monthKey)} ${selectedYear}`;
+      } else {
+        return `${selectedMonths.length} ${t('months') || 'months'} ${selectedYear}`;
+      }
+    } else {
+      return `${selectedYear} (${t('all') || 'All'})`;
+    }
+  }, [selectedYear, selectedMonths, t]);
 
   // Loading state - after all hooks
   if (!user) {
@@ -388,9 +415,9 @@ function Expenses() {
           <PeriodSelector
             transactions={transactions}
             selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
+            selectedMonths={selectedMonths}
             onYearChange={setSelectedYear}
-            onMonthChange={setSelectedMonth}
+            onMonthChange={setSelectedMonths}
           />
         </div>
 
@@ -406,6 +433,8 @@ function Expenses() {
             onDuplicate={handleDuplicateTransaction}
             isLoading={isLoading}
             monthLabel={selectedPeriodLabel}
+            selectedYear={selectedYear}
+            selectedMonths={selectedMonths}
           />
         </div>
 
@@ -433,6 +462,8 @@ function Expenses() {
           onUpdate={(id, data) => updateBudgetMutation.mutate({ id, data })}
           onDelete={deleteBudgetMutation.mutate}
           isLoading={createBudgetMutation.isPending || updateBudgetMutation.isPending || deleteBudgetMutation.isPending}
+          selectedYear={selectedYear}
+          selectedMonths={selectedMonths}
         />
 
         {/* Category Manager Dialog */}

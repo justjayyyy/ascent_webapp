@@ -102,9 +102,9 @@ export default function AccountDetail() {
     enabled: !!accountId,
   });
 
-  // Calculate total cash from all cash positions
+  // Calculate total cash from all cash positions for this account only
   const totalCashBalance = positions
-    .filter(p => p.assetType === 'Cash')
+    .filter(p => p.assetType === 'Cash' && p.accountId === accountId)
     .reduce((sum, p) => sum + p.quantity, 0);
 
   const createPositionMutation = useMutation({
@@ -118,10 +118,10 @@ export default function AccountDetail() {
           throw new Error(`Insufficient cash. Available: ${formatCurrency(totalCashBalance, account.baseCurrency)}, Required: ${formatCurrency(purchaseCost, account.baseCurrency)}`);
         }
         
-        // Deduct from cash positions (FIFO - oldest first)
+        // Deduct from cash positions for this account only (FIFO - oldest first)
         let remainingToDeduct = purchaseCost;
         const cashPositions = positions
-          .filter(p => p.assetType === 'Cash')
+          .filter(p => p.assetType === 'Cash' && p.accountId === accountId)
           .sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
         
         for (const cashPos of cashPositions) {
@@ -359,17 +359,19 @@ export default function AccountDetail() {
   });
 
   const handleRefreshPrices = async () => {
-    if (positions.length === 0) return;
+    // Filter positions to only include those for this account
+    const accountPositions = positions.filter(p => p.accountId === accountId);
+    if (accountPositions.length === 0) return;
     
     setRefreshingPrices(true);
     try {
-      const symbols = [...new Set(positions.map(p => p.symbol))];
+      const symbols = [...new Set(accountPositions.map(p => p.symbol))];
       
       // Use the new stock quote API
       const quotes = await ascent.integrations.Core.getStockQuotes(symbols);
       
       let updatedCount = 0;
-      for (const position of positions) {
+      for (const position of accountPositions) {
         const symbolUpper = position.symbol.toUpperCase();
         const quote = quotes[symbolUpper] || quotes[position.symbol];
         
@@ -440,8 +442,11 @@ export default function AccountDetail() {
       return amount;
     };
 
-    // Process ALL positions, including Cash and edge cases
-    positions.forEach(position => {
+    // Filter positions to only include those for this account
+    const accountPositions = positions.filter(p => p.accountId === accountId);
+    
+    // Process ALL positions for this account, including Cash and edge cases
+    accountPositions.forEach(position => {
       const quantity = position.quantity || 0;
       const positionCurrency = position.currency || accountCurrency;
       
@@ -478,8 +483,11 @@ export default function AccountDetail() {
 
     const positionPnL = totalValue - totalCostBasis;
     
+    // Filter day trades to only include those for this account
+    const accountDayTrades = dayTrades.filter(dt => dt.accountId === accountId);
+    
     // Add day trading P&L (convert to account currency)
-    const dayTradingPnL = dayTrades.reduce((sum, trade) => {
+    const dayTradingPnL = accountDayTrades.reduce((sum, trade) => {
       const tradeCurrency = trade.currency || accountCurrency;
       const convertedPnL = convertToAccountCurrency(trade.profitLoss, tradeCurrency);
       return sum + convertedPnL;
@@ -525,10 +533,13 @@ export default function AccountDetail() {
       return amount;
     };
     
-    // Aggregate positions by symbol - include ALL positions
+    // Filter positions to only include those for this account
+    const accountPositions = positions.filter(p => p.accountId === accountId);
+    
+    // Aggregate positions by symbol - include ALL positions for this account
     const aggregated = {};
     
-    positions.forEach((position, index) => {
+    accountPositions.forEach((position, index) => {
       // Handle Cash positions and positions with missing symbols
       let symbol = position.symbol;
       const originalSymbol = symbol;
@@ -598,7 +609,7 @@ export default function AccountDetail() {
     const chartSymbols = new Set(chartData.map(item => item.name));
     const positionSymbols = new Map(); // Use Map to track count of positions per symbol
     
-    positions.forEach(p => {
+    accountPositions.forEach(p => {
       let symbol = p.symbol;
       if (p.assetType === 'Cash' || !symbol || (typeof symbol === 'string' && symbol.toUpperCase() === 'CASH')) {
         symbol = 'Cash';
@@ -694,7 +705,10 @@ export default function AccountDetail() {
       let portfolioValue = 0;
       let costBasis = 0;
       
-      positions.forEach(position => {
+      // Filter positions to only include those for this account
+      const accountPositions = positions.filter(p => p.accountId === accountId);
+      
+      accountPositions.forEach(position => {
         const positionDate = new Date(position.date || position.created_date);
         positionDate.setHours(0, 0, 0, 0);
         
@@ -762,8 +776,8 @@ export default function AccountDetail() {
       return amount;
     };
     
-    // Get all positions with this symbol
-    const symbolPositions = positions.filter(p => p.symbol === symbol);
+    // Get all positions with this symbol for this account only
+    const symbolPositions = positions.filter(p => p.symbol === symbol && p.accountId === accountId);
     if (symbolPositions.length === 0) return [];
     
     const data = [];
@@ -892,9 +906,10 @@ export default function AccountDetail() {
     return data;
   };
 
-  // Get unique symbols for position selector (aggregate by symbol)
+  // Get unique symbols for position selector (aggregate by symbol) - only for this account
+  const accountPositionsForSymbols = positions.filter(p => p.accountId === accountId);
   const aggregatedSymbols = {};
-  positions.forEach(p => {
+  accountPositionsForSymbols.forEach(p => {
     if (!aggregatedSymbols[p.symbol]) {
       aggregatedSymbols[p.symbol] = { symbol: p.symbol, assetType: p.assetType };
     }

@@ -25,7 +25,9 @@ function ExpenseMonthView({
   onDelete,
   onDuplicate,
   isLoading,
-  monthLabel
+  monthLabel,
+  selectedYear,
+  selectedMonths = []
 }) {
   const { user, colors, t, language, theme, isRTL } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
@@ -98,6 +100,15 @@ function ExpenseMonthView({
   React.useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchQuery, categoryFilter]);
+
+  // Adjust current page if it's beyond total pages (e.g., after deleting last transaction on a page)
+  React.useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    } else if (totalPages === 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   const formatCurrency = useCallback((value, currency) => {
     return new Intl.NumberFormat('en-US', {
@@ -492,13 +503,13 @@ function ExpenseMonthView({
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Budget Progress */}
-        {budgets && budgets.length > 0 && (
-          <BudgetProgress 
-            budgets={budgets} 
-            transactions={transactions} 
-            formatCurrency={formatCurrency}
-          />
-        )}
+        <BudgetProgress 
+          budgets={budgets}
+          transactions={transactions}
+          formatCurrency={formatCurrency}
+          selectedYear={selectedYear}
+          selectedMonths={selectedMonths}
+        />
 
         {/* Expenses by Category */}
         <Card className={cn(colors.cardBg, colors.cardBorder)}>

@@ -7,7 +7,7 @@ import { useTheme, translateCategory } from '../ThemeProvider';
 import BlurValue from '../BlurValue';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
-function BudgetProgress({ budgets, transactions, formatCurrency }) {
+function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [] }) {
   const { colors, language, user, t } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'USD';
@@ -19,18 +19,60 @@ function BudgetProgress({ budgets, transactions, formatCurrency }) {
     }
   }, [userCurrency, fetchExchangeRates]);
 
-  // Calculate current month spending by category (memoized, using stored converted amounts)
+  // Filter budgets by selected period - only show budgets that match the exact year + month(s)
+  const filteredBudgets = useMemo(() => {
+    if (!selectedYear) {
+      // If no year selected, don't show any budgets
+      return [];
+    }
+    const yearNum = parseInt(selectedYear);
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    
+    if (selectedMonths && selectedMonths.length > 0) {
+      // Filter by selected months - only show budgets for those specific months
+      const monthNums = selectedMonths.map(m => parseInt(m));
+      return budgets.filter(b => {
+        // Handle budgets without year/month (backward compatibility - show for current month/year only)
+        if (!b.year || !b.month) {
+          // Only show old budgets if viewing current month/year
+          return yearNum === currentYear && monthNums.includes(currentMonth);
+        }
+        // Convert month to number if it's a string
+        const budgetMonth = typeof b.month === 'string' ? parseInt(b.month) : b.month;
+        const budgetYear = typeof b.year === 'string' ? parseInt(b.year) : b.year;
+        // Only include budgets with matching year and month
+        return budgetYear === yearNum && monthNums.includes(budgetMonth);
+      });
+    } else {
+      // If no months selected (yearly view), don't show budgets (budgets are month-specific)
+      return [];
+    }
+  }, [budgets, selectedYear, selectedMonths]);
+
+  // Calculate spending by category for selected period (memoized, using stored converted amounts)
   const spendingByCategory = useMemo(() => {
-    const now = new Date();
-    const thisMonthTransactions = transactions.filter(t => {
+    if (!selectedYear) return {};
+    const yearNum = parseInt(selectedYear);
+    
+    let periodTransactions = transactions.filter(t => {
+      if (!t.date || t.type !== 'Expense') return false;
       const transDate = new Date(t.date);
-      return t.type === 'Expense' &&
-        transDate.getMonth() === now.getMonth() &&
-        transDate.getFullYear() === now.getFullYear();
+      const transYear = transDate.getFullYear();
+      
+      if (selectedMonths && selectedMonths.length > 0) {
+        // Filter by selected months
+        const transMonth = transDate.getMonth() + 1; // getMonth returns 0-11
+        const monthNums = selectedMonths.map(m => parseInt(m));
+        return transYear === yearNum && monthNums.includes(transMonth);
+      } else {
+        // Filter by year only
+        return transYear === yearNum;
+      }
     });
 
     const spending = {};
-    thisMonthTransactions.forEach(t => {
+    periodTransactions.forEach(t => {
       if (!spending[t.category]) {
         spending[t.category] = 0;
       }
@@ -52,10 +94,10 @@ function BudgetProgress({ budgets, transactions, formatCurrency }) {
     });
 
     return spending;
-  }, [transactions, userCurrency, rates, convertCurrency]);
+  }, [transactions, userCurrency, rates, convertCurrency, selectedYear, selectedMonths]);
 
   const budgetData = useMemo(() => {
-    return budgets.map(budget => {
+    return filteredBudgets.map(budget => {
       // Convert budget limit to user's currency if needed
       let budgetLimit = budget.monthlyLimit;
       if (budget.currency !== userCurrency && rates && Object.keys(rates).length > 0) {
@@ -84,8 +126,14 @@ function BudgetProgress({ budgets, transactions, formatCurrency }) {
       };
     })
     .sort((a, b) => b.displayPercentage - a.displayPercentage);
-  }, [budgets, spendingByCategory, userCurrency, rates, convertCurrency]);
+  }, [filteredBudgets, spendingByCategory, userCurrency, rates, convertCurrency]);
 
+  // Don't show the module if there are no budgets for the selected period
+  // Debug: Log to help troubleshoot
+  if (filteredBudgets.length === 0) {
+    return null;
+  }
+  
   if (budgetData.length === 0) {
     return null;
   }

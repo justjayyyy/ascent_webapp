@@ -526,6 +526,9 @@ export const translations = {
     clickToChangePeriod: 'Click to change period',
     futureMonth: 'Future month',
     noTransactions: 'No transactions',
+    yearlyView: 'Yearly view',
+    months: 'months',
+    all: 'All',
     
     // Expense View
     cardPayments: 'Card Payments',
@@ -1081,6 +1084,9 @@ export const translations = {
     clickToChangePeriod: 'לחץ לשינוי התקופה',
     futureMonth: 'חודש עתידי',
     noTransactions: 'אין תנועות',
+    yearlyView: 'תצוגה שנתית',
+    months: 'חודשים',
+    all: 'הכל',
     
     // Expense View
     cardPayments: 'תשלומי כרטיס',
@@ -1636,6 +1642,9 @@ export const translations = {
     clickToChangePeriod: 'Нажмите для изменения периода',
     futureMonth: 'Будущий месяц',
     noTransactions: 'Нет транзакций',
+    yearlyView: 'Годовой вид',
+    months: 'месяцев',
+    all: 'Все',
     
     // Expense View
     cardPayments: 'Платежи картой',
