@@ -14,6 +14,7 @@ import { Toaster as SonnerToaster } from 'sonner';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SkeletonPage } from '@/components/ui/skeleton-card';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -102,6 +103,7 @@ function App() {
         <Toaster />
         <SonnerToaster position="top-right" richColors />
         <Analytics />
+        <SpeedInsights />
       </QueryClientProvider>
     </AuthProvider>
   )
