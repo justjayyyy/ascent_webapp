@@ -19,6 +19,16 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
   // Ensure we have a valid currency code
   const currency = accountCurrency || user?.currency || 'USD';
   
+  // Format currency helper function
+  const formatCurrency = (value, currencyCode = currency) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  };
+  
   const [formData, setFormData] = useState(editPosition || {
     symbol: '',
     assetType: 'Stock',
@@ -287,7 +297,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
               />
               {hasCashPosition && cashBalance > 0 && (
                 <p className={cn("text-sm flex items-center gap-1", colors.textTertiary)}>
-                  💰 {t('currentCashBalance') || 'Current cash balance'}: <span className="font-medium text-green-400">{new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(cashBalance)}</span>
+                  💰 {t('currentCashBalance') || 'Current cash balance'}: <span className="font-medium text-green-400">{formatCurrency(cashBalance, currency)}</span>
                 </p>
               )}
               <p className={cn("text-xs", colors.textTertiary)}>
@@ -481,7 +491,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                     <div className="flex justify-between">
                       <span>{t('availableCash') || 'Available cash'}:</span>
                       <span className={cn("font-medium", cashBalance > 0 ? 'text-green-400' : colors.textPrimary)}>
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(cashBalance)}
+                        {formatCurrency(cashBalance, currency)}
                       </span>
                     </div>
                     {purchaseCost > 0 && (
@@ -489,13 +499,13 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                         <div className="flex justify-between">
                           <span>{t('purchaseCost') || 'Purchase cost'}:</span>
                           <span className="font-medium text-amber-400">
-                            -{new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(purchaseCost)}
+                            -{formatCurrency(purchaseCost, currency)}
                           </span>
                         </div>
                         <div className={cn("flex justify-between pt-1 border-t mt-1", colors.borderLight)}>
                           <span>{t('remainingCash') || 'Remaining'}:</span>
                           <span className={cn("font-medium", hasSufficientCash ? 'text-green-400' : 'text-red-400')}>
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(cashBalance - purchaseCost)}
+                            {formatCurrency(cashBalance - purchaseCost, currency)}
                           </span>
                         </div>
                       </>

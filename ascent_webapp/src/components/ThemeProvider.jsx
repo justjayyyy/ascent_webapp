@@ -106,6 +106,10 @@ export const translations = {
     adding: 'Adding...',
     deleting: 'Deleting...',
     optional: 'Optional',
+    confirmDelete: 'Confirm Delete',
+    confirmDeletePosition: 'Are you sure you want to delete this position? This action cannot be undone.',
+    confirmDeleteDayTrade: 'Are you sure you want to delete this day trade? This action cannot be undone.',
+    confirmDeleteAllPositions: 'Are you sure you want to delete all positions for {symbol}? This action cannot be undone.',
     
     // Login/Register
     welcome: 'Welcome',
@@ -663,6 +667,10 @@ export const translations = {
     adding: 'מוסיף...',
     deleting: 'מוחק...',
     optional: 'אופציונלי',
+    confirmDelete: 'אשר מחיקה',
+    confirmDeletePosition: 'האם אתה בטוח שברצונך למחוק את הפוזיציה הזו? פעולה זו לא ניתנת לביטול.',
+    confirmDeleteDayTrade: 'האם אתה בטוח שברצונך למחוק את המסחר היומי הזה? פעולה זו לא ניתנת לביטול.',
+    confirmDeleteAllPositions: 'האם אתה בטוח שברצונך למחוק את כל הפוזיציות עבור {symbol}? פעולה זו לא ניתנת לביטול.',
     
     // Login/Register
     welcome: 'ברוכים הבאים',
@@ -1221,6 +1229,10 @@ export const translations = {
     adding: 'Добавление...',
     deleting: 'Удаление...',
     optional: 'Необязательно',
+    confirmDelete: 'Подтвердить удаление',
+    confirmDeletePosition: 'Вы уверены, что хотите удалить эту позицию? Это действие нельзя отменить.',
+    confirmDeleteDayTrade: 'Вы уверены, что хотите удалить эту дневную сделку? Это действие нельзя отменить.',
+    confirmDeleteAllPositions: 'Вы уверены, что хотите удалить все позиции для {symbol}? Это действие нельзя отменить.',
     
     // Login/Register
     welcome: 'Добро пожаловать',

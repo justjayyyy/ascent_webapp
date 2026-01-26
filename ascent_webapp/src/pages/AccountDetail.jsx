@@ -102,10 +102,30 @@ export default function AccountDetail() {
     enabled: !!accountId,
   });
 
-  // Calculate total cash from all cash positions for this account only
-  const totalCashBalance = positions
-    .filter(p => p.assetType === 'Cash' && p.accountId === accountId)
-    .reduce((sum, p) => sum + p.quantity, 0);
+  // Calculate total cash from all cash positions for this account only, converted to account currency
+  const totalCashBalance = useMemo(() => {
+    const accountCurrency = account?.baseCurrency || 'USD';
+    const cashPositions = positions.filter(p => p.assetType === 'Cash' && p.accountId === accountId);
+    
+    if (cashPositions.length === 0) return 0;
+    
+    // Helper to convert amount to account currency
+    const convertToAccountCurrency = (amount, fromCurrency) => {
+      if (!fromCurrency || fromCurrency === accountCurrency) {
+        return amount;
+      }
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(amount, fromCurrency, accountCurrency, rates);
+      }
+      return amount;
+    };
+    
+    return cashPositions.reduce((sum, p) => {
+      const cashCurrency = p.currency || accountCurrency;
+      const convertedAmount = convertToAccountCurrency(p.quantity || 0, cashCurrency);
+      return sum + convertedAmount;
+    }, 0);
+  }, [positions, accountId, account?.baseCurrency, rates, convertCurrency]);
 
   const createPositionMutation = useMutation({
     mutationFn: async (positionData) => {
@@ -536,24 +556,19 @@ export default function AccountDetail() {
     // Filter positions to only include those for this account
     const accountPositions = positions.filter(p => p.accountId === accountId);
     
-    // Aggregate positions by symbol - include ALL positions for this account
+    // Aggregate positions by symbol - include Cash positions grouped by currency
     const aggregated = {};
     
     accountPositions.forEach((position, index) => {
-      // Handle Cash positions and positions with missing symbols
+      // Handle positions with missing symbols
       let symbol = position.symbol;
       const originalSymbol = symbol;
       
-      // Normalize Cash positions
-      if (position.assetType === 'Cash' || 
-          !symbol || 
-          (typeof symbol === 'string' && symbol.trim() === '') || 
-          (typeof symbol === 'string' && symbol.toUpperCase() === 'CASH')) {
-        symbol = 'Cash';
-      }
-      
-      // Ensure we have a valid symbol (fallback to 'Unknown' if still missing)
-      if (!symbol || (typeof symbol === 'string' && symbol.trim() === '')) {
+      // Handle Cash positions - group by currency
+      if (position.assetType === 'Cash') {
+        const cashCurrency = position.currency || accountCurrency;
+        symbol = `Cash (${cashCurrency})`;
+      } else if (!symbol || (typeof symbol === 'string' && symbol.trim() === '')) {
         symbol = `Unknown-${position.id}`;
       }
       
@@ -568,8 +583,8 @@ export default function AccountDetail() {
         const contractMultiplier = 100;
         marketValue = quantity * currentPrice * contractMultiplier;
       } else if (position.assetType === 'Cash') {
-        currentPrice = 1;
-        marketValue = quantity * currentPrice;
+        // Cash: use quantity as value (already in its currency)
+        marketValue = quantity;
       } else {
         currentPrice = position.currentPrice || position.averageBuyPrice || 0;
         marketValue = quantity * currentPrice;
@@ -611,10 +626,12 @@ export default function AccountDetail() {
     
     accountPositions.forEach(p => {
       let symbol = p.symbol;
-      if (p.assetType === 'Cash' || !symbol || (typeof symbol === 'string' && symbol.toUpperCase() === 'CASH')) {
-        symbol = 'Cash';
-      }
-      if (!symbol || (typeof symbol === 'string' && symbol.trim() === '')) {
+      
+      // Handle Cash positions - group by currency (matching aggregation logic)
+      if (p.assetType === 'Cash') {
+        const cashCurrency = p.currency || accountCurrency;
+        symbol = `Cash (${cashCurrency})`;
+      } else if (!symbol || (typeof symbol === 'string' && symbol.trim() === '')) {
         symbol = `Unknown-${p.id}`;
       }
       
@@ -622,12 +639,26 @@ export default function AccountDetail() {
       if (!positionSymbols.has(symbol)) {
         positionSymbols.set(symbol, []);
       }
+      
+      // Calculate value for verification
+      let value;
+      if (p.assetType === 'Cash') {
+        value = p.quantity || 0;
+      } else if (p.assetType === 'Option') {
+        const premiumPrice = p.premiumPrice || p.averageBuyPrice || 0;
+        const currentPrice = p.currentPrice || premiumPrice;
+        const contractMultiplier = 100;
+        value = (p.quantity || 0) * currentPrice * contractMultiplier;
+      } else {
+        value = (p.quantity || 0) * (p.currentPrice || p.averageBuyPrice || 0);
+      }
+      
       positionSymbols.get(symbol).push({
         id: p.id,
         symbol: p.symbol,
         assetType: p.assetType,
         quantity: p.quantity,
-        value: (p.quantity || 0) * (p.currentPrice || p.averageBuyPrice || (p.assetType === 'Cash' ? 1 : 0))
+        value: value
       });
     });
     
@@ -705,7 +736,7 @@ export default function AccountDetail() {
       let portfolioValue = 0;
       let costBasis = 0;
       
-      // Filter positions to only include those for this account
+      // Filter positions to only include those for this account (including Cash)
       const accountPositions = positions.filter(p => p.accountId === accountId);
       
       accountPositions.forEach(position => {
@@ -714,38 +745,55 @@ export default function AccountDetail() {
         
         // Only count positions that existed on this date
         if (positionDate <= date) {
-          let currentPrice, buyPrice;
-          const contractMultiplier = 100;
+          const positionCurrency = position.currency || accountCurrency;
           
-          if (position.assetType === 'Option') {
-            buyPrice = position.premiumPrice || position.averageBuyPrice || 0;
-            currentPrice = position.currentPrice || buyPrice;
-            // Calculate days since position was added
-            const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
-            const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
-            // Linear interpolation from buy price to current price
-            const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
-            const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
-            portfolioValue += position.quantity * interpolatedPrice * contractMultiplier;
-            costBasis += position.quantity * buyPrice * contractMultiplier;
+          if (position.assetType === 'Cash') {
+            // Cash: value is the quantity (doesn't change over time)
+            const cashValue = position.quantity || 0;
+            // Convert cash to account currency first, then to display currency
+            const convertedCashValue = convertToDisplayCurrency(cashValue, positionCurrency);
+            portfolioValue += convertedCashValue;
+            costBasis += convertedCashValue; // Cash has no P&L, cost basis equals value
           } else {
-            currentPrice = position.currentPrice || position.averageBuyPrice;
-            buyPrice = position.averageBuyPrice;
-            // Calculate days since position was added
-            const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
-            const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
-            // Linear interpolation from buy price to current price
-            const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
-            const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
-            portfolioValue += position.quantity * interpolatedPrice;
-            costBasis += position.quantity * buyPrice;
+            let currentPrice, buyPrice;
+            const contractMultiplier = 100;
+            
+            if (position.assetType === 'Option') {
+              buyPrice = position.premiumPrice || position.averageBuyPrice || 0;
+              currentPrice = position.currentPrice || buyPrice;
+              // Calculate days since position was added
+              const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
+              const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
+              // Linear interpolation from buy price to current price
+              const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
+              const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
+              const positionValue = position.quantity * interpolatedPrice * contractMultiplier;
+              const positionCost = position.quantity * buyPrice * contractMultiplier;
+              // Convert to display currency
+              portfolioValue += convertToDisplayCurrency(positionValue, positionCurrency);
+              costBasis += convertToDisplayCurrency(positionCost, positionCurrency);
+            } else {
+              currentPrice = position.currentPrice || position.averageBuyPrice;
+              buyPrice = position.averageBuyPrice;
+              // Calculate days since position was added
+              const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
+              const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
+              // Linear interpolation from buy price to current price
+              const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
+              const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
+              const positionValue = position.quantity * interpolatedPrice;
+              const positionCost = position.quantity * buyPrice;
+              // Convert to display currency
+              portfolioValue += convertToDisplayCurrency(positionValue, positionCurrency);
+              costBasis += convertToDisplayCurrency(positionCost, positionCurrency);
+            }
           }
         }
       });
       
-      // Convert to display currency
-      const convertedValue = convertToDisplayCurrency(portfolioValue);
-      const convertedCostBasis = convertToDisplayCurrency(costBasis);
+      // Values are already converted to display currency above
+      const convertedValue = portfolioValue;
+      const convertedCostBasis = costBasis;
       const convertedPnL = convertedValue - convertedCostBasis;
       
       data.push({
@@ -1314,8 +1362,8 @@ export default function AccountDetail() {
                   </div>
                 ) : (
                   <PositionTable
-                    positions={positions}
-                    dayTrades={dayTrades}
+                    positions={positions.filter(p => p.accountId === accountId)}
+                    dayTrades={dayTrades.filter(dt => dt.accountId === accountId)}
                     totalAccountValue={metrics.totalValue}
                     userCurrency={displayCurrency}
                     accountCurrency={account?.baseCurrency || 'USD'}
