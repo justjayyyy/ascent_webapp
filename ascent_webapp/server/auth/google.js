@@ -105,14 +105,23 @@ export default async function handler(req, res) {
     
     // Check for pending invitations and auto-accept if email matches
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const pendingInvitations = await SharedUser.find({
-        invitedEmail: email.toLowerCase(),
+        $or: [
+          { invitedEmail: normalizedEmail },
+          { invitedEmail: { $regex: `^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+        ],
         status: 'pending'
       });
+      
+      if (pendingInvitations.length > 0) {
+        console.log(`[Google Auth] Found ${pendingInvitations.length} pending invitation(s) for ${normalizedEmail}`);
+      }
       
       for (const invitation of pendingInvitations) {
         invitation.status = 'accepted';
         await invitation.save();
+        console.log(`[Google Auth] Auto-accepted invitation for ${normalizedEmail} from ${invitation.created_by}`);
       }
     } catch (invitationError) {
       // Don't fail login if invitation acceptance fails

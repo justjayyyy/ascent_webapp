@@ -52,14 +52,22 @@ export function createEntityHandler(Model, options = {}) {
           }
           
           // Check if user is a shared user (invited by someone)
+          // Use case-insensitive regex matching to be safe
           const sharedUserRecord = await SharedUser.findOne({
-            invitedEmail: userEmail,
+            $or: [
+              { invitedEmail: userEmail },
+              { invitedEmail: { $regex: `^${userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+            ],
             status: 'accepted'
           }).lean();
           
           if (sharedUserRecord && sharedUserRecord.created_by) {
             // User is a shared user - return the owner's email (created_by)
-            return sharedUserRecord.created_by.trim().toLowerCase();
+            const ownerEmail = sharedUserRecord.created_by.trim().toLowerCase();
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[EntityHandler] Shared user detected: ${userEmail} -> Owner: ${ownerEmail}`);
+            }
+            return ownerEmail;
           }
         } catch (error) {
           // If there's an error checking shared user, fall back to user's own email
@@ -79,6 +87,13 @@ export function createEntityHandler(Model, options = {}) {
           const effectiveEmail = await getEffectiveOwnerEmail();
           if (!effectiveEmail) return {};
           
+          const userEmail = user.email.trim().toLowerCase();
+          const isSharedUser = effectiveEmail !== userEmail;
+          
+          if (process.env.NODE_ENV === 'development' && isSharedUser) {
+            console.log(`[EntityHandler] Building filter for shared user ${userEmail} -> Owner: ${effectiveEmail}`);
+          }
+          
           const escapedEmail = effectiveEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           
           // Use case-insensitive regex matching AND try exact lowercase match
@@ -89,7 +104,7 @@ export function createEntityHandler(Model, options = {}) {
             ]
           };
         } catch (error) {
-          // Fallback to user's own email if there's an error
+          // Fallback to user's own email if there's an error (but log it)
           console.error('[EntityHandler] Error building user filter:', error.message);
           const userEmail = user.email.trim().toLowerCase();
           const escapedEmail = userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -152,12 +167,10 @@ export function createEntityHandler(Model, options = {}) {
             .limit(limitValue)
             .lean();
 
-          // Fallback to simpler queries if main query returns 0 items
-          if (items.length === 0 && filterByUser && Object.keys(query).length > 0) {
-            const userEmail = user.email.trim().toLowerCase();
-            const exactQuery = { [userField]: userEmail };
-            items = await Model.find(exactQuery).sort(sortField).limit(limitValue).lean();
-          }
+          // Don't fallback to user's own email - if they're a shared user, 
+          // we want to show owner's data (even if empty), not their own empty data
+          // The query already uses the effective owner email, so if it returns 0 items,
+          // that means the owner has no data, which is correct
 
           // Ensure all items have id field
           const itemsArray = items.map(item => {
