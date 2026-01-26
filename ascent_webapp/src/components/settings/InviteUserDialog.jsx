@@ -16,9 +16,14 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
     permissions: {
       viewPortfolio: true,
       editPortfolio: false,
-      viewDashboard: true,
       viewExpenses: false,
       editExpenses: false,
+      viewNotes: false,
+      editNotes: false,
+      viewGoals: false,
+      editGoals: false,
+      viewBudgets: false,
+      editBudgets: false,
       viewSettings: false,
       manageUsers: false,
     },
@@ -48,7 +53,8 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
     
     if (!validate()) return;
 
-    await onSubmit(formData);
+    // Close dialog immediately, don't wait for email
+    onClose();
     
     // Reset form
     setFormData({
@@ -57,14 +63,22 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
       permissions: {
         viewPortfolio: true,
         editPortfolio: false,
-        viewDashboard: true,
         viewExpenses: false,
         editExpenses: false,
+        viewNotes: false,
+        editNotes: false,
+        viewGoals: false,
+        editGoals: false,
+        viewBudgets: false,
+        editBudgets: false,
         viewSettings: false,
         manageUsers: false,
       },
     });
     setErrors({});
+    
+    // Submit in background (email will be sent asynchronously)
+    onSubmit(formData);
   };
 
   const togglePermission = (key) => {
@@ -135,17 +149,6 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                 <Switch
                   checked={formData.permissions.editPortfolio}
                   onCheckedChange={() => togglePermission('editPortfolio')}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewDashboard')}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canAccessDashboard')}</p>
-                </div>
-                <Switch
-                  checked={formData.permissions.viewDashboard}
-                  onCheckedChange={() => togglePermission('viewDashboard')}
                 />
               </div>
 

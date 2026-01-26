@@ -39,6 +39,16 @@
       "includeFiles": "server/**",
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/send-daily-summary",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/send-weekly-summary",
+      "schedule": "0 9 * * 1"
+    }
+  ]
 }
 

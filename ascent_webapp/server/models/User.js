@@ -47,6 +47,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  dailySummary: {
+    type: Boolean,
+    default: false
+  },
   weeklyReports: {
     type: Boolean,
     default: true

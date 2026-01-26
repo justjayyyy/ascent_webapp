@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       
       const allowedUpdates = [
         'full_name', 'language', 'currency', 'theme',
-        'blurValues', 'priceAlerts', 'weeklyReports', 'emailNotifications'
+        'blurValues', 'priceAlerts', 'dailySummary', 'weeklyReports', 'emailNotifications'
       ];
       
       const updates = {};

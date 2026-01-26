@@ -18,11 +18,16 @@ const sharedUserSchema = new mongoose.Schema({
   },
   permissions: {
     viewPortfolio: { type: Boolean, default: true },
-    viewDashboard: { type: Boolean, default: true },
-    viewExpenses: { type: Boolean, default: true },
-    viewSettings: { type: Boolean, default: false },
     editPortfolio: { type: Boolean, default: false },
+    viewExpenses: { type: Boolean, default: true },
     editExpenses: { type: Boolean, default: false },
+    viewNotes: { type: Boolean, default: false },
+    editNotes: { type: Boolean, default: false },
+    viewGoals: { type: Boolean, default: false },
+    editGoals: { type: Boolean, default: false },
+    viewBudgets: { type: Boolean, default: false },
+    editBudgets: { type: Boolean, default: false },
+    viewSettings: { type: Boolean, default: false },
     manageUsers: { type: Boolean, default: false }
   },
   created_by: {

@@ -186,6 +186,10 @@ app.delete('/api/integrations/google-calendar', googleCalendarHandler);
 
 app.options('/api/integrations/*', (req, res) => res.sendStatus(200));
 
+// Cron job routes (for scheduled notifications)
+app.post('/api/send-daily-summary', wrapHandler('./api/send-daily-summary.js'));
+app.post('/api/send-weekly-summary', wrapHandler('./api/send-weekly-summary.js'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

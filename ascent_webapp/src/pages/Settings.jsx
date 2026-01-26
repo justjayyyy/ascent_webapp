@@ -82,6 +82,56 @@ export default function Settings() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: notes = [] } = useQuery({
+    queryKey: ['notes', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      return await ascent.entities.Note.filter({ created_by: user.email });
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: goals = [] } = useQuery({
+    queryKey: ['goals', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      return await ascent.entities.FinancialGoal.filter({ created_by: user.email }, '-created_date');
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: budgets = [] } = useQuery({
+    queryKey: ['budgets', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      return await ascent.entities.Budget.filter({ created_by: user.email }, '-created_date');
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      return await ascent.entities.Category.list('-created_date');
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: cards = [] } = useQuery({
+    queryKey: ['cards', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      return await ascent.entities.Card.filter({ created_by: user.email });
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: sharedUsers = [] } = useQuery({
     queryKey: ['sharedUsers', user?.id],
     queryFn: async () => {
@@ -117,44 +167,206 @@ export default function Settings() {
         ...data,
         created_by: user.email
       });
-      try {
-        const emailResult = await ascent.integrations.Core.SendEmail({
-          to: data.invitedEmail,
-          subject: `You've been invited to Ascend by ${user.full_name}`,
-          body: `Hello ${data.displayName},\n\n${user.full_name} has invited you to collaborate on their Ascend account.\n\nYou can access the account at: ${window.location.origin}\n\nBest regards,\nAscend Team`
-        });
+      // Send email asynchronously (don't wait for it)
+      const sendEmailAsync = async () => {
+        try {
+          const appUrl = window.location.origin;
+          const permissionsList = [];
+          
+          if (data.permissions.viewPortfolio) permissionsList.push('• View Portfolio - See investment accounts and positions');
+          if (data.permissions.editPortfolio) permissionsList.push('• Edit Portfolio - Add, edit, and delete accounts and positions');
+          if (data.permissions.viewExpenses) permissionsList.push('• View Expenses - See income and expense transactions');
+          if (data.permissions.editExpenses) permissionsList.push('• Edit Expenses - Add, edit, and delete transactions');
+          if (data.permissions.viewNotes) permissionsList.push('• View Notes - See notes and personal memos');
+          if (data.permissions.editNotes) permissionsList.push('• Edit Notes - Create, edit, and delete notes');
+          if (data.permissions.viewGoals) permissionsList.push('• View Goals - See financial goals and progress');
+          if (data.permissions.editGoals) permissionsList.push('• Edit Goals - Create, edit, and delete financial goals');
+          if (data.permissions.viewBudgets) permissionsList.push('• View Budgets - See budget categories and limits');
+          if (data.permissions.editBudgets) permissionsList.push('• Edit Budgets - Create, edit, and delete budgets');
+          if (data.permissions.viewSettings) permissionsList.push('• View Settings - Access settings page');
+          if (data.permissions.manageUsers) permissionsList.push('• Manage Users - Invite and manage other users');
+          
+          const permissionsText = permissionsList.length > 0 
+            ? `\n\nYour Permissions:\n${permissionsList.join('\n')}`
+            : '\n\nYou have view-only access to the portfolio.';
+          
+          const emailBody = `Hello ${data.displayName},
+
+${user.full_name} has invited you to collaborate on their Ascent financial account.
+
+📧 Your Account:
+• Email: ${data.invitedEmail}
+• Display Name: ${data.displayName}
+
+🔗 Access Your Account:
+Visit: ${appUrl}
+Sign in with your email address to get started.
+
+${permissionsText}
+
+📝 What is Ascent?
+Ascent is a comprehensive personal finance management application that helps you track:
+• Investment portfolios and positions
+• Income and expenses
+• Financial goals and budgets
+• Personal notes and memos
+
+🔐 Getting Started:
+1. Visit ${appUrl}
+2. Click "Sign In" or "Login"
+3. Use your email address (${data.invitedEmail}) to access the account
+4. If you don't have an account yet, you can create one - your invitation will be automatically linked
+
+💡 Need Help?
+If you have any questions or need assistance, please contact ${user.full_name} at ${user.email}.
+
+Best regards,
+Ascent Team
+
+---
+This is an automated invitation email. Please do not reply to this email.`;
+
+          const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invitation to Ascent</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #092635 0%, #1B4242 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: #9EC8B9; margin: 0; font-size: 28px;">You've Been Invited to Ascent</h1>
+  </div>
+  
+  <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none;">
+    <p style="font-size: 16px; margin-top: 0;">Hello <strong>${data.displayName}</strong>,</p>
+    
+    <p style="font-size: 16px;">
+      <strong>${user.full_name}</strong> has invited you to collaborate on their Ascent financial account.
+    </p>
+    
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #5C8374;">
+      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">📧 Your Account Details</h2>
+      <p style="margin: 5px 0;"><strong>Email:</strong> ${data.invitedEmail}</p>
+      <p style="margin: 5px 0;"><strong>Display Name:</strong> ${data.displayName}</p>
+    </div>
+    
+    <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50;">
+      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🔗 Get Started</h2>
+      <p style="margin: 10px 0;">
+        <a href="${appUrl}" style="display: inline-block; background: #5C8374; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0;">
+          Access Your Account →
+        </a>
+      </p>
+      <p style="margin: 5px 0; font-size: 14px; color: #666;">
+        Or visit: <a href="${appUrl}" style="color: #5C8374;">${appUrl}</a>
+      </p>
+    </div>
+    
+    ${permissionsList.length > 0 ? `
+    <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🔐 Your Permissions</h2>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        ${permissionsList.map(p => `<li style="margin: 8px 0;">${p.replace('•', '')}</li>`).join('')}
+      </ul>
+    </div>
+    ` : `
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="margin: 0; color: #666; font-size: 14px;">You have view-only access to the portfolio.</p>
+    </div>
+    `}
+    
+    <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
+      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">📝 What is Ascent?</h2>
+      <p style="margin: 10px 0; font-size: 14px;">
+        Ascent is a comprehensive personal finance management application that helps you track:
+      </p>
+      <ul style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+        <li>Investment portfolios and positions</li>
+        <li>Income and expenses</li>
+        <li>Financial goals and budgets</li>
+        <li>Personal notes and memos</li>
+      </ul>
+    </div>
+    
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+      <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🚀 Getting Started</h2>
+      <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+        <li>Visit <a href="${appUrl}" style="color: #5C8374;">${appUrl}</a></li>
+        <li>Click "Sign In" or "Login"</li>
+        <li>Use your email address (<strong>${data.invitedEmail}</strong>) to access the account</li>
+        <li>If you don't have an account yet, you can create one - your invitation will be automatically linked</li>
+      </ol>
+    </div>
+    
+    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px;">
+      <p style="margin: 5px 0; font-size: 14px; color: #666;">
+        <strong>Need Help?</strong><br>
+        If you have any questions or need assistance, please contact <strong>${user.full_name}</strong> at 
+        <a href="mailto:${user.email}" style="color: #5C8374;">${user.email}</a>.
+      </p>
+    </div>
+    
+    <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
+      Best regards,<br>
+      <strong style="color: #5C8374;">Ascent Team</strong><br><br>
+      <em>This is an automated invitation email. Please do not reply to this email.</em>
+    </p>
+  </div>
+</body>
+</html>`;
+
+          const emailResult = await ascent.integrations.Core.SendEmail({
+            to: data.invitedEmail,
+            subject: `You've been invited to collaborate on ${user.full_name}'s Ascent account`,
+            body: emailBody,
+            html: emailHtml
+          });
         
-        // Check if email was actually sent
-        if (emailResult && emailResult.sent === false) {
-          console.warn('Email not sent - SMTP not configured');
-          // Still return invitation but with a warning
-          return { ...invitation, emailSent: false };
+          // Check if email was actually sent
+          if (emailResult && emailResult.sent === false) {
+            console.warn('Email not sent - SMTP not configured');
+            // Still return invitation but with a warning
+            return { ...invitation, emailSent: false };
+          }
+          
+          return { ...invitation, emailSent: true };
+        } catch (emailError) {
+          console.error('Email sending error:', emailError);
+          // Still return invitation even if email fails
+          return { ...invitation, emailSent: false, emailError: emailError.message };
         }
-        
-        return { ...invitation, emailSent: true };
-      } catch (emailError) {
-        console.error('Email sending error:', emailError);
-        // Still return invitation even if email fails
-        return { ...invitation, emailSent: false, emailError: emailError.message };
-      }
+      };
+      
+      // Send email in background (don't await - fire and forget)
+      sendEmailAsync().catch(err => {
+        console.error('Background email sending failed:', err);
+        // Don't show error to user since dialog is already closed
+      });
+      
+      return invitation;
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['sharedUsers'] });
-      setInviteDialogOpen(false);
-      if (result?.emailSent === false) {
-        const errorMsg = result?.emailError || 'SMTP configuration issue';
-        if (errorMsg.includes('BadCredentials') || errorMsg.includes('Invalid login')) {
-          toast.warning('Invitation created but email failed. Please check your Gmail App Password in .env file. Generate a new App Password at: https://myaccount.google.com/apppasswords');
-        } else {
-          toast.warning(`Invitation created but email could not be sent: ${errorMsg}`);
-        }
-      } else {
-        toast.success('Invitation sent successfully!');
-      }
+      // Dialog is already closed by InviteUserDialog component
+      // Show success message (email is sent asynchronously)
+      toast.success('Invitation created successfully! The invitation email will be sent shortly.');
     },
     onError: (error) => {
       console.error('Invitation error:', error);
       const errorMsg = error?.message || 'Unknown error';
+      
+      // Check if user session is invalid
+      if (errorMsg.includes('User not found') || errorMsg.includes('Invalid or expired token') || errorMsg.includes('No token provided')) {
+        toast.error('Your session has expired. Please log out and log back in.');
+        // Optionally redirect to login after a delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+        return;
+      }
+      
       if (errorMsg.includes('BadCredentials') || errorMsg.includes('Invalid login')) {
         toast.error('Failed to send invitation: Gmail authentication failed. Please check your App Password in .env file.');
       } else {
@@ -353,6 +565,16 @@ export default function Settings() {
                 </div>
                 <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
                   <div>
+                    <p className={cn("font-medium", colors.textPrimary)}>{t('dailySummary')}</p>
+                    <p className={cn("text-sm", colors.textTertiary)}>{t('receiveDailyReports')}</p>
+                  </div>
+                  <Switch
+                    checked={user?.dailySummary !== false}
+                    onCheckedChange={(checked) => updateUserMutation.mutate({ dailySummary: checked })}
+                  />
+                </div>
+                <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
+                  <div>
                     <p className={cn("font-medium", colors.textPrimary)}>{t('weeklySummary')}</p>
                     <p className={cn("text-sm", colors.textTertiary)}>{t('receiveWeeklyReports')}</p>
                   </div>
@@ -388,11 +610,15 @@ export default function Settings() {
             canManageUsers={!myPermissions || myPermissions.manageUsers === true}
           />
 
-          {/* Import/Export */}
+          {/* Export */}
           <ImportExportSection
             accounts={accounts}
             positions={positions}
             transactions={transactions}
+            notes={notes}
+            budgets={budgets}
+            categories={categories}
+            cards={cards}
           />
 
           {/* Invite User Dialog */}

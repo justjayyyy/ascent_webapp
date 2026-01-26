@@ -11,7 +11,10 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "reset:app": "node --env-file=.env server/scripts/reset-app.mjs",
+    "seed:test-data": "node --env-file=.env server/scripts/seed-test-data.mjs",
+    "test:email": "node --env-file=.env server/scripts/test-email.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

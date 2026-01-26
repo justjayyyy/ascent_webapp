@@ -133,13 +133,6 @@ export default function SharedUsersSection({
                       />
                     </div>
                     <div className="flex items-center justify-between py-2">
-                      <Label className={cn("text-sm", colors.textPrimary)}>{t('viewDashboard')}</Label>
-                      <Switch
-                        checked={user.permissions?.viewDashboard || false}
-                        onCheckedChange={() => togglePermission(user, 'viewDashboard')}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between py-2">
                       <Label className={cn("text-sm", colors.textPrimary)}>{t('viewExpenses')}</Label>
                       <Switch
                         checked={user.permissions?.viewExpenses || false}
@@ -151,6 +144,48 @@ export default function SharedUsersSection({
                       <Switch
                         checked={user.permissions?.editExpenses || false}
                         onCheckedChange={() => togglePermission(user, 'editExpenses')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <Label className={cn("text-sm", colors.textPrimary)}>{t('viewNotes')}</Label>
+                      <Switch
+                        checked={user.permissions?.viewNotes || false}
+                        onCheckedChange={() => togglePermission(user, 'viewNotes')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <Label className={cn("text-sm", colors.textPrimary)}>{t('editNotes')}</Label>
+                      <Switch
+                        checked={user.permissions?.editNotes || false}
+                        onCheckedChange={() => togglePermission(user, 'editNotes')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <Label className={cn("text-sm", colors.textPrimary)}>{t('viewGoals')}</Label>
+                      <Switch
+                        checked={user.permissions?.viewGoals || false}
+                        onCheckedChange={() => togglePermission(user, 'viewGoals')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <Label className={cn("text-sm", colors.textPrimary)}>{t('editGoals')}</Label>
+                      <Switch
+                        checked={user.permissions?.editGoals || false}
+                        onCheckedChange={() => togglePermission(user, 'editGoals')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <Label className={cn("text-sm", colors.textPrimary)}>{t('viewBudgets')}</Label>
+                      <Switch
+                        checked={user.permissions?.viewBudgets || false}
+                        onCheckedChange={() => togglePermission(user, 'viewBudgets')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <Label className={cn("text-sm", colors.textPrimary)}>{t('editBudgets')}</Label>
+                      <Switch
+                        checked={user.permissions?.editBudgets || false}
+                        onCheckedChange={() => togglePermission(user, 'editBudgets')}
                       />
                     </div>
                     <div className="flex items-center justify-between py-2">
