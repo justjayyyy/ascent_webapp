@@ -14,6 +14,14 @@ const expenseTransactionSchema = new mongoose.Schema({
     type: String,
     default: 'USD'
   },
+  amountInGlobalCurrency: {
+    type: Number,
+    default: null // Will be set to amount if currency matches global currency, or converted amount if different
+  },
+  exchangeRate: {
+    type: Number,
+    default: null // Store the exchange rate used at transaction time for reference
+  },
   category: {
     type: String,
     required: true

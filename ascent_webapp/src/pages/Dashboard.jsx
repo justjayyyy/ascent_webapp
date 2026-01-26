@@ -37,6 +37,7 @@ const COLORS = ['#5C8374', '#9EC8B9', '#60A5FA', '#A78BFA', '#F59E0B', '#EF4444'
 
 export default function Dashboard() {
   const { user, colors, t, theme } = useTheme();
+  const userCurrency = user?.currency || 'USD';
   const [addGoalOpen, setAddGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
@@ -298,8 +299,8 @@ export default function Dashboard() {
     })).sort((a, b) => b.value - a.value);
   };
 
-  // Calculate savings rate
-  const calculateSavingsRate = () => {
+  // Calculate savings rate (using stored converted amounts)
+  const calculateSavingsRate = useCallback(() => {
     const thisMonth = new Date();
     const thisMonthTransactions = transactions.filter(t => {
       const transDate = parseISO(t.date);
@@ -309,15 +310,37 @@ export default function Dashboard() {
 
     const totalIncome = thisMonthTransactions
       .filter(t => t.type === 'Income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => {
+        // Use stored converted amount if available
+        if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
+          return sum + t.amountInGlobalCurrency;
+        }
+        // Fallback: only use amount if currency matches user's currency
+        if (t.currency === userCurrency) {
+          return sum + t.amount;
+        }
+        // Skip transactions in different currencies without converted amount
+        return sum;
+      }, 0);
 
     const totalExpenses = thisMonthTransactions
       .filter(t => t.type === 'Expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => {
+        // Use stored converted amount if available
+        if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
+          return sum + t.amountInGlobalCurrency;
+        }
+        // Fallback: only use amount if currency matches user's currency
+        if (t.currency === userCurrency) {
+          return sum + t.amount;
+        }
+        // Skip transactions in different currencies without converted amount
+        return sum;
+      }, 0);
 
     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
     return { savingsRate, totalIncome, totalExpenses };
-  };
+  }, [transactions, userCurrency]);
 
   // Deterministic pseudo-random based on date (same date = same value)
   const seededRandom = (seed) => {
@@ -325,8 +348,8 @@ export default function Dashboard() {
     return x - Math.floor(x);
   };
 
-  // Net worth over time (Assets - Cumulative Expenses)
-  const getNetWorthData = (range = '30d') => {
+  // Net worth over time (Assets - Cumulative Expenses, using stored converted amounts)
+  const getNetWorthData = useCallback((range = '30d') => {
     const metrics = calculateTotalMetrics();
     const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 365;
     const data = [];
@@ -366,15 +389,25 @@ export default function Dashboard() {
         continue;
       }
       
-      // Calculate cumulative expenses up to this date
+      // Calculate cumulative expenses up to this date (using stored converted amounts)
       const cumulativeExpenses = transactions
         .filter(t => t.type === 'Expense' && parseISO(t.date) <= date)
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => {
+          const amountToUse = t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined
+            ? t.amountInGlobalCurrency
+            : (t.currency === userCurrency ? t.amount : t.amount);
+          return sum + amountToUse;
+        }, 0);
       
-      // Calculate cumulative income up to this date
+      // Calculate cumulative income up to this date (using stored converted amounts)
       const cumulativeIncome = transactions
         .filter(t => t.type === 'Income' && parseISO(t.date) <= date)
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => {
+          const amountToUse = t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined
+            ? t.amountInGlobalCurrency
+            : (t.currency === userCurrency ? t.amount : t.amount);
+          return sum + amountToUse;
+        }, 0);
       
       // Calculate portfolio value based on position dates
       const daysFromStart = Math.floor((date - earliestDate) / 86400000);
@@ -394,7 +427,7 @@ export default function Dashboard() {
     }
     
     return data;
-  };
+  }, [accounts, positions, transactions, userCurrency]);
 
   // Portfolio performance vs S&P 500 benchmark
   const getBenchmarkComparison = () => {
@@ -553,8 +586,8 @@ export default function Dashboard() {
   const accountTypeData = React.useMemo(() => getAccountTypeAllocation(metrics.accountsWithPositions), [metrics.accountsWithPositions]);
   const assetTypeData = React.useMemo(() => getAssetTypeAllocation(), [positions]);
   const historicalData = React.useMemo(() => getHistoricalData(timeRange), [snapshots, metrics.totalPortfolioValue, timeRange]);
-  const savingsMetrics = React.useMemo(() => calculateSavingsRate(), [transactions]);
-  const netWorthData = React.useMemo(() => getNetWorthData(timeRange), [metrics.totalPortfolioValue, transactions, timeRange]);
+  const savingsMetrics = React.useMemo(() => calculateSavingsRate(), [calculateSavingsRate]);
+  const netWorthData = React.useMemo(() => getNetWorthData(timeRange), [getNetWorthData, timeRange]);
   const benchmarkData = React.useMemo(() => getBenchmarkComparison(), [metrics.totalPnLPercent]);
 
   const enabledWidgets = (dashboardWidgets || []).filter(w => 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { useTheme, translateCategory } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { ascent } from '@/api/client';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 export default function AddTransactionDialog({ 
   open, 
@@ -23,6 +24,8 @@ export default function AddTransactionDialog({
   editTransaction = null 
 }) {
   const { user, t, language, colors } = useTheme();
+  const { convertCurrency, fetchExchangeRates, rates, isLoading: isLoadingRates } = useCurrencyConversion();
+  const userCurrency = user?.currency || 'USD';
   const defaultCategory = categories.find(c => c.type === 'Expense' || c.type === 'Both');
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -43,6 +46,55 @@ export default function AddTransactionDialog({
   const [errors, setErrors] = useState({});
   const dateInputRef = useRef(null);
   const isInitialOpenRef = useRef(true);
+
+  // Fetch exchange rates on mount
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
+
+  // Calculate converted amount and exchange rate
+  const conversionInfo = useMemo(() => {
+    const amount = parseFloat(formData.amount) || 0;
+    const transactionCurrency = formData.currency || 'USD';
+    
+    if (!amount || amount === 0) {
+      return { convertedAmount: 0, exchangeRate: null, needsConversion: false };
+    }
+
+    if (transactionCurrency === userCurrency) {
+      return { 
+        convertedAmount: amount, 
+        exchangeRate: 1, 
+        needsConversion: false 
+      };
+    }
+
+    if (!rates || Object.keys(rates).length === 0) {
+      return { convertedAmount: amount, exchangeRate: null, needsConversion: true };
+    }
+
+    const convertedAmount = convertCurrency(amount, transactionCurrency, userCurrency, rates);
+    
+    // Calculate exchange rate: how many units of global currency per 1 unit of transaction currency
+    let exchangeRate = null;
+    if (transactionCurrency === 'USD' && rates[userCurrency]) {
+      exchangeRate = rates[userCurrency];
+    } else if (userCurrency === 'USD' && rates[transactionCurrency]) {
+      exchangeRate = 1 / rates[transactionCurrency];
+    } else if (rates[transactionCurrency] && rates[userCurrency]) {
+      // Convert via USD: transactionCurrency -> USD -> userCurrency
+      const rateToUSD = 1 / rates[transactionCurrency];
+      exchangeRate = rateToUSD * rates[userCurrency];
+    }
+
+    return { 
+      convertedAmount, 
+      exchangeRate, 
+      needsConversion: true 
+    };
+  }, [formData.amount, formData.currency, userCurrency, rates, convertCurrency]);
 
   const { data: cards = [] } = useQuery({
     queryKey: ['cards', user?.id],
@@ -72,6 +124,7 @@ export default function AddTransactionDialog({
         recurringStartDate: editTransaction.recurringStartDate || format(new Date(), 'yyyy-MM-dd'),
         recurringEndDate: editTransaction.recurringEndDate || format(addMonths(new Date(), 11), 'yyyy-MM-dd'),
       });
+      // If editing and no amountInGlobalCurrency exists, we'll recalculate it on submit
     } else {
       const defaultCategory = categories.find(c => c.type === 'Expense' || c.type === 'Both');
       setFormData({
@@ -156,6 +209,8 @@ export default function AddTransactionDialog({
     await onSubmit({
       ...formData,
       amount: parseFloat(formData.amount),
+      amountInGlobalCurrency: conversionInfo.convertedAmount,
+      exchangeRate: conversionInfo.exchangeRate,
       relatedAccountId: formData.relatedAccountId || undefined,
     });
   };
@@ -222,7 +277,8 @@ export default function AddTransactionDialog({
                   setFormData({ 
                     ...formData, 
                     type: value,
-                    category: availableCategories.length > 0 ? availableCategories[0].name : ''
+                    category: availableCategories.length > 0 ? availableCategories[0].name : '',
+                    isRecurring: value === 'Income' ? false : formData.isRecurring // Remove recurring for Income
                   });
                 }}
               >
@@ -267,6 +323,27 @@ export default function AddTransactionDialog({
                 className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary, errors.amount && 'border-red-500')}
               />
               {errors.amount && <p className="text-[9px] sm:text-xs text-red-400">{errors.amount}</p>}
+              {conversionInfo.needsConversion && formData.amount && parseFloat(formData.amount) > 0 && (
+                <p className={cn("text-[9px] sm:text-xs", colors.textTertiary)}>
+                  {isLoadingRates ? (
+                    <span>Loading exchange rate...</span>
+                  ) : (
+                    <>
+                      ≈ {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: userCurrency,
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(conversionInfo.convertedAmount)}
+                      {conversionInfo.exchangeRate && (
+                        <span className="ml-1">
+                          (1 {formData.currency} = {conversionInfo.exchangeRate.toFixed(4)} {userCurrency})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </p>
+              )}
             </div>
           </div>
 
@@ -305,6 +382,9 @@ export default function AddTransactionDialog({
                   <SelectItem value="Card" className={colors.textPrimary}>{t('card')}</SelectItem>
                   <SelectItem value="Cash" className={colors.textPrimary}>{t('cash')}</SelectItem>
                   <SelectItem value="Transfer" className={colors.textPrimary}>{t('transfer')}</SelectItem>
+                  <SelectItem value="Paybox" className={colors.textPrimary}>Paybox</SelectItem>
+                  <SelectItem value="PayPal" className={colors.textPrimary}>PayPal</SelectItem>
+                  <SelectItem value="Bit" className={colors.textPrimary}>Bit</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -322,30 +402,32 @@ export default function AddTransactionDialog({
             {errors.description && <p className="text-[9px] sm:text-xs text-red-400">{errors.description}</p>}
           </div>
 
-          {/* Recurring Transaction Toggle */}
-          <div className="flex items-center gap-2 p-2 rounded-md">
-            <Checkbox
-              id="isRecurring"
-              checked={formData.isRecurring}
-              onCheckedChange={(checked) => {
-                setFormData({ 
-                  ...formData, 
-                  isRecurring: checked,
-                  recurringStartDate: checked ? formData.recurringStartDate : format(new Date(), 'yyyy-MM-dd'),
-                  recurringEndDate: checked ? formData.recurringEndDate : format(addMonths(new Date(), 11), 'yyyy-MM-dd'),
-                });
-                setErrors({});
-              }}
-              className={cn(colors.border)}
-            />
-            <Label 
-              htmlFor="isRecurring" 
-              className={cn("text-xs sm:text-sm cursor-pointer flex items-center gap-1.5", colors.textSecondary)}
-            >
-              <Repeat className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>{t('monthlyRecurring') !== 'monthlyRecurring' ? t('monthlyRecurring') : 'Monthly Recurring'}</span>
-            </Label>
-          </div>
+          {/* Recurring Transaction Toggle - Only show for Expenses */}
+          {formData.type === 'Expense' && (
+            <div className="flex items-center gap-2 p-2 rounded-md">
+              <Checkbox
+                id="isRecurring"
+                checked={formData.isRecurring}
+                onCheckedChange={(checked) => {
+                  setFormData({ 
+                    ...formData, 
+                    isRecurring: checked,
+                    recurringStartDate: checked ? formData.recurringStartDate : format(new Date(), 'yyyy-MM-dd'),
+                    recurringEndDate: checked ? formData.recurringEndDate : format(addMonths(new Date(), 11), 'yyyy-MM-dd'),
+                  });
+                  setErrors({});
+                }}
+                className={cn(colors.border)}
+              />
+              <Label 
+                htmlFor="isRecurring" 
+                className={cn("text-xs sm:text-sm cursor-pointer flex items-center gap-1.5", colors.textSecondary)}
+              >
+                <Repeat className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>{t('monthlyRecurring') !== 'monthlyRecurring' ? t('monthlyRecurring') : 'Monthly Recurring'}</span>
+              </Label>
+            </div>
+          )}
 
           {/* Recurring Transaction Date Range */}
           {formData.isRecurring && (

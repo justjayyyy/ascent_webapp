@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -18,11 +18,14 @@ import { toast } from 'sonner';
 import { useTheme } from '../components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import BlurValue from '../components/BlurValue';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const COLORS = ['#5C8374', '#9EC8B9', '#1B4242', '#60A5FA', '#A78BFA', '#F59E0B', '#EF4444'];
 
 export default function AccountDetail() {
-  const { colors, theme, t } = useTheme();
+  const { colors, theme, t, user: themeUser } = useTheme();
+  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const userCurrency = themeUser?.currency || 'USD';
   const [user, setUser] = useState(null);
   const [accountId, setAccountId] = useState(null);
   const [addPositionOpen, setAddPositionOpen] = useState(false);
@@ -35,6 +38,13 @@ export default function AccountDetail() {
   const [sellPositionDialog, setSellPositionDialog] = useState({ open: false, position: null });
   const [selectedPositionSymbol, setSelectedPositionSymbol] = useState(null);
   const queryClient = useQueryClient();
+
+  // Fetch exchange rates on mount
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -131,8 +141,29 @@ export default function AccountDetail() {
         }
       }
       
-      // Create the position
-      const newPosition = await ascent.entities.Position.create({ ...data, accountId });
+      // Create the position - include Option-specific fields if assetType is Option
+      const positionPayload = { ...data, accountId };
+      if (data.assetType === 'Option') {
+        positionPayload.strikePrice = data.strikePrice || null;
+        positionPayload.expirationDate = data.expirationDate || null;
+        positionPayload.optionType = data.optionType || null;
+        positionPayload.optionAction = data.optionAction || null;
+        positionPayload.premiumPrice = data.premiumPrice || null;
+        positionPayload.stockPriceAtPurchase = data.stockPriceAtPurchase || null;
+        // For options, use premiumPrice as averageBuyPrice
+        if (data.premiumPrice) {
+          positionPayload.averageBuyPrice = parseFloat(data.premiumPrice) || 0;
+        }
+      } else {
+        // Remove Option-specific fields for non-Option asset types
+        delete positionPayload.strikePrice;
+        delete positionPayload.expirationDate;
+        delete positionPayload.optionType;
+        delete positionPayload.optionAction;
+        delete positionPayload.premiumPrice;
+        delete positionPayload.stockPriceAtPurchase;
+      }
+      const newPosition = await ascent.entities.Position.create(positionPayload);
       
       // Log the transaction
       const transactionType = data.assetType === 'Cash' ? 'deposit' : 'buy';
@@ -396,37 +427,103 @@ export default function AccountDetail() {
   const calculateAccountMetrics = () => {
     let totalValue = 0;
     let totalCostBasis = 0;
+    const accountCurrency = account?.baseCurrency || 'USD';
+
+    // Helper to convert position value to account currency
+    const convertToAccountCurrency = (amount, positionCurrency) => {
+      if (!positionCurrency || positionCurrency === accountCurrency) {
+        return amount;
+      }
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(amount, positionCurrency, accountCurrency, rates);
+      }
+      return amount;
+    };
 
     // Process ALL positions, including Cash and edge cases
     positions.forEach(position => {
       const quantity = position.quantity || 0;
-      const averageBuyPrice = position.averageBuyPrice || 0;
+      const positionCurrency = position.currency || accountCurrency;
       
-      // For Cash positions, price is always 1
-      const currentPrice = position.assetType === 'Cash' 
-        ? 1 
-        : (position.currentPrice || position.averageBuyPrice || 0);
+      let marketValue, costBasis;
       
-      const marketValue = quantity * currentPrice;
-      const costBasis = quantity * averageBuyPrice;
+      if (position.assetType === 'Option') {
+        // Options: use premiumPrice, multiply by 100 (standard contract multiplier)
+        const premiumPrice = position.premiumPrice || position.averageBuyPrice || 0;
+        const currentPremium = position.currentPrice || premiumPrice;
+        const contractMultiplier = 100;
+        marketValue = quantity * currentPremium * contractMultiplier;
+        costBasis = quantity * premiumPrice * contractMultiplier;
+      } else if (position.assetType === 'Cash') {
+        // For Cash positions, price is always 1
+        const currentPrice = 1;
+        const averageBuyPrice = 1;
+        marketValue = quantity * currentPrice;
+        costBasis = quantity * averageBuyPrice;
+      } else {
+        // Standard positions
+        const averageBuyPrice = position.averageBuyPrice || 0;
+        const currentPrice = position.currentPrice || position.averageBuyPrice || 0;
+        marketValue = quantity * currentPrice;
+        costBasis = quantity * averageBuyPrice;
+      }
       
-      totalValue += marketValue;
-      totalCostBasis += costBasis;
+      // Convert to account currency before summing
+      const convertedMarketValue = convertToAccountCurrency(marketValue, positionCurrency);
+      const convertedCostBasis = convertToAccountCurrency(costBasis, positionCurrency);
+      
+      totalValue += convertedMarketValue;
+      totalCostBasis += convertedCostBasis;
     });
 
     const positionPnL = totalValue - totalCostBasis;
     
-    // Add day trading P&L
-    const dayTradingPnL = dayTrades.reduce((sum, trade) => sum + trade.profitLoss, 0);
+    // Add day trading P&L (convert to account currency)
+    const dayTradingPnL = dayTrades.reduce((sum, trade) => {
+      const tradeCurrency = trade.currency || accountCurrency;
+      const convertedPnL = convertToAccountCurrency(trade.profitLoss, tradeCurrency);
+      return sum + convertedPnL;
+    }, 0);
     
     const totalPnL = positionPnL + dayTradingPnL;
     const totalPnLPercent = totalCostBasis > 0 ? (totalPnL / totalCostBasis) * 100 : 0;
 
-    return { totalValue, totalPnL, totalPnLPercent, dayTradingPnL };
+    // Convert to user's global currency if needed
+    const convertAmount = (amount) => {
+      if (accountCurrency === userCurrency) {
+        return amount;
+      }
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(amount, accountCurrency, userCurrency, rates);
+      }
+      return amount;
+    };
+
+    return { 
+      totalValue: convertAmount(totalValue), 
+      totalPnL: convertAmount(totalPnL), 
+      totalPnLPercent, 
+      dayTradingPnL: convertAmount(dayTradingPnL),
+      originalTotalValue: totalValue, // Now in account currency
+      originalTotalPnL: totalPnL // Now in account currency
+    };
   };
 
   const getChartData = () => {
     const metrics = calculateAccountMetrics();
+    const accountCurrency = account?.baseCurrency || 'USD';
+    const displayCurrency = (accountCurrency !== 'USD') ? accountCurrency : userCurrency;
+    
+    // Helper to convert amount to display currency
+    const convertToDisplayCurrency = (amount, fromCurrency = accountCurrency) => {
+      if (fromCurrency === displayCurrency) {
+        return amount;
+      }
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(amount, fromCurrency, displayCurrency, rates);
+      }
+      return amount;
+    };
     
     // Aggregate positions by symbol - include ALL positions
     const aggregated = {};
@@ -451,16 +548,33 @@ export default function AccountDetail() {
       
       // Calculate market value
       const quantity = position.quantity || 0;
-      const currentPrice = position.currentPrice || position.averageBuyPrice || (position.assetType === 'Cash' ? 1 : 0);
-      const marketValue = quantity * currentPrice;
+      let currentPrice, marketValue;
+      
+      if (position.assetType === 'Option') {
+        // Options: use premiumPrice, multiply by 100 (standard contract multiplier)
+        const premiumPrice = position.premiumPrice || position.averageBuyPrice || 0;
+        currentPrice = position.currentPrice || premiumPrice;
+        const contractMultiplier = 100;
+        marketValue = quantity * currentPrice * contractMultiplier;
+      } else if (position.assetType === 'Cash') {
+        currentPrice = 1;
+        marketValue = quantity * currentPrice;
+      } else {
+        currentPrice = position.currentPrice || position.averageBuyPrice || 0;
+        marketValue = quantity * currentPrice;
+      }
+      
+      const positionCurrency = position.currency || accountCurrency;
+      const convertedValue = convertToDisplayCurrency(marketValue, positionCurrency);
       
       // Initialize if doesn't exist
       if (!aggregated[symbol]) {
-        aggregated[symbol] = { name: symbol, value: 0 };
+        aggregated[symbol] = { name: symbol, value: 0, originalValue: 0 };
       }
       
-      // Sum values for positions with the same symbol
-      aggregated[symbol].value += marketValue;
+      // Sum values for positions with the same symbol (use converted value)
+      aggregated[symbol].value += convertedValue;
+      aggregated[symbol].originalValue += marketValue; // Keep original for reference
     });
     
     // Convert to array and calculate percentages - include ALL positions
@@ -472,7 +586,7 @@ export default function AccountDetail() {
         const percentage = metrics.totalValue > 0 ? (item.value / metrics.totalValue) * 100 : 0;
         return {
           ...item,
-          value: item.value, // Keep original value for calculations
+          value: item.value, // Converted value in global currency
           displayValue: displayValue, // Use for chart rendering
           percentage: percentage.toFixed(1),
           rawPercentage: percentage, // Keep raw number for calculations
@@ -481,7 +595,6 @@ export default function AccountDetail() {
       .sort((a, b) => b.value - a.value);
     
     // Verify we're not missing any positions (positions can be aggregated, so chartData can be <= positions.length)
-    const accountCurrency = account?.baseCurrency || 'USD';
     const chartSymbols = new Set(chartData.map(item => item.name));
     const positionSymbols = new Map(); // Use Map to track count of positions per symbol
     
@@ -527,6 +640,19 @@ export default function AccountDetail() {
     const data = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const accountCurrency = account?.baseCurrency || 'USD';
+    const displayCurrency = (accountCurrency !== 'USD') ? accountCurrency : userCurrency;
+    
+    // Helper to convert amount to display currency
+    const convertToDisplayCurrency = (amount, fromCurrency = accountCurrency) => {
+      if (fromCurrency === displayCurrency) {
+        return amount;
+      }
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(amount, fromCurrency, displayCurrency, rates);
+      }
+      return amount;
+    };
     
     // Determine number of days based on time range
     const daysMap = {
@@ -574,27 +700,45 @@ export default function AccountDetail() {
         
         // Only count positions that existed on this date
         if (positionDate <= date) {
-          const currentPrice = position.currentPrice || position.averageBuyPrice;
-          const buyPrice = position.averageBuyPrice;
+          let currentPrice, buyPrice;
+          const contractMultiplier = 100;
           
-          // Calculate days since position was added
-          const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
-          const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
-          
-          // Linear interpolation from buy price to current price
-          const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
-          const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
-          
-          portfolioValue += position.quantity * interpolatedPrice;
-          costBasis += position.quantity * buyPrice;
+          if (position.assetType === 'Option') {
+            buyPrice = position.premiumPrice || position.averageBuyPrice || 0;
+            currentPrice = position.currentPrice || buyPrice;
+            // Calculate days since position was added
+            const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
+            const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
+            // Linear interpolation from buy price to current price
+            const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
+            const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
+            portfolioValue += position.quantity * interpolatedPrice * contractMultiplier;
+            costBasis += position.quantity * buyPrice * contractMultiplier;
+          } else {
+            currentPrice = position.currentPrice || position.averageBuyPrice;
+            buyPrice = position.averageBuyPrice;
+            // Calculate days since position was added
+            const daysSincePosition = Math.max(0, Math.floor((date - positionDate) / 86400000));
+            const totalDays = Math.max(1, Math.floor((today - positionDate) / 86400000));
+            // Linear interpolation from buy price to current price
+            const progress = totalDays > 0 ? daysSincePosition / totalDays : 1;
+            const interpolatedPrice = buyPrice + (currentPrice - buyPrice) * progress;
+            portfolioValue += position.quantity * interpolatedPrice;
+            costBasis += position.quantity * buyPrice;
+          }
         }
       });
       
+      // Convert to display currency
+      const convertedValue = convertToDisplayCurrency(portfolioValue);
+      const convertedCostBasis = convertToDisplayCurrency(costBasis);
+      const convertedPnL = convertedValue - convertedCostBasis;
+      
       data.push({
         date: dateStr,
-        value: Math.round(portfolioValue * 100) / 100,
-        costBasis: Math.round(costBasis * 100) / 100,
-        pnl: Math.round((portfolioValue - costBasis) * 100) / 100,
+        value: Math.round(convertedValue * 100) / 100,
+        costBasis: Math.round(convertedCostBasis * 100) / 100,
+        pnl: Math.round(convertedPnL * 100) / 100,
       });
     }
     
@@ -604,6 +748,19 @@ export default function AccountDetail() {
   // Get performance data for a specific position
   const getPositionPerformanceData = (symbol) => {
     if (!symbol) return [];
+    const accountCurrency = account?.baseCurrency || 'USD';
+    const displayCurrency = (accountCurrency !== 'USD') ? accountCurrency : userCurrency;
+    
+    // Helper to convert amount to display currency
+    const convertToDisplayCurrency = (amount, fromCurrency = accountCurrency) => {
+      if (fromCurrency === displayCurrency) {
+        return amount;
+      }
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(amount, fromCurrency, displayCurrency, rates);
+      }
+      return amount;
+    };
     
     // Get all positions with this symbol
     const symbolPositions = positions.filter(p => p.symbol === symbol);
@@ -621,10 +778,21 @@ export default function AccountDetail() {
     earliestDate.setHours(0, 0, 0, 0);
     
     // Calculate total quantity and weighted average buy price
+    const isOption = symbolPositions[0]?.assetType === 'Option';
+    const contractMultiplier = isOption ? 100 : 1;
+    
     const totalQuantity = symbolPositions.reduce((sum, p) => sum + p.quantity, 0);
-    const totalCost = symbolPositions.reduce((sum, p) => sum + (p.quantity * p.averageBuyPrice), 0);
-    const avgBuyPrice = totalCost / totalQuantity;
-    const currentPrice = symbolPositions[0].currentPrice || avgBuyPrice;
+    const totalCost = symbolPositions.reduce((sum, p) => {
+      if (p.assetType === 'Option') {
+        const premiumPrice = p.premiumPrice || p.averageBuyPrice || 0;
+        return sum + (p.quantity * premiumPrice * contractMultiplier);
+      }
+      return sum + (p.quantity * p.averageBuyPrice);
+    }, 0);
+    const avgBuyPrice = totalQuantity > 0 ? totalCost / (totalQuantity * contractMultiplier) : 0;
+    const currentPrice = isOption 
+      ? (symbolPositions[0].currentPrice || symbolPositions[0].premiumPrice || avgBuyPrice)
+      : (symbolPositions[0].currentPrice || avgBuyPrice);
     
     // Calculate days since first purchase
     const daysSinceStart = Math.max(1, Math.floor((today - earliestDate) / 86400000));
@@ -665,7 +833,13 @@ export default function AccountDetail() {
         
         if (posDate <= date) {
           cumulativeQuantity += pos.quantity;
-          cumulativeCost += pos.quantity * pos.averageBuyPrice;
+          if (pos.assetType === 'Option') {
+            const premiumPrice = pos.premiumPrice || pos.averageBuyPrice || 0;
+            const contractMultiplier = 100;
+            cumulativeCost += pos.quantity * premiumPrice * contractMultiplier;
+          } else {
+            cumulativeCost += pos.quantity * pos.averageBuyPrice;
+          }
         }
       });
       
@@ -674,22 +848,41 @@ export default function AccountDetail() {
         continue;
       }
       
-      const avgCost = cumulativeCost / cumulativeQuantity;
+      const avgCost = cumulativeQuantity > 0 ? cumulativeCost / cumulativeQuantity : 0;
+      
+      // Check if this is an option position
+      const isOption = symbolPositions[0]?.assetType === 'Option';
+      const contractMultiplier = isOption ? 100 : 1;
       
       // Linear interpolation to current price
       const progress = daysSinceStart > 0 ? i / daysSinceStart : 1;
-      const interpolatedPrice = avgCost + (currentPrice - avgCost) * progress;
-      const currentValue = cumulativeQuantity * interpolatedPrice;
+      let interpolatedPrice, currentValue;
+      
+      if (isOption) {
+        const avgPremium = avgCost / contractMultiplier;
+        const currentPremium = symbolPositions[0].currentPrice || avgPremium;
+        interpolatedPrice = avgPremium + (currentPremium - avgPremium) * progress;
+        currentValue = cumulativeQuantity * interpolatedPrice * contractMultiplier;
+      } else {
+        interpolatedPrice = avgCost + (currentPrice - avgCost) * progress;
+        currentValue = cumulativeQuantity * interpolatedPrice;
+      }
+      
       const pnl = currentValue - cumulativeCost;
       const pnlPercent = cumulativeCost > 0 ? (pnl / cumulativeCost) * 100 : 0;
       
+      // Convert to display currency
+      const convertedValue = convertToDisplayCurrency(currentValue);
+      const convertedCostBasis = convertToDisplayCurrency(cumulativeCost);
+      const convertedPnL = convertedValue - convertedCostBasis;
+      
       data.push({
         date: dateStr,
-        value: Math.round(currentValue * 100) / 100,
-        costBasis: Math.round(cumulativeCost * 100) / 100,
+        value: Math.round(convertedValue * 100) / 100,
+        costBasis: Math.round(convertedCostBasis * 100) / 100,
         price: Math.round(interpolatedPrice * 100) / 100,
         quantity: cumulativeQuantity,
-        pnl: Math.round(pnl * 100) / 100,
+        pnl: Math.round(convertedPnL * 100) / 100,
         pnlPercent: Math.round(pnlPercent * 100) / 100,
       });
       
@@ -740,6 +933,11 @@ export default function AccountDetail() {
 
   const metrics = calculateAccountMetrics();
   const chartData = getChartData();
+  
+  // Determine display currency: use account currency if it's not USD, otherwise use user currency
+  const displayCurrency = (account?.baseCurrency && account.baseCurrency !== 'USD') 
+    ? account.baseCurrency 
+    : userCurrency;
 
   return (
     <div className={cn("flex flex-col h-[calc(100vh-10rem)] md:h-auto md:min-h-screen p-4 md:p-8", colors.bgPrimary)}>
@@ -796,26 +994,70 @@ export default function AccountDetail() {
           <div className="flex flex-row flex-nowrap gap-2 md:gap-4 overflow-x-auto">
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
               <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalValue')}</p>
-              <p className={cn("text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start", colors.textPrimary)}>
-                <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(metrics.totalValue, account.baseCurrency)}
-                </BlurValue>
-              </p>
+              {account?.baseCurrency && account.baseCurrency !== 'USD' && account.baseCurrency !== undefined ? (
+                <>
+                  <p className={cn("text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words", colors.textPrimary)}>
+                    <BlurValue blur={user?.blurValues} className="truncate">
+                      {formatCurrency(metrics.originalTotalValue, account.baseCurrency)}
+                    </BlurValue>
+                  </p>
+                  {account.baseCurrency !== userCurrency && metrics.totalValue !== undefined && (
+                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                      {formatCurrency(metrics.totalValue, userCurrency)}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className={cn("text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words", colors.textPrimary)}>
+                    <BlurValue blur={user?.blurValues} className="truncate">
+                      {formatCurrency(metrics.totalValue, userCurrency)}
+                    </BlurValue>
+                  </p>
+                  {account.baseCurrency && account.baseCurrency !== userCurrency && metrics.originalTotalValue !== undefined && (
+                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                      {formatCurrency(metrics.originalTotalValue, account.baseCurrency)}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
 
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
               <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
-              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${metrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                <BlurValue blur={user?.blurValues}>
-                  {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, account.baseCurrency)}
-                </BlurValue>
-              </p>
+              {account?.baseCurrency && account.baseCurrency !== 'USD' && account.baseCurrency !== undefined ? (
+                <>
+                  <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.originalTotalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <BlurValue blur={user?.blurValues} className="truncate">
+                      {metrics.originalTotalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.originalTotalPnL, account.baseCurrency)}
+                    </BlurValue>
+                  </p>
+                  {account.baseCurrency !== userCurrency && metrics.totalPnL !== undefined && (
+                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                      {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, userCurrency)}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <BlurValue blur={user?.blurValues} className="truncate">
+                      {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, userCurrency)}
+                    </BlurValue>
+                  </p>
+                  {account.baseCurrency && account.baseCurrency !== userCurrency && metrics.originalTotalPnL !== undefined && (
+                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                      {metrics.originalTotalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.originalTotalPnL, account.baseCurrency)}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
 
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
               <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
-              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${metrics.totalPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                <BlurValue blur={user?.blurValues}>
+              <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.totalPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <BlurValue blur={user?.blurValues} className="truncate">
                   {metrics.totalPnLPercent >= 0 ? '+' : ''}{metrics.totalPnLPercent.toFixed(2)}%
                 </BlurValue>
               </p>
@@ -873,7 +1115,7 @@ export default function AccountDetail() {
                         tick={{ fontSize: 12 }}
                         tickFormatter={(value) => {
                           const symbols = { USD: '$', EUR: '€', GBP: '£', ILS: '₪', RUB: '₽' };
-                          const symbol = symbols[user?.currency] || '$';
+                          const symbol = symbols[displayCurrency] || '$';
                           if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`;
                           if (value >= 1000) return `${symbol}${(value / 1000).toFixed(0)}K`;
                           return `${symbol}${value}`;
@@ -893,7 +1135,17 @@ export default function AccountDetail() {
                             }}>
                               <p style={{ margin: '0 0 4px 0', fontWeight: '500' }}>{data.date}</p>
                               <p style={{ margin: '0', fontSize: '14px', fontWeight: '600' }}>
-                                {formatCurrency(data.value, account.baseCurrency)}
+                                {formatCurrency(data.value, displayCurrency)}
+                                {displayCurrency !== 'USD' && (() => {
+                                  const usdValue = rates && Object.keys(rates).length > 0 
+                                    ? convertCurrency(data.value, displayCurrency, 'USD', rates)
+                                    : null;
+                                  return usdValue !== null ? (
+                                    <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7, fontWeight: '400' }}>
+                                      ({formatCurrency(usdValue, 'USD')})
+                                    </span>
+                                  ) : null;
+                                })()}
                               </p>
                             </div>
                           );
@@ -975,9 +1227,9 @@ export default function AccountDetail() {
                           color: theme === 'light' ? '#475569' : '#ffffff',
                         }}
                         formatter={(value, name, props) => {
-                          // Use the original value, not displayValue
-                          const originalValue = props.payload?.value || value;
-                          return formatCurrency(originalValue, account.baseCurrency);
+                          // Use the converted value (already in display currency)
+                          const displayValue = props.payload?.value || value;
+                          return formatCurrency(displayValue, displayCurrency);
                         }}
                         labelFormatter={(name) => name}
                       />
@@ -1007,9 +1259,21 @@ export default function AccountDetail() {
                         <div className="text-right flex-shrink-0 ml-1">
                           <p className={cn("font-semibold text-xs md:text-base", colors.textPrimary)}>
                             <BlurValue blur={user?.blurValues}>
-                              {formatCurrency(item.value, account.baseCurrency)}
+                              {formatCurrency(item.value, displayCurrency)}
                             </BlurValue>
                           </p>
+                          {displayCurrency !== 'USD' && (() => {
+                            const usdValue = rates && Object.keys(rates).length > 0 
+                              ? convertCurrency(item.value, displayCurrency, 'USD', rates)
+                              : null;
+                            return usdValue !== null ? (
+                              <p className={cn("text-[10px] md:text-xs", colors.textTertiary)}>
+                                <BlurValue blur={user?.blurValues}>
+                                  {formatCurrency(usdValue, 'USD')}
+                                </BlurValue>
+                              </p>
+                            ) : null;
+                          })()}
                           <p className={cn("text-[10px] md:text-sm", colors.textTertiary)}>
                             <BlurValue blur={user?.blurValues}>
                               {item.percentage}%
@@ -1038,6 +1302,10 @@ export default function AccountDetail() {
                     positions={positions}
                     dayTrades={dayTrades}
                     totalAccountValue={metrics.totalValue}
+                    userCurrency={displayCurrency}
+                    accountCurrency={account?.baseCurrency || 'USD'}
+                    exchangeRates={rates}
+                    convertCurrency={convertCurrency}
                     onEdit={(position) => {
                       setEditingPosition(position);
                       setEditingDayTrade(null);
@@ -1114,7 +1382,7 @@ export default function AccountDetail() {
                             tick={{ fontSize: 12 }}
                             tickFormatter={(value) => {
                               const symbols = { USD: '$', EUR: '€', GBP: '£', ILS: '₪', RUB: '₽' };
-                              const symbol = symbols[account?.baseCurrency] || '$';
+                              const symbol = symbols[displayCurrency] || '$';
                               if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`;
                               if (value >= 1000) return `${symbol}${(value / 1000).toFixed(0)}K`;
                               return `${symbol}${value}`;
@@ -1146,17 +1414,47 @@ export default function AccountDetail() {
                                 }}>
                                   <p style={{ margin: '0 0 4px 0', fontWeight: '500' }}>{data.date}</p>
                                   <p style={{ margin: '2px 0', color: '#5C8374' }}>
-                                    {t('currentValue') || 'Value'}: {formatCurrency(data.value, account.baseCurrency)}
+                                    {t('currentValue') || 'Value'}: {formatCurrency(data.value, displayCurrency)}
+                                    {displayCurrency !== 'USD' && (() => {
+                                      const usdValue = rates && Object.keys(rates).length > 0 
+                                        ? convertCurrency(data.value, displayCurrency, 'USD', rates)
+                                        : null;
+                                      return usdValue !== null ? (
+                                        <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7 }}>
+                                          ({formatCurrency(usdValue, 'USD')})
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </p>
                                   <p style={{ margin: '2px 0', color: '#9EC8B9' }}>
-                                    {t('costBasis') || 'Cost'}: {formatCurrency(data.costBasis, account.baseCurrency)}
+                                    {t('costBasis') || 'Cost'}: {formatCurrency(data.costBasis, displayCurrency)}
+                                    {displayCurrency !== 'USD' && (() => {
+                                      const usdValue = rates && Object.keys(rates).length > 0 
+                                        ? convertCurrency(data.costBasis, displayCurrency, 'USD', rates)
+                                        : null;
+                                      return usdValue !== null ? (
+                                        <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7 }}>
+                                          ({formatCurrency(usdValue, 'USD')})
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </p>
                                   <p style={{ 
                                     margin: '2px 0', 
                                     color: data.pnl >= 0 ? '#10b981' : '#ef4444',
                                     fontWeight: '500'
                                   }}>
-                                    P/L: {formatCurrency(data.pnl, account.baseCurrency)} ({data.pnlPercent >= 0 ? '+' : ''}{data.pnlPercent.toFixed(2)}%)
+                                    P/L: {formatCurrency(data.pnl, displayCurrency)} ({data.pnlPercent >= 0 ? '+' : ''}{data.pnlPercent.toFixed(2)}%)
+                                    {displayCurrency !== 'USD' && (() => {
+                                      const usdValue = rates && Object.keys(rates).length > 0 
+                                        ? convertCurrency(data.pnl, displayCurrency, 'USD', rates)
+                                        : null;
+                                      return usdValue !== null ? (
+                                        <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7 }}>
+                                          ({formatCurrency(usdValue, 'USD')})
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </p>
                                 </div>
                               );

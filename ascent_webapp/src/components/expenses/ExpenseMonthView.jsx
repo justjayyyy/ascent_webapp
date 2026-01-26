@@ -1,9 +1,9 @@
-import React, { useMemo, useState, useCallback, memo } from 'react';
+import React, { useMemo, useState, useCallback, memo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingDown, TrendingUp, DollarSign, CreditCard, Banknote, Loader2, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingDown, TrendingUp, DollarSign, CreditCard, Banknote, Loader2, Search, X, ChevronLeft, ChevronRight, ArrowLeftRight, Wallet } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import TransactionList from './TransactionList';
 import BudgetProgress from './BudgetProgress';
@@ -11,8 +11,10 @@ import BlurValue from '../BlurValue';
 import { cn } from '@/lib/utils';
 import { useTheme, translateCategory } from '../ThemeProvider';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
+const CARD_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#14B8A6', '#EF4444', '#6366F1', '#F97316'];
 
 function ExpenseMonthView({ 
   transactions, 
@@ -26,6 +28,15 @@ function ExpenseMonthView({
   monthLabel
 }) {
   const { user, colors, t, language, theme, isRTL } = useTheme();
+  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const userCurrency = user?.currency || 'USD';
+  
+  // Fetch exchange rates on mount
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
   
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,22 +108,50 @@ function ExpenseMonthView({
     }).format(value || 0);
   }, [user?.currency]);
 
-  // Calculate metrics for the given transactions
+  // Calculate metrics for the given transactions (using stored converted amounts)
   const metrics = useMemo(() => {
     const totalIncome = transactions
       .filter(t => t.type === 'Income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => {
+        // Use stored converted amount if available
+        if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
+          return sum + t.amountInGlobalCurrency;
+        }
+        // Fallback: use amount directly if currency matches user's currency
+        if (t.currency === userCurrency) {
+          return sum + t.amount;
+        }
+        // Fallback: convert on the fly for older transactions without stored conversion
+        if (rates && Object.keys(rates).length > 0) {
+          return sum + convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
+        }
+        return sum;
+      }, 0);
 
     const totalExpenses = transactions
       .filter(t => t.type === 'Expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => {
+        // Use stored converted amount if available
+        if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
+          return sum + t.amountInGlobalCurrency;
+        }
+        // Fallback: use amount directly if currency matches user's currency
+        if (t.currency === userCurrency) {
+          return sum + t.amount;
+        }
+        // Fallback: convert on the fly for older transactions without stored conversion
+        if (rates && Object.keys(rates).length > 0) {
+          return sum + convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
+        }
+        return sum;
+      }, 0);
 
     const netAmount = totalIncome - totalExpenses;
 
     return { totalIncome, totalExpenses, netAmount };
-  }, [transactions]);
+  }, [transactions, userCurrency, rates, convertCurrency]);
 
-  // Expenses by category (uses filtered transactions for chart)
+  // Expenses by category (uses filtered transactions for chart, using stored converted amounts)
   const categoryData = useMemo(() => {
     const expenseTransactions = filteredTransactions.filter(t => t.type === 'Expense');
     const categoryTotals = {};
@@ -121,7 +160,21 @@ function ExpenseMonthView({
       if (!categoryTotals[t.category]) {
         categoryTotals[t.category] = 0;
       }
-      categoryTotals[t.category] += t.amount;
+      
+      let amountToUse = 0;
+      
+      // Use stored converted amount if available
+      if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
+        amountToUse = t.amountInGlobalCurrency;
+      } else if (t.currency === userCurrency) {
+        // Fallback: use amount directly if currency matches user's currency
+        amountToUse = t.amount;
+      } else if (rates && Object.keys(rates).length > 0) {
+        // Fallback: convert on the fly for older transactions without stored conversion
+        amountToUse = convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
+      }
+      
+      categoryTotals[t.category] += amountToUse;
     });
 
     // Filter out categories with 0 or negative values
@@ -129,29 +182,95 @@ function ExpenseMonthView({
       .map(([name, value]) => ({ name, value }))
       .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [filteredTransactions]);
+  }, [filteredTransactions, userCurrency, rates, convertCurrency]);
 
-  // Card vs Cash breakdown (uses all transactions for totals)
-  const cardVsCash = useMemo(() => {
-    const userCurrency = user?.currency || 'USD';
-    const expenseTransactions = transactions.filter(t => 
-      t.type === 'Expense' && t.currency === userCurrency
-    );
+  // Payment methods breakdown (uses all transactions for totals, using stored converted amounts)
+  const paymentMethodsBreakdown = useMemo(() => {
+    const expenseTransactions = transactions.filter(t => t.type === 'Expense');
     
-    const cardTotal = expenseTransactions
-      .filter(t => t.paymentMethod === 'Card')
-      .reduce((sum, t) => sum + t.amount, 0);
+    const getConvertedAmount = (t) => {
+      // Use stored converted amount if available
+      if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
+        return t.amountInGlobalCurrency;
+      }
+      // Fallback: use amount directly if currency matches user's currency
+      if (t.currency === userCurrency) {
+        return t.amount;
+      }
+      // Fallback: convert on the fly for older transactions without stored conversion
+      if (rates && Object.keys(rates).length > 0) {
+        return convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
+      }
+      return 0;
+    };
     
-    const cashTotal = expenseTransactions
-      .filter(t => t.paymentMethod === 'Cash')
-      .reduce((sum, t) => sum + t.amount, 0);
+    // Calculate total for percentage calculation
+    const totalExpenses = expenseTransactions.reduce((sum, t) => sum + getConvertedAmount(t), 0);
     
-    const otherTotal = expenseTransactions
-      .filter(t => t.paymentMethod !== 'Card' && t.paymentMethod !== 'Cash')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    return { cardTotal, cashTotal, otherTotal };
-  }, [transactions, user?.currency]);
+    // Group by payment method
+    const methodGroups = {};
+    const cardIdToIndex = new Map(); // Track card color assignment
+    
+    expenseTransactions.forEach(t => {
+      const amount = getConvertedAmount(t);
+      if (amount <= 0) return;
+      
+      const method = t.paymentMethod || 'Other';
+      
+      if (method === 'Card' && t.cardId) {
+        // For cards, group by cardId
+        const card = cards.find(c => c.id === t.cardId);
+        const cardName = card 
+          ? (user?.blurValues ? '••••••' : `${card.name || card.cardName || 'Card'} •••• ${card.lastFourDigits || ''}`)
+          : 'Card';
+        const key = `Card_${t.cardId}`;
+        
+        if (!methodGroups[key]) {
+          // Assign a color index to this card if not already assigned
+          if (!cardIdToIndex.has(t.cardId)) {
+            cardIdToIndex.set(t.cardId, cardIdToIndex.size);
+          }
+          const colorIndex = cardIdToIndex.get(t.cardId);
+          
+          methodGroups[key] = {
+            method: 'Card',
+            name: cardName,
+            cardId: t.cardId,
+            total: 0,
+            count: 0,
+            color: CARD_COLORS[colorIndex % CARD_COLORS.length]
+          };
+        }
+        methodGroups[key].total += amount;
+        methodGroups[key].count += 1;
+      } else {
+        // For other payment methods, group by method name
+        if (!methodGroups[method]) {
+          methodGroups[method] = {
+            method: method,
+            name: method === 'Other' || !method ? 'Other' : method,
+            total: 0,
+            count: 0,
+            color: null // Use default color logic
+          };
+        }
+        methodGroups[method].total += amount;
+        methodGroups[method].count += 1;
+      }
+    });
+    
+    // Convert to array and calculate percentages, format for pie chart
+    const breakdown = Object.values(methodGroups)
+      .map(item => ({
+        ...item,
+        percentage: totalExpenses > 0 ? (item.total / totalExpenses) * 100 : 0,
+        value: item.total, // For pie chart
+        name: item.name // For pie chart
+      }))
+      .sort((a, b) => b.total - a.total);
+    
+    return { breakdown, totalExpenses };
+  }, [transactions, userCurrency, rates, convertCurrency, cards, user?.blurValues]);
 
   if (isLoading) {
     return (
@@ -214,45 +333,160 @@ function ExpenseMonthView({
         </Card>
       </div>
 
-      {/* Card vs Cash */}
-      {(cardVsCash.cardTotal > 0 || cardVsCash.cashTotal > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>
-                  {t('cardPayments')}
-                </CardTitle>
-                <CreditCard className="w-5 h-5 text-blue-400" />
+      {/* Payment Methods Breakdown - Pie Chart */}
+      {paymentMethodsBreakdown.breakdown.length > 0 && (
+        <Card className={cn(colors.cardBg, colors.cardBorder)}>
+          <CardHeader className="pb-2 sm:pb-2">
+            <CardTitle className={cn("text-sm sm:text-base", colors.accentText)}>
+              {t('expensesByPaymentMethod') || 'Expenses by Payment Method'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              {/* Pie Chart */}
+              <div className="w-full sm:w-1/2 flex-shrink-0 sm:flex-shrink">
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={paymentMethodsBreakdown.breakdown}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={(props) => {
+                        const { value } = props;
+                        const total = paymentMethodsBreakdown.totalExpenses;
+                        if (total === 0) return false;
+                        const percent = (value / total) * 100;
+                        return percent >= 0.1;
+                      }}
+                      label={(props) => {
+                        const { name, value, x, y, cx } = props;
+                        const total = paymentMethodsBreakdown.totalExpenses;
+                        if (total === 0) return null;
+                        const percent = (value / total) * 100;
+                        if (percent < 0.1 || value === 0) return null;
+                        const percentStr = percent < 1 ? percent.toFixed(1) : percent.toFixed(0);
+                        const amountStr = user?.blurValues ? '••••' : formatCurrency(value, userCurrency);
+                        // Truncate long names
+                        const displayName = name.length > 12 ? name.substring(0, 10) + '...' : name;
+                        return (
+                          <g>
+                            <text 
+                              x={x} 
+                              y={y - 6} 
+                              fill={theme === 'light' ? '#1e293b' : '#ffffff'} 
+                              textAnchor={x > cx ? 'start' : 'end'} 
+                              dominantBaseline="central"
+                              style={{ fontSize: '11px', fontWeight: '500' }}
+                            >
+                              {`${displayName} ${percentStr}%`}
+                            </text>
+                            <text 
+                              x={x} 
+                              y={y + 8} 
+                              fill={theme === 'light' ? '#64748b' : '#9ca3af'} 
+                              textAnchor={x > cx ? 'start' : 'end'} 
+                              dominantBaseline="central"
+                              style={{ fontSize: '10px', fontWeight: '400' }}
+                            >
+                              {amountStr}
+                            </text>
+                          </g>
+                        );
+                      }}
+                      outerRadius={60}
+                      innerRadius={20}
+                      fill="#8884d8"
+                      dataKey="value"
+                      paddingAngle={2}
+                    >
+                      {paymentMethodsBreakdown.breakdown.map((entry, index) => {
+                        const getMethodColor = () => {
+                          // For cards, use the assigned color
+                          if (entry.method === 'Card' && entry.color) {
+                            return entry.color;
+                          }
+                          // For other methods, use default colors
+                          switch (entry.method) {
+                            case 'Cash': return '#10B981'; // emerald-400
+                            case 'Transfer': return '#A78BFA'; // purple-400
+                            case 'Paybox': return '#F59E0B'; // orange-400
+                            case 'PayPal': return '#06B6D4'; // cyan-400
+                            case 'Bit': return '#EAB308'; // yellow-400
+                            default: return '#9CA3AF'; // gray-400
+                          }
+                        };
+                        return (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={getMethodColor()}
+                            stroke={theme === 'light' ? '#ffffff' : '#092635'}
+                            strokeWidth={2}
+                          />
+                        );
+                      })}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
+                        border: `1px solid ${theme === 'light' ? '#e2e8f0' : '#5C8374'}`,
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      }}
+                      itemStyle={{ color: theme === 'light' ? '#1e293b' : '#ffffff' }}
+                      formatter={(value, name) => [
+                        user?.blurValues ? '••••••' : formatCurrency(value, userCurrency),
+                        name
+                      ]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold text-blue-400">
-                <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(cardVsCash.cardTotal, user?.currency)}
-                </BlurValue>
-              </p>
-            </CardContent>
-          </Card>
 
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>
-                  {t('cashPayments')}
-                </CardTitle>
-                <Banknote className="w-5 h-5 text-emerald-400" />
+              {/* Legend - Side by side on desktop, compact, hidden on mobile */}
+              <div className="hidden sm:block w-full sm:w-1/2 space-y-1.5 sm:space-y-2">
+                {paymentMethodsBreakdown.breakdown.map((entry, index) => {
+                  const getMethodColor = () => {
+                    if (entry.method === 'Card' && entry.color) {
+                      return entry.color;
+                    }
+                    switch (entry.method) {
+                      case 'Cash': return '#10B981';
+                      case 'Transfer': return '#A78BFA';
+                      case 'Paybox': return '#F59E0B';
+                      case 'PayPal': return '#06B6D4';
+                      case 'Bit': return '#EAB308';
+                      default: return '#9CA3AF';
+                    }
+                  };
+                  const color = getMethodColor();
+                  const total = paymentMethodsBreakdown.totalExpenses;
+                  const percent = total > 0 ? ((entry.value / total) * 100).toFixed(0) : 0;
+                  return (
+                    <div key={`${entry.method}_${entry.cardId || index}`} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                        <div 
+                          className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className={cn("text-xs sm:text-sm truncate", colors.textSecondary)}>
+                          {entry.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                        <span className={cn("text-[10px] sm:text-xs font-medium", colors.textTertiary)}>{percent}%</span>
+                        <span className={cn("text-xs sm:text-sm font-semibold min-w-[50px] sm:min-w-[60px] text-right", colors.textPrimary)}>
+                          <BlurValue blur={user?.blurValues}>
+                            {formatCurrency(entry.value, userCurrency)}
+                          </BlurValue>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold text-emerald-400">
-                <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(cardVsCash.cashTotal, user?.currency)}
-                </BlurValue>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Charts Row */}

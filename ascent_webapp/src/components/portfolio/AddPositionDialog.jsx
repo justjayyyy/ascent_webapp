@@ -28,6 +28,10 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
     date: new Date().toISOString().split('T')[0],
     strikePrice: '',
     expirationDate: '',
+    optionType: 'Call',
+    optionAction: 'Buy',
+    premiumPrice: '',
+    stockPriceAtPurchase: '',
     notes: '',
   });
   const [dayTradeData, setDayTradeData] = useState(editDayTrade || {
@@ -57,6 +61,10 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
         date: new Date().toISOString().split('T')[0],
         strikePrice: '',
         expirationDate: '',
+        optionType: 'Call',
+        optionAction: 'Buy',
+        premiumPrice: '',
+        stockPriceAtPurchase: '',
         notes: '',
       });
       setDayTradeData({
@@ -70,16 +78,59 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate Option-specific fields
+    if (formData.assetType === 'Option') {
+      if (!formData.strikePrice || parseFloat(formData.strikePrice) <= 0) {
+        alert('Please enter a valid strike price for the option.');
+        return;
+      }
+      if (!formData.expirationDate) {
+        alert('Please select an expiration date for the option.');
+        return;
+      }
+      if (!formData.optionType || !['Call', 'Put'].includes(formData.optionType)) {
+        alert('Please select option type (Call or Put).');
+        return;
+      }
+      if (!formData.optionAction || !['Buy', 'Sell'].includes(formData.optionAction)) {
+        alert('Please select option action (Buy or Sell).');
+        return;
+      }
+      if (!formData.premiumPrice || parseFloat(formData.premiumPrice) <= 0) {
+        alert('Please enter a valid premium price for the option.');
+        return;
+      }
+      if (!formData.stockPriceAtPurchase || parseFloat(formData.stockPriceAtPurchase) <= 0) {
+        alert('Please enter the stock price at purchase.');
+        return;
+      }
+    }
+    
     const submitData = {
       ...formData,
-      symbol: formData.symbol.toUpperCase(),
+      symbol: formData.symbol ? formData.symbol.toUpperCase() : '',
       quantity: parseFloat(formData.quantity) || 0,
       averageBuyPrice: parseFloat(formData.averageBuyPrice) || 0,
     };
 
     if (formData.assetType === 'Option') {
       submitData.strikePrice = parseFloat(formData.strikePrice) || 0;
-      submitData.expirationDate = formData.expirationDate;
+      submitData.expirationDate = formData.expirationDate || '';
+      submitData.optionType = formData.optionType || 'Call';
+      submitData.optionAction = formData.optionAction || 'Buy';
+      submitData.premiumPrice = parseFloat(formData.premiumPrice) || 0;
+      submitData.stockPriceAtPurchase = parseFloat(formData.stockPriceAtPurchase) || 0;
+      // For options, averageBuyPrice should be the premium price
+      submitData.averageBuyPrice = submitData.premiumPrice;
+    } else {
+      // Remove Option-specific fields for non-Option asset types
+      delete submitData.strikePrice;
+      delete submitData.expirationDate;
+      delete submitData.optionType;
+      delete submitData.optionAction;
+      delete submitData.premiumPrice;
+      delete submitData.stockPriceAtPurchase;
     }
 
     // Add deductFromCash flag for non-cash positions (not when editing)
@@ -132,9 +183,27 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                   updates.symbol = 'CASH';
                   updates.averageBuyPrice = '1';
                   updates.quantity = '';
+                  updates.strikePrice = '';
+                  updates.expirationDate = '';
                 } else if (formData.assetType === 'Cash') {
                   updates.symbol = '';
                   updates.averageBuyPrice = '';
+                }
+                // Clear Option-specific fields when switching away from Option
+                if (formData.assetType === 'Option' && value !== 'Option') {
+                  updates.strikePrice = '';
+                  updates.expirationDate = '';
+                  updates.optionType = 'Call';
+                  updates.optionAction = 'Buy';
+                  updates.premiumPrice = '';
+                  updates.stockPriceAtPurchase = '';
+                }
+                // Initialize Option fields when switching to Option
+                if (value === 'Option' && formData.assetType !== 'Option') {
+                  updates.optionType = updates.optionType || 'Call';
+                  updates.optionAction = updates.optionAction || 'Buy';
+                  updates.premiumPrice = updates.premiumPrice || '';
+                  updates.stockPriceAtPurchase = updates.stockPriceAtPurchase || '';
                 }
                 setFormData({ ...formData, ...updates });
               }}>
@@ -229,6 +298,40 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
             <>
               <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="optionType" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Option Type *</Label>
+                  <Select 
+                    value={formData.optionType || 'Call'} 
+                    onValueChange={(value) => setFormData({ ...formData, optionType: value })}
+                  >
+                    <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      <SelectItem value="Call" className={colors.textPrimary}>Call</SelectItem>
+                      <SelectItem value="Put" className={colors.textPrimary}>Put</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="optionAction" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Action *</Label>
+                  <Select 
+                    value={formData.optionAction || 'Buy'} 
+                    onValueChange={(value) => setFormData({ ...formData, optionAction: value })}
+                  >
+                    <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      <SelectItem value="Buy" className={colors.textPrimary}>Buy</SelectItem>
+                      <SelectItem value="Sell" className={colors.textPrimary}>Sell</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="space-y-1 sm:space-y-2">
                   <Label htmlFor="quantity" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Contracts *</Label>
                   <Input
                     id="quantity"
@@ -243,14 +346,14 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                 </div>
 
                 <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="averageBuyPrice" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Contract Avg Price *</Label>
+                  <Label htmlFor="premiumPrice" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Premium per Contract *</Label>
                   <Input
-                    id="averageBuyPrice"
+                    id="premiumPrice"
                     type="number"
                     step="0.01"
                     placeholder="0.00"
-                    value={formData.averageBuyPrice}
-                    onChange={(e) => setFormData({ ...formData, averageBuyPrice: e.target.value })}
+                    value={formData.premiumPrice}
+                    onChange={(e) => setFormData({ ...formData, premiumPrice: e.target.value })}
                     required
                     className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
@@ -273,17 +376,47 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                 </div>
 
                 <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="expirationDate" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Expiration Date *</Label>
+                  <Label htmlFor="stockPriceAtPurchase" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Stock Price at Purchase *</Label>
                   <Input
-                    id="expirationDate"
-                    type="date"
-                    value={formData.expirationDate}
-                    onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
+                    id="stockPriceAtPurchase"
+                    type="number"
+                    step="0.01"
+                    placeholder="150.00"
+                    value={formData.stockPriceAtPurchase}
+                    onChange={(e) => setFormData({ ...formData, stockPriceAtPurchase: e.target.value })}
                     required
                     className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
               </div>
+
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="expirationDate" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Expiration Date *</Label>
+                <Input
+                  id="expirationDate"
+                  type="date"
+                  value={formData.expirationDate}
+                  onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
+                  required
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+                />
+              </div>
+
+              {formData.quantity && formData.premiumPrice && (
+                <div className={cn("p-2 rounded-lg border text-xs", colors.bgTertiary, colors.border)}>
+                  <p className={cn(colors.textSecondary)}>
+                    Total Premium: <span className="font-semibold text-amber-400">
+                      {new Intl.NumberFormat('en-US', { 
+                        style: 'currency', 
+                        currency: currency 
+                      }).format((parseFloat(formData.quantity) || 0) * (parseFloat(formData.premiumPrice) || 0) * 100)}
+                    </span>
+                    <span className={cn("ml-1", colors.textTertiary)}>
+                      ({formData.quantity} contracts × {formData.premiumPrice} × 100)
+                    </span>
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:gap-4">

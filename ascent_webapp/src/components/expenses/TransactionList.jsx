@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCar
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTheme, translateCategory } from '../ThemeProvider';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const categoryColors = {
   'Food & Dining': 'bg-orange-500/10 text-orange-400 border-orange-500/30',
@@ -26,6 +27,15 @@ const categoryColors = {
 };
 
 const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t }) => {
+  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const userCurrency = user?.currency || 'USD';
+
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
+
   const getPaymentMethodIcon = useCallback((method) => {
     switch (method) {
       case 'Card': return CreditCard;
@@ -52,6 +62,25 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
       maximumFractionDigits: 2,
     }).format(value || 0);
   }, [user?.currency]);
+
+  // Calculate converted amount (use stored value if available, otherwise calculate on the fly)
+  const convertedAmount = useMemo(() => {
+    if (transaction.currency === userCurrency) {
+      return null; // No conversion needed
+    }
+    
+    // Use stored converted amount if available
+    if (transaction.amountInGlobalCurrency !== null && transaction.amountInGlobalCurrency !== undefined) {
+      return transaction.amountInGlobalCurrency;
+    }
+    
+    // Fallback: calculate on the fly if rates are available
+    if (rates && Object.keys(rates).length > 0) {
+      return convertCurrency(transaction.amount, transaction.currency || 'USD', userCurrency, rates);
+    }
+    
+    return null;
+  }, [transaction.amount, transaction.currency, transaction.amountInGlobalCurrency, userCurrency, rates, convertCurrency]);
 
   const handleEdit = useCallback(() => {
     onEdit(transaction);
@@ -125,13 +154,20 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
 
           {/* Amount and Actions */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className={cn(
-              'text-base font-bold whitespace-nowrap',
-              transaction.type === 'Income' ? 'text-green-400' : 'text-red-400'
-            )}>
-              {transaction.type === 'Income' ? '+' : '-'}
-              {formatCurrency(transaction.amount, transaction.currency)}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className={cn(
+                'text-base font-bold whitespace-nowrap',
+                transaction.type === 'Income' ? 'text-green-400' : 'text-red-400'
+              )}>
+                {transaction.type === 'Income' ? '+' : '-'}
+                {formatCurrency(transaction.amount, transaction.currency)}
+              </span>
+              {convertedAmount !== null && convertedAmount !== undefined && (
+                <span className={cn("text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap")}>
+                  {formatCurrency(convertedAmount, userCurrency)}
+                </span>
+              )}
+            </div>
             
             {/* 3-dots Dropdown Menu */}
             <DropdownMenu>

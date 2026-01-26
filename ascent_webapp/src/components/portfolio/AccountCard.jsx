@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { ascent } from '@/api/client';
 import BlurValue from '../BlurValue';
 import { useTheme } from '../ThemeProvider';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const accountTypeIcons = {
   Investment: Briefcase,
@@ -28,17 +29,48 @@ const accountTypeColors = {
 
 function AccountCard({ account, totalValue, totalPnL, totalPnLPercent, editMode, onDelete }) {
   const { user, t, colors } = useTheme();
+  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const userCurrency = user?.currency || 'USD';
+  const accountCurrency = account.baseCurrency || 'USD';
+  
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
+
   const Icon = useMemo(() => accountTypeIcons[account.type] || Coins, [account.type]);
   const isPositive = useMemo(() => totalPnL >= 0, [totalPnL]);
 
-  const formatCurrency = useCallback((value, currency = 'USD') => {
+  // Convert amounts to user's global currency
+  const convertedTotalValue = useMemo(() => {
+    if (accountCurrency === userCurrency) {
+      return totalValue;
+    }
+    if (rates && Object.keys(rates).length > 0) {
+      return convertCurrency(totalValue, accountCurrency, userCurrency, rates);
+    }
+    return totalValue;
+  }, [totalValue, accountCurrency, userCurrency, rates, convertCurrency]);
+
+  const convertedTotalPnL = useMemo(() => {
+    if (accountCurrency === userCurrency) {
+      return totalPnL;
+    }
+    if (rates && Object.keys(rates).length > 0) {
+      return convertCurrency(totalPnL, accountCurrency, userCurrency, rates);
+    }
+    return totalPnL;
+  }, [totalPnL, accountCurrency, userCurrency, rates, convertCurrency]);
+
+  const formatCurrency = useCallback((value, currency = userCurrency) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value || 0);
-  }, []);
+  }, [userCurrency]);
 
   const handleEdit = useCallback((e) => {
     e.preventDefault();
@@ -76,9 +108,14 @@ function AccountCard({ account, totalValue, totalPnL, totalPnLPercent, editMode,
               <p className={cn("text-xs mb-0.5 md:mb-1 leading-tight", colors.textTertiary)}>{t('totalValue')}</p>
               <p className={cn("text-xl md:text-2xl font-bold leading-tight", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(totalValue, account.baseCurrency)}
+                  {formatCurrency(convertedTotalValue, userCurrency)}
                 </BlurValue>
               </p>
+              {accountCurrency !== userCurrency && (
+                <p className={cn("text-[10px] md:text-xs leading-tight mt-0.5", colors.textTertiary)}>
+                  {formatCurrency(totalValue, accountCurrency)}
+                </p>
+              )}
             </div>
 
             <div className={cn("flex items-center justify-between pt-2 md:pt-3 border-t", colors.border)}>
@@ -93,9 +130,14 @@ function AccountCard({ account, totalValue, totalPnL, totalPnLPercent, editMode,
                   isPositive ? 'text-green-400' : 'text-red-400'
                 )}>
                   <BlurValue blur={user?.blurValues}>
-                    {isPositive ? '+' : ''}{formatCurrency(totalPnL, account.baseCurrency)}
+                    {isPositive ? '+' : ''}{formatCurrency(convertedTotalPnL, userCurrency)}
                   </BlurValue>
                 </span>
+                {accountCurrency !== userCurrency && (
+                  <span className={cn("text-[10px] md:text-xs leading-tight ml-1", colors.textTertiary)}>
+                    ({isPositive ? '+' : ''}{formatCurrency(totalPnL, accountCurrency)})
+                  </span>
+                )}
               </div>
               <span className={cn(
                 'text-xs md:text-sm font-semibold leading-tight flex-shrink-0',

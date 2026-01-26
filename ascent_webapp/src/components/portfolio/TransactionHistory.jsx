@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, DollarSign, ShoppingC
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import BlurValue from '../BlurValue';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const typeConfig = {
   buy: {
@@ -42,8 +43,17 @@ const typeConfig = {
 
 export default function TransactionHistory({ transactions = [], isLoading, accountCurrency }) {
   const { colors, t, user } = useTheme();
+  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const userCurrency = user?.currency || accountCurrency || 'USD';
   const [isExpanded, setIsExpanded] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
+
+  // Fetch exchange rates on mount
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
 
   const formatCurrency = (value, currency = accountCurrency) => {
     return new Intl.NumberFormat('en-US', {
@@ -203,14 +213,43 @@ export default function TransactionHistory({ transactions = [], isLoading, accou
                           </BlurValue>
                         </TableCell>
                         <TableCell className={cn("text-right", colors.textSecondary)}>
-                          <BlurValue blur={user?.blurValues}>
-                            {tx.pricePerUnit ? formatCurrency(tx.pricePerUnit, tx.currency) : '-'}
-                          </BlurValue>
+                          {tx.pricePerUnit ? (
+                            <div className="flex flex-col items-end">
+                              <BlurValue blur={user?.blurValues}>
+                                {formatCurrency(tx.pricePerUnit, tx.currency)}
+                              </BlurValue>
+                              {tx.currency !== userCurrency && rates && Object.keys(rates).length > 0 && (
+                                <BlurValue blur={user?.blurValues}>
+                                  <span className={cn("text-xs text-gray-500 dark:text-gray-400")}>
+                                    {formatCurrency(
+                                      convertCurrency(tx.pricePerUnit, tx.currency, userCurrency, rates),
+                                      userCurrency
+                                    )}
+                                  </span>
+                                </BlurValue>
+                              )}
+                            </div>
+                          ) : (
+                            <span>-</span>
+                          )}
                         </TableCell>
                         <TableCell className={cn("text-right font-semibold", isInflow ? 'text-green-400' : 'text-red-400')}>
-                          <BlurValue blur={user?.blurValues}>
-                            {isInflow ? '+' : '-'}{formatCurrency(Math.abs(tx.totalAmount), tx.currency)}
-                          </BlurValue>
+                          <div className="flex flex-col items-end">
+                            <BlurValue blur={user?.blurValues}>
+                              {isInflow ? '+' : '-'}{formatCurrency(Math.abs(tx.totalAmount), tx.currency)}
+                            </BlurValue>
+                            {tx.currency !== userCurrency && rates && Object.keys(rates).length > 0 && (
+                              <BlurValue blur={user?.blurValues}>
+                                <span className={cn("text-xs text-gray-500 dark:text-gray-400")}>
+                                  {isInflow ? '+' : '-'}
+                                  {formatCurrency(
+                                    Math.abs(convertCurrency(tx.totalAmount, tx.currency, userCurrency, rates)),
+                                    userCurrency
+                                  )}
+                                </span>
+                              </BlurValue>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className={cn("text-sm max-w-[150px] truncate", colors.textTertiary)}>
                           {tx.notes || '-'}

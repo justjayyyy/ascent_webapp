@@ -13,7 +13,33 @@ const positionSchema = new mongoose.Schema({
   assetType: {
     type: String,
     required: true,
-    enum: ['Stock', 'ETF', 'Bond', 'Crypto', 'Cash', 'Real Estate', 'Commodity', 'Other']
+    enum: ['Stock', 'ETF', 'Bond', 'Crypto', 'Cash', 'Real Estate', 'Commodity', 'Option', 'Other']
+  },
+  strikePrice: {
+    type: Number,
+    default: null
+  },
+  expirationDate: {
+    type: String,
+    default: null
+  },
+  optionType: {
+    type: String,
+    enum: ['Call', 'Put'],
+    default: null
+  },
+  optionAction: {
+    type: String,
+    enum: ['Buy', 'Sell'],
+    default: null
+  },
+  premiumPrice: {
+    type: Number,
+    default: null
+  },
+  stockPriceAtPurchase: {
+    type: Number,
+    default: null
   },
   quantity: {
     type: Number,
