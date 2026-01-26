@@ -224,7 +224,7 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
           <img 
-            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
+            src="/logo-dark.png"
             alt="Ascend Logo" 
             className="object-contain mx-auto mb-1 sm:mb-3 h-[70px] sm:h-[120px] w-auto"
             style={{ filter: 'brightness(1.1) saturate(1.2)' }}

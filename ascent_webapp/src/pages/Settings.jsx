@@ -701,8 +701,8 @@ This is an automated invitation email. Please do not reply to this email.`;
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <img 
                     src={theme === 'dark' 
-                      ? "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
-                      : "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/da2eb9289_acseend_ver1.png"
+                      ? "/logo-dark.png"
+                      : "/logo-light.png"
                     }
                     alt="Ascend Logo" 
                     className="w-24 h-24 object-contain"

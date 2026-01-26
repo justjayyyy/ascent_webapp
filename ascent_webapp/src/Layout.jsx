@@ -182,8 +182,8 @@ function LayoutContent({ children, currentPageName }) {
             ) : (
               <img 
                 src={theme === 'dark' 
-                  ? "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
-                  : "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/da2eb9289_acseend_ver1.png"
+                  ? "/logo-dark.png"
+                  : "/logo-light.png"
                 }
                 alt="Ascend Logo" 
                 className="w-20 h-20 object-contain"
@@ -374,8 +374,8 @@ function LayoutContent({ children, currentPageName }) {
         <div className="flex items-center justify-center h-16 px-4">
           <img 
             src={theme === 'dark' 
-              ? "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/c7a1d13e4_ascend_darkmode_logo.png"
-              : "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/693973feb6a9cd11c10d222b/da2eb9289_acseend_ver1.png"
+              ? "/logo-dark.png"
+              : "/logo-light.png"
             }
             alt="Ascend Logo" 
             className="w-16 h-16 object-contain"
