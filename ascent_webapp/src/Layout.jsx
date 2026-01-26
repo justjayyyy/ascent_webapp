@@ -41,9 +41,24 @@ function LayoutContent({ children, currentPageName }) {
           status: 'accepted' 
         });
         
-        if (shared.length > 0) {
+        if (shared.length > 0 && shared[0]?.permissions) {
           // User was invited - they're a shared user with limited permissions
-          setPermissions(shared[0].permissions);
+          // Ensure permissions object has all required fields with defaults
+          const permissions = shared[0].permissions || {};
+          setPermissions({
+            viewPortfolio: permissions.viewPortfolio ?? true,
+            editPortfolio: permissions.editPortfolio ?? false,
+            viewExpenses: permissions.viewExpenses ?? true,
+            editExpenses: permissions.editExpenses ?? false,
+            viewNotes: permissions.viewNotes ?? false,
+            editNotes: permissions.editNotes ?? false,
+            viewGoals: permissions.viewGoals ?? false,
+            editGoals: permissions.editGoals ?? false,
+            viewBudgets: permissions.viewBudgets ?? false,
+            editBudgets: permissions.editBudgets ?? false,
+            viewSettings: permissions.viewSettings ?? false,
+            manageUsers: permissions.manageUsers ?? false,
+          });
         } else {
           // No SharedUser records found - user is owner (new account or no sharing yet)
           setPermissions(null);
@@ -96,7 +111,8 @@ function LayoutContent({ children, currentPageName }) {
     // If no permissions object exists, user is owner and has all permissions
     if (!permissions) return true;
     // For shared users, check if the specific permission is granted
-    return permissions[permission] === true;
+    // Use optional chaining to safely access permissions
+    return permissions?.[permission] === true;
   }, [permissions]);
 
   const navigation = useMemo(() => [

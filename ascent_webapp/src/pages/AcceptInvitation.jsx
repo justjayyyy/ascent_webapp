@@ -155,18 +155,18 @@ export default function AcceptInvitation() {
   }
 
   const permissionsList = [];
-  if (invitation.permissions.viewPortfolio) permissionsList.push('View Portfolio');
-  if (invitation.permissions.editPortfolio) permissionsList.push('Edit Portfolio');
-  if (invitation.permissions.viewExpenses) permissionsList.push('View Expenses');
-  if (invitation.permissions.editExpenses) permissionsList.push('Edit Expenses');
-  if (invitation.permissions.viewNotes) permissionsList.push('View Notes');
-  if (invitation.permissions.editNotes) permissionsList.push('Edit Notes');
-  if (invitation.permissions.viewGoals) permissionsList.push('View Goals');
-  if (invitation.permissions.editGoals) permissionsList.push('Edit Goals');
-  if (invitation.permissions.viewBudgets) permissionsList.push('View Budgets');
-  if (invitation.permissions.editBudgets) permissionsList.push('Edit Budgets');
-  if (invitation.permissions.viewSettings) permissionsList.push('View Settings');
-  if (invitation.permissions.manageUsers) permissionsList.push('Manage Users');
+  if (invitation?.permissions?.viewPortfolio) permissionsList.push('View Portfolio');
+  if (invitation?.permissions?.editPortfolio) permissionsList.push('Edit Portfolio');
+  if (invitation?.permissions?.viewExpenses) permissionsList.push('View Expenses');
+  if (invitation?.permissions?.editExpenses) permissionsList.push('Edit Expenses');
+  if (invitation?.permissions?.viewNotes) permissionsList.push('View Notes');
+  if (invitation?.permissions?.editNotes) permissionsList.push('Edit Notes');
+  if (invitation?.permissions?.viewGoals) permissionsList.push('View Goals');
+  if (invitation?.permissions?.editGoals) permissionsList.push('Edit Goals');
+  if (invitation?.permissions?.viewBudgets) permissionsList.push('View Budgets');
+  if (invitation?.permissions?.editBudgets) permissionsList.push('Edit Budgets');
+  if (invitation?.permissions?.viewSettings) permissionsList.push('View Settings');
+  if (invitation?.permissions?.manageUsers) permissionsList.push('Manage Users');
 
   return (
     <div className="min-h-screen bg-[#092635] flex items-center justify-center p-4">

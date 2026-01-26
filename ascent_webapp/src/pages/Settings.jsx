@@ -202,18 +202,18 @@ export default function Settings() {
           const invitationLink = `${appUrl}/accept-invitation/${invitationToken}`;
           const permissionsList = [];
           
-          if (data.permissions.viewPortfolio) permissionsList.push('• View Portfolio - See investment accounts and positions');
-          if (data.permissions.editPortfolio) permissionsList.push('• Edit Portfolio - Add, edit, and delete accounts and positions');
-          if (data.permissions.viewExpenses) permissionsList.push('• View Expenses - See income and expense transactions');
-          if (data.permissions.editExpenses) permissionsList.push('• Edit Expenses - Add, edit, and delete transactions');
-          if (data.permissions.viewNotes) permissionsList.push('• View Notes - See notes and personal memos');
-          if (data.permissions.editNotes) permissionsList.push('• Edit Notes - Create, edit, and delete notes');
-          if (data.permissions.viewGoals) permissionsList.push('• View Goals - See financial goals and progress');
-          if (data.permissions.editGoals) permissionsList.push('• Edit Goals - Create, edit, and delete financial goals');
-          if (data.permissions.viewBudgets) permissionsList.push('• View Budgets - See budget categories and limits');
-          if (data.permissions.editBudgets) permissionsList.push('• Edit Budgets - Create, edit, and delete budgets');
-          if (data.permissions.viewSettings) permissionsList.push('• View Settings - Access settings page');
-          if (data.permissions.manageUsers) permissionsList.push('• Manage Users - Invite and manage other users');
+          if (data?.permissions?.viewPortfolio) permissionsList.push('• View Portfolio - See investment accounts and positions');
+          if (data?.permissions?.editPortfolio) permissionsList.push('• Edit Portfolio - Add, edit, and delete accounts and positions');
+          if (data?.permissions?.viewExpenses) permissionsList.push('• View Expenses - See income and expense transactions');
+          if (data?.permissions?.editExpenses) permissionsList.push('• Edit Expenses - Add, edit, and delete transactions');
+          if (data?.permissions?.viewNotes) permissionsList.push('• View Notes - See notes and personal memos');
+          if (data?.permissions?.editNotes) permissionsList.push('• Edit Notes - Create, edit, and delete notes');
+          if (data?.permissions?.viewGoals) permissionsList.push('• View Goals - See financial goals and progress');
+          if (data?.permissions?.editGoals) permissionsList.push('• Edit Goals - Create, edit, and delete financial goals');
+          if (data?.permissions?.viewBudgets) permissionsList.push('• View Budgets - See budget categories and limits');
+          if (data?.permissions?.editBudgets) permissionsList.push('• Edit Budgets - Create, edit, and delete budgets');
+          if (data?.permissions?.viewSettings) permissionsList.push('• View Settings - Access settings page');
+          if (data?.permissions?.manageUsers) permissionsList.push('• Manage Users - Invite and manage other users');
           
           const permissionsText = permissionsList.length > 0 
             ? `\n\nYour Permissions:\n${permissionsList.join('\n')}`
