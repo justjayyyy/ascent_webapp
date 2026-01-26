@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -219,8 +219,8 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-[#092635] flex items-start sm:items-center justify-center p-2 pt-0 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <div className="w-full max-w-md flex flex-col items-center justify-start sm:justify-center max-h-full overflow-y-auto custom-scrollbar pt-2 sm:pt-0 pb-2">
+    <div className="bg-[#092635] flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <div className="w-full max-w-md flex flex-col items-center justify-center max-h-full overflow-hidden pt-2 sm:pt-0 pb-2">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
           <img 
@@ -430,6 +430,28 @@ export default function Login() {
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* Footer with legal links */}
+        <div className="mt-2 sm:mt-4 text-center flex-shrink-0">
+          <p className="text-xs sm:text-sm text-[#5C8374] mb-1 sm:mb-2">
+            By signing in, you agree to our
+          </p>
+          <div className="flex items-center justify-center gap-2 sm:gap-4 flex-wrap">
+            <Link 
+              to="/privacy-policy" 
+              className="text-xs sm:text-sm text-[#9EC8B9] hover:text-[#5C8374] underline transition-colors"
+            >
+              {t('privacyPolicy') || 'Privacy Policy'}
+            </Link>
+            <span className="text-[#5C8374]">•</span>
+            <Link 
+              to="/terms-of-service" 
+              className="text-xs sm:text-sm text-[#9EC8B9] hover:text-[#5C8374] underline transition-colors"
+            >
+              {t('termsOfService') || 'Terms of Service'}
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
