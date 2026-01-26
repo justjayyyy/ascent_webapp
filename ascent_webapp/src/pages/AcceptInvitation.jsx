@@ -91,14 +91,33 @@ export default function AcceptInvitation() {
       return;
     }
 
+    // Ensure invitation is still available
+    if (!invitation || !invitation.invitedEmail) {
+      setIsSigningIn(false);
+      toast.error('Invitation data not available. Please refresh the page.');
+      return;
+    }
+
     setIsSigningIn(true);
 
     try {
       // Verify the email matches the invitation
       const tokenResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${response.credential}`);
+      
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to verify Google token');
+      }
+      
       const tokenData = await tokenResponse.json();
       
-      if (!tokenData.email || tokenData.email.toLowerCase() !== invitation.invitedEmail.toLowerCase()) {
+      if (!tokenData?.email) {
+        throw new Error('Unable to verify email address from Google');
+      }
+      
+      const userEmail = tokenData.email.toLowerCase();
+      const invitedEmail = invitation.invitedEmail.toLowerCase();
+      
+      if (userEmail !== invitedEmail) {
         throw new Error(`You must sign in with ${invitation.invitedEmail} to accept this invitation`);
       }
       
