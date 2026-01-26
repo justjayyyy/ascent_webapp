@@ -9,11 +9,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDayTrade, isLoading, accountCurrency, editPosition = null, editDayTrade = null, cashBalance = null, hasCashPosition = false }) {
   const { colors, t, user } = useTheme();
-  const [activeTab, setActiveTab] = useState('position');
   const [deductFromCash, setDeductFromCash] = useState(true);
   
   // Ensure we have a valid currency code
@@ -44,23 +42,10 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
     stockPriceAtPurchase: '',
     notes: '',
   });
-  const [dayTradeData, setDayTradeData] = useState(editDayTrade || {
-    date: new Date().toISOString().split('T')[0],
-    profitLoss: '',
-    notes: '',
-  });
 
   React.useEffect(() => {
     if (editPosition) {
       setFormData(editPosition);
-      setActiveTab('position');
-    } else if (editDayTrade) {
-      setDayTradeData({
-        date: editDayTrade.date,
-        profitLoss: editDayTrade.profitLoss.toString(),
-        notes: editDayTrade.notes || '',
-      });
-      setActiveTab('daytrade');
     } else {
       setFormData({
         symbol: '',
@@ -77,14 +62,8 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
         stockPriceAtPurchase: '',
         notes: '',
       });
-      setDayTradeData({
-        date: new Date().toISOString().split('T')[0],
-        profitLoss: '',
-        notes: '',
-      });
-      setActiveTab('position');
     }
-  }, [editPosition, editDayTrade, accountCurrency, user?.currency, open]);
+  }, [editPosition, accountCurrency, user?.currency, open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -155,34 +134,21 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
   const purchaseCost = parseFloat(formData.quantity || 0) * parseFloat(formData.averageBuyPrice || 0);
   const hasSufficientCash = cashBalance !== null && cashBalance >= purchaseCost;
 
-  const handleDayTradeSubmit = async (e) => {
-    e.preventDefault();
-    await onSubmitDayTrade({
-      date: dayTradeData.date,
-      profitLoss: parseFloat(dayTradeData.profitLoss),
-      notes: dayTradeData.notes,
-    });
-  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className={cn(colors.cardBg, colors.cardBorder, "w-[95vw] max-w-[95vw] sm:w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-3 sm:p-6")}>
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className={cn("text-base sm:text-xl font-bold", colors.accentText)}>
-            {editPosition ? t('editPosition') : editDayTrade ? 'Edit Day Trade' : 'Add to Portfolio'}
+            {editPosition ? t('editPosition') : 'Add to Portfolio'}
           </DialogTitle>
           <DialogDescription className={cn("text-[10px] sm:text-sm hidden sm:block", colors.textTertiary)}>
-            {editPosition ? t('updatePositionDetails') : editDayTrade ? 'Update your day trade record' : 'Add a position or record day trading P&L'}
+            {editPosition ? t('updatePositionDetails') : 'Add a position to your portfolio'}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2 sm:mt-4">
-          <TabsList className={cn("grid w-full grid-cols-2 mb-2 sm:mb-4 h-8 sm:h-10", colors.bgTertiary, colors.border)}>
-            <TabsTrigger value="position" disabled={!!editDayTrade} className="text-xs sm:text-sm">Position</TabsTrigger>
-            <TabsTrigger value="daytrade" disabled={!!editPosition} className="text-xs sm:text-sm">Day Trade</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="position">
+        <div className="mt-2 sm:mt-4">
+          <div className="position-form">
             <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4">
           <div className={cn("grid gap-2 sm:gap-4", formData.assetType === 'Cash' ? "grid-cols-1" : "grid-cols-2")}>
             <div className="space-y-1 sm:space-y-2">
@@ -547,79 +513,8 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
                 </Button>
               </div>
             </form>
-          </TabsContent>
-
-          <TabsContent value="daytrade">
-            <form onSubmit={handleDayTradeSubmit} className="space-y-2 sm:space-y-4">
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="date" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>Date *</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={dayTradeData.date}
-                    onChange={(e) => setDayTradeData({ ...dayTradeData, date: e.target.value })}
-                    required
-                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-                  />
-                </div>
-
-                <div className="space-y-1 sm:space-y-2">
-                  <Label htmlFor="profitLoss" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
-                    Profit/Loss ({currency}) *
-                  </Label>
-                  <Input
-                    id="profitLoss"
-                    type="number"
-                    step="0.01"
-                    placeholder="150.00"
-                    value={dayTradeData.profitLoss}
-                    onChange={(e) => setDayTradeData({ ...dayTradeData, profitLoss: e.target.value })}
-                    required
-                    className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="dayTradeNotes" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('notesOptional')}</Label>
-                <Textarea
-                  id="dayTradeNotes"
-                  placeholder="Day trading strategy, trades executed, etc."
-                  value={dayTradeData.notes}
-                  onChange={(e) => setDayTradeData({ ...dayTradeData, notes: e.target.value })}
-                  className={cn("text-xs sm:text-sm min-h-[60px] sm:min-h-[80px]", colors.bgTertiary, colors.border, colors.textPrimary)}
-                />
-              </div>
-
-              <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  disabled={isLoading}
-                  className={cn("flex-1 h-8 sm:h-10 text-xs sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
-                >
-                  {t('cancel')}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex-1 h-8 sm:h-10 text-xs sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                      <span className="hidden sm:inline">{t('saving')}</span>
-                    </>
-                  ) : (
-                    editDayTrade ? 'Update Trade' : 'Add Trade'
-                  )}
-                </Button>
-              </div>
-            </form>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
