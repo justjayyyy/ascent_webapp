@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import connectDB from './mongodb.js';
 import { handleCors } from './cors.js';
 import { success, error, notFound, serverError } from './response.js';
@@ -66,14 +65,10 @@ export function createEntityHandler(Model, options = {}) {
             // Check if this is a self-referencing invite (should not happen, but safety check)
             const ownerEmail = sharedUserRecord.created_by.trim().toLowerCase();
             if (ownerEmail === userEmail) {
-              // console.error(`[EntityHandler] Self-referencing shared user detected for ${userEmail}. Ignoring.`);
               return userEmail;
             }
 
             // User is a shared user - return the owner's email (created_by)
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[EntityHandler] Shared user detected: ${userEmail} -> Owner: ${ownerEmail}`);
-            }
             return ownerEmail;
           }
         } catch (error) {
@@ -87,26 +82,12 @@ export function createEntityHandler(Model, options = {}) {
 
       // Helper function to build user filter (case-insensitive)
       const buildUserFilter = async () => {
-        /*
-        // HARDCODED BYPASS FOR DEBUGGING
-        if (user && user.email === 'daniel.meresidi@gmail.com') {
-           console.error(`[DEPLOY-CHECK-v99] HARDCODED BYPASS for daniel.meresidi@gmail.com`);
-           return { [userField]: 'daniel.meresidi@gmail.com' };
-        }
-        */
-
         if (!filterByUser || !user || !user.email) return {};
         
         try {
           // Get the effective owner email (owner's email for shared users, own email for owners)
           const effectiveEmail = await getEffectiveOwnerEmail();
           if (!effectiveEmail) return {};
-          
-          const userEmail = user.email.trim().toLowerCase();
-          const isSharedUser = effectiveEmail !== userEmail;
-          
-          // Log for debugging production issues
-          console.error(`[EntityHandler] BuildFilter: User=${userEmail}, Effective=${effectiveEmail}, Shared=${isSharedUser}`);
           
           // Simple direct match since we enforce lowercase in models
           return {
@@ -167,27 +148,11 @@ export function createEntityHandler(Model, options = {}) {
           const sortField = sort || '-created_date';
           const limitValue = Math.min(parseInt(limit) || 1000, 10000); // Cap at 10k
           
-          // Log query for debugging
-          /*
-          try {
-            console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
-            const dbName = mongoose.connection.name || 'unknown';
-            const collName = Model.collection ? Model.collection.name : 'unknown';
-            const readyState = mongoose.connection.readyState;
-            console.error(`[EntityHandler] DB Info: DB=${dbName}, Coll=${collName}, State=${readyState}`);
-            console.error(`[EntityHandler] Registered Models: ${JSON.stringify(mongoose.modelNames())}`);
-          } catch (logError) {
-            console.error('[EntityHandler] Error logging DB info:', logError);
-          }
-          */
-
           // Try main query first
           let items = await Model.find(query)
             .sort(sortField)
             .limit(limitValue)
             .lean();
-
-          // console.error(`[EntityHandler] GET ${entityName} Found: ${items.length} items`);
 
           // DIAGNOSTIC FALLBACK: If main query returns 0, check if items exist for the user directly
           // This helps identify if the SharedUser logic is pointing to the wrong place
