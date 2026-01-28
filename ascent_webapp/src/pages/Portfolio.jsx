@@ -90,11 +90,14 @@ export default function Portfolio() {
         // Backend automatically sets created_by from authenticated user
         const account = await ascent.entities.Account.create(accountData);
         
-        // Create initial Cash position with the initial investment
-        if (accountData.initialInvestment > 0) {
+        const accountId = account.id || account._id?.toString();
+        const accountWithId = accountId ? { ...account, id: accountId } : account;
+
+        // Create initial Cash position with the initial investment (only if we have an ID)
+        if (accountId && accountData.initialInvestment > 0) {
           try {
             await ascent.entities.Position.create({
-              accountId: account.id,
+              accountId,
               symbol: 'CASH',
               assetType: 'Cash',
               quantity: accountData.initialInvestment,
@@ -104,12 +107,13 @@ export default function Portfolio() {
               date: new Date().toISOString().split('T')[0],
             });
           } catch (positionError) {
-            // Position creation failed but account is still created successfully
-            // Position can be added later
+            console.warn('Initial cash position failed after account creation:', positionError);
           }
+        } else if (!accountId && accountData.initialInvestment > 0) {
+          console.warn('Skipping initial cash position because account ID is missing', account);
         }
         
-        return account;
+        return accountWithId;
       } catch (error) {
         console.error('Account creation failed:', error);
         throw error;
@@ -120,8 +124,12 @@ export default function Portfolio() {
       setAddDialogOpen(false);
       
       // Ensure account has id field
-      const accountId = account.id || account._id?.toString();
-      const accountWithId = { ...account, id: accountId };
+      const accountId = account?.id || account?._id?.toString();
+      const accountWithId = accountId ? { ...account, id: accountId } : account;
+      
+      if (!accountId) {
+        console.warn('Received account response without an ID. Cache update may be incomplete.', account);
+      }
       
       // Show success message
       toast.success(t('accountCreatedSuccessfully'));
@@ -134,7 +142,7 @@ export default function Portfolio() {
           return [accountWithId];
         }
         // Check if account already exists
-        const exists = oldAccounts.some(acc => {
+        const exists = accountId && oldAccounts.some(acc => {
           const accId = acc.id || acc._id?.toString();
           return accId === accountId;
         });
@@ -144,7 +152,7 @@ export default function Portfolio() {
             return accId === accountId ? accountWithId : acc;
           });
         }
-        return [accountWithId, ...oldAccounts];
+        return accountId ? [accountWithId, ...oldAccounts] : oldAccounts;
       });
       
       // Invalidate queries - React Query will refetch in background
