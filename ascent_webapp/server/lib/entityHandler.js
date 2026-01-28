@@ -19,9 +19,6 @@ export function createEntityHandler(Model, options = {}) {
     if (handleCors(req, res)) return;
     
     try {
-      // Add version header for debugging
-      res.setHeader('X-Debug-Version', 'v1.0.5-deep-diagnostics');
-      
       const user = await authMiddleware(req, res);
       if (!user) return;
       
@@ -161,8 +158,16 @@ export function createEntityHandler(Model, options = {}) {
           const limitValue = Math.min(parseInt(limit) || 1000, 10000); // Cap at 10k
           
           // Log query for debugging
-          console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
-          console.error(`[EntityHandler] DB Connection: ${mongoose.connection.name}, Collection: ${Model.collection.name}, ReadyState: ${mongoose.connection.readyState}`);
+          try {
+            console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
+            const dbName = mongoose.connection.name || 'unknown';
+            const collName = Model.collection ? Model.collection.name : 'unknown';
+            const readyState = mongoose.connection.readyState;
+            console.error(`[EntityHandler] DB Info: DB=${dbName}, Coll=${collName}, State=${readyState}`);
+            console.error(`[EntityHandler] Registered Models: ${JSON.stringify(mongoose.modelNames())}`);
+          } catch (logError) {
+            console.error('[EntityHandler] Error logging DB info:', logError);
+          }
 
           // Try main query first
           let items = await Model.find(query)
@@ -171,31 +176,6 @@ export function createEntityHandler(Model, options = {}) {
             .lean();
 
           console.error(`[EntityHandler] GET ${entityName} Found: ${items.length} items`);
-
-          // DIAGNOSTIC FALLBACK: If main query returns 0, run deep diagnostics
-          if (items.length === 0) {
-             // 1. Check total docs in collection
-             try {
-               const totalDocs = await Model.countDocuments({});
-               console.error(`[EntityHandler] DIAGNOSTIC: Total docs in ${Model.collection.name}: ${totalDocs}`);
-               
-               if (totalDocs > 0) {
-                 // 2. Sample a doc to check structure
-                 const sample = await Model.findOne({}).lean();
-                 console.error(`[EntityHandler] DIAGNOSTIC: Sample doc:`, JSON.stringify(sample));
-                 
-                 // 3. Check for specific user match with regex (to catch hidden chars)
-                 if (user && user.email) {
-                   const userEmail = user.email.trim().toLowerCase();
-                   const regexQuery = { [userField]: { $regex: new RegExp(`^${userEmail}$`, 'i') } };
-                   const regexMatch = await Model.countDocuments(regexQuery);
-                   console.error(`[EntityHandler] DIAGNOSTIC: Regex match for ${userEmail}: ${regexMatch}`);
-                 }
-               }
-             } catch (diagError) {
-               console.error(`[EntityHandler] DIAGNOSTIC ERROR:`, diagError);
-             }
-          }
 
           // DIAGNOSTIC FALLBACK: If main query returns 0, check if items exist for the user directly
           // This helps identify if the SharedUser logic is pointing to the wrong place
