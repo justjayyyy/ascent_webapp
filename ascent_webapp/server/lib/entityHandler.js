@@ -41,11 +41,6 @@ export function createEntityHandler(Model, options = {}) {
         
         const userEmail = user.email.trim().toLowerCase();
         
-        // TEMPORARY DEBUG: Force disable shared user lookup to isolate the issue
-        console.error(`[EntityHandler] DEBUG: Forcing effective email to ${userEmail} (SharedUser lookup disabled)`);
-        return userEmail;
-
-        /* 
         // Skip SharedUser lookup if we're already working with SharedUser model
         // to avoid circular dependency issues
         if (Model.modelName === 'SharedUser') {
@@ -64,8 +59,14 @@ export function createEntityHandler(Model, options = {}) {
           }).lean();
           
           if (sharedUserRecord && sharedUserRecord.created_by) {
-            // User is a shared user - return the owner's email (created_by)
+            // Check if this is a self-referencing invite (should not happen, but safety check)
             const ownerEmail = sharedUserRecord.created_by.trim().toLowerCase();
+            if (ownerEmail === userEmail) {
+              console.error(`[EntityHandler] Self-referencing shared user detected for ${userEmail}. Ignoring.`);
+              return userEmail;
+            }
+
+            // User is a shared user - return the owner's email (created_by)
             if (process.env.NODE_ENV === 'development') {
               console.log(`[EntityHandler] Shared user detected: ${userEmail} -> Owner: ${ownerEmail}`);
             }
@@ -78,7 +79,6 @@ export function createEntityHandler(Model, options = {}) {
         
         // User is the owner - return their own email
         return userEmail;
-        */
       };
 
       // Helper function to build user filter (case-insensitive)
@@ -165,6 +165,20 @@ export function createEntityHandler(Model, options = {}) {
             .lean();
 
           console.error(`[EntityHandler] GET ${entityName} Found: ${items.length} items`);
+
+          // DIAGNOSTIC FALLBACK: If main query returns 0, check if items exist for the user directly
+          // This helps identify if the SharedUser logic is pointing to the wrong place
+          if (items.length === 0 && user && user.email) {
+            const userEmail = user.email.trim().toLowerCase();
+            // Only run fallback if the original query wasn't already just for the user
+            if (query[userField] !== userEmail) {
+              const directQuery = { ...query, [userField]: userEmail };
+              const directItems = await Model.find(directQuery).limit(1).lean();
+              if (directItems.length > 0) {
+                console.error(`[EntityHandler] CRITICAL DIAGNOSTIC: Main query returned 0, but DIRECT query for ${userEmail} found items! SharedUser logic is likely redirecting incorrectly.`);
+              }
+            }
+          }
 
           // Don't fallback to user's own email - if they're a shared user, 
           // we want to show owner's data (even if empty), not their own empty data
