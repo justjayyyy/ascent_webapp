@@ -16,7 +16,8 @@ export default function CategoryManager({
   categories, 
   onAdd, 
   onDelete, 
-  isLoading 
+  isLoading,
+  canEdit = true
 }) {
   const { colors, t, language } = useTheme();
   const [formData, setFormData] = useState({
@@ -74,6 +75,7 @@ export default function CategoryManager({
         </DialogHeader>
 
         {/* Add Form */}
+        {canEdit && (
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1.5 sm:space-y-2">
@@ -128,6 +130,7 @@ export default function CategoryManager({
             {t('addCategory') || 'Add Category'}
           </Button>
         </form>
+        )}
 
         {/* All Categories */}
         <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
@@ -156,14 +159,16 @@ export default function CategoryManager({
                           {category.type === 'Expense' ? t('expense') : category.type === 'Income' ? t('income') : category.type}
                         </span>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onDelete(category.id)}
-                        className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20 flex-shrink-0"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => onDelete(category.id)}
+                          className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20 flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

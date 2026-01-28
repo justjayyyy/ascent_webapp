@@ -27,7 +27,8 @@ function ExpenseMonthView({
   isLoading,
   monthLabel,
   selectedYear,
-  selectedMonths = []
+  selectedMonths = [],
+  canEdit = true
 }) {
   const { user, colors, t, language, theme, isRTL } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
@@ -729,6 +730,7 @@ function ExpenseMonthView({
             onEdit={onEdit}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
+            canEdit={canEdit}
           />
 
           {/* Pagination */}

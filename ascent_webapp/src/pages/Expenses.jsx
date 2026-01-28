@@ -10,6 +10,7 @@ import CategoryManager from '../components/expenses/CategoryManager';
 import ExpenseMonthView from '../components/expenses/ExpenseMonthView';
 import PeriodSelector from '../components/expenses/PeriodSelector';
 import { useTheme } from '../components/ThemeProvider';
+import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -25,6 +26,8 @@ import {
 
 function Expenses() {
   const { user, colors, t } = useTheme();
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('editExpenses');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonths, setSelectedMonths] = useState([(new Date().getMonth() + 1).toString()]); // Array of selected months
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -394,18 +397,20 @@ function Expenses() {
                 <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
                 <span className="hidden md:inline">Budgets</span>
               </Button>
-              <Button 
-                onClick={() => {
-                  setEditingTransaction(null);
-                  setAddDialogOpen(true);
-                }}
-                size="sm"
-                className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-8 sm:h-10 text-xs sm:text-base"
-              >
-                <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                <span className="hidden sm:inline">{t('addTransaction')}</span>
-                <span className="sm:hidden">{t('add')}</span>
-              </Button>
+              {canEdit && (
+                <Button 
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setAddDialogOpen(true);
+                  }}
+                  size="sm"
+                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-8 sm:h-10 text-xs sm:text-base"
+                >
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                  <span className="hidden sm:inline">{t('addTransaction')}</span>
+                  <span className="sm:hidden">{t('add')}</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -435,6 +440,7 @@ function Expenses() {
             monthLabel={selectedPeriodLabel}
             selectedYear={selectedYear}
             selectedMonths={selectedMonths}
+            canEdit={canEdit}
           />
         </div>
 
@@ -464,6 +470,7 @@ function Expenses() {
           isLoading={createBudgetMutation.isPending || updateBudgetMutation.isPending || deleteBudgetMutation.isPending}
           selectedYear={selectedYear}
           selectedMonths={selectedMonths}
+          canEdit={canEdit}
         />
 
         {/* Category Manager Dialog */}
@@ -474,6 +481,7 @@ function Expenses() {
           onAdd={createCategoryMutation.mutate}
           onDelete={deleteCategoryMutation.mutate}
           isLoading={createCategoryMutation.isPending || deleteCategoryMutation.isPending}
+          canEdit={canEdit}
         />
 
         {/* Delete Transaction Confirmation Dialog */}

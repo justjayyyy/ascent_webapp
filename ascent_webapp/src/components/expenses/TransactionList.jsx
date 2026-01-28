@@ -26,7 +26,7 @@ const categoryColors = {
   'Other': 'bg-gray-500/10 text-gray-400 border-gray-500/30',
 };
 
-const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t }) => {
+const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true }) => {
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'USD';
 
@@ -170,43 +170,45 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
             </div>
             
             {/* 3-dots Dropdown Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+            {canEdit && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  align="end" 
+                  className={cn(colors.cardBg, colors.cardBorder, "min-w-[160px]")}
                 >
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                align="end" 
-                className={cn(colors.cardBg, colors.cardBorder, "min-w-[160px]")}
-              >
-                <DropdownMenuItem
-                  onClick={handleEdit}
-                  className={cn("cursor-pointer", colors.textPrimary, "hover:bg-[#5C8374]/20")}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  <span>{t('edit')}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleDuplicate}
-                  className={cn("cursor-pointer", colors.textPrimary, "hover:bg-[#5C8374]/20")}
-                >
-                  <Copy className="w-4 h-4 mr-2" />
-                  <span>{t('duplicate')}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className={cn("cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/20")}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  <span>{t('delete')}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem
+                    onClick={handleEdit}
+                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-[#5C8374]/20")}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    <span>{t('edit')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDuplicate}
+                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-[#5C8374]/20")}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    <span>{t('duplicate')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    className={cn("cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/20")}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    <span>{t('delete')}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </CardContent>
@@ -216,7 +218,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
 
 TransactionItem.displayName = 'TransactionItem';
 
-function TransactionList({ transactions, onEdit, onDelete, onDuplicate, cards = [] }) {
+function TransactionList({ transactions, onEdit, onDelete, onDuplicate, cards = [], canEdit = true }) {
   const { t, language, colors, user } = useTheme();
 
   const handleEdit = useCallback((transaction) => {
@@ -263,6 +265,7 @@ function TransactionList({ transactions, onEdit, onDelete, onDuplicate, cards = 
           language={language}
           user={user}
           t={t}
+          canEdit={canEdit}
         />
       ))}
     </div>

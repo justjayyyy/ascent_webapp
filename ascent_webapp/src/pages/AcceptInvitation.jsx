@@ -140,10 +140,17 @@ export default function AcceptInvitation() {
         })
       });
 
-      const loginData = await loginResponse.json();
+      const responseJson = await loginResponse.json();
 
       if (!loginResponse.ok) {
-        throw new Error(loginData.message || 'Login failed');
+        throw new Error(responseJson.message || 'Login failed');
+      }
+
+      // The API wraps data in { success: true, data: {...} }
+      const loginData = responseJson.data || responseJson;
+
+      if (!loginData.token) {
+        throw new Error('No token received from server');
       }
 
       // Store token
@@ -152,7 +159,9 @@ export default function AcceptInvitation() {
       toast.success('Welcome! Your invitation has been accepted.');
       
       // Force a hard navigation to ensure auth context updates
-      window.location.href = '/Portfolio';
+      setTimeout(() => {
+        window.location.href = '/Portfolio';
+      }, 100);
     } catch (error) {
       console.error('Google login error:', error);
       toast.error(error.message || 'Failed to sign in');

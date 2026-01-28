@@ -6,6 +6,7 @@ import { SidebarCalendarButton, HeaderCalendarButton, FloatingCalendarButton } f
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { ThemeProvider, useTheme } from './components/ThemeProvider';
+import { useAuth } from '@/lib/AuthContext';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
@@ -13,9 +14,9 @@ import WelcomeDialog from './components/WelcomeDialog';
 
 function LayoutContent({ children, currentPageName }) {
   const { user, theme, language, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
+  const { permissions, hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [permissions, setPermissions] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
 
@@ -29,58 +30,6 @@ function LayoutContent({ children, currentPageName }) {
       sessionStorage.removeItem('showWelcomeMessage');
     }
   }, [user]);
-
-  useEffect(() => {
-    const loadPermissions = async () => {
-      if (!user?.email) return;
-      try {
-        // Check if user is the owner (has created any SharedUser invitations)
-        const owned = await ascent.entities.SharedUser.filter({ 
-          created_by: user.email 
-        });
-        
-        // If user has created SharedUser records, they are definitely the owner
-        if (owned.length > 0) {
-          setPermissions(null); // Owner has full access
-          return;
-        }
-        
-        // Otherwise, check if user was invited (shared user)
-        const shared = await ascent.entities.SharedUser.filter({ 
-          invitedEmail: user.email, 
-          status: 'accepted' 
-        });
-        
-        if (shared.length > 0) {
-          // User was invited - they're a shared user with limited permissions
-          // Ensure permissions object has all required fields with defaults
-          const permissions = shared[0].permissions || {};
-          setPermissions({
-            viewPortfolio: permissions.viewPortfolio ?? true,
-            editPortfolio: permissions.editPortfolio ?? false,
-            viewExpenses: permissions.viewExpenses ?? true,
-            editExpenses: permissions.editExpenses ?? false,
-            viewNotes: permissions.viewNotes ?? false,
-            editNotes: permissions.editNotes ?? false,
-            viewGoals: permissions.viewGoals ?? false,
-            editGoals: permissions.editGoals ?? false,
-            viewBudgets: permissions.viewBudgets ?? false,
-            editBudgets: permissions.editBudgets ?? false,
-            viewSettings: permissions.viewSettings ?? false,
-            manageUsers: permissions.manageUsers ?? false,
-          });
-        } else {
-          // No SharedUser records found - user is owner (new account or no sharing yet)
-          setPermissions(null);
-        }
-      } catch (error) {
-        console.error('Failed to load permissions:', error);
-        // On error, assume owner (full access)
-        setPermissions(null);
-      }
-    };
-    loadPermissions();
-  }, [user?.email]);
 
   const handleLogout = useCallback(async () => {
     await ascent.auth.logout();
@@ -117,13 +66,13 @@ function LayoutContent({ children, currentPageName }) {
     }
   }, [user, updateUserLocal, refreshUser]);
 
-  const hasPermission = useCallback((permission) => {
-    // If no permissions object exists, user is owner and has all permissions
-    if (!permissions) return true;
-    // For shared users, check if the specific permission is granted
-    // Use optional chaining to safely access permissions
-    return permissions?.[permission] === true;
-  }, [permissions]);
+  // const hasPermission = useCallback((permission) => {
+  //   // If no permissions object exists, user is owner and has all permissions
+  //   if (!permissions) return true;
+  //   // For shared users, check if the specific permission is granted
+  //   // Use optional chaining to safely access permissions
+  //   return permissions?.[permission] === true;
+  // }, [permissions]);
 
   const navigation = useMemo(() => [
     { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },

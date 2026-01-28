@@ -22,6 +22,7 @@ const isPublicRoute = (pathname) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [permissions, setPermissions] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
   const [authError, setAuthError] = useState(null);
@@ -70,6 +71,51 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await ascent.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
+      
+      // Load permissions
+      try {
+        // Check if user is the owner (has created any SharedUser invitations)
+        const owned = await ascent.entities.SharedUser.filter({ 
+          created_by: currentUser.email 
+        });
+        
+        // If user has created SharedUser records, they are definitely the owner
+        if (owned.length > 0) {
+          setPermissions(null); // Owner has full access
+        } else {
+          // Otherwise, check if user was invited (shared user)
+          const shared = await ascent.entities.SharedUser.filter({ 
+            invitedEmail: currentUser.email, 
+            status: 'accepted' 
+          });
+          
+          if (shared.length > 0) {
+            // User was invited - they're a shared user with limited permissions
+            const perms = shared[0].permissions || {};
+            setPermissions({
+              viewPortfolio: perms.viewPortfolio ?? true,
+              editPortfolio: perms.editPortfolio ?? false,
+              viewExpenses: perms.viewExpenses ?? true,
+              editExpenses: perms.editExpenses ?? false,
+              viewNotes: perms.viewNotes ?? false,
+              editNotes: perms.editNotes ?? false,
+              viewGoals: perms.viewGoals ?? false,
+              editGoals: perms.editGoals ?? false,
+              viewBudgets: perms.viewBudgets ?? false,
+              editBudgets: perms.editBudgets ?? false,
+              viewSettings: perms.viewSettings ?? false,
+              manageUsers: perms.manageUsers ?? false,
+            });
+          } else {
+            // No SharedUser records found - user is owner (new account or no sharing yet)
+            setPermissions(null);
+          }
+        }
+      } catch (permError) {
+        console.error('Failed to load permissions:', permError);
+        setPermissions(null);
+      }
+
       setIsLoadingAuth(false);
     } catch (error) {
       setIsLoadingAuth(false);
@@ -184,10 +230,19 @@ export const AuthProvider = ({ children }) => {
     ascent.auth.redirectToLogin(window.location.href);
   };
 
+  const hasPermission = (permission) => {
+    // If no permissions object exists, user is owner and has all permissions
+    if (!permissions) return true;
+    // For shared users, check if the specific permission is granted
+    return permissions?.[permission] === true;
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       isAuthenticated, 
+      permissions,
+      hasPermission,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,

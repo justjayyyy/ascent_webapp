@@ -34,7 +34,8 @@ export default function BudgetManager({
   onDelete, 
   isLoading,
   selectedYear,
-  selectedMonths = []
+  selectedMonths = [],
+  canEdit = true
 }) {
   const { colors, t, language, user } = useTheme();
   const [editingBudget, setEditingBudget] = useState(null);
@@ -182,131 +183,134 @@ export default function BudgetManager({
         </DialogHeader>
 
         {/* Add/Edit Form */}
-        {availableCategories.length === 0 && !editingBudget ? (
-          <div className={cn("text-center py-4 sm:py-6", colors.textTertiary)}>
-            <Target className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50" />
-            <p className={cn("text-sm sm:text-base font-medium", colors.textTertiary)}>{t('allCategoriesHaveBudgets')}</p>
-            <p className={cn("text-xs sm:text-sm mt-1", colors.textTertiary)}>{t('deleteBudgetToAddNew')}</p>
-          </div>
-        ) : (
-        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-                disabled={editingBudget !== null}
-              >
-                <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                  <SelectValue placeholder={t('selectCategory')} />
-                </SelectTrigger>
-                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                  {editAvailableCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.name} className={colors.textPrimary}>
-                      {translateCategory(category.name, language)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {canEdit && (
+          availableCategories.length === 0 && !editingBudget ? (
+            <div className={cn("text-center py-4 sm:py-6", colors.textTertiary)}>
+              <Target className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50" />
+              <p className={cn("text-sm sm:text-base font-medium", colors.textTertiary)}>{t('allCategoriesHaveBudgets')}</p>
+              <p className={cn("text-xs sm:text-sm mt-1", colors.textTertiary)}>{t('deleteBudgetToAddNew')}</p>
+            </div>
+          ) : (
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
+            {/* ... form fields ... */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
+                <Select 
+                  value={formData.category} 
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  disabled={editingBudget !== null}
+                >
+                  <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                    <SelectValue placeholder={t('selectCategory')} />
+                  </SelectTrigger>
+                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                    {editAvailableCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.name} className={colors.textPrimary}>
+                        {translateCategory(category.name, language)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="1000"
+                  value={formData.monthlyLimit}
+                  onChange={(e) => setFormData({ ...formData, monthlyLimit: e.target.value })}
+                  className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
+                <Input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  placeholder={currentYear.toString()}
+                  value={formData.year}
+                  onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || currentYear })}
+                  className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
+                <Select 
+                  value={formData.month?.toString()} 
+                  onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
+                >
+                  <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                    <SelectValue placeholder={t('selectMonth') || 'Select month'} />
+                  </SelectTrigger>
+                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                    {MONTHS.map((month) => (
+                      <SelectItem key={month.value} value={month.value.toString()} className={colors.textPrimary}>
+                        {t(month.labelKey)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
               <Input
                 type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="1000"
-                value={formData.monthlyLimit}
-                onChange={(e) => setFormData({ ...formData, monthlyLimit: e.target.value })}
+                min="1"
+                max="100"
+                placeholder="80"
+                value={formData.alertThreshold}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string for typing, but clamp to valid range
+                  const numValue = value === '' ? '' : Math.min(100, Math.max(1, parseInt(value) || 80));
+                  setFormData({ ...formData, alertThreshold: numValue });
+                }}
                 className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
               />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
-              <Input
-                type="number"
-                min="2000"
-                max="2100"
-                placeholder={currentYear.toString()}
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || currentYear })}
-                className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-              />
+              <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
+                {t('alertThresholdHelp')}
+              </p>
             </div>
 
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
-              <Select 
-                value={formData.month?.toString()} 
-                onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
-              >
-                <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                  <SelectValue placeholder={t('selectMonth') || 'Select month'} />
-                </SelectTrigger>
-                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                  {MONTHS.map((month) => (
-                    <SelectItem key={month.value} value={month.value.toString()} className={colors.textPrimary}>
-                      {t(month.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
-            <Input
-              type="number"
-              min="1"
-              max="100"
-              placeholder="80"
-              value={formData.alertThreshold}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Allow empty string for typing, but clamp to valid range
-                const numValue = value === '' ? '' : Math.min(100, Math.max(1, parseInt(value) || 80));
-                setFormData({ ...formData, alertThreshold: numValue });
-              }}
-              className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-            />
-            <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
-              {t('alertThresholdHelp')}
-            </p>
-          </div>
-
-          <div className="flex gap-2 sm:gap-3">
-            {editingBudget && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
-              >
-                {t('cancel')}
-              </Button>
-            )}
-            <Button
-              type="submit"
-              disabled={isLoading || !formData.monthlyLimit || !formData.category || !formData.year || !formData.month}
-              className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
-            >
-              {isLoading ? (
-                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
-              ) : editingBudget ? (
-                <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-              ) : (
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+            <div className="flex gap-2 sm:gap-3">
+              {editingBudget && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancel}
+                  className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                >
+                  {t('cancel')}
+                </Button>
               )}
-              {editingBudget ? t('updateBudget') : t('addBudget')}
-            </Button>
-          </div>
-        </form>
+              <Button
+                type="submit"
+                disabled={isLoading || !formData.monthlyLimit || !formData.category || !formData.year || !formData.month}
+                className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
+              >
+                {isLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                ) : editingBudget ? (
+                  <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                ) : (
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                )}
+                {editingBudget ? t('updateBudget') : t('addBudget')}
+              </Button>
+            </div>
+          </form>
+          )
         )}
 
         {/* Existing Budgets */}
@@ -339,22 +343,26 @@ export default function BudgetManager({
                       </p>
                     </div>
                     <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleEdit(budget)}
-                        className={cn("h-7 w-7 sm:h-8 sm:w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
-                      >
-                        <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onDelete(budget.id)}
-                        className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </Button>
+                      {canEdit && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleEdit(budget)}
+                            className={cn("h-7 w-7 sm:h-8 sm:w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                          >
+                            <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => onDelete(budget.id)}
+                            className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
