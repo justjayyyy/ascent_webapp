@@ -22,6 +22,8 @@ export function createEntityHandler(Model, options = {}) {
       const user = await authMiddleware(req, res);
       if (!user) return;
       
+      const { method } = req;
+      
       // Log basic request info
       console.error(`[EntityHandler] ${method} ${entityName} START. User: ${user.email}`);
 
@@ -35,7 +37,6 @@ export function createEntityHandler(Model, options = {}) {
         return serverError(res, dbError);
       }
 
-      const { method } = req;
       const { id, _single } = req.query;
 
       // Helper function to get the effective owner email (for shared users, use owner's email)
