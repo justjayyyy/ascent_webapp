@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import connectDB from './mongodb.js';
 import { handleCors } from './cors.js';
 import { success, error, notFound, serverError } from './response.js';
