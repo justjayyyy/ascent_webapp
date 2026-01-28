@@ -103,10 +103,19 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const currentUser = await ascent.auth.login(email, password);
+      const response = await ascent.auth.login(email, password);
+      const currentUser = response.user || response;
+      const isFirstLogin = response.isFirstLogin || false;
+      
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
+      
+      // Store first login flag for welcome message
+      if (isFirstLogin) {
+        sessionStorage.setItem('showWelcomeMessage', 'true');
+      }
+      
       return currentUser;
     } catch (error) {
       setAuthError({
@@ -137,10 +146,19 @@ export const AuthProvider = ({ children }) => {
     try {
       // If userInfo is provided, we're using the OAuth2 access token flow
       // Otherwise, we're using the ID token (credential) flow
-      const currentUser = await ascent.auth.googleLogin(credential, clientId, userInfo);
+      const response = await ascent.auth.googleLogin(credential, clientId, userInfo);
+      const currentUser = response.user || response;
+      const isFirstLogin = response.isFirstLogin || false;
+      
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
+      
+      // Store first login flag for welcome message
+      if (isFirstLogin) {
+        sessionStorage.setItem('showWelcomeMessage', 'true');
+      }
+      
       return currentUser;
     } catch (error) {
       setAuthError({

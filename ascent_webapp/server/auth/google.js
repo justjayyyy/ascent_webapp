@@ -72,6 +72,7 @@ export default async function handler(req, res) {
     
     // Find or create user
     let user;
+    let isFirstLogin = false;
     try {
       user = await User.findOne({ email: email.toLowerCase() });
       
@@ -83,9 +84,14 @@ export default async function handler(req, res) {
           full_name: name || '',
           googleId,
           avatar: picture,
-          authProvider: 'google'
+          authProvider: 'google',
+          isFirstLogin: true
         });
+        isFirstLogin = true;
       } else {
+        // Check if first login before updating
+        isFirstLogin = user.isFirstLogin === true;
+        
         // Update existing user with Google info if not already set
         if (!user.googleId) {
           user.googleId = googleId;
@@ -96,8 +102,14 @@ export default async function handler(req, res) {
           if (name && !user.full_name) {
             user.full_name = name;
           }
-          await user.save();
         }
+        
+        // Mark first login as complete
+        if (isFirstLogin) {
+          user.isFirstLogin = false;
+        }
+        
+        await user.save();
       }
     } catch (userError) {
       return serverError(res, userError);
@@ -133,7 +145,8 @@ export default async function handler(req, res) {
     
     return success(res, {
       user: user.toJSON(),
-      token
+      token,
+      isFirstLogin
     });
     
   } catch (err) {

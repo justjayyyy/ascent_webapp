@@ -53,8 +53,14 @@ export default async function handler(req, res) {
       return error(res, 'Invalid email or password', 401);
     }
     
-    // Update last login
+    // Check if first login
+    const isFirstLogin = user.isFirstLogin === true;
+    
+    // Update last login and mark first login as complete
     user.lastLogin = new Date();
+    if (isFirstLogin) {
+      user.isFirstLogin = false;
+    }
     await user.save();
     
     // Generate token
@@ -62,7 +68,8 @@ export default async function handler(req, res) {
     
     return success(res, {
       user: user.toJSON(),
-      token
+      token,
+      isFirstLogin
     });
     
   } catch (err) {

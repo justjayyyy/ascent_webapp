@@ -156,7 +156,11 @@ const auth = {
         throw new Error('Invalid response: missing user data');
       }
       setToken(result.token);
-      return result.user;
+      // Return full result including isFirstLogin flag
+      return {
+        user: result.user,
+        isFirstLogin: result.isFirstLogin || false
+      };
     } catch (error) {
       console.error('[Auth] Login error:', error);
       throw error;
@@ -183,7 +187,11 @@ const auth = {
       body: JSON.stringify(body)
     });
     setToken(result.token);
-    return result.user;
+    // Return full result including isFirstLogin flag
+    return {
+      user: result.user,
+      isFirstLogin: result.isFirstLogin || false
+    };
   },
   
   async me() {

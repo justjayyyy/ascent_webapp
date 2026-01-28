@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from './components/ThemeProvider';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import WelcomeDialog from './components/WelcomeDialog';
 
 function LayoutContent({ children, currentPageName }) {
   const { user, theme, language, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
@@ -16,9 +17,18 @@ function LayoutContent({ children, currentPageName }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [permissions, setPermissions] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
 
   // Session timeout - auto logout after 5 minutes of inactivity
   useSessionTimeout(!!user, t);
+
+  // Check for first login welcome message
+  useEffect(() => {
+    if (user && sessionStorage.getItem('showWelcomeMessage') === 'true') {
+      setShowWelcomeDialog(true);
+      sessionStorage.removeItem('showWelcomeMessage');
+    }
+  }, [user]);
 
   useEffect(() => {
     const loadPermissions = async () => {
@@ -573,6 +583,12 @@ function LayoutContent({ children, currentPageName }) {
           </div>
         </div>
       </div>
+
+      {/* Welcome Dialog for First Login */}
+      <WelcomeDialog 
+        open={showWelcomeDialog} 
+        onClose={() => setShowWelcomeDialog(false)} 
+      />
     </div>
   );
 }

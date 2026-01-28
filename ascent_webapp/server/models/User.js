@@ -72,6 +72,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['email', 'google'],
     default: 'email'
+  },
+  // Track first login to show welcome message
+  isFirstLogin: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
