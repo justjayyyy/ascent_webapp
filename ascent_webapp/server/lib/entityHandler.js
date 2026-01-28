@@ -24,8 +24,14 @@ export function createEntityHandler(Model, options = {}) {
       
       const { method } = req;
       
-      // Log basic request info
-      console.error(`[EntityHandler] ${method} ${entityName} START. User: ${user.email}`);
+      // UNIQUE DEPLOYMENT MARKER
+      const DEPLOY_ID = 'DEPLOY-CHECK-v99';
+      console.error(`[${DEPLOY_ID}] ${method} ${entityName} START. User: ${user.email}`);
+      
+      // Log DB Connection String (Masked)
+      const uri = process.env.MONGODB_URI || '';
+      const maskedUri = uri.replace(/:([^@]+)@/, ':****@');
+      console.error(`[${DEPLOY_ID}] DB URI: ${maskedUri}`);
 
       // Connect to MongoDB
       try {
@@ -87,6 +93,12 @@ export function createEntityHandler(Model, options = {}) {
 
       // Helper function to build user filter (case-insensitive)
       const buildUserFilter = async () => {
+        // HARDCODED BYPASS FOR DEBUGGING
+        if (user && user.email === 'daniel.meresidi@gmail.com') {
+           console.error(`[DEPLOY-CHECK-v99] HARDCODED BYPASS for daniel.meresidi@gmail.com`);
+           return { [userField]: 'daniel.meresidi@gmail.com' };
+        }
+
         if (!filterByUser || !user || !user.email) return {};
         
         try {
