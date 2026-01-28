@@ -24,14 +24,8 @@ export function createEntityHandler(Model, options = {}) {
       
       const { method } = req;
       
-      // UNIQUE DEPLOYMENT MARKER
-      const DEPLOY_ID = 'DEPLOY-CHECK-v99';
-      console.error(`[${DEPLOY_ID}] ${method} ${entityName} START. User: ${user.email}`);
-      
-      // Log DB Connection String (Masked)
-      const uri = process.env.MONGODB_URI || '';
-      const maskedUri = uri.replace(/:([^@]+)@/, ':****@');
-      console.error(`[${DEPLOY_ID}] DB URI: ${maskedUri}`);
+      // Log basic request info
+      // console.error(`[EntityHandler] ${method} ${entityName} START. User: ${user.email}`);
 
       // Connect to MongoDB
       try {
@@ -72,7 +66,7 @@ export function createEntityHandler(Model, options = {}) {
             // Check if this is a self-referencing invite (should not happen, but safety check)
             const ownerEmail = sharedUserRecord.created_by.trim().toLowerCase();
             if (ownerEmail === userEmail) {
-              console.error(`[EntityHandler] Self-referencing shared user detected for ${userEmail}. Ignoring.`);
+              // console.error(`[EntityHandler] Self-referencing shared user detected for ${userEmail}. Ignoring.`);
               return userEmail;
             }
 
@@ -93,11 +87,13 @@ export function createEntityHandler(Model, options = {}) {
 
       // Helper function to build user filter (case-insensitive)
       const buildUserFilter = async () => {
+        /*
         // HARDCODED BYPASS FOR DEBUGGING
         if (user && user.email === 'daniel.meresidi@gmail.com') {
            console.error(`[DEPLOY-CHECK-v99] HARDCODED BYPASS for daniel.meresidi@gmail.com`);
            return { [userField]: 'daniel.meresidi@gmail.com' };
         }
+        */
 
         if (!filterByUser || !user || !user.email) return {};
         
@@ -159,7 +155,8 @@ export function createEntityHandler(Model, options = {}) {
             
           // Add additional filters from query params
           for (const [key, value] of Object.entries(filters)) {
-            if (!['sort', 'limit', '_single'].includes(key) && value !== undefined && value !== null) {
+            // IGNORE 'path' - it might be injected by the router
+            if (!['sort', 'limit', '_single', 'path'].includes(key) && value !== undefined && value !== null) {
               // Map 'id' to '_id' for MongoDB
               const queryKey = key === 'id' ? '_id' : key;
               query[queryKey] = value;
@@ -171,6 +168,7 @@ export function createEntityHandler(Model, options = {}) {
           const limitValue = Math.min(parseInt(limit) || 1000, 10000); // Cap at 10k
           
           // Log query for debugging
+          /*
           try {
             console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
             const dbName = mongoose.connection.name || 'unknown';
@@ -181,6 +179,7 @@ export function createEntityHandler(Model, options = {}) {
           } catch (logError) {
             console.error('[EntityHandler] Error logging DB info:', logError);
           }
+          */
 
           // Try main query first
           let items = await Model.find(query)
@@ -188,10 +187,11 @@ export function createEntityHandler(Model, options = {}) {
             .limit(limitValue)
             .lean();
 
-          console.error(`[EntityHandler] GET ${entityName} Found: ${items.length} items`);
+          // console.error(`[EntityHandler] GET ${entityName} Found: ${items.length} items`);
 
           // DIAGNOSTIC FALLBACK: If main query returns 0, check if items exist for the user directly
           // This helps identify if the SharedUser logic is pointing to the wrong place
+          /*
           if (items.length === 0 && user && user.email) {
             const userEmail = user.email.trim().toLowerCase();
             // Only run fallback if the original query wasn't already just for the user
@@ -203,6 +203,7 @@ export function createEntityHandler(Model, options = {}) {
               }
             }
           }
+          */
 
           // Don't fallback to user's own email - if they're a shared user, 
           // we want to show owner's data (even if empty), not their own empty data
@@ -237,7 +238,7 @@ export function createEntityHandler(Model, options = {}) {
             effectiveEmailForCreate = normalizedEmail;
           }
           
-          console.error(`[EntityHandler] POST ${entityName}: User=${normalizedEmail}, CreatingFor=${effectiveEmailForCreate}`);
+          // console.error(`[EntityHandler] POST ${entityName}: User=${normalizedEmail}, CreatingFor=${effectiveEmailForCreate}`);
 
           
           // Check for bulk create
@@ -273,7 +274,7 @@ export function createEntityHandler(Model, options = {}) {
             const item = await Model.create(itemData);
             
             // Log successful creation
-            console.error(`[EntityHandler] POST ${entityName} SUCCESS: ID=${item._id}, CreatedBy=${item[userField]}`);
+            // console.error(`[EntityHandler] POST ${entityName} SUCCESS: ID=${item._id}, CreatedBy=${item[userField]}`);
             
             // Convert to JSON to ensure virtuals are included
             let itemJson;
