@@ -156,7 +156,7 @@ export function createEntityHandler(Model, options = {}) {
           
           // Log query for debugging
           console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
-          console.error(`[EntityHandler] DB ReadyState: ${mongoose.connection.readyState}`);
+          console.error(`[EntityHandler] DB Connection: ${mongoose.connection.name}, Collection: ${Model.collection.name}, ReadyState: ${mongoose.connection.readyState}`);
 
           // Try main query first
           let items = await Model.find(query)
