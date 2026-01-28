@@ -34,7 +34,18 @@ const LayoutWrapper = React.memo(({ children, currentPageName }) => Layout ?
   : <ErrorBoundary><Suspense fallback={<SkeletonPage />}>{children}</Suspense></ErrorBoundary>);
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin, hasPermission, permissions } = useAuth();
+  const navigate = React.useMemo(() => {
+    // Determine the first available page for the user
+    if (!permissions) return 'Portfolio'; // Owner goes to Portfolio
+    
+    if (permissions.viewPortfolio) return 'Portfolio';
+    if (permissions.viewExpenses) return 'Expenses';
+    if (permissions.viewNotes) return 'Notes';
+    if (permissions.viewSettings) return 'Settings';
+    
+    return 'Settings'; // Fallback
+  }, [permissions]);
 
   // Show loading spinner while checking auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -62,22 +73,47 @@ const AuthenticatedApp = () => {
     return null;
   }
 
+  // Permission Guard Component
+  const PermissionGuard = ({ pageName, children }) => {
+    const permissionMap = {
+      'Portfolio': 'viewPortfolio',
+      'Expenses': 'viewExpenses',
+      'Notes': 'viewNotes',
+      'Settings': 'viewSettings',
+      'Dashboard': 'viewDashboard',
+    };
+
+    const requiredPermission = permissionMap[pageName];
+    
+    // If no specific permission required or user has permission, render content
+    if (!requiredPermission || hasPermission(requiredPermission)) {
+      return children;
+    }
+
+    // Redirect to the first available page
+    return <React.Navigate to={`/${navigate}`} replace />;
+  };
+
   // Render the main app
   return (
     <Routes>
       <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
+        <PermissionGuard pageName={mainPageKey}>
+          <LayoutWrapper currentPageName={mainPageKey}>
+            <MainPage />
+          </LayoutWrapper>
+        </PermissionGuard>
       } />
       {Object.entries(Pages).map(([path, Page]) => (
         <Route
           key={path}
           path={`/${path}`}
           element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
+            <PermissionGuard pageName={path}>
+              <LayoutWrapper currentPageName={path}>
+                <Page />
+              </LayoutWrapper>
+            </PermissionGuard>
           }
         />
       ))}

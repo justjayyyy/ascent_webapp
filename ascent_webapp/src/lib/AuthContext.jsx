@@ -74,13 +74,18 @@ export const AuthProvider = ({ children }) => {
       
       // Load permissions
       try {
+        console.log('[AuthContext] Loading permissions for:', currentUser.email);
+        
         // Check if user is the owner (has created any SharedUser invitations)
         const owned = await ascent.entities.SharedUser.filter({ 
           created_by: currentUser.email 
         });
         
+        console.log('[AuthContext] Owned records:', owned.length);
+        
         // If user has created SharedUser records, they are definitely the owner
         if (owned.length > 0) {
+          console.log('[AuthContext] User is OWNER (has created invites)');
           setPermissions(null); // Owner has full access
         } else {
           // Otherwise, check if user was invited (shared user)
@@ -89,9 +94,13 @@ export const AuthProvider = ({ children }) => {
             status: 'accepted' 
           });
           
+          console.log('[AuthContext] Shared records found:', shared.length);
+          
           if (shared.length > 0) {
             // User was invited - they're a shared user with limited permissions
             const perms = shared[0].permissions || {};
+            console.log('[AuthContext] User is SHARED. Permissions:', perms);
+            
             setPermissions({
               viewPortfolio: perms.viewPortfolio ?? true,
               editPortfolio: perms.editPortfolio ?? false,
@@ -108,6 +117,7 @@ export const AuthProvider = ({ children }) => {
             });
           } else {
             // No SharedUser records found - user is owner (new account or no sharing yet)
+            console.log('[AuthContext] No shared records found. Defaulting to OWNER.');
             setPermissions(null);
           }
         }

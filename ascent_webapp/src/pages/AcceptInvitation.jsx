@@ -160,7 +160,7 @@ export default function AcceptInvitation() {
       
       // Force a hard navigation to ensure auth context updates
       setTimeout(() => {
-        window.location.href = '/Portfolio';
+        window.location.href = '/';
       }, 100);
     } catch (error) {
       console.error('Google login error:', error);
