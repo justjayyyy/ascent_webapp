@@ -52,12 +52,8 @@ export function createEntityHandler(Model, options = {}) {
           }
           
           // Check if user is a shared user (invited by someone)
-          // Use case-insensitive regex matching to be safe
           const sharedUserRecord = await SharedUser.findOne({
-            $or: [
-              { invitedEmail: userEmail },
-              { invitedEmail: { $regex: `^${userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
-            ],
+            invitedEmail: userEmail,
             status: 'accepted'
           }).lean();
           
@@ -94,25 +90,16 @@ export function createEntityHandler(Model, options = {}) {
             console.log(`[EntityHandler] Building filter for shared user ${userEmail} -> Owner: ${effectiveEmail}`);
           }
           
-          const escapedEmail = effectiveEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          
-          // Use case-insensitive regex matching AND try exact lowercase match
+          // Simple direct match since we enforce lowercase in models
           return {
-            $or: [
-              { [userField]: { $regex: `^${escapedEmail}$`, $options: 'i' } },
-              { [userField]: effectiveEmail }
-            ]
+            [userField]: effectiveEmail
           };
         } catch (error) {
           // Fallback to user's own email if there's an error (but log it)
           console.error('[EntityHandler] Error building user filter:', error.message);
           const userEmail = user.email.trim().toLowerCase();
-          const escapedEmail = userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           return {
-            $or: [
-              { [userField]: { $regex: `^${escapedEmail}$`, $options: 'i' } },
-              { [userField]: userEmail }
-            ]
+            [userField]: userEmail
           };
         }
       };

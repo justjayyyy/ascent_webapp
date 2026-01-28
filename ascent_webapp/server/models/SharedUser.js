@@ -33,7 +33,9 @@ const sharedUserSchema = new mongoose.Schema({
   created_by: {
     type: String,
     required: true,
-    index: true
+    index: true,
+    lowercase: true,
+    trim: true
   }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
