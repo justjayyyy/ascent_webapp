@@ -358,9 +358,8 @@ export function createEntityHandler(Model, options = {}) {
           return error(res, 'Method not allowed', 405);
       }
     } catch (err) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error(`[EntityHandler] ${req.method} ${entityName}:`, err.message);
-      }
+      // Always log the error
+      console.error(`[EntityHandler] ${req.method} ${entityName} ERROR:`, err);
       return serverError(res, err);
     }
   };

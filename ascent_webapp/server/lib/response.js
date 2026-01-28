@@ -53,10 +53,8 @@ export function forbidden(res, message = 'Forbidden') {
 }
 
 export function serverError(res, err) {
-  // Log errors only in development
-  if (process.env.NODE_ENV === 'development') {
-    console.error('Server error:', err.message);
-  }
+  // Always log errors to console so they appear in Vercel logs
+  console.error('Server error:', err);
   
   // Handle MongoDB connection errors
   if (err.code === 'MONGODB_CONNECTION_FAILED' || err.code === 'MONGODB_AUTH_FAILED') {
@@ -64,7 +62,7 @@ export function serverError(res, err) {
   }
   
   // Show error message in development, generic in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  return error(res, isDevelopment ? (err.message || 'Internal server error') : 'Internal server error', 500);
+  // TEMPORARY: Show full error in production for debugging
+  return error(res, err.message || 'Internal server error', 500);
 }
 
