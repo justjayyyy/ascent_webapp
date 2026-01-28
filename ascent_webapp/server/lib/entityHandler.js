@@ -40,6 +40,11 @@ export function createEntityHandler(Model, options = {}) {
         
         const userEmail = user.email.trim().toLowerCase();
         
+        // TEMPORARY DEBUG: Force disable shared user lookup to isolate the issue
+        console.error(`[EntityHandler] DEBUG: Forcing effective email to ${userEmail} (SharedUser lookup disabled)`);
+        return userEmail;
+
+        /* 
         // Skip SharedUser lookup if we're already working with SharedUser model
         // to avoid circular dependency issues
         if (Model.modelName === 'SharedUser') {
@@ -72,6 +77,7 @@ export function createEntityHandler(Model, options = {}) {
         
         // User is the owner - return their own email
         return userEmail;
+        */
       };
 
       // Helper function to build user filter (case-insensitive)
@@ -149,6 +155,7 @@ export function createEntityHandler(Model, options = {}) {
           
           // Log query for debugging
           console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
+          console.error(`[EntityHandler] DB ReadyState: ${mongoose.connection.readyState}`);
 
           // Try main query first
           let items = await Model.find(query)
