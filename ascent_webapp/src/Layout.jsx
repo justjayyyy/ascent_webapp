@@ -51,7 +51,7 @@ function LayoutContent({ children, currentPageName }) {
           status: 'accepted' 
         });
         
-        if (shared.length > 0 && shared[0]?.permissions) {
+        if (shared.length > 0) {
           // User was invited - they're a shared user with limited permissions
           // Ensure permissions object has all required fields with defaults
           const permissions = shared[0].permissions || {};

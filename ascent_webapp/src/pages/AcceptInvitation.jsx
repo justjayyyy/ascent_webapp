@@ -150,7 +150,9 @@ export default function AcceptInvitation() {
       localStorage.setItem('ascent_access_token', loginData.token);
 
       toast.success('Welcome! Your invitation has been accepted.');
-      navigate('/Portfolio');
+      
+      // Force a hard navigation to ensure auth context updates
+      window.location.href = '/Portfolio';
     } catch (error) {
       console.error('Google login error:', error);
       toast.error(error.message || 'Failed to sign in');
