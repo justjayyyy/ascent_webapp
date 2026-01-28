@@ -86,9 +86,8 @@ export function createEntityHandler(Model, options = {}) {
           const userEmail = user.email.trim().toLowerCase();
           const isSharedUser = effectiveEmail !== userEmail;
           
-          if (process.env.NODE_ENV === 'development' && isSharedUser) {
-            console.log(`[EntityHandler] Building filter for shared user ${userEmail} -> Owner: ${effectiveEmail}`);
-          }
+          // Log for debugging production issues
+          console.error(`[EntityHandler] BuildFilter: User=${userEmail}, Effective=${effectiveEmail}, Shared=${isSharedUser}`);
           
           // Simple direct match since we enforce lowercase in models
           return {
@@ -148,11 +147,16 @@ export function createEntityHandler(Model, options = {}) {
           const sortField = sort || '-created_date';
           const limitValue = Math.min(parseInt(limit) || 1000, 10000); // Cap at 10k
           
+          // Log query for debugging
+          console.error(`[EntityHandler] GET ${entityName} Query:`, JSON.stringify(query));
+
           // Try main query first
           let items = await Model.find(query)
             .sort(sortField)
             .limit(limitValue)
             .lean();
+
+          console.error(`[EntityHandler] GET ${entityName} Found: ${items.length} items`);
 
           // Don't fallback to user's own email - if they're a shared user, 
           // we want to show owner's data (even if empty), not their own empty data
@@ -187,6 +191,9 @@ export function createEntityHandler(Model, options = {}) {
             effectiveEmailForCreate = normalizedEmail;
           }
           
+          console.error(`[EntityHandler] POST ${entityName}: User=${normalizedEmail}, CreatingFor=${effectiveEmailForCreate}`);
+
+          
           // Check for bulk create
           if (Array.isArray(req.body)) {
             const itemsToCreate = req.body.map(item => ({
@@ -218,6 +225,9 @@ export function createEntityHandler(Model, options = {}) {
           
           try {
             const item = await Model.create(itemData);
+            
+            // Log successful creation
+            console.error(`[EntityHandler] POST ${entityName} SUCCESS: ID=${item._id}, CreatedBy=${item[userField]}`);
             
             // Convert to JSON to ensure virtuals are included
             let itemJson;
