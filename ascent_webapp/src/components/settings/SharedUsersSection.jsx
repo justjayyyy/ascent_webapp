@@ -188,20 +188,6 @@ const SharedUsersSection = memo(function SharedUsersSection({
                         onCheckedChange={() => togglePermission(user, 'editBudgets')}
                       />
                     </div>
-                    <div className="flex items-center justify-between py-2">
-                      <Label className={cn("text-sm", colors.textPrimary)}>{t('viewSettings')}</Label>
-                      <Switch
-                        checked={user.permissions?.viewSettings || false}
-                        onCheckedChange={() => togglePermission(user, 'viewSettings')}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <Label className={cn("text-sm", colors.textPrimary)}>{t('manageUsers')}</Label>
-                      <Switch
-                        checked={user.permissions?.manageUsers || false}
-                        onCheckedChange={() => togglePermission(user, 'manageUsers')}
-                      />
-                    </div>
                   </div>
                 )}
               </div>
