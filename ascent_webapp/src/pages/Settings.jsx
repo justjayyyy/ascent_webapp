@@ -38,10 +38,11 @@ export default function Settings() {
   }, [themeUser]);
 
   useEffect(() => {
-    if (currentWorkspace) {
+    if (currentWorkspace && currentWorkspace.name !== workspaceNameValue) {
+      console.log('[Settings] Workspace name changed, updating input value');
       setWorkspaceNameValue(currentWorkspace.name);
     }
-  }, [currentWorkspace]);
+  }, [currentWorkspace?.name]); // Only depend on the name, not the entire object
 
   const handleSaveFullName = async () => {
     if (fullNameValue.trim() === (user?.full_name || '').trim()) {
@@ -183,7 +184,9 @@ export default function Settings() {
     }
   });
 
-  const isOwner = currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
+  const isOwner = useMemo(() => {
+    return currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
+  }, [currentWorkspace?.ownerId, user?.id, user?._id]);
 
   const handleSaveWorkspaceName = async () => {
     if (workspaceNameValue.trim() === currentWorkspace?.name) {
