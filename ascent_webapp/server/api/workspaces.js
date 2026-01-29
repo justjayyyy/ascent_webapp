@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError, unauthorized, notFound } from '../lib/response.js';
+import { sendEmail } from '../lib/email-helper.js';
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
@@ -69,17 +70,105 @@ export default async function handler(req, res) {
             userId: invitedUser ? invitedUser._id : null,
             email: normalizedEmail,
             role: role || 'viewer',
-            status: invitedUser ? 'accepted' : 'pending', // Auto-accept if user exists? Maybe better to keep pending until they accept explicitly? 
-            // Actually, for simplicity, if they exist, let's auto-accept or keep pending. 
-            // Standard flow: Pending -> User clicks link -> Accepted.
-            // Let's keep it 'pending' for now.
             status: 'pending',
             permissions: permissions || {}
           });
 
           await workspace.save();
           
-          // TODO: Send email invitation
+          // Get the newly added member to get their ID (token)
+          const newMember = workspace.members.find(m => m.email === normalizedEmail);
+          
+          if (newMember) {
+            const token = newMember._id;
+            const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
+            const inviteLink = `${origin}/accept-invitation/${token}`;
+            
+            const emailSubject = `Invitation to join ${workspace.name} / הזמנה להצטרף ל-${workspace.name} / Приглашение в ${workspace.name}`;
+            const emailBody = `
+              Hello / שלום / Здравствуйте,
+
+              You have been invited to join the workspace "${workspace.name}" on Ascent.
+              הוזמנת להצטרף לסביבת העבודה "${workspace.name}" ב-Ascent.
+              Вас пригласили присоединиться к рабочей области "${workspace.name}" в Ascent.
+
+              Click the link below to accept the invitation:
+              לחץ על הקישור למטה כדי לקבל את ההזמנה:
+              Нажмите на ссылку ниже, чтобы принять приглашение:
+              ${inviteLink}
+
+              If you don't have an account, you will be asked to create one.
+              אם אין לך חשבון, תתבקש ליצור אחד.
+              Если у вас нет учетной записи, вам будет предложено создать ее.
+
+              Best regards,
+              The Ascent Team
+              צוות Ascent
+              Команда Ascent
+            `;
+            
+            const emailHtml = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: ltr;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <h2 style="color: #5C8374;">Ascent</h2>
+                </div>
+                
+                <!-- English -->
+                <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                  <h3 style="color: #333; margin-top: 0;">Invitation to join ${workspace.name}</h3>
+                  <p>Hello,</p>
+                  <p>You have been invited to join the workspace "<strong>${workspace.name}</strong>" on Ascent.</p>
+                  <div style="margin: 20px 0;">
+                    <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Accept Invitation</a>
+                  </div>
+                  <p style="font-size: 14px; color: #666;">If you don't have an account, you will be asked to create one.</p>
+                </div>
+
+                <!-- Hebrew -->
+                <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px; direction: rtl; text-align: right;">
+                  <h3 style="color: #333; margin-top: 0;">הזמנה להצטרף ל-${workspace.name}</h3>
+                  <p>שלום,</p>
+                  <p>הוזמנת להצטרף לסביבת העבודה "<strong>${workspace.name}</strong>" ב-Ascent.</p>
+                  <div style="margin: 20px 0;">
+                    <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">קבל הזמנה</a>
+                  </div>
+                  <p style="font-size: 14px; color: #666;">אם אין לך חשבון, תתבקש ליצור אחד.</p>
+                </div>
+
+                <!-- Russian -->
+                <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                  <h3 style="color: #333; margin-top: 0;">Приглашение в ${workspace.name}</h3>
+                  <p>Здравствуйте,</p>
+                  <p>Вас пригласили присоединиться к рабочей области "<strong>${workspace.name}</strong>" в Ascent.</p>
+                  <div style="margin: 20px 0;">
+                    <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Принять приглашение</a>
+                  </div>
+                  <p style="font-size: 14px; color: #666;">Если у вас нет учетной записи, вам будет предложено создать ее.</p>
+                </div>
+
+                <div style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
+                  <p>Or copy and paste this link into your browser / או העתק והדבק את הקישור בדפדפן / Или скопируйте ссылку в браузер:</p>
+                  <p>${inviteLink}</p>
+                  <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                  <p>If you didn't expect this invitation, you can ignore this email.</p>
+                </div>
+              </div>
+            `;
+
+            // Send email asynchronously (don't block response)
+            sendEmail({
+              to: normalizedEmail,
+              subject: emailSubject,
+              body: emailBody,
+              html: emailHtml
+            }).then(result => {
+              if (!result.sent) {
+                console.error('Failed to send invitation email:', result.error || result.message);
+              } else {
+                console.log('Invitation email sent to:', normalizedEmail);
+              }
+            });
+          }
           
           return success(res, { message: 'Invitation sent', workspace });
         } else if (action === 'accept') {
