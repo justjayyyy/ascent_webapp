@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -297,6 +297,20 @@ export default function Settings() {
     },
   });
 
+  // Memoize callbacks to prevent SharedUsersSection re-renders
+  const handleInviteUser = useCallback(() => {
+    setInviteDialogOpen(true);
+  }, []);
+
+  const handleUpdateUser = useCallback((id, data) => {
+    console.log('[Settings] handleUpdateUser called', { id, data });
+    updateSharedUserMutation.mutate({ id, data });
+  }, [updateSharedUserMutation.mutate]);
+
+  const handleDeleteUser = useCallback((id) => {
+    deleteSharedUserMutation.mutate(id);
+  }, [deleteSharedUserMutation.mutate]);
+
   if (isLoading || themeLoading) {
     return (
       <div className={cn("flex items-center justify-center min-h-screen", colors.bgPrimary)}>
@@ -589,9 +603,9 @@ export default function Settings() {
           {isOwner && (
           <SharedUsersSection
             sharedUsers={sharedUsers}
-            onInvite={() => setInviteDialogOpen(true)}
-            onUpdate={(id, data) => updateSharedUserMutation.mutate({ id, data })}
-            onDelete={deleteSharedUserMutation.mutate}
+            onInvite={handleInviteUser}
+            onUpdate={handleUpdateUser}
+            onDelete={handleDeleteUser}
             canManageUsers={canManageUsers}
           />
           )}
