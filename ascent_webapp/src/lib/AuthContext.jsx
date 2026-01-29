@@ -37,6 +37,65 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, []);
 
+  const loadWorkspaces = async (currentUser) => {
+    try {
+      const wsList = await ascent.workspaces.list();
+      setWorkspaces(wsList);
+      
+      let activeWs = null;
+      const storedWsId = localStorage.getItem('ascent_current_workspace_id');
+
+      if (storedWsId) {
+        activeWs = wsList.find(w => (w.id || w._id) === storedWsId);
+      }
+
+      if (!activeWs && wsList.length > 0) {
+        activeWs = wsList[0];
+      }
+
+      // Create default workspace if user has none
+      if (!activeWs && wsList.length === 0) {
+         console.log('[AuthContext] No workspaces found. Creating default.');
+         try {
+           // Create a default workspace name
+           const workspaceName = 'My Workspace';
+             
+           const newWs = await ascent.workspaces.create({ name: workspaceName });
+           setWorkspaces([newWs]);
+           activeWs = newWs;
+         } catch (createError) {
+           console.error('Failed to create default workspace:', createError);
+         }
+      }
+
+      if (activeWs) {
+        setCurrentWorkspace(activeWs);
+        localStorage.setItem('ascent_current_workspace_id', activeWs.id || activeWs._id);
+        
+        // Determine permissions for this workspace
+        const member = activeWs.members.find(m => 
+          (m.userId && (m.userId === currentUser.id || m.userId === currentUser._id)) || 
+          m.email === currentUser.email
+        );
+        
+        if (member) {
+           console.log(`[AuthContext] Active Workspace: ${activeWs.name}, Role: ${member.role}`);
+           if (member.role === 'owner' || member.role === 'admin') {
+             setPermissions(null); // Full access
+           } else {
+             setPermissions(member.permissions || {});
+           }
+        } else {
+          console.warn('[AuthContext] User is not a member of the active workspace?');
+          setPermissions({}); // No access?
+        }
+      }
+    } catch (wsError) {
+      console.error('Failed to load workspaces:', wsError);
+      setPermissions(null); // Fallback? Or lock out?
+    }
+  };
+
   const checkAppState = async () => {
     try {
       setIsLoadingAuth(true);
@@ -75,64 +134,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       
       // Load workspaces and permissions
-      try {
-        const wsList = await ascent.workspaces.list();
-        setWorkspaces(wsList);
-        
-        let activeWs = null;
-        const storedWsId = localStorage.getItem('ascent_current_workspace_id');
-
-        if (storedWsId) {
-          activeWs = wsList.find(w => (w.id || w._id) === storedWsId);
-        }
-
-        if (!activeWs && wsList.length > 0) {
-          activeWs = wsList[0];
-        }
-
-        // Create default workspace if user has none
-        if (!activeWs && wsList.length === 0) {
-           console.log('[AuthContext] No workspaces found. Creating default.');
-           try {
-             // Create a personalized workspace name
-             const workspaceName = currentUser.full_name 
-               ? `${currentUser.full_name}'s Workspace`
-               : `${currentUser.email.split('@')[0]}'s Workspace`;
-               
-             const newWs = await ascent.workspaces.create({ name: workspaceName });
-             setWorkspaces([newWs]);
-             activeWs = newWs;
-           } catch (createError) {
-             console.error('Failed to create default workspace:', createError);
-           }
-        }
-
-        if (activeWs) {
-          setCurrentWorkspace(activeWs);
-          localStorage.setItem('ascent_current_workspace_id', activeWs.id || activeWs._id);
-          
-          // Determine permissions for this workspace
-          const member = activeWs.members.find(m => 
-            (m.userId && (m.userId === currentUser.id || m.userId === currentUser._id)) || 
-            m.email === currentUser.email
-          );
-          
-          if (member) {
-             console.log(`[AuthContext] Active Workspace: ${activeWs.name}, Role: ${member.role}`);
-             if (member.role === 'owner' || member.role === 'admin') {
-               setPermissions(null); // Full access
-             } else {
-               setPermissions(member.permissions || {});
-             }
-          } else {
-            console.warn('[AuthContext] User is not a member of the active workspace?');
-            setPermissions({}); // No access?
-          }
-        }
-      } catch (wsError) {
-        console.error('Failed to load workspaces:', wsError);
-        setPermissions(null); // Fallback? Or lock out?
-      }
+      await loadWorkspaces(currentUser);
 
       setIsLoadingAuth(false);
     } catch (error) {
@@ -175,6 +177,9 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       setAuthError(null);
       
+      // Load workspaces
+      await loadWorkspaces(currentUser);
+      
       // Store first login flag for welcome message
       if (isFirstLogin) {
         sessionStorage.setItem('showWelcomeMessage', 'true');
@@ -196,6 +201,10 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
+      
+      // Load workspaces
+      await loadWorkspaces(currentUser);
+      
       return currentUser;
     } catch (error) {
       setAuthError({
@@ -217,6 +226,9 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
+      
+      // Load workspaces
+      await loadWorkspaces(currentUser);
       
       // Store first login flag for welcome message
       if (isFirstLogin) {

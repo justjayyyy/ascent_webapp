@@ -53,9 +53,7 @@ export default async function handler(req, res) {
     });
 
     // Create default workspace
-    const workspaceName = user.full_name 
-      ? `${user.full_name}'s Workspace`
-      : `${user.email.split('@')[0]}'s Workspace`;
+    const workspaceName = 'My Workspace';
 
     const workspace = await Workspace.create({
       name: workspaceName,
