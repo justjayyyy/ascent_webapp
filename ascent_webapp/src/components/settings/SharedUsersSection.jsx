@@ -94,9 +94,14 @@ const SharedUsersSection = memo(function SharedUsersSection({
                   {canManageUsers && (
                     <div className="flex gap-2">
                       <Button
+                        type="button"
                         size="icon"
                         variant="ghost"
-                        onClick={() => toggleShowPermissions(user.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleShowPermissions(user.id);
+                        }}
                         className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
                       >
                         {showPermissions[user.id] ? (
@@ -106,9 +111,14 @@ const SharedUsersSection = memo(function SharedUsersSection({
                         )}
                       </Button>
                       <Button
+                        type="button"
                         size="icon"
                         variant="ghost"
-                        onClick={() => onDelete(user.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onDelete(user.id);
+                        }}
                         className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -123,7 +133,9 @@ const SharedUsersSection = memo(function SharedUsersSection({
                       <Label className={cn("text-sm", colors.textPrimary)}>{t('viewPortfolio')}</Label>
                       <Switch
                         checked={user.permissions?.viewPortfolio || false}
-                        onCheckedChange={() => togglePermission(user, 'viewPortfolio')}
+                        onCheckedChange={(checked) => {
+                          togglePermission(user, 'viewPortfolio');
+                        }}
                       />
                     </div>
                     <div className="flex items-center justify-between py-2">
