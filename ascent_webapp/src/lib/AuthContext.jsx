@@ -171,8 +171,19 @@ export const AuthProvider = ({ children }) => {
     if (!user) return;
     
     try {
+      console.log('[AuthContext] Fetching updated workspaces...');
       const wsList = await ascent.workspaces.list();
-      setWorkspaces(wsList);
+      
+      // Only update workspaces if they actually changed
+      setWorkspaces(prevWorkspaces => {
+        const hasChanges = JSON.stringify(prevWorkspaces) !== JSON.stringify(wsList);
+        if (hasChanges) {
+          console.log('[AuthContext] Workspaces changed, updating state');
+          return wsList;
+        }
+        console.log('[AuthContext] No workspace changes detected, keeping current state');
+        return prevWorkspaces;
+      });
       
       // Find and update only the current workspace without changing reference if data is same
       const storedWsId = localStorage.getItem('ascent_current_workspace_id');
@@ -184,8 +195,10 @@ export const AuthProvider = ({ children }) => {
           // Compare member data to see if anything changed
           const membersChanged = JSON.stringify(prevWs?.members) !== JSON.stringify(updatedCurrentWs.members);
           if (membersChanged || prevWs?.name !== updatedCurrentWs.name) {
+            console.log('[AuthContext] Current workspace changed, updating state');
             return updatedCurrentWs;
           }
+          console.log('[AuthContext] No current workspace changes, keeping reference');
           return prevWs; // Keep same reference to prevent unnecessary re-renders
         });
         
@@ -203,8 +216,10 @@ export const AuthProvider = ({ children }) => {
           // Only update permissions if they actually changed
           setPermissions(prevPerms => {
             if (JSON.stringify(prevPerms) !== JSON.stringify(newPermissions)) {
+              console.log('[AuthContext] Permissions changed, updating state');
               return newPermissions;
             }
+            console.log('[AuthContext] No permission changes');
             return prevPerms;
           });
         }

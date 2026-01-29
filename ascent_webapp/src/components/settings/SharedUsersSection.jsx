@@ -36,6 +36,7 @@ const SharedUsersSection = memo(function SharedUsersSection({
       ...user.permissions,
       [key]: !user.permissions[key],
     };
+    // Prevent default to stop any form submission or navigation
     onUpdate(user.id, { permissions: updatedPermissions });
   }, [onUpdate]);
 

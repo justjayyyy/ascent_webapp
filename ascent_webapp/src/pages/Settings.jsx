@@ -248,11 +248,14 @@ export default function Settings() {
   const updateSharedUserMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       if (!currentWorkspace) return;
+      console.log('[Settings] Updating member permissions...', { id, data });
       return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
     },
     onSuccess: async () => {
+      console.log('[Settings] Permission update successful, refreshing workspace state...');
       // Silently refresh workspaces in background
       await refreshWorkspaces();
+      console.log('[Settings] Workspace state refreshed');
     },
     onError: (error) => {
       console.error('Failed to update permissions:', error);
