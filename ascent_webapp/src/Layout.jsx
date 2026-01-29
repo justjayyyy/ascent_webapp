@@ -573,9 +573,5 @@ function LayoutContent({ children, currentPageName }) {
 }
 
 export default function Layout({ children, currentPageName }) {
-  return (
-    <ThemeProvider>
-      <LayoutContent children={children} currentPageName={currentPageName} />
-    </ThemeProvider>
-  );
+  return <LayoutContent children={children} currentPageName={currentPageName} />;
 }

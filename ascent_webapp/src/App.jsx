@@ -8,6 +8,7 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -132,24 +133,26 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
-            <Route path="/*" element={
-              <>
-                <NavigationTracker />
-                <AuthenticatedApp />
-              </>
-            } />
-          </Routes>
-        </Router>
-        <Toaster />
-        <SonnerToaster position="top-right" richColors />
-        <Analytics />
-        <SpeedInsights />
+        <ThemeProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+              <Route path="/*" element={
+                <>
+                  <NavigationTracker />
+                  <AuthenticatedApp />
+                </>
+              } />
+            </Routes>
+          </Router>
+          <Toaster />
+          <SonnerToaster position="top-right" richColors />
+          <Analytics />
+          <SpeedInsights />
+        </ThemeProvider>
       </QueryClientProvider>
     </AuthProvider>
   )
