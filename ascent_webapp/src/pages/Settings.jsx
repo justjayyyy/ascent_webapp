@@ -172,9 +172,11 @@ export default function Settings() {
       if (!currentWorkspace) return;
       return ascent.workspaces.update(currentWorkspace.id || currentWorkspace._id, { name });
     },
-    onSuccess: () => {
-      // Reload page to refresh workspace list in context
-      window.location.reload();
+    onSuccess: async () => {
+      // Refresh workspaces to update name in background
+      await refreshWorkspaces();
+      setEditingWorkspaceName(false);
+      toast.success('Workspace name updated!');
     },
     onError: (error) => {
       toast.error('Failed to update workspace name');
