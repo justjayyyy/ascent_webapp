@@ -5,7 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -44,7 +44,7 @@ const AuthenticatedApp = () => {
     if (permissions.viewNotes) return 'Notes';
     if (permissions.viewSettings) return 'Settings';
     
-    return 'Settings'; // Fallback
+    return null; // No access
   }, [permissions]);
 
   // Show loading spinner while checking auth
@@ -90,8 +90,12 @@ const AuthenticatedApp = () => {
       return children;
     }
 
+    if (!navigate) {
+       return <div className="p-8 text-center text-white">You do not have access to any pages. Please contact your workspace owner.</div>;
+    }
+
     // Redirect to the first available page
-    return <React.Navigate to={`/${navigate}`} replace />;
+    return <Navigate to={`/${navigate}`} replace />;
   };
 
   // Render the main app
