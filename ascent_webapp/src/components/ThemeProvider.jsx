@@ -1904,7 +1904,8 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     loadUser();
-  }, [loadUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Function to refresh user data (called after settings update)
   const refreshUser = useCallback(async () => {
