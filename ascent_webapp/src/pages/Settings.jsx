@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 
 export default function Settings() {
   const { user: themeUser, theme, colors, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
-  const { currentWorkspace, permissions, hasPermission } = useAuth();
+  const { currentWorkspace, permissions, hasPermission, refreshWorkspaces } = useAuth();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -215,11 +215,11 @@ export default function Settings() {
       
       return result;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Invitation sent successfully!');
       setInviteDialogOpen(false);
-      // Reload to refresh members list
-      window.location.reload(); 
+      // Refresh workspaces to update members list in background
+      await refreshWorkspaces();
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to send invitation');
@@ -248,9 +248,9 @@ export default function Settings() {
       if (!currentWorkspace) return;
       return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Permissions updated!');
-      window.location.reload();
+      await refreshWorkspaces();
     },
   });
 
@@ -259,9 +259,9 @@ export default function Settings() {
       if (!currentWorkspace) return;
       return ascent.workspaces.removeMember(currentWorkspace.id || currentWorkspace._id, id);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('User access revoked!');
-      window.location.reload();
+      await refreshWorkspaces();
     },
   });
 

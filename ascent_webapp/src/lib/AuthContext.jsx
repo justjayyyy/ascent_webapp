@@ -167,6 +167,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshWorkspaces = async () => {
+    if (user) {
+      await loadWorkspaces(user);
+    }
+  };
+
   const login = async (email, password) => {
     try {
       const response = await ascent.auth.login(email, password);
@@ -301,6 +307,7 @@ export const AuthProvider = ({ children }) => {
       workspaces,
       currentWorkspace,
       switchWorkspace,
+      refreshWorkspaces,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,
