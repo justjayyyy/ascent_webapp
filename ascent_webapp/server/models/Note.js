@@ -18,6 +18,10 @@ const noteSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isShared: {
+    type: Boolean,
+    default: true
+  },
   tags: [{
     type: String
   }],

@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Plus, Trash2, Edit, Target } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit, Target, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme, translateCategory } from '../ThemeProvider';
+import { useAuth } from '@/lib/AuthContext';
+import { Switch } from '@/components/ui/switch';
 
 const MONTHS = [
   { value: 1, labelKey: 'january' },
@@ -38,6 +40,8 @@ export default function BudgetManager({
   canEdit = true
 }) {
   const { colors, t, language, user } = useTheme();
+  const { currentWorkspace } = useAuth();
+  const isOwner = currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
   const [editingBudget, setEditingBudget] = useState(null);
   
   const currentYear = new Date().getFullYear();
@@ -77,6 +81,7 @@ export default function BudgetManager({
     currency: user?.currency || 'USD',
     year: displayYear,
     month: displayMonth,
+    isShared: true,
   });
 
   // Set initial category and period when available categories change or dialog opens
@@ -99,6 +104,7 @@ export default function BudgetManager({
         ...prev,
         year: displayYear,
         month: displayMonth,
+        isShared: true,
       }));
     }
   }, [displayYear, displayMonth, open, editingBudget]);
@@ -137,6 +143,7 @@ export default function BudgetManager({
       currency: user?.currency || 'USD',
       year: displayYear,
       month: displayMonth,
+      isShared: true,
     });
   };
 
@@ -149,6 +156,7 @@ export default function BudgetManager({
       currency: budget.currency,
       year: budget.year || displayYear,
       month: budget.month || displayMonth,
+      isShared: budget.isShared !== false, // Default to true if undefined
     });
   };
 
@@ -161,6 +169,7 @@ export default function BudgetManager({
       currency: user?.currency || 'USD',
       year: displayYear,
       month: displayMonth,
+      isShared: true,
     });
   };
 
@@ -282,6 +291,26 @@ export default function BudgetManager({
                 {t('alertThresholdHelp')}
               </p>
             </div>
+
+            {isOwner && (
+              <div className="flex items-center justify-between py-2 px-1">
+                <div className="flex items-center gap-2">
+                  {formData.isShared ? (
+                    <Eye className={cn("w-4 h-4", colors.textSecondary)} />
+                  ) : (
+                    <EyeOff className={cn("w-4 h-4", colors.textTertiary)} />
+                  )}
+                  <Label htmlFor="isShared" className={cn("text-sm cursor-pointer", colors.textSecondary)}>
+                    {t('shareWithTeam') || 'Share with team'}
+                  </Label>
+                </div>
+                <Switch
+                  id="isShared"
+                  checked={formData.isShared}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isShared: checked })}
+                />
+              </div>
+            )}
 
             <div className="flex gap-2 sm:gap-3">
               {editingBudget && (

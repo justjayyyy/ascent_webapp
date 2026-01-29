@@ -513,9 +513,10 @@ export default function Settings() {
           </div>
 
           {/* Card Management */}
-          <CardManagement user={user} />
+          {hasPermission('editExpenses') && <CardManagement user={user} />}
 
           {/* Workspace Management */}
+          {isOwner && (
           <Card className={cn(colors.cardBg, colors.cardBorder)}>
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -571,8 +572,10 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Shared Access */}
+          {isOwner && (
           <SharedUsersSection
             sharedUsers={sharedUsers}
             onInvite={() => setInviteDialogOpen(true)}
@@ -580,6 +583,7 @@ export default function Settings() {
             onDelete={deleteSharedUserMutation.mutate}
             canManageUsers={canManageUsers}
           />
+          )}
 
           {/* Export */}
           <ImportExportSection

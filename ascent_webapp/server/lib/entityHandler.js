@@ -8,7 +8,8 @@ export function createEntityHandler(Model, options = {}) {
   const { 
     allowPublic = false,
     filterByUser = true,
-    userField = 'created_by'
+    userField = 'created_by',
+    checkSharing = false
   } = options;
 
   return async function handler(req, res) {
@@ -40,7 +41,20 @@ export function createEntityHandler(Model, options = {}) {
         
         // If workspace context is available (set by authMiddleware)
         if (req.workspace) {
-          return { workspaceId: req.workspace._id };
+          const baseFilter = { workspaceId: req.workspace._id };
+          
+          // If checkSharing is enabled and user is not the workspace owner
+          if (checkSharing && req.workspace.ownerId && req.workspace.ownerId.toString() !== user._id.toString()) {
+            return {
+              ...baseFilter,
+              $or: [
+                { createdBy: user._id },
+                { isShared: true }
+              ]
+            };
+          }
+          
+          return baseFilter;
         }
         
         // Fallback or no workspace context (should ideally not happen if enforced)

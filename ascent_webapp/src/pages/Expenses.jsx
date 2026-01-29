@@ -28,6 +28,7 @@ function Expenses() {
   const { user, colors, t } = useTheme();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('editExpenses');
+  const canEditBudgets = hasPermission('editBudgets');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonths, setSelectedMonths] = useState([(new Date().getMonth() + 1).toString()]); // Array of selected months
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -472,7 +473,7 @@ function Expenses() {
           isLoading={createBudgetMutation.isPending || updateBudgetMutation.isPending || deleteBudgetMutation.isPending}
           selectedYear={selectedYear}
           selectedMonths={selectedMonths}
-          canEdit={canEdit}
+          canEdit={canEditBudgets}
         />
 
         {/* Category Manager Dialog */}

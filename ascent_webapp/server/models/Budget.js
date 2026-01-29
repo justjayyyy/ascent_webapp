@@ -45,6 +45,10 @@ const budgetSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isShared: {
+    type: Boolean,
+    default: true
+  },
   workspaceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Workspace',

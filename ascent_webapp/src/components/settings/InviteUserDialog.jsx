@@ -173,28 +173,6 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   onCheckedChange={() => togglePermission('editExpenses')}
                 />
               </div>
-
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewSettings')}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canAccessSettingsPage')}</p>
-                </div>
-                <Switch
-                  checked={formData.permissions.viewSettings}
-                  onCheckedChange={() => togglePermission('viewSettings')}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('manageUsers')}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canInviteManageUsers')}</p>
-                </div>
-                <Switch
-                  checked={formData.permissions.manageUsers}
-                  onCheckedChange={() => togglePermission('manageUsers')}
-                />
-              </div>
             </div>
           </div>
 

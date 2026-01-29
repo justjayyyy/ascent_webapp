@@ -7,11 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   Plus, Loader2, Pin, PinOff, Trash2, X, Search, 
-  StickyNote, Edit2, Check, Tag
+  StickyNote, Edit2, Check, Tag, Eye, EyeOff
 } from 'lucide-react';
 import { useTheme } from '../components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
@@ -38,6 +41,9 @@ const NOTE_COLORS = [
 
 function Notes() {
   const { user, colors, t, theme, isRTL } = useTheme();
+  const { currentWorkspace, hasPermission } = useAuth();
+  const isOwner = currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
+  const canEdit = hasPermission('editNotes');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNote, setEditingNote] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -45,7 +51,8 @@ function Notes() {
     title: '', 
     content: '', 
     color: '#5C8374',
-    tags: []
+    tags: [],
+    isShared: true
   });
   const [newTag, setNewTag] = useState('');
   const queryClient = useQueryClient();
@@ -99,7 +106,7 @@ function Notes() {
 
   const openNewNote = useCallback(() => {
     setEditingNote(null);
-    setNoteForm({ title: '', content: '', color: '#5C8374', tags: [] });
+    setNoteForm({ title: '', content: '', color: '#5C8374', tags: [], isShared: true });
     setIsDialogOpen(true);
   }, []);
 
@@ -109,7 +116,8 @@ function Notes() {
       title: note.title, 
       content: note.content, 
       color: note.color || '#5C8374',
-      tags: note.tags || []
+      tags: note.tags || [],
+      isShared: note.isShared !== false
     });
     setIsDialogOpen(true);
   }, []);
@@ -117,7 +125,7 @@ function Notes() {
   const closeDialog = useCallback(() => {
     setIsDialogOpen(false);
     setEditingNote(null);
-    setNoteForm({ title: '', content: '', color: '#5C8374', tags: [] });
+    setNoteForm({ title: '', content: '', color: '#5C8374', tags: [], isShared: true });
     setNewTag('');
   }, []);
 
@@ -132,6 +140,7 @@ function Notes() {
       content: noteForm.content,
       color: noteForm.color,
       tags: noteForm.tags,
+      isShared: noteForm.isShared
     };
 
     if (editingNote) {
@@ -206,6 +215,7 @@ function Notes() {
                 {t('notesDescription') || 'Your personal notes and ideas'}
               </p>
             </div>
+            {canEdit && (
             <Button
               onClick={openNewNote}
               size="sm"
@@ -217,6 +227,7 @@ function Notes() {
               <Plus className={cn("w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0")} />
               <span className="whitespace-nowrap">{t('newNote') || 'New Note'}</span>
             </Button>
+            )}
           </div>
 
           {/* Search */}
@@ -272,6 +283,7 @@ function Notes() {
                       theme={theme}
                       t={t}
                       isRTL={isRTL}
+                      canEdit={canEdit}
                     />
                   ))}
                 </div>
@@ -298,6 +310,7 @@ function Notes() {
                       theme={theme}
                       t={t}
                       isRTL={isRTL}
+                      canEdit={canEdit}
                     />
                   ))}
                 </div>
@@ -395,24 +408,43 @@ function Notes() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-1.5 sm:gap-2 pt-2 sm:pt-4 justify-start">
-                <Button 
-                  variant="outline" 
-                  onClick={closeDialog}
-                  className={cn("h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4", colors.border, colors.textSecondary)}
-                >
-                  {t('cancel') || 'Cancel'}
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={createNoteMutation.isPending || updateNoteMutation.isPending}
-                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4"
-                >
-                  {(createNoteMutation.isPending || updateNoteMutation.isPending) && (
-                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin me-1 sm:me-2" />
-                  )}
-                  {editingNote ? (t('save') || 'Save') : (t('create') || 'Create')}
-                </Button>
+              <div className="flex gap-1.5 sm:gap-2 pt-2 sm:pt-4 justify-between items-center">
+                {isOwner && (
+                  <div className="flex items-center gap-2">
+                    {noteForm.isShared ? (
+                      <Eye className={cn("w-4 h-4", colors.textSecondary)} />
+                    ) : (
+                      <EyeOff className={cn("w-4 h-4", colors.textTertiary)} />
+                    )}
+                    <Label htmlFor="isShared" className={cn("text-xs sm:text-sm cursor-pointer", colors.textSecondary)}>
+                      {t('shareWithTeam') || 'Share'}
+                    </Label>
+                    <Switch
+                      id="isShared"
+                      checked={noteForm.isShared}
+                      onCheckedChange={(checked) => setNoteForm(prev => ({ ...prev, isShared: checked }))}
+                    />
+                  </div>
+                )}
+                <div className="flex gap-1.5 sm:gap-2 flex-1 justify-end">
+                  <Button 
+                    variant="outline" 
+                    onClick={closeDialog}
+                    className={cn("h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4", colors.border, colors.textSecondary)}
+                  >
+                    {t('cancel') || 'Cancel'}
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={createNoteMutation.isPending || updateNoteMutation.isPending}
+                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4"
+                  >
+                    {(createNoteMutation.isPending || updateNoteMutation.isPending) && (
+                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin me-1 sm:me-2" />
+                    )}
+                    {editingNote ? (t('save') || 'Save') : (t('create') || 'Create')}
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>
@@ -425,12 +457,14 @@ function Notes() {
 export default memo(Notes);
 
 // Note Card Component - memoized for performance
-const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL }) {
+const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL, canEdit }) {
   const [showActions, setShowActions] = useState(false);
 
   const handleMouseEnter = useCallback(() => setShowActions(true), []);
   const handleMouseLeave = useCallback(() => setShowActions(false), []);
-  const handleClick = useCallback(() => onEdit(note), [onEdit, note]);
+  const handleClick = useCallback(() => {
+    if (canEdit) onEdit(note);
+  }, [onEdit, note, canEdit]);
   const handleTogglePin = useCallback(() => onTogglePin(note.id, note.isPinned), [onTogglePin, note.id, note.isPinned]);
   const handleDelete = useCallback(() => onDelete(note.id), [onDelete, note.id]);
 
@@ -505,6 +539,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
         </div>
 
         {/* Action Buttons */}
+        {canEdit && (
         <div 
           className={cn(
             "absolute top-0.5 sm:top-2 flex gap-0.5 sm:gap-1 transition-opacity",
@@ -536,6 +571,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
             <Trash2 className="w-2.5 h-2.5 sm:w-4 sm:h-4" />
           </button>
         </div>
+        )}
 
         {/* Pin indicator */}
         {note.isPinned && (
