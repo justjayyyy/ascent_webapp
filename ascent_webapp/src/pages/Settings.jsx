@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,12 +37,24 @@ export default function Settings() {
     }
   }, [themeUser]);
 
+  // Store previous workspace name to detect actual changes
+  const prevWorkspaceNameRef = useRef(currentWorkspace?.name);
+  
   useEffect(() => {
-    if (currentWorkspace && currentWorkspace.name !== workspaceNameValue) {
+    const currentName = currentWorkspace?.name;
+    const prevName = prevWorkspaceNameRef.current;
+    
+    // Only update if the name value actually changed (not just the object reference)
+    if (currentName && currentName !== prevName) {
       console.log('[Settings] Workspace name changed, updating input value');
-      setWorkspaceNameValue(currentWorkspace.name);
+      setWorkspaceNameValue(currentName);
+      prevWorkspaceNameRef.current = currentName;
+    } else if (currentName && prevName === undefined) {
+      // Initial load
+      setWorkspaceNameValue(currentName);
+      prevWorkspaceNameRef.current = currentName;
     }
-  }, [currentWorkspace?.name]); // Only depend on the name, not the entire object
+  }, [currentWorkspace?.name]);
 
   const handleSaveFullName = async () => {
     if (fullNameValue.trim() === (user?.full_name || '').trim()) {
