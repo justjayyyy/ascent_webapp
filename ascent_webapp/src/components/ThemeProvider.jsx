@@ -1877,9 +1877,18 @@ const isPublicRoute = (pathname) => {
 export function ThemeProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = React.useRef(false); // Track if we've already loaded user
 
   const loadUser = useCallback(async () => {
-    console.log('[ThemeProvider] loadUser called - stack trace:', new Error().stack);
+    // Prevent duplicate loads - only load once per session
+    if (hasLoadedRef.current) {
+      console.log('[ThemeProvider] User already loaded, skipping duplicate load');
+      return user;
+    }
+    
+    console.log('[ThemeProvider] Loading user for the first time');
+    hasLoadedRef.current = true;
+    
     // Skip auth check on public routes
     const pathname = window.location.pathname;
     if (isPublicRoute(pathname)) {
@@ -1888,7 +1897,6 @@ export function ThemeProvider({ children }) {
     }
 
     try {
-      console.log('[ThemeProvider] Fetching user from /api/auth/me');
       const currentUser = await ascent.auth.me();
       setUser(currentUser);
       return currentUser;
@@ -1902,7 +1910,7 @@ export function ThemeProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadUser();
@@ -1911,6 +1919,9 @@ export function ThemeProvider({ children }) {
 
   // Function to refresh user data (called after settings update)
   const refreshUser = useCallback(async () => {
+    console.log('[ThemeProvider] refreshUser called - forcing reload');
+    // Reset the ref to allow reload
+    hasLoadedRef.current = false;
     const updatedUser = await loadUser();
     return updatedUser;
   }, [loadUser]);
