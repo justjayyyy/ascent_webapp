@@ -181,6 +181,8 @@ export default function Settings() {
     }
   });
 
+  const isOwner = currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
+
   const handleSaveWorkspaceName = async () => {
     if (workspaceNameValue.trim() === currentWorkspace?.name) {
       setEditingWorkspaceName(false);
@@ -554,15 +556,16 @@ export default function Settings() {
                       </Button>
                     </div>
                   ) : (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setEditingWorkspaceName(true)}
-                      disabled={!canManageUsers}
-                      className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
+                    isOwner && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingWorkspaceName(true)}
+                        className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    )
                   )}
                 </div>
               </div>

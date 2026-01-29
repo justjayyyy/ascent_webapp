@@ -575,6 +575,8 @@ export const translations = {
     downloadDataCsv: 'Download your data as CSV files for backup or analysis in other tools.',
     uploadCsvFormats: 'Upload CSV files with the following formats:',
 
+    workspaceSettings: 'Workspace Settings',
+    workspaceName: 'Workspace Name',
     // Shared Users
     viewPortfolio: 'View Portfolio',
     editPortfolio: 'Edit Portfolio',
@@ -1163,6 +1165,8 @@ export const translations = {
     downloadDataCsv: 'הורד את הנתונים שלך כקבצי CSV לגיבוי או ניתוח בכלים אחרים.',
     uploadCsvFormats: 'העלה קבצי CSV בפורמטים הבאים:',
 
+    workspaceSettings: 'הגדרות סביבת עבודה',
+    workspaceName: 'שם סביבת העבודה',
     // Shared Users
     viewPortfolio: 'צפה בתיק',
     editPortfolio: 'ערוך תיק',
@@ -1751,6 +1755,8 @@ export const translations = {
     downloadDataCsv: 'Скачайте ваши данные в виде CSV файлов для резервного копирования или анализа.',
     uploadCsvFormats: 'Загрузите CSV файлы в следующих форматах:',
 
+    workspaceSettings: 'Настройки рабочего пространства',
+    workspaceName: 'Название рабочего пространства',
     // Shared Users
     viewPortfolio: 'Просмотр портфеля',
     editPortfolio: 'Редактирование портфеля',

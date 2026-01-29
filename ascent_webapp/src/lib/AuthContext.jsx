@@ -94,7 +94,12 @@ export const AuthProvider = ({ children }) => {
         if (!activeWs && wsList.length === 0) {
            console.log('[AuthContext] No workspaces found. Creating default.');
            try {
-             const newWs = await ascent.workspaces.create({ name: 'My Workspace' });
+             // Create a personalized workspace name
+             const workspaceName = currentUser.full_name 
+               ? `${currentUser.full_name}'s Workspace`
+               : `${currentUser.email.split('@')[0]}'s Workspace`;
+               
+             const newWs = await ascent.workspaces.create({ name: workspaceName });
              setWorkspaces([newWs]);
              activeWs = newWs;
            } catch (createError) {

@@ -88,6 +88,39 @@ export default async function handler(req, res) {
           isFirstLogin: true
         });
         isFirstLogin = true;
+
+        // Create default workspace
+        const workspaceName = user.full_name 
+          ? `${user.full_name}'s Workspace`
+          : `${user.email.split('@')[0]}'s Workspace`;
+
+        const workspace = await Workspace.create({
+          name: workspaceName,
+          ownerId: user._id,
+          members: [{
+            userId: user._id,
+            email: user.email,
+            role: 'owner',
+            status: 'accepted',
+            permissions: {
+              viewPortfolio: true,
+              editPortfolio: true,
+              viewExpenses: true,
+              editExpenses: true,
+              viewNotes: true,
+              editNotes: true,
+              viewGoals: true,
+              editGoals: true,
+              viewBudgets: true,
+              editBudgets: true,
+              viewSettings: true,
+              manageUsers: true
+            }
+          }]
+        });
+
+        user.defaultWorkspace = workspace._id;
+        await user.save();
       } else {
         // Check if first login before updating
         isFirstLogin = user.isFirstLogin === true;
