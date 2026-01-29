@@ -16,10 +16,9 @@ import {
   RefreshCw,
   Trash2,
   Check,
-  CalendarDays,
-  CalendarRange,
-  LayoutGrid,
-  GripVertical
+  Grid,
+  List,
+  Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
@@ -729,7 +728,7 @@ export default function CalendarModal({ open, onOpenChange }) {
       >
         {/* Drag handle */}
         <div className="absolute top-0 left-0 right-0 h-4 flex items-center justify-center cursor-move opacity-50 hover:opacity-100">
-          <GripVertical className="w-3 h-3" />
+          <Menu className="w-3 h-3 rotate-90" />
         </div>
         
         <div className="font-medium text-sm truncate mt-2">{event.summary}</div>
@@ -1028,7 +1027,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                           : cn(colors.textSecondary, "hover:bg-[#5C8374]/20")
                       )}
                     >
-                      <CalendarDays className="w-4 h-4" />
+                      <CalendarIcon className="w-4 h-4" />
                       {t('day') || 'Day'}
                     </button>
                     <button
@@ -1041,7 +1040,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                           : cn(colors.textSecondary, "hover:bg-[#5C8374]/20")
                       )}
                     >
-                      <CalendarRange className="w-4 h-4" />
+                      <List className="w-4 h-4" />
                       {t('week') || 'Week'}
                     </button>
                     <button
@@ -1053,7 +1052,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                           : cn(colors.textSecondary, "hover:bg-[#5C8374]/20")
                       )}
                     >
-                      <LayoutGrid className="w-4 h-4" />
+                      <Grid className="w-4 h-4" />
                       {t('month') || 'Month'}
                     </button>
                   </div>

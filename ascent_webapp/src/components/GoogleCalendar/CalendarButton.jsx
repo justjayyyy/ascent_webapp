@@ -93,7 +93,7 @@ export default function CalendarButton({ variant = 'icon', className }) {
   return (
     <>
       {renderButton()}
-      <CalendarModal open={isOpen} onOpenChange={setIsOpen} />
+      {CalendarModal && <CalendarModal open={isOpen} onOpenChange={setIsOpen} />}
     </>
   );
 }

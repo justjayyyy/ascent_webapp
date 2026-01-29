@@ -34,8 +34,8 @@ const DEFAULT_CATEGORIES = [
   { nameKey: 'other_income', type: 'Income', icon: '💵', color: '#78716C' },
 ];
 
-// Create default categories for a user
-async function createDefaultCategories(userEmail) {
+// Create default categories for a workspace
+async function createDefaultCategories(workspaceId, userId) {
   const categories = DEFAULT_CATEGORIES.map(cat => ({
     name: cat.nameKey, // Store the key as name, frontend will translate
     nameKey: cat.nameKey,
@@ -43,11 +43,12 @@ async function createDefaultCategories(userEmail) {
     icon: cat.icon,
     color: cat.color,
     isDefault: true,
-    created_by: userEmail,
+    workspaceId: workspaceId,
+    createdBy: userId,
   }));
   
   await Category.insertMany(categories);
-  return Category.find({ created_by: { $regex: new RegExp(`^${userEmail}$`, 'i') } }).sort('-created_date');
+  return Category.find({ workspaceId }).sort('-created_date');
 }
 
 export default async function handler(req, res) {
@@ -59,20 +60,25 @@ export default async function handler(req, res) {
 
     await connectDB();
 
+    // Ensure workspace context
+    if (!req.workspace) {
+      return error(res, 'Workspace context required', 400);
+    }
+
     const { method } = req;
     const { id } = req.query;
 
-    // Build base filter (case insensitive email)
-    const baseFilter = { created_by: { $regex: new RegExp(`^${user.email}$`, 'i') } };
+    // Filter by workspace
+    const baseFilter = { workspaceId: req.workspace._id };
 
     switch (method) {
       case 'GET': {
-        // Check if user has any categories
+        // Check if workspace has any categories
         let categories = await Category.find(baseFilter).sort('-created_date');
         
         // If no categories, create defaults
         if (categories.length === 0) {
-          categories = await createDefaultCategories(user.email);
+          categories = await createDefaultCategories(req.workspace._id, user._id);
         }
         
         return success(res, categories);
@@ -83,7 +89,8 @@ export default async function handler(req, res) {
         const category = await Category.create({
           ...req.body,
           isDefault: false, // User-created categories are not default
-          created_by: user.email
+          workspaceId: req.workspace._id,
+          createdBy: user._id
         });
         return success(res, category, 201);
       }
@@ -125,6 +132,7 @@ export default async function handler(req, res) {
         return error(res, 'Method not allowed', 405);
     }
   } catch (err) {
+    console.error('[Categories API Error]', err);
     return serverError(res, err);
   }
 }

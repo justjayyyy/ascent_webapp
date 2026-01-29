@@ -6,6 +6,8 @@ const ThemeContext = createContext();
 export const translations = {
   en: {
     // Navigation
+    switchWorkspace: 'Switch Workspace',
+    workspace: 'Workspace',
     portfolio: 'Portfolio',
     dashboard: 'Dashboard',
     expenses: 'Expenses',
@@ -673,6 +675,8 @@ export const translations = {
   },
   he: {
     // Navigation
+    switchWorkspace: 'החלף סביבת עבודה',
+    workspace: 'סביבת עבודה',
     portfolio: 'תיק השקעות',
     dashboard: 'לוח בקרה',
     expenses: 'הוצאות',
@@ -1263,6 +1267,8 @@ export const translations = {
   },
   ru: {
     // Navigation
+    switchWorkspace: 'Сменить рабочую область',
+    workspace: 'Рабочая область',
     portfolio: 'Портфель',
     dashboard: 'Панель',
     expenses: 'Расходы',
