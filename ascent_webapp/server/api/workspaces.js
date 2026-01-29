@@ -84,76 +84,137 @@ export default async function handler(req, res) {
             const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
             const inviteLink = `${origin}/accept-invitation/${token}`;
             
-            const emailSubject = `Invitation to join ${workspace.name} / הזמנה להצטרף ל-${workspace.name} / Приглашение в ${workspace.name}`;
-            const emailBody = `
-              Hello / שלום / Здравствуйте,
-
-              You have been invited to join the workspace "${workspace.name}" on Ascent.
-              הוזמנת להצטרף לסביבת העבודה "${workspace.name}" ב-Ascent.
-              Вас пригласили присоединиться к рабочей области "${workspace.name}" в Ascent.
-
-              Click the link below to accept the invitation:
-              לחץ על הקישור למטה כדי לקבל את ההזמנה:
-              Нажмите на ссылку ниже, чтобы принять приглашение:
-              ${inviteLink}
-
-              If you don't have an account, you will be asked to create one.
-              אם אין לך חשבון, תתבקש ליצור אחד.
-              Если у вас нет учетной записи, вам будет предложено создать ее.
-
-              Best regards,
-              The Ascent Team
-              צוות Ascent
-              Команда Ascent
-            `;
+            // Determine language based on inviter's preference (user.language)
+            const language = user.language || 'en';
             
-            const emailHtml = `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: ltr;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                  <h2 style="color: #5C8374;">Ascent</h2>
-                </div>
-                
-                <!-- English -->
-                <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                  <h3 style="color: #333; margin-top: 0;">Invitation to join ${workspace.name}</h3>
-                  <p>Hello,</p>
-                  <p>You have been invited to join the workspace "<strong>${workspace.name}</strong>" on Ascent.</p>
-                  <div style="margin: 20px 0;">
-                    <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Accept Invitation</a>
-                  </div>
-                  <p style="font-size: 14px; color: #666;">If you don't have an account, you will be asked to create one.</p>
-                </div>
+            let emailSubject = '';
+            let emailBody = '';
+            let emailHtml = '';
+            
+            if (language === 'he') {
+              // Hebrew Template
+              emailSubject = `הזמנה להצטרף ל-${workspace.name}`;
+              emailBody = `
+                שלום,
 
-                <!-- Hebrew -->
-                <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px; direction: rtl; text-align: right;">
-                  <h3 style="color: #333; margin-top: 0;">הזמנה להצטרף ל-${workspace.name}</h3>
-                  <p>שלום,</p>
-                  <p>הוזמנת להצטרף לסביבת העבודה "<strong>${workspace.name}</strong>" ב-Ascent.</p>
-                  <div style="margin: 20px 0;">
-                    <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">קבל הזמנה</a>
-                  </div>
-                  <p style="font-size: 14px; color: #666;">אם אין לך חשבון, תתבקש ליצור אחד.</p>
-                </div>
+                הוזמנת להצטרף לסביבת העבודה "${workspace.name}" ב-Ascent.
 
-                <!-- Russian -->
-                <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                  <h3 style="color: #333; margin-top: 0;">Приглашение в ${workspace.name}</h3>
-                  <p>Здравствуйте,</p>
-                  <p>Вас пригласили присоединиться к рабочей области "<strong>${workspace.name}</strong>" в Ascent.</p>
-                  <div style="margin: 20px 0;">
-                    <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Принять приглашение</a>
-                  </div>
-                  <p style="font-size: 14px; color: #666;">Если у вас нет учетной записи, вам будет предложено создать ее.</p>
-                </div>
+                לחץ על הקישור למטה כדי לקבל את ההזמנה:
+                ${inviteLink}
 
-                <div style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
-                  <p>Or copy and paste this link into your browser / או העתק והדבק את הקישור בדפדפן / Или скопируйте ссылку в браузер:</p>
-                  <p>${inviteLink}</p>
-                  <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-                  <p>If you didn't expect this invitation, you can ignore this email.</p>
+                אם אין לך חשבון, תתבקש ליצור אחד.
+
+                בברכה,
+                צוות Ascent
+              `;
+              
+              emailHtml = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: rtl; text-align: right;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #5C8374;">Ascent</h2>
+                  </div>
+                  
+                  <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-top: 0;">הזמנה להצטרף ל-${workspace.name}</h3>
+                    <p>שלום,</p>
+                    <p>הוזמנת להצטרף לסביבת העבודה "<strong>${workspace.name}</strong>" ב-Ascent.</p>
+                    <div style="margin: 20px 0;">
+                      <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">קבל הזמנה</a>
+                    </div>
+                    <p style="font-size: 14px; color: #666;">אם אין לך חשבון, תתבקש ליצור אחד.</p>
+                  </div>
+
+                  <div style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
+                    <p>או העתק והדבק את הקישור בדפדפן:</p>
+                    <p>${inviteLink}</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p>אם לא ציפית להזמנה זו, אתה יכול להתעלם מהודעה זו.</p>
+                  </div>
                 </div>
-              </div>
-            `;
+              `;
+            } else if (language === 'ru') {
+              // Russian Template
+              emailSubject = `Приглашение в ${workspace.name}`;
+              emailBody = `
+                Здравствуйте,
+
+                Вас пригласили присоединиться к рабочей области "${workspace.name}" в Ascent.
+
+                Нажмите на ссылку ниже, чтобы принять приглашение:
+                ${inviteLink}
+
+                Если у вас нет учетной записи, вам будет предложено создать ее.
+
+                С уважением,
+                Команда Ascent
+              `;
+              
+              emailHtml = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: ltr;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #5C8374;">Ascent</h2>
+                  </div>
+                  
+                  <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-top: 0;">Приглашение в ${workspace.name}</h3>
+                    <p>Здравствуйте,</p>
+                    <p>Вас пригласили присоединиться к рабочей области "<strong>${workspace.name}</strong>" в Ascent.</p>
+                    <div style="margin: 20px 0;">
+                      <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Принять приглашение</a>
+                    </div>
+                    <p style="font-size: 14px; color: #666;">Если у вас нет учетной записи, вам будет предложено создать ее.</p>
+                  </div>
+
+                  <div style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
+                    <p>Или скопируйте ссылку в браузер:</p>
+                    <p>${inviteLink}</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p>Если вы не ожидали этого приглашения, вы можете проигнорировать это письмо.</p>
+                  </div>
+                </div>
+              `;
+            } else {
+              // English Template (Default)
+              emailSubject = `Invitation to join ${workspace.name}`;
+              emailBody = `
+                Hello,
+
+                You have been invited to join the workspace "${workspace.name}" on Ascent.
+
+                Click the link below to accept the invitation:
+                ${inviteLink}
+
+                If you don't have an account, you will be asked to create one.
+
+                Best regards,
+                The Ascent Team
+              `;
+              
+              emailHtml = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: ltr;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #5C8374;">Ascent</h2>
+                  </div>
+                  
+                  <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-top: 0;">Invitation to join ${workspace.name}</h3>
+                    <p>Hello,</p>
+                    <p>You have been invited to join the workspace "<strong>${workspace.name}</strong>" on Ascent.</p>
+                    <div style="margin: 20px 0;">
+                      <a href="${inviteLink}" style="background-color: #5C8374; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Accept Invitation</a>
+                    </div>
+                    <p style="font-size: 14px; color: #666;">If you don't have an account, you will be asked to create one.</p>
+                  </div>
+
+                  <div style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
+                    <p>Or copy and paste this link into your browser:</p>
+                    <p>${inviteLink}</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p>If you didn't expect this invitation, you can ignore this email.</p>
+                  </div>
+                </div>
+              `;
+            }
 
             // Send email asynchronously (don't block response)
             sendEmail({

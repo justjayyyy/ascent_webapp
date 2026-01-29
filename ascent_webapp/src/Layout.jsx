@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { Home, PieChart, Receipt, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, StickyNote, Calendar, ChevronUp, Moon, Sun, Eye, EyeOff } from 'lucide-react';
+import { Home, PieChart, Receipt, Settings as SettingsIcon, LogOut, Menu, X, ChevronLeft, ChevronRight, StickyNote, Calendar, ChevronUp, Moon, Sun, Eye, EyeOff } from 'lucide-react';
 import { SidebarCalendarButton, HeaderCalendarButton, FloatingCalendarButton } from '@/components/GoogleCalendar';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -80,7 +80,7 @@ function LayoutContent({ children, currentPageName }) {
     // { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewDashboard' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('notes'), page: 'Notes', icon: StickyNote, permission: 'viewNotes' },
-    // { name: t('settings'), page: 'Settings', icon: Settings, permission: 'viewSettings' },
+    // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
   ].filter(item => hasPermission(item.permission)), [t, hasPermission]);
 
   return (
@@ -324,7 +324,7 @@ function LayoutContent({ children, currentPageName }) {
                             className={cn("flex items-center gap-2 px-3 py-[5px] cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
                             onClick={() => setUserMenuOpen(false)}
                           >
-                            <Settings className="w-4 h-4" />
+                            <SettingsIcon className="w-4 h-4" />
                             <span className="text-sm">{t('settings')}</span>
                           </Link>
                         </DropdownMenuItem>
@@ -467,7 +467,7 @@ function LayoutContent({ children, currentPageName }) {
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn("flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
                 >
-                  <Settings className="w-4 h-4" />
+                  <SettingsIcon className="w-4 h-4" />
                   <span className="text-sm">{t('settings')}</span>
                 </Link>
               )}
