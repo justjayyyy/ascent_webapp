@@ -80,7 +80,7 @@ function LayoutContent({ children, currentPageName }) {
     // { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewDashboard' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('notes'), page: 'Notes', icon: StickyNote, permission: 'viewNotes' },
-    { name: t('settings'), page: 'Settings', icon: Settings, permission: 'viewSettings' },
+    // { name: t('settings'), page: 'Settings', icon: Settings, permission: 'viewSettings' },
   ].filter(item => hasPermission(item.permission)), [t, hasPermission]);
 
   return (
@@ -162,7 +162,7 @@ function LayoutContent({ children, currentPageName }) {
                     <img 
                       src={theme === 'dark' ? "/logo-dark.png" : "/logo-light.png"}
                       alt="Ascend Logo" 
-                      className="w-8 h-8 object-contain"
+                      className="w-12 h-12 object-contain"
                       style={{ filter: 'brightness(1.1) saturate(1.2)' }}
                     />
                     <div className="flex-1 text-left min-w-0">
