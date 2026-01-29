@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "reset:app": "node --env-file=.env server/scripts/reset-app.mjs",
     "seed:test-data": "node --env-file=.env server/scripts/seed-test-data.mjs",
+    "create:demo": "node --env-file=.env server/scripts/create-demo-account.mjs",
     "test:email": "node --env-file=.env server/scripts/test-email.mjs"
   },
   "dependencies": {
