@@ -293,8 +293,8 @@ export const AuthProvider = ({ children }) => {
          }
       }
       
-      // Force reload of data by invalidating queries (will be done by components listening to workspace change)
-      window.location.reload(); // Simplest way to ensure everything re-fetches with new header
+      // Instead of reload, we'll let the app re-render with the new workspace context
+      // Components using useAuth() will see the change and re-fetch their data
     }
   };
 
