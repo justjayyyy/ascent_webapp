@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { Home, PieChart, Receipt, Settings as SettingsIcon, LogOut, Menu, X, ChevronLeft, ChevronRight, StickyNote, Calendar, ChevronUp, Moon, Sun, Eye, EyeOff } from 'lucide-react';
-import { SidebarCalendarButton, HeaderCalendarButton, FloatingCalendarButton } from '@/components/GoogleCalendar';
+import { SidebarCalendarButton, HeaderCalendarButton, FloatingCalendarButton } from '@/components/GoogleCalendar/CalendarButton';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { ThemeProvider, useTheme } from './components/ThemeProvider';
@@ -213,6 +213,7 @@ function LayoutContent({ children, currentPageName }) {
             {navigation.map((item) => {
               const isActive = currentPageName === item.page;
               const Icon = item.icon;
+              if (!Icon) return null;
               return (
                 <Link
                   key={item.page}
