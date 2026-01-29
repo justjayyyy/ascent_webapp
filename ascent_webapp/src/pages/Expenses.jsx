@@ -379,37 +379,39 @@ function Expenses() {
               <p className={cn("text-xs sm:text-base", colors.textTertiary)}>{t('trackYourIncomeExpenses')}</p>
             </div>
             <div className="flex gap-1 sm:gap-2">
-              <Button 
-                onClick={() => setCategoryDialogOpen(true)}
-                variant="outline"
-                size="sm"
-                className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
-              >
-                <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                <span className="hidden md:inline">Categories</span>
-              </Button>
-              <Button 
-                onClick={() => setBudgetDialogOpen(true)}
-                variant="outline"
-                size="sm"
-                className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
-              >
-                <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                <span className="hidden md:inline">Budgets</span>
-              </Button>
               {canEdit && (
-                <Button 
-                  onClick={() => {
-                    setEditingTransaction(null);
-                    setAddDialogOpen(true);
-                  }}
-                  size="sm"
-                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-8 sm:h-10 text-xs sm:text-base"
-                >
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                  <span className="hidden sm:inline">{t('addTransaction')}</span>
-                  <span className="sm:hidden">{t('add')}</span>
-                </Button>
+                <>
+                  <Button 
+                    onClick={() => setCategoryDialogOpen(true)}
+                    variant="outline"
+                    size="sm"
+                    className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
+                  >
+                    <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                    <span className="hidden md:inline">Categories</span>
+                  </Button>
+                  <Button 
+                    onClick={() => setBudgetDialogOpen(true)}
+                    variant="outline"
+                    size="sm"
+                    className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
+                  >
+                    <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                    <span className="hidden md:inline">Budgets</span>
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setEditingTransaction(null);
+                      setAddDialogOpen(true);
+                    }}
+                    size="sm"
+                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-8 sm:h-10 text-xs sm:text-base"
+                  >
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                    <span className="hidden sm:inline">{t('addTransaction')}</span>
+                    <span className="sm:hidden">{t('add')}</span>
+                  </Button>
+                </>
               )}
             </div>
           </div>
