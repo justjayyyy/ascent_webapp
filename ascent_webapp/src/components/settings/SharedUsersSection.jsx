@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useTheme } from '../ThemeProvider';
 
-export default function SharedUsersSection({ 
+const SharedUsersSection = memo(function SharedUsersSection({ 
   sharedUsers = [], 
   onInvite, 
   onUpdate, 
@@ -31,20 +31,20 @@ export default function SharedUsersSection({
     revoked: 'bg-red-500/10 text-red-400 border-red-500/30',
   };
 
-  const togglePermission = (user, key) => {
+  const togglePermission = useCallback((user, key) => {
     const updatedPermissions = {
       ...user.permissions,
       [key]: !user.permissions[key],
     };
     onUpdate(user.id, { permissions: updatedPermissions });
-  };
+  }, [onUpdate]);
 
-  const toggleShowPermissions = (userId) => {
+  const toggleShowPermissions = useCallback((userId) => {
     setShowPermissions(prev => ({
       ...prev,
       [userId]: !prev[userId],
     }));
-  };
+  }, []);
 
   return (
     <Card className={cn(colors.cardBg, colors.cardBorder)}>
@@ -226,4 +226,6 @@ export default function SharedUsersSection({
       </CardContent>
     </Card>
   );
-}
+});
+
+export default SharedUsersSection;

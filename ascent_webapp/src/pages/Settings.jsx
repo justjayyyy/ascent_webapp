@@ -241,7 +241,7 @@ export default function Settings() {
         permissions: m.permissions,
         role: m.role
       }));
-  }, [currentWorkspace, user]);
+  }, [currentWorkspace?.members, user?.id, user?._id, user?.email]);
 
   const canManageUsers = hasPermission('manageUsers');
 
@@ -251,9 +251,14 @@ export default function Settings() {
       return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
     },
     onSuccess: async () => {
-      toast.success('Permissions updated!');
+      // Refresh workspaces in background
       await refreshWorkspaces();
+      toast.success('Permissions updated!');
     },
+    onError: (error) => {
+      console.error('Failed to update permissions:', error);
+      toast.error('Failed to update permissions');
+    }
   });
 
   const deleteSharedUserMutation = useMutation({
@@ -262,8 +267,8 @@ export default function Settings() {
       return ascent.workspaces.removeMember(currentWorkspace.id || currentWorkspace._id, id);
     },
     onSuccess: async () => {
-      toast.success('User access revoked!');
       await refreshWorkspaces();
+      toast.success('User access revoked!');
     },
   });
 
