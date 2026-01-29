@@ -1879,6 +1879,7 @@ export function ThemeProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
+    console.log('[ThemeProvider] loadUser called - stack trace:', new Error().stack);
     // Skip auth check on public routes
     const pathname = window.location.pathname;
     if (isPublicRoute(pathname)) {
@@ -1887,6 +1888,7 @@ export function ThemeProvider({ children }) {
     }
 
     try {
+      console.log('[ThemeProvider] Fetching user from /api/auth/me');
       const currentUser = await ascent.auth.me();
       setUser(currentUser);
       return currentUser;
