@@ -87,7 +87,7 @@ export default function Dashboard() {
     queryKey: ['accounts', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.Account.filter({ created_by: user.email });
+      return await ascent.entities.Account.list();
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -107,11 +107,7 @@ export default function Dashboard() {
     queryKey: ['snapshots', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.PortfolioSnapshot.filter(
-        { created_by: user.email },
-        '-date',
-        30
-      );
+      return await ascent.entities.PortfolioSnapshot.list('-date', 30);
     },
     enabled: !!user,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -121,7 +117,7 @@ export default function Dashboard() {
     queryKey: ['transactions', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.ExpenseTransaction.filter({ created_by: user.email }, '-date', 1000);
+      return await ascent.entities.ExpenseTransaction.list('-date', 1000);
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -131,7 +127,7 @@ export default function Dashboard() {
     queryKey: ['goals', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.FinancialGoal.filter({ created_by: user.email }, '-created_date');
+      return await ascent.entities.FinancialGoal.list('-created_date');
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -172,7 +168,7 @@ export default function Dashboard() {
     queryKey: ['dashboardWidgets', user?.id],
     queryFn: async () => {
       if (!user) return DEFAULT_WIDGETS;
-      const widgets = await ascent.entities.DashboardWidget.filter({ created_by: user.email });
+      const widgets = await ascent.entities.DashboardWidget.list();
       if (widgets.length === 0) {
         return DEFAULT_WIDGETS;
       }
@@ -194,7 +190,7 @@ export default function Dashboard() {
   const saveWidgetsMutation = useMutation({
     mutationFn: async (widgets) => {
       // Delete all existing widgets
-      const existing = await ascent.entities.DashboardWidget.filter({ created_by: user.email });
+      const existing = await ascent.entities.DashboardWidget.list();
       await Promise.all(existing.map(w => ascent.entities.DashboardWidget.delete(w.id)));
       
       // Create new widgets without IDs

@@ -59,6 +59,11 @@ const expenseTransactionSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  relatedAccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Account',
+    default: null
+  },
   tags: [{
     type: String
   }],

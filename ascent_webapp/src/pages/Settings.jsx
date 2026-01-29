@@ -91,7 +91,7 @@ export default function Settings() {
     queryKey: ['accounts', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.Account.filter({ created_by: user.email });
+      return await ascent.entities.Account.list();
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -111,7 +111,7 @@ export default function Settings() {
     queryKey: ['transactions', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.ExpenseTransaction.filter({ created_by: user.email }, '-date', 1000);
+      return await ascent.entities.ExpenseTransaction.list('-date', 1000);
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -121,7 +121,7 @@ export default function Settings() {
     queryKey: ['notes', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.Note.filter({ created_by: user.email });
+      return await ascent.entities.Note.list();
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -131,7 +131,7 @@ export default function Settings() {
     queryKey: ['goals', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.FinancialGoal.filter({ created_by: user.email }, '-created_date');
+      return await ascent.entities.FinancialGoal.list('-created_date');
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -141,7 +141,7 @@ export default function Settings() {
     queryKey: ['budgets', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.Budget.filter({ created_by: user.email }, '-created_date');
+      return await ascent.entities.Budget.list('-created_date');
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -161,7 +161,7 @@ export default function Settings() {
     queryKey: ['cards', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      return await ascent.entities.Card.filter({ created_by: user.email });
+      return await ascent.entities.Card.list();
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,

@@ -46,7 +46,7 @@ function Expenses() {
     queryKey: ['transactions', userId],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await ascent.entities.ExpenseTransaction.filter({ created_by: userEmail }, '-date', 1000);
+      return await ascent.entities.ExpenseTransaction.list('-date', 1000);
     },
     enabled: !!userEmail,
     staleTime: 3 * 60 * 1000, // 3 minutes
@@ -56,7 +56,7 @@ function Expenses() {
     queryKey: ['cards', userId],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await ascent.entities.Card.filter({ created_by: userEmail });
+      return await ascent.entities.Card.list();
     },
     enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
@@ -66,7 +66,7 @@ function Expenses() {
     queryKey: ['accounts', userId],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await ascent.entities.Account.filter({ created_by: userEmail });
+      return await ascent.entities.Account.list();
     },
     enabled: !!userEmail,
     staleTime: 5 * 60 * 1000,
@@ -76,7 +76,7 @@ function Expenses() {
     queryKey: ['budgets', userId],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await ascent.entities.Budget.filter({ created_by: userEmail }, '-created_date');
+      return await ascent.entities.Budget.list('-created_date');
     },
     enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
