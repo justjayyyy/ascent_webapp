@@ -168,8 +168,49 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshWorkspaces = async () => {
-    if (user) {
-      await loadWorkspaces(user);
+    if (!user) return;
+    
+    try {
+      const wsList = await ascent.workspaces.list();
+      setWorkspaces(wsList);
+      
+      // Find and update only the current workspace without changing reference if data is same
+      const storedWsId = localStorage.getItem('ascent_current_workspace_id');
+      const updatedCurrentWs = wsList.find(w => (w.id || w._id) === storedWsId);
+      
+      if (updatedCurrentWs) {
+        // Only update if there are actual changes
+        setCurrentWorkspace(prevWs => {
+          // Compare member data to see if anything changed
+          const membersChanged = JSON.stringify(prevWs?.members) !== JSON.stringify(updatedCurrentWs.members);
+          if (membersChanged || prevWs?.name !== updatedCurrentWs.name) {
+            return updatedCurrentWs;
+          }
+          return prevWs; // Keep same reference to prevent unnecessary re-renders
+        });
+        
+        // Update permissions for current user in this workspace
+        const member = updatedCurrentWs.members.find(m => 
+          (m.userId && (m.userId === user.id || m.userId === user._id)) || 
+          m.email === user.email
+        );
+        
+        if (member) {
+          const newPermissions = (member.role === 'owner' || member.role === 'admin') 
+            ? null 
+            : (member.permissions || {});
+          
+          // Only update permissions if they actually changed
+          setPermissions(prevPerms => {
+            if (JSON.stringify(prevPerms) !== JSON.stringify(newPermissions)) {
+              return newPermissions;
+            }
+            return prevPerms;
+          });
+        }
+      }
+    } catch (wsError) {
+      console.error('Failed to refresh workspaces:', wsError);
     }
   };
 

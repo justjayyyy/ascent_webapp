@@ -251,9 +251,8 @@ export default function Settings() {
       return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
     },
     onSuccess: async () => {
-      // Refresh workspaces in background
+      // Silently refresh workspaces in background
       await refreshWorkspaces();
-      toast.success('Permissions updated!');
     },
     onError: (error) => {
       console.error('Failed to update permissions:', error);
