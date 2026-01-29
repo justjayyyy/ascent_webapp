@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, User, Mail, Shield, Bell, Globe, Eye, EyeOff, Edit2, Check, X, Users } from 'lucide-react';
+import { Loader2, User, Mail, Shield, Bell, Globe, Edit2, Check, X, Users } from 'lucide-react';
 import ImportExportSection from '../components/settings/ImportExportSection';
 import SharedUsersSection from '../components/settings/SharedUsersSection';
 import InviteUserDialog from '../components/settings/InviteUserDialog';
@@ -435,27 +435,6 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Privacy */}
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                {user?.blurValues ? <EyeOff className="w-5 h-5 text-[#5C8374]" /> : <Eye className="w-5 h-5 text-[#5C8374]" />}
-                <CardTitle className={colors.accentText}>{t('privacy')}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between py-3">
-                <div className="flex-1">
-                  <p className={cn("font-medium", colors.textPrimary)}>{t('blurFinancialValues')}</p>
-                  <p className={cn("text-sm", colors.textTertiary)}>{t('hideAmountsWhenShowing')}</p>
-                </div>
-                <Switch
-                  checked={user?.blurValues || false}
-                  onCheckedChange={(checked) => updateUserMutation.mutate({ blurValues: checked })}
-                />
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Notifications */}
           <Card className={cn(colors.cardBg, colors.cardBorder)}>
