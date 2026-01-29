@@ -235,7 +235,7 @@ function LayoutContent({ children, currentPageName }) {
             
             {/* OPTION 1: Calendar in Sidebar - ENABLED */}
             <div className="pt-2 border-t border-[#5C8374]/20 mt-2">
-              <SidebarCalendarButton className={sidebarCollapsed ? "justify-center" : ""} />
+              {SidebarCalendarButton && <SidebarCalendarButton className={sidebarCollapsed ? "justify-center" : ""} />}
             </div>
           </nav>
 
@@ -564,10 +564,10 @@ function LayoutContent({ children, currentPageName }) {
       </div>
 
       {/* Welcome Dialog for First Login */}
-      <WelcomeDialog 
+      {WelcomeDialog && <WelcomeDialog 
         open={showWelcomeDialog} 
         onClose={() => setShowWelcomeDialog(false)} 
-      />
+      />}
     </div>
   );
 }
