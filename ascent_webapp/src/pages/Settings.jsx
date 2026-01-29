@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 
 export default function Settings() {
   const { user: themeUser, theme, colors, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
-  const { currentWorkspace, permissions, hasPermission, refreshWorkspaces } = useAuth();
+  const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission } = useAuth();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -271,17 +271,42 @@ export default function Settings() {
   const updateSharedUserMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       if (!currentWorkspace) return;
-      console.log('[Settings] Updating member permissions...', { id, data });
+      console.log('[Settings] Updating member permissions in background...', { id, data });
       return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
     },
-    onSuccess: async () => {
-      console.log('[Settings] Permission update successful, refreshing workspace state...');
-      // Silently refresh workspaces in background
-      await refreshWorkspaces();
-      console.log('[Settings] Workspace state refreshed');
+    onMutate: async ({ id, data }) => {
+      // Optimistic update - update UI immediately BEFORE server responds
+      console.log('[Settings] Applying optimistic UI update');
+      
+      // Snapshot the previous value in case we need to rollback
+      const previousWorkspace = currentWorkspace;
+      
+      // Optimistically update the local state immediately
+      if (currentWorkspace?.members) {
+        const updatedMembers = currentWorkspace.members.map(member => {
+          if ((member._id || member.userId) === id) {
+            return { ...member, ...data };
+          }
+          return member;
+        });
+        
+        // Update only the members array to trigger minimal re-render
+        setCurrentWorkspace(prev => ({ ...prev, members: updatedMembers }));
+      }
+      
+      // Return context with previous value for potential rollback
+      return { previousWorkspace };
     },
-    onError: (error) => {
-      console.error('Failed to update permissions:', error);
+    onSuccess: () => {
+      console.log('[Settings] Permission update confirmed by server');
+      toast.success('Permissions updated');
+    },
+    onError: (error, variables, context) => {
+      console.error('[Settings] Permission update failed, rolling back:', error);
+      // Rollback to previous state on error
+      if (context?.previousWorkspace) {
+        setCurrentWorkspace(context.previousWorkspace);
+      }
       toast.error('Failed to update permissions');
     }
   });
@@ -291,10 +316,29 @@ export default function Settings() {
       if (!currentWorkspace) return;
       return ascent.workspaces.removeMember(currentWorkspace.id || currentWorkspace._id, id);
     },
-    onSuccess: async () => {
-      await refreshWorkspaces();
+    onMutate: async (id) => {
+      // Optimistic update - remove user from UI immediately
+      const previousWorkspace = currentWorkspace;
+      
+      if (currentWorkspace?.members) {
+        const updatedMembers = currentWorkspace.members.filter(
+          member => (member._id || member.userId) !== id
+        );
+        setCurrentWorkspace(prev => ({ ...prev, members: updatedMembers }));
+      }
+      
+      return { previousWorkspace };
+    },
+    onSuccess: () => {
       toast.success('User access revoked!');
     },
+    onError: (error, variables, context) => {
+      console.error('[Settings] Failed to remove user, rolling back:', error);
+      if (context?.previousWorkspace) {
+        setCurrentWorkspace(context.previousWorkspace);
+      }
+      toast.error('Failed to remove user');
+    }
   });
 
   // Memoize callbacks to prevent SharedUsersSection re-renders

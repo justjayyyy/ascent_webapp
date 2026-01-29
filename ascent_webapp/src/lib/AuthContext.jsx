@@ -372,6 +372,7 @@ export const AuthProvider = ({ children }) => {
       hasPermission,
       workspaces,
       currentWorkspace,
+      setCurrentWorkspace,
       switchWorkspace,
       refreshWorkspaces,
       isLoadingAuth,
