@@ -229,19 +229,27 @@ export default function Settings() {
   });
 
   // Map workspace members to the format expected by SharedUsersSection
+  // Stable reference unless members actually change
   const sharedUsers = useMemo(() => {
     if (!currentWorkspace?.members) return [];
-    return currentWorkspace.members
-      .filter(m => m.userId !== user?.id && m.userId !== user?._id && m.email !== user?.email) // Exclude self
-      .map(m => ({
-        id: m._id || m.userId, // Use member ID or User ID
-        invitedEmail: m.email,
-        displayName: m.email.split('@')[0], // Fallback display name
-        status: m.status,
-        permissions: m.permissions,
-        role: m.role
-      }));
-  }, [currentWorkspace?.members, user?.id, user?._id, user?.email]);
+    const filtered = currentWorkspace.members
+      .filter(m => m.userId !== user?.id && m.userId !== user?._id && m.email !== user?.email);
+    
+    return filtered.map(m => ({
+      id: m._id || m.userId,
+      invitedEmail: m.email,
+      displayName: m.email.split('@')[0],
+      status: m.status,
+      permissions: m.permissions,
+      role: m.role
+    }));
+  }, [
+    // Use stringified members to ensure stable comparison
+    currentWorkspace?.members ? JSON.stringify(currentWorkspace.members) : null,
+    user?.id, 
+    user?._id, 
+    user?.email
+  ]);
 
   const canManageUsers = hasPermission('manageUsers');
 

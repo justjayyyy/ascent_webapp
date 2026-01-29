@@ -174,32 +174,42 @@ export const AuthProvider = ({ children }) => {
       console.log('[AuthContext] Fetching updated workspaces...');
       const wsList = await ascent.workspaces.list();
       
-      // Only update workspaces if they actually changed
-      setWorkspaces(prevWorkspaces => {
-        const hasChanges = JSON.stringify(prevWorkspaces) !== JSON.stringify(wsList);
-        if (hasChanges) {
-          console.log('[AuthContext] Workspaces changed, updating state');
-          return wsList;
-        }
-        console.log('[AuthContext] No workspace changes detected, keeping current state');
-        return prevWorkspaces;
-      });
-      
-      // Find and update only the current workspace without changing reference if data is same
+      // Find and update only the current workspace without triggering full workspaces update
       const storedWsId = localStorage.getItem('ascent_current_workspace_id');
       const updatedCurrentWs = wsList.find(w => (w.id || w._id) === storedWsId);
       
       if (updatedCurrentWs) {
-        // Only update if there are actual changes
+        // Update current workspace members only (most surgical update possible)
         setCurrentWorkspace(prevWs => {
-          // Compare member data to see if anything changed
-          const membersChanged = JSON.stringify(prevWs?.members) !== JSON.stringify(updatedCurrentWs.members);
-          if (membersChanged || prevWs?.name !== updatedCurrentWs.name) {
-            console.log('[AuthContext] Current workspace changed, updating state');
-            return updatedCurrentWs;
+          if (!prevWs) return updatedCurrentWs;
+          
+          // Deep compare only the members array
+          const membersChanged = JSON.stringify(prevWs.members) !== JSON.stringify(updatedCurrentWs.members);
+          
+          if (membersChanged) {
+            console.log('[AuthContext] Members changed, updating only members array');
+            // Return a new object but preserve other properties to minimize re-renders
+            return { ...prevWs, members: updatedCurrentWs.members };
           }
-          console.log('[AuthContext] No current workspace changes, keeping reference');
-          return prevWs; // Keep same reference to prevent unnecessary re-renders
+          
+          console.log('[AuthContext] No member changes, keeping current workspace reference');
+          return prevWs;
+        });
+        
+        // Update workspaces list (less frequently accessed, so lower priority)
+        setWorkspaces(prevWorkspaces => {
+          // Find and update only the changed workspace in the list
+          const wsIndex = prevWorkspaces.findIndex(w => (w.id || w._id) === storedWsId);
+          if (wsIndex !== -1) {
+            const needsUpdate = JSON.stringify(prevWorkspaces[wsIndex].members) !== JSON.stringify(updatedCurrentWs.members);
+            if (needsUpdate) {
+              console.log('[AuthContext] Updating workspace in list');
+              const newWorkspaces = [...prevWorkspaces];
+              newWorkspaces[wsIndex] = updatedCurrentWs;
+              return newWorkspaces;
+            }
+          }
+          return prevWorkspaces;
         });
         
         // Update permissions for current user in this workspace
