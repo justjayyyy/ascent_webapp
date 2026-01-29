@@ -16,11 +16,12 @@ const AccountSchema = new mongoose.Schema({
   totalWithdrawals: { type: Number, default: 0 },
   totalFees: { type: Number, default: 0 },
   notes: { type: String },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now, index: true },
   updated_date: { type: Date, default: Date.now },
 });
-AccountSchema.index({ created_by: 1, created_date: -1 });
+AccountSchema.index({ workspaceId: 1, created_date: -1 });
 
 // Position Model with indexes
 const PositionSchema = new mongoose.Schema({
@@ -45,12 +46,13 @@ const PositionSchema = new mongoose.Schema({
   sector: { type: String },
   currency: { type: String, default: 'USD' },
   notes: { type: String },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
-PositionSchema.index({ created_by: 1, accountId: 1 });
-PositionSchema.index({ symbol: 1, created_by: 1 });
+PositionSchema.index({ workspaceId: 1, accountId: 1 });
+PositionSchema.index({ symbol: 1, workspaceId: 1 });
 
 // DayTrade Model with indexes
 const DayTradeSchema = new mongoose.Schema({
@@ -64,11 +66,12 @@ const DayTradeSchema = new mongoose.Schema({
   profitLoss: { type: Number, required: true },
   fees: { type: Number, default: 0 },
   notes: { type: String },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
-DayTradeSchema.index({ created_by: 1, date: -1 });
+DayTradeSchema.index({ workspaceId: 1, date: -1 });
 
 // ExpenseTransaction Model with indexes
 const ExpenseTransactionSchema = new mongoose.Schema({
@@ -83,12 +86,13 @@ const ExpenseTransactionSchema = new mongoose.Schema({
   recurringFrequency: { type: String },
   tags: [String],
   notes: { type: String },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
-ExpenseTransactionSchema.index({ created_by: 1, date: -1 });
-ExpenseTransactionSchema.index({ created_by: 1, category: 1, date: -1 });
+ExpenseTransactionSchema.index({ workspaceId: 1, date: -1 });
+ExpenseTransactionSchema.index({ workspaceId: 1, category: 1, date: -1 });
 
 // Budget Model
 const BudgetSchema = new mongoose.Schema({
@@ -100,12 +104,13 @@ const BudgetSchema = new mongoose.Schema({
   month: { type: Number, required: true, min: 1, max: 12, index: true },
   period: { type: String, enum: ['monthly', 'weekly', 'yearly'], default: 'monthly' },
   isActive: { type: Boolean, default: true },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
-BudgetSchema.index({ created_by: 1, category: 1 });
-BudgetSchema.index({ created_by: 1, year: 1, month: 1, category: 1 });
+BudgetSchema.index({ workspaceId: 1, category: 1 });
+BudgetSchema.index({ workspaceId: 1, year: 1, month: 1, category: 1 });
 
 // Category Model
 const CategorySchema = new mongoose.Schema({
@@ -113,7 +118,8 @@ const CategorySchema = new mongoose.Schema({
   color: { type: String, default: '#5C8374' },
   icon: { type: String },
   type: { type: String, enum: ['expense', 'income', 'both'], default: 'expense' },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
@@ -125,7 +131,8 @@ const CardSchema = new mongoose.Schema({
   lastFourDigits: { type: String },
   bank: { type: String },
   color: { type: String, default: '#5C8374' },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
@@ -141,7 +148,8 @@ const FinancialGoalSchema = new mongoose.Schema({
   priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
   status: { type: String, enum: ['active', 'completed', 'paused'], default: 'active' },
   notes: { type: String },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
@@ -155,7 +163,8 @@ const DashboardWidgetSchema = new mongoose.Schema({
   h: { type: Number, default: 1 },
   enabled: { type: Boolean, default: true },
   config: { type: mongoose.Schema.Types.Mixed },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
@@ -164,35 +173,11 @@ const DashboardWidgetSchema = new mongoose.Schema({
 const PageLayoutSchema = new mongoose.Schema({
   pageName: { type: String, required: true },
   layout: { type: mongoose.Schema.Types.Mixed },
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
   updated_date: { type: Date, default: Date.now },
 });
-
-// SharedUser Model
-const SharedUserSchema = new mongoose.Schema({
-  ownerEmail: { type: String, required: true, index: true },
-  invitedEmail: { type: String, required: true, index: true },
-  status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
-  permissions: {
-    viewPortfolio: { type: Boolean, default: true },
-    editPortfolio: { type: Boolean, default: false },
-    viewExpenses: { type: Boolean, default: true },
-    editExpenses: { type: Boolean, default: false },
-    viewNotes: { type: Boolean, default: false },
-    editNotes: { type: Boolean, default: false },
-    viewGoals: { type: Boolean, default: false },
-    editGoals: { type: Boolean, default: false },
-    viewBudgets: { type: Boolean, default: false },
-    editBudgets: { type: Boolean, default: false },
-    viewSettings: { type: Boolean, default: false },
-    manageUsers: { type: Boolean, default: false }
-  },
-  created_by: { type: String, required: true },
-  created_date: { type: Date, default: Date.now },
-  updated_date: { type: Date, default: Date.now },
-});
-SharedUserSchema.index({ ownerEmail: 1, invitedEmail: 1 });
 
 // PortfolioSnapshot Model
 const PortfolioSnapshotSchema = new mongoose.Schema({
@@ -203,10 +188,11 @@ const PortfolioSnapshotSchema = new mongoose.Schema({
     accountId: String, 
     value: Number 
   }],
-  created_by: { type: String, required: true, index: true },
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   created_date: { type: Date, default: Date.now },
 });
-PortfolioSnapshotSchema.index({ created_by: 1, date: -1 });
+PortfolioSnapshotSchema.index({ workspaceId: 1, date: -1 });
 
 // User Model
 const UserSchema = new mongoose.Schema({
@@ -227,7 +213,7 @@ const UserSchema = new mongoose.Schema({
 const schemas = [
   AccountSchema, PositionSchema, DayTradeSchema, ExpenseTransactionSchema,
   BudgetSchema, CategorySchema, CardSchema, FinancialGoalSchema,
-  DashboardWidgetSchema, PageLayoutSchema, SharedUserSchema, UserSchema
+  DashboardWidgetSchema, PageLayoutSchema, UserSchema
 ];
 
 schemas.forEach(schema => {
@@ -250,7 +236,6 @@ export const Card = mongoose.models.Card || mongoose.model('Card', CardSchema);
 export const FinancialGoal = mongoose.models.FinancialGoal || mongoose.model('FinancialGoal', FinancialGoalSchema);
 export const DashboardWidget = mongoose.models.DashboardWidget || mongoose.model('DashboardWidget', DashboardWidgetSchema);
 export const PageLayout = mongoose.models.PageLayout || mongoose.model('PageLayout', PageLayoutSchema);
-export const SharedUser = mongoose.models.SharedUser || mongoose.model('SharedUser', SharedUserSchema);
 export const PortfolioSnapshot = mongoose.models.PortfolioSnapshot || mongoose.model('PortfolioSnapshot', PortfolioSnapshotSchema);
 export const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
@@ -265,7 +250,6 @@ export default {
   FinancialGoal,
   DashboardWidget,
   PageLayout,
-  SharedUser,
   PortfolioSnapshot,
   User,
 };

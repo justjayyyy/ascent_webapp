@@ -1,6 +1,6 @@
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
-import SharedUser from '../models/SharedUser.js';
+import Workspace from '../models/Workspace.js';
 import { signToken } from '../lib/jwt.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
@@ -118,22 +118,26 @@ export default async function handler(req, res) {
     // Check for pending invitations and auto-accept if email matches
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const pendingInvitations = await SharedUser.find({
-        $or: [
-          { invitedEmail: normalizedEmail },
-          { invitedEmail: { $regex: `^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
-        ],
-        status: 'pending'
+      
+      // Find workspaces where this user is a pending member
+      const workspacesWithPendingInvite = await Workspace.find({
+        'members.email': normalizedEmail,
+        'members.status': 'pending'
       });
       
-      if (pendingInvitations.length > 0) {
-        console.log(`[Google Auth] Found ${pendingInvitations.length} pending invitation(s) for ${normalizedEmail}`);
+      if (workspacesWithPendingInvite.length > 0) {
+        console.log(`[Google Auth] Found ${workspacesWithPendingInvite.length} pending invitation(s) for ${normalizedEmail}`);
       }
       
-      for (const invitation of pendingInvitations) {
-        invitation.status = 'accepted';
-        await invitation.save();
-        console.log(`[Google Auth] Auto-accepted invitation for ${normalizedEmail} from ${invitation.created_by}`);
+      for (const workspace of workspacesWithPendingInvite) {
+        // Update member status to accepted and link userId
+        const memberIndex = workspace.members.findIndex(m => m.email === normalizedEmail);
+        if (memberIndex !== -1) {
+          workspace.members[memberIndex].status = 'accepted';
+          workspace.members[memberIndex].userId = user._id;
+          await workspace.save();
+          console.log(`[Google Auth] Auto-accepted invitation for ${normalizedEmail} to workspace ${workspace.name}`);
+        }
       }
     } catch (invitationError) {
       // Don't fail login if invitation acceptance fails

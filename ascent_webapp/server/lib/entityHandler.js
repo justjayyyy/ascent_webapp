@@ -2,7 +2,6 @@ import connectDB from './mongodb.js';
 import { handleCors } from './cors.js';
 import { success, error, notFound, serverError } from './response.js';
 import { authMiddleware } from '../middleware/auth.js';
-import SharedUser from '../models/SharedUser.js';
 
 // Generic CRUD handler for entities
 export function createEntityHandler(Model, options = {}) {
@@ -23,9 +22,6 @@ export function createEntityHandler(Model, options = {}) {
       
       const { method } = req;
       
-      // Log basic request info
-      // console.error(`[EntityHandler] ${method} ${entityName} START. User: ${user.email}`);
-
       // Connect to MongoDB
       try {
         await connectDB();
@@ -38,69 +34,17 @@ export function createEntityHandler(Model, options = {}) {
 
       const { id, _single } = req.query;
 
-      // Helper function to get the effective owner email (for shared users, use owner's email)
-      const getEffectiveOwnerEmail = async () => {
-        if (!user || !user.email) return null;
-        
-        const userEmail = user.email.trim().toLowerCase();
-        
-        // Skip SharedUser lookup if we're already working with SharedUser model
-        // to avoid circular dependency issues
-        if (Model.modelName === 'SharedUser') {
-          return userEmail;
-        }
-        
-        try {
-          if (!SharedUser) {
-            return userEmail;
-          }
-          
-          // Check if user is a shared user (invited by someone)
-          const sharedUserRecord = await SharedUser.findOne({
-            invitedEmail: userEmail,
-            status: 'accepted'
-          }).lean();
-          
-          if (sharedUserRecord && sharedUserRecord.created_by) {
-            // Check if this is a self-referencing invite (should not happen, but safety check)
-            const ownerEmail = sharedUserRecord.created_by.trim().toLowerCase();
-            if (ownerEmail === userEmail) {
-              return userEmail;
-            }
-
-            // User is a shared user - return the owner's email (created_by)
-            return ownerEmail;
-          }
-        } catch (error) {
-          // If there's an error checking shared user, fall back to user's own email
-          console.error('[EntityHandler] Error checking shared user:', error.message);
-        }
-        
-        // User is the owner - return their own email
-        return userEmail;
-      };
-
-      // Helper function to build user filter (case-insensitive)
+      // Helper function to build user filter (workspace-based)
       const buildUserFilter = async () => {
-        if (!filterByUser || !user || !user.email) return {};
+        if (!filterByUser || !user) return {};
         
-        try {
-          // Get the effective owner email (owner's email for shared users, own email for owners)
-          const effectiveEmail = await getEffectiveOwnerEmail();
-          if (!effectiveEmail) return {};
-          
-          // Simple direct match since we enforce lowercase in models
-          return {
-            [userField]: effectiveEmail
-          };
-        } catch (error) {
-          // Fallback to user's own email if there's an error (but log it)
-          console.error('[EntityHandler] Error building user filter:', error.message);
-          const userEmail = user.email.trim().toLowerCase();
-          return {
-            [userField]: userEmail
-          };
+        // If workspace context is available (set by authMiddleware)
+        if (req.workspace) {
+          return { workspaceId: req.workspace._id };
         }
+        
+        // Fallback or no workspace context (should ideally not happen if enforced)
+        return {};
       };
 
       switch (method) {
@@ -131,7 +75,7 @@ export function createEntityHandler(Model, options = {}) {
             ...filters 
           } = req.query;
 
-          // Build query from filters (case insensitive email matching)
+          // Build query from filters
           let query = await buildUserFilter();
             
           // Add additional filters from query params
@@ -154,27 +98,6 @@ export function createEntityHandler(Model, options = {}) {
             .limit(limitValue)
             .lean();
 
-          // DIAGNOSTIC FALLBACK: If main query returns 0, check if items exist for the user directly
-          // This helps identify if the SharedUser logic is pointing to the wrong place
-          /*
-          if (items.length === 0 && user && user.email) {
-            const userEmail = user.email.trim().toLowerCase();
-            // Only run fallback if the original query wasn't already just for the user
-            if (query[userField] !== userEmail) {
-              const directQuery = { ...query, [userField]: userEmail };
-              const directItems = await Model.find(directQuery).limit(1).lean();
-              if (directItems.length > 0) {
-                console.error(`[EntityHandler] CRITICAL DIAGNOSTIC: Main query returned 0, but DIRECT query for ${userEmail} found items! SharedUser logic is likely redirecting incorrectly.`);
-              }
-            }
-          }
-          */
-
-          // Don't fallback to user's own email - if they're a shared user, 
-          // we want to show owner's data (even if empty), not their own empty data
-          // The query already uses the effective owner email, so if it returns 0 items,
-          // that means the owner has no data, which is correct
-
           // Ensure all items have id field
           const itemsArray = items.map(item => {
             if (!item.id && item._id) {
@@ -191,26 +114,16 @@ export function createEntityHandler(Model, options = {}) {
             return error(res, 'Request body is required', 400);
           }
           
-          // Normalize user email to ensure consistency (lowercase, trimmed)
-          const normalizedEmail = user.email.trim().toLowerCase();
-          
-          // Get effective owner email (for shared users, use owner's email)
-          let effectiveEmailForCreate = normalizedEmail;
-          try {
-            effectiveEmailForCreate = await getEffectiveOwnerEmail() || normalizedEmail;
-          } catch (error) {
-            console.error('[EntityHandler] Error getting effective email for create:', error.message);
-            effectiveEmailForCreate = normalizedEmail;
+          if (!req.workspace) {
+             return error(res, 'Workspace context required', 400);
           }
-          
-          // console.error(`[EntityHandler] POST ${entityName}: User=${normalizedEmail}, CreatingFor=${effectiveEmailForCreate}`);
-
           
           // Check for bulk create
           if (Array.isArray(req.body)) {
             const itemsToCreate = req.body.map(item => ({
               ...item,
-              [userField]: effectiveEmailForCreate
+              workspaceId: req.workspace._id,
+              createdBy: user._id
             }));
             try {
               const items = await Model.insertMany(itemsToCreate);
@@ -229,17 +142,14 @@ export function createEntityHandler(Model, options = {}) {
           }
 
           // Single create
-          // For shared users, use owner's email; for owners, use their own email
           const itemData = {
             ...req.body,
-            [userField]: effectiveEmailForCreate
+            workspaceId: req.workspace._id,
+            createdBy: user._id
           };
           
           try {
             const item = await Model.create(itemData);
-            
-            // Log successful creation
-            // console.error(`[EntityHandler] POST ${entityName} SUCCESS: ID=${item._id}, CreatedBy=${item[userField]}`);
             
             // Convert to JSON to ensure virtuals are included
             let itemJson;
@@ -289,7 +199,7 @@ export function createEntityHandler(Model, options = {}) {
             if (!item) {
               const exists = await Model.findById(id).lean();
               if (exists) {
-                return forbidden(res, 'You do not have permission to update this item');
+                return error(res, 'You do not have permission to update this item', 403);
               }
               return notFound(res, 'Item not found');
             }
@@ -322,7 +232,7 @@ export function createEntityHandler(Model, options = {}) {
             if (!item) {
               const exists = await Model.findById(id).lean();
               if (exists) {
-                return forbidden(res, 'You do not have permission to delete this item');
+                return error(res, 'You do not have permission to delete this item', 403);
               }
               return notFound(res, 'Item not found');
             }
@@ -345,10 +255,11 @@ export function createEntityHandler(Model, options = {}) {
 }
 
 // Helper to handle bulk operations
-export async function bulkCreate(Model, items, userEmail, userField = 'created_by') {
+export async function bulkCreate(Model, items, workspaceId, userId) {
   const itemsToCreate = items.map(item => ({
     ...item,
-    [userField]: userEmail
+    workspaceId,
+    createdBy: userId
   }));
   return Model.insertMany(itemsToCreate);
 }
