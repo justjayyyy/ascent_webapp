@@ -23,6 +23,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [permissions, setPermissions] = useState(null);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
   const [authError, setAuthError] = useState(null);
@@ -72,58 +74,59 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
       
-      // Load permissions
+      // Load workspaces and permissions
       try {
-        console.log('[AuthContext] Loading permissions for:', currentUser.email);
+        const wsList = await ascent.workspaces.list();
+        setWorkspaces(wsList);
         
-        // Check if user is the owner (has created any SharedUser invitations)
-        const owned = await ascent.entities.SharedUser.filter({ 
-          created_by: currentUser.email 
-        });
-        
-        console.log('[AuthContext] Owned records:', owned.length);
-        
-        // If user has created SharedUser records, they are definitely the owner
-        if (owned.length > 0) {
-          console.log('[AuthContext] User is OWNER (has created invites)');
-          setPermissions(null); // Owner has full access
-        } else {
-          // Otherwise, check if user was invited (shared user)
-          const shared = await ascent.entities.SharedUser.filter({ 
-            invitedEmail: currentUser.email, 
-            status: 'accepted' 
-          });
+        let activeWs = null;
+        const storedWsId = localStorage.getItem('ascent_current_workspace_id');
+
+        if (storedWsId) {
+          activeWs = wsList.find(w => (w.id || w._id) === storedWsId);
+        }
+
+        if (!activeWs && wsList.length > 0) {
+          activeWs = wsList[0];
+        }
+
+        // Create default workspace if user has none
+        if (!activeWs && wsList.length === 0) {
+           console.log('[AuthContext] No workspaces found. Creating default.');
+           try {
+             const newWs = await ascent.workspaces.create({ name: 'My Workspace' });
+             setWorkspaces([newWs]);
+             activeWs = newWs;
+           } catch (createError) {
+             console.error('Failed to create default workspace:', createError);
+           }
+        }
+
+        if (activeWs) {
+          setCurrentWorkspace(activeWs);
+          localStorage.setItem('ascent_current_workspace_id', activeWs.id || activeWs._id);
           
-          console.log('[AuthContext] Shared records found:', shared.length);
+          // Determine permissions for this workspace
+          const member = activeWs.members.find(m => 
+            (m.userId && (m.userId === currentUser.id || m.userId === currentUser._id)) || 
+            m.email === currentUser.email
+          );
           
-          if (shared.length > 0) {
-            // User was invited - they're a shared user with limited permissions
-            const perms = shared[0].permissions || {};
-            console.log('[AuthContext] User is SHARED. Permissions:', perms);
-            
-            setPermissions({
-              viewPortfolio: perms.viewPortfolio ?? true,
-              editPortfolio: perms.editPortfolio ?? false,
-              viewExpenses: perms.viewExpenses ?? true,
-              editExpenses: perms.editExpenses ?? false,
-              viewNotes: perms.viewNotes ?? false,
-              editNotes: perms.editNotes ?? false,
-              viewGoals: perms.viewGoals ?? false,
-              editGoals: perms.editGoals ?? false,
-              viewBudgets: perms.viewBudgets ?? false,
-              editBudgets: perms.editBudgets ?? false,
-              viewSettings: perms.viewSettings ?? false,
-              manageUsers: perms.manageUsers ?? false,
-            });
+          if (member) {
+             console.log(`[AuthContext] Active Workspace: ${activeWs.name}, Role: ${member.role}`);
+             if (member.role === 'owner' || member.role === 'admin') {
+               setPermissions(null); // Full access
+             } else {
+               setPermissions(member.permissions || {});
+             }
           } else {
-            // No SharedUser records found - user is owner (new account or no sharing yet)
-            console.log('[AuthContext] No shared records found. Defaulting to OWNER.');
-            setPermissions(null);
+            console.warn('[AuthContext] User is not a member of the active workspace?');
+            setPermissions({}); // No access?
           }
         }
-      } catch (permError) {
-        console.error('Failed to load permissions:', permError);
-        setPermissions(null);
+      } catch (wsError) {
+        console.error('Failed to load workspaces:', wsError);
+        setPermissions(null); // Fallback? Or lock out?
       }
 
       setIsLoadingAuth(false);
@@ -247,12 +250,40 @@ export const AuthProvider = ({ children }) => {
     return permissions?.[permission] === true;
   };
 
+  const switchWorkspace = async (workspaceId) => {
+    const ws = workspaces.find(w => (w.id || w._id) === workspaceId);
+    if (ws) {
+      setCurrentWorkspace(ws);
+      localStorage.setItem('ascent_current_workspace_id', ws.id || ws._id);
+      
+      // Reload permissions
+      const member = ws.members.find(m => 
+        (m.userId && (m.userId === user.id || m.userId === user._id)) || 
+        m.email === user.email
+      );
+      
+      if (member) {
+         if (member.role === 'owner' || member.role === 'admin') {
+           setPermissions(null);
+         } else {
+           setPermissions(member.permissions || {});
+         }
+      }
+      
+      // Force reload of data by invalidating queries (will be done by components listening to workspace change)
+      window.location.reload(); // Simplest way to ensure everything re-fetches with new header
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       isAuthenticated, 
       permissions,
       hasPermission,
+      workspaces,
+      currentWorkspace,
+      switchWorkspace,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,

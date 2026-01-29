@@ -62,10 +62,15 @@ const expenseTransactionSchema = new mongoose.Schema({
   tags: [{
     type: String
   }],
-  created_by: {
-    type: String,
+  workspaceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Workspace',
     required: true,
     index: true
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }

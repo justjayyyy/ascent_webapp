@@ -14,10 +14,11 @@ import WelcomeDialog from './components/WelcomeDialog';
 
 function LayoutContent({ children, currentPageName }) {
   const { user, theme, language, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
-  const { permissions, hasPermission } = useAuth();
+  const { permissions, hasPermission, workspaces, currentWorkspace, switchWorkspace } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
 
   // Session timeout - auto logout after 5 minutes of inactivity
@@ -155,15 +156,43 @@ function LayoutContent({ children, currentPageName }) {
                 {isRTL ? <ChevronLeft className="w-4 h-4 text-white" /> : <ChevronRight className="w-4 h-4 text-white" />}
               </button>
             ) : (
-              <img 
-                src={theme === 'dark' 
-                  ? "/logo-dark.png"
-                  : "/logo-light.png"
-                }
-                alt="Ascend Logo" 
-                className="w-20 h-20 object-contain"
-                style={{ filter: 'brightness(1.1) saturate(1.2)' }}
-              />
+              <DropdownMenu open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[#5C8374]/10 transition-colors w-full">
+                    <img 
+                      src={theme === 'dark' ? "/logo-dark.png" : "/logo-light.png"}
+                      alt="Ascend Logo" 
+                      className="w-8 h-8 object-contain"
+                      style={{ filter: 'brightness(1.1) saturate(1.2)' }}
+                    />
+                    <div className="flex-1 text-left min-w-0">
+                      <p className={cn("text-sm font-bold truncate", colors.textPrimary)}>
+                        {currentWorkspace?.name || 'Ascent'}
+                      </p>
+                      <p className={cn("text-[10px] truncate", colors.textTertiary)}>
+                        {workspaces.length > 1 ? t('switchWorkspace') : t('workspace')}
+                      </p>
+                    </div>
+                    {workspaces.length > 1 && <ChevronUp className={cn("w-4 h-4", colors.textTertiary)} />}
+                  </button>
+                </DropdownMenuTrigger>
+                {workspaces.length > 1 && (
+                  <DropdownMenuContent className={cn("w-56", colors.cardBg, colors.cardBorder)}>
+                    {workspaces.map(ws => (
+                      <DropdownMenuItem 
+                        key={ws.id || ws._id}
+                        onClick={() => switchWorkspace(ws.id || ws._id)}
+                        className={cn(
+                          "cursor-pointer", 
+                          (currentWorkspace?.id === ws.id || currentWorkspace?._id === ws._id) && "bg-[#5C8374]/10"
+                        )}
+                      >
+                        <span className={cn(colors.textPrimary)}>{ws.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                )}
+              </DropdownMenu>
             )}
           </div>
           

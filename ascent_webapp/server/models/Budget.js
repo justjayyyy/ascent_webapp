@@ -45,17 +45,22 @@ const budgetSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  created_by: {
-    type: String,
+  workspaceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Workspace',
     required: true,
     index: true
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
 });
 
-// Compound index for efficient queries by user, year, month, and category
-budgetSchema.index({ created_by: 1, year: 1, month: 1, category: 1 });
+// Compound index for efficient queries by workspace, year, month, and category
+budgetSchema.index({ workspaceId: 1, year: 1, month: 1, category: 1 });
 
 budgetSchema.virtual('id').get(function() {
   return this._id.toHexString();

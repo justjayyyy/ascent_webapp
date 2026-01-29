@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { connectDB } from '../lib/mongodb.js';
-import SharedUser from '../models/SharedUser.js';
+import Workspace from '../models/Workspace.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, notFound } from '../lib/response.js';
 
@@ -21,8 +21,16 @@ export default async function handler(req, res) {
       return error(res, 'Invitation token is required', 400);
     }
 
-    // Find invitation by _id (token)
-    const invitation = await SharedUser.findById(token).lean();
+    // Find workspace containing the member invitation
+    const workspace = await Workspace.findOne({ 'members._id': token }).lean();
+
+    if (!workspace) {
+      return notFound(res, 'Invitation not found');
+    }
+
+    // Find the specific member invitation
+    // Note: workspace.members is an array of objects since we used lean()
+    const invitation = workspace.members.find(m => m._id.toString() === token);
 
     if (!invitation) {
       return notFound(res, 'Invitation not found');
@@ -36,11 +44,12 @@ export default async function handler(req, res) {
     // Return invitation details (without sensitive info)
     const invitationData = {
       id: invitation._id.toString(),
-      invitedEmail: invitation.invitedEmail,
-      displayName: invitation.displayName,
+      workspaceId: workspace._id.toString(),
+      workspaceName: workspace.name,
+      invitedEmail: invitation.email,
       permissions: invitation.permissions,
-      created_by: invitation.created_by,
-      created_date: invitation.created_date
+      created_by: workspace.ownerId, // For compatibility, or show workspace owner
+      created_date: workspace.createdAt
     };
 
     return success(res, invitationData);

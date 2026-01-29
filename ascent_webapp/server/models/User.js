@@ -77,6 +77,11 @@ const userSchema = new mongoose.Schema({
   isFirstLogin: {
     type: Boolean,
     default: true
+  },
+  // Default workspace to load on login
+  defaultWorkspace: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Workspace'
   }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }

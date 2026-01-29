@@ -36,6 +36,11 @@ async function request(endpoint, options = {}, retryCount = 0) {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+
+  const currentWorkspaceId = localStorage.getItem('ascent_current_workspace_id');
+  if (currentWorkspaceId) {
+    headers['x-workspace-id'] = currentWorkspaceId;
+  }
   
   // Create abort controller for timeout
   const controller = new AbortController();
@@ -381,10 +386,55 @@ const appLogs = {
   }
 };
 
+// Workspaces API
+const workspaces = {
+  async list() {
+    return request('/workspaces');
+  },
+  async get(id) {
+    return request(`/workspaces?id=${id}`);
+  },
+  async create(data) {
+    return request('/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async update(id, data) {
+    return request(`/workspaces?id=${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  async delete(id) {
+    return request(`/workspaces?id=${id}`, {
+      method: 'DELETE'
+    });
+  },
+  async invite(id, data) {
+    return request(`/workspaces?id=${id}&action=invite`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async updateMember(workspaceId, memberId, data) {
+    return request(`/workspaces?id=${workspaceId}&action=updateMember&memberId=${memberId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  async removeMember(workspaceId, memberId) {
+    return request(`/workspaces?id=${workspaceId}&action=removeMember&memberId=${memberId}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
 // Main client export - maintains same interface as base44 client
 export const ascent = {
   auth,
   entities,
+  workspaces,
   integrations,
   appLogs
 };

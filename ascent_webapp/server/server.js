@@ -154,11 +154,19 @@ app.put('/api/auth/me', wrapHandler('./auth/me.js'));
 app.patch('/api/auth/me', wrapHandler('./auth/me.js'));
 app.options('/api/auth/*', (req, res) => res.sendStatus(200));
 
+// Workspace routes
+const workspaceHandler = wrapHandler('./api/workspaces.js');
+app.get('/api/workspaces', workspaceHandler);
+app.post('/api/workspaces', workspaceHandler);
+app.put('/api/workspaces', workspaceHandler);
+app.delete('/api/workspaces', workspaceHandler);
+app.options('/api/workspaces', (req, res) => res.sendStatus(200));
+
 // Entity routes - generic handler
 const entities = [
   'accounts', 'positions', 'day-trades', 'transactions',
   'budgets', 'categories', 'cards', 'goals',
-  'dashboard-widgets', 'page-layouts', 'shared-users', 'snapshots', 'notes',
+  'dashboard-widgets', 'page-layouts', 'snapshots', 'notes',
   'portfolio-transactions'
 ];
 
