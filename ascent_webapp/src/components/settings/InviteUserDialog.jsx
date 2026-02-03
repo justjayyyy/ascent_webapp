@@ -4,21 +4,53 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { ascent } from '@/api/client';
 
 export default function InviteUserDialog({ open, onClose, onSubmit, isLoading }) {
   const { colors, t } = useTheme();
+
+  // Fetch available resources when dialog is open
+  const { data: accounts = [], isLoading: isLoadingAccounts } = useQuery({
+    queryKey: ['accounts', 'for-invite'],
+    queryFn: async () => ascent.entities.Account.list(),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: notes = [], isLoading: isLoadingNotes } = useQuery({
+    queryKey: ['notes', 'for-invite'],
+    queryFn: async () => ascent.entities.Note.list(),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [formData, setFormData] = useState({
     invitedEmail: '',
     displayName: '',
     permissions: {
       viewPortfolio: true,
+      allowedAccountIds: [], // Start with empty (none selected) or select all by default? 
+      // Let's assume empty implies "All" if we want backward compat, OR enforce selection.
+      // Given "select which one i want to share", forcing explicit selection is better UI,
+      // but might be annoying.
+      // Decision: If array is empty AND boolean is true, treating it as "All" is easy,
+      // but treating it as "None" is safer.
+      // However, for Invite, let's start with None selected to force owner to choose?
+      // No, owner likely wants to share "everything" by default.
+      // Let's populate allowedAccountIds with ALL IDs if viewPortfolio is true?
+      // No, let's stick to the logic: empty array = 0 items. 
+      // But my backend logic was: undefined = all, array = filter.
+      // So if I initialize it as [], it acts as filter -> 0 items.
       editPortfolio: false,
       viewExpenses: false,
       editExpenses: false,
       viewNotes: false,
+      allowedNoteIds: [],
       editNotes: false,
       viewGoals: false,
       editGoals: false,
@@ -33,7 +65,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
   const validate = () => {
     const newErrors = {};
-    
+
     if (!formData.invitedEmail.trim()) {
       newErrors.invitedEmail = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.invitedEmail)) {
@@ -50,22 +82,24 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validate()) return;
 
-    // Close dialog immediately, don't wait for email
+    // Close dialog immediately
     onClose();
-    
+
     // Reset form
-    setFormData({
+    const resetData = {
       invitedEmail: '',
       displayName: '',
       permissions: {
         viewPortfolio: true,
+        allowedAccountIds: [],
         editPortfolio: false,
         viewExpenses: false,
         editExpenses: false,
         viewNotes: false,
+        allowedNoteIds: [],
         editNotes: false,
         viewGoals: false,
         editGoals: false,
@@ -74,10 +108,14 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
         viewSettings: false,
         manageUsers: false,
       },
-    });
+    };
+
+    // If we want "Select All" behavior by default when boolean is true, we should have populated ids. 
+    // But let's leave as is. User must select.
+
+    setFormData(resetData);
     setErrors({});
-    
-    // Submit in background (email will be sent asynchronously)
+
     onSubmit(formData);
   };
 
@@ -87,6 +125,35 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
       permissions: {
         ...formData.permissions,
         [key]: !formData.permissions[key],
+      },
+    });
+  };
+
+  const toggleResourceId = (resourceKey, id) => {
+    const currentIds = formData.permissions[resourceKey] || [];
+    const newIds = currentIds.includes(id)
+      ? currentIds.filter(i => i !== id)
+      : [...currentIds, id];
+
+    setFormData({
+      ...formData,
+      permissions: {
+        ...formData.permissions,
+        [resourceKey]: newIds,
+      },
+    });
+  };
+
+  const toggleAllResources = (resourceKey, items) => {
+    const currentIds = formData.permissions[resourceKey] || [];
+    const allIds = items.map(i => i.id);
+    const areAllSelected = allIds.every(id => currentIds.includes(id));
+
+    setFormData({
+      ...formData,
+      permissions: {
+        ...formData.permissions,
+        [resourceKey]: areAllSelected ? [] : allIds,
       },
     });
   };
@@ -128,17 +195,55 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
           <div className={cn("space-y-3 pt-4 border-t", colors.borderLight)}>
             <Label className={colors.textSecondary}>{t('permissions')}</Label>
-            
+
             <div className="space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewPortfolio')}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeAccountsPositions')}</p>
+              {/* Portfolio */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewPortfolio')}</p>
+                    <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeAccountsPositions')}</p>
+                  </div>
+                  <Switch
+                    checked={formData.permissions.viewPortfolio}
+                    onCheckedChange={() => togglePermission('viewPortfolio')}
+                  />
                 </div>
-                <Switch
-                  checked={formData.permissions.viewPortfolio}
-                  onCheckedChange={() => togglePermission('viewPortfolio')}
-                />
+                {formData.permissions.viewPortfolio && (
+                  <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2", colors.bgSecondary, colors.border)}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase opacity-70">Select Accounts</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs px-2"
+                        onClick={() => toggleAllResources('allowedAccountIds', accounts)}
+                      >
+                        {accounts.length > 0 && accounts.every(i => (formData.permissions.allowedAccountIds || []).includes(i.id)) ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                      {isLoadingAccounts ? (
+                        <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Loading accounts...</div>
+                      ) : accounts.length === 0 ? (
+                        <p className="text-xs italic opacity-70">No accounts found</p>
+                      ) : (
+                        accounts.map(acc => (
+                          <div key={acc.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`acc-${acc.id}`}
+                              checked={(formData.permissions.allowedAccountIds || []).includes(acc.id)}
+                              onCheckedChange={() => toggleResourceId('allowedAccountIds', acc.id)}
+                              className="w-4 h-4"
+                            />
+                            <Label htmlFor={`acc-${acc.id}`} className="font-normal cursor-pointer">{acc.name}</Label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between py-2">
@@ -149,6 +254,66 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                 <Switch
                   checked={formData.permissions.editPortfolio}
                   onCheckedChange={() => togglePermission('editPortfolio')}
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewNotes') || 'View Notes'}</p>
+                    <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeNotes') || 'Can see notes'}</p>
+                  </div>
+                  <Switch
+                    checked={formData.permissions.viewNotes}
+                    onCheckedChange={() => togglePermission('viewNotes')}
+                  />
+                </div>
+                {formData.permissions.viewNotes && (
+                  <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2", colors.bgSecondary, colors.border)}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase opacity-70">Select Notes</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs px-2"
+                        onClick={() => toggleAllResources('allowedNoteIds', notes)}
+                      >
+                        {notes.length > 0 && notes.every(i => (formData.permissions.allowedNoteIds || []).includes(i.id)) ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                      {isLoadingNotes ? (
+                        <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Loading notes...</div>
+                      ) : notes.length === 0 ? (
+                        <p className="text-xs italic opacity-70">No notes found</p>
+                      ) : (
+                        notes.map(note => (
+                          <div key={note.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`note-${note.id}`}
+                              checked={(formData.permissions.allowedNoteIds || []).includes(note.id)}
+                              onCheckedChange={() => toggleResourceId('allowedNoteIds', note.id)}
+                              className="w-4 h-4"
+                            />
+                            <Label htmlFor={`note-${note.id}`} className="font-normal cursor-pointer text-xs">{note.title || 'Untitled'}</Label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editNotes') || 'Edit Notes'}</p>
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('canCreateEditNotes') || 'Can create and edit notes'}</p>
+                </div>
+                <Switch
+                  checked={formData.permissions.editNotes}
+                  onCheckedChange={() => togglePermission('editNotes')}
                 />
               </div>
 
@@ -171,6 +336,28 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                 <Switch
                   checked={formData.permissions.editExpenses}
                   onCheckedChange={() => togglePermission('editExpenses')}
+                />
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewBudgets') || 'View Budgets'}</p>
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeBudgets') || 'Can see budgets'}</p>
+                </div>
+                <Switch
+                  checked={formData.permissions.viewBudgets}
+                  onCheckedChange={() => togglePermission('viewBudgets')}
+                />
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editBudgets') || 'Edit Budgets'}</p>
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('canEditBudgets') || 'Can create and edit budgets'}</p>
+                </div>
+                <Switch
+                  checked={formData.permissions.editBudgets}
+                  onCheckedChange={() => togglePermission('editBudgets')}
                 />
               </div>
             </div>

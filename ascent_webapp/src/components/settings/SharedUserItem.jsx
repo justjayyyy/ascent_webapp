@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Mail, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
+import { useQuery } from '@tanstack/react-query';
+import { ascent } from '@/api/client';
 
 const SharedUserItem = memo(function SharedUserItem({
   user,
@@ -18,16 +21,76 @@ const SharedUserItem = memo(function SharedUserItem({
 }) {
   const { colors, t } = useTheme();
 
+  // Fetch all accounts and notes for the owner to select from
+  // We only fetch if expanded to save resources
+  const { data: accounts = [], isLoading: isLoadingAccounts } = useQuery({
+    queryKey: ['accounts', 'for-permissions'],
+    queryFn: async () => ascent.entities.Account.list(),
+    enabled: isExpanded && canManageUsers,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: notes = [], isLoading: isLoadingNotes } = useQuery({
+    queryKey: ['notes', 'for-permissions'],
+    queryFn: async () => ascent.entities.Note.list(),
+    enabled: isExpanded && canManageUsers,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const togglePermission = useCallback((key) => {
     try {
       const updatedPermissions = {
         ...user.permissions,
         [key]: !user.permissions[key],
       };
+
+      // If turning ON viewPortfolio, default to ALL accounts if none selected? 
+      // Or empty? Let's assume empty means NONE, unless we want to initialize it.
+      // For now, let's keep it simple: just toggle the boolean.
+
       onUpdate(user.id, { permissions: updatedPermissions });
     } catch (e) {
       console.error('[SharedUserItem] Error toggling permission:', e);
     }
+  }, [user.id, user.permissions, onUpdate]);
+
+  const toggleResourceId = useCallback((resourceKey, resourceId) => {
+    try {
+      const currentIds = user.permissions?.[resourceKey] || [];
+      const isSelected = currentIds.includes(resourceId);
+
+      let newIds;
+      if (isSelected) {
+        newIds = currentIds.filter(id => id !== resourceId);
+      } else {
+        newIds = [...currentIds, resourceId];
+      }
+
+      const updatedPermissions = {
+        ...user.permissions,
+        [resourceKey]: newIds,
+      };
+
+      onUpdate(user.id, { permissions: updatedPermissions });
+    } catch (e) {
+      console.error('[SharedUserItem] Error toggling resource ID:', e);
+    }
+  }, [user.id, user.permissions, onUpdate]);
+
+  // Select/Deselect All helper
+  const toggleAllResources = useCallback((resourceKey, allItems) => {
+    const currentIds = user.permissions?.[resourceKey] || [];
+    const allIds = allItems.map(item => item.id);
+
+    // If all are selected, deselect all. Otherwise, select all.
+    const areAllSelected = allIds.every(id => currentIds.includes(id));
+
+    const updatedPermissions = {
+      ...user.permissions,
+      [resourceKey]: areAllSelected ? [] : allIds,
+    };
+
+    onUpdate(user.id, { permissions: updatedPermissions });
   }, [user.id, user.permissions, onUpdate]);
 
   const toggleExpanded = useCallback((e) => {
@@ -41,6 +104,17 @@ const SharedUserItem = memo(function SharedUserItem({
     e.stopPropagation();
     onDelete(user.id);
   }, [user.id, onDelete]);
+
+  const permissionsList = [
+    { key: 'viewPortfolio', label: 'viewPortfolio', subResource: 'allowedAccountIds', items: accounts, isLoading: isLoadingAccounts, itemName: 'name' },
+    { key: 'editPortfolio', label: 'editPortfolio' },
+    { key: 'viewExpenses', label: 'viewExpenses' },
+    { key: 'editExpenses', label: 'editExpenses' },
+    { key: 'viewNotes', label: 'viewNotes', subResource: 'allowedNoteIds', items: notes, isLoading: isLoadingNotes, itemName: 'title' },
+    { key: 'editNotes', label: 'editNotes' },
+    { key: 'viewBudgets', label: 'viewBudgets' },
+    { key: 'editBudgets', label: 'editBudgets' },
+  ];
 
   return (
     <div className={cn("p-4 rounded-lg border", colors.bgTertiary, colors.border)}>
@@ -89,22 +163,66 @@ const SharedUserItem = memo(function SharedUserItem({
       </div>
 
       {isExpanded && canManageUsers && (
-        <div className={cn("mt-4 pt-4 border-t space-y-2", colors.borderLight)}>
-          {[
-            'viewPortfolio', 'editPortfolio',
-            'viewExpenses', 'editExpenses',
-            'viewNotes', 'editNotes',
-            'viewGoals', 'editGoals',
-            'viewBudgets', 'editBudgets'
-          ].map((perm) => (
-            <div key={perm} className="flex items-center justify-between py-2">
-              <Label className={cn("text-sm", colors.textPrimary)}>{t(perm)}</Label>
-              <Switch
-                checked={user.permissions?.[perm] || false}
-                onCheckedChange={(checked) => {
-                  togglePermission(perm);
-                }}
-              />
+        <div className={cn("mt-4 pt-4 border-t space-y-4", colors.borderLight)}>
+          {permissionsList.map((perm) => (
+            <div key={perm.key} className="space-y-2">
+              <div className="flex items-center justify-between py-1">
+                <Label className={cn("text-sm", colors.textPrimary)}>{t(perm.label)}</Label>
+                <Switch
+                  checked={user.permissions?.[perm.key] || false}
+                  onCheckedChange={() => togglePermission(perm.key)}
+                />
+              </div>
+
+              {/* Granular Permissions Selection */}
+              {user.permissions?.[perm.key] && perm.subResource && (
+                <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2", colors.bgSecondary, colors.border)}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={cn("text-xs font-semibold uppercase", colors.textTertiary)}>
+                      {t('selectItems') || 'Select Items'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => toggleAllResources(perm.subResource, perm.items)}
+                    >
+                      {perm.items.length > 0 && perm.items.every(i => (user.permissions?.[perm.subResource] || []).includes(i.id))
+                        ? (t('deselectAll') || 'Deselect All')
+                        : (t('selectAll') || 'Select All')
+                      }
+                    </Button>
+                  </div>
+
+                  {perm.isLoading ? (
+                    <div className="flex items-center gap-2 text-xs py-2">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Loading...
+                    </div>
+                  ) : perm.items.length === 0 ? (
+                    <p className={cn("text-xs italic", colors.textTertiary)}>No items found</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                      {perm.items.map(item => (
+                        <div key={item.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`${perm.subResource}-${item.id}`}
+                            checked={(user.permissions?.[perm.subResource] || []).includes(item.id)}
+                            onCheckedChange={() => toggleResourceId(perm.subResource, item.id)}
+                            className="w-4 h-4"
+                          />
+                          <Label
+                            htmlFor={`${perm.subResource}-${item.id}`}
+                            className={cn("text-sm cursor-pointer font-normal", colors.textSecondary)}
+                          >
+                            {item[perm.itemName] || 'Untitled'}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

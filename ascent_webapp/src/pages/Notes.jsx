@@ -5,8 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Plus, Loader2, Pin, PinOff, Trash2, X, Search, 
+import {
+  Plus, Loader2, Pin, PinOff, Trash2, X, Search,
   StickyNote, Edit2, Check, Tag, Eye, EyeOff
 } from 'lucide-react';
 import { useTheme } from '../components/ThemeProvider';
@@ -47,9 +47,9 @@ function Notes() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingNote, setEditingNote] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [noteForm, setNoteForm] = useState({ 
-    title: '', 
-    content: '', 
+  const [noteForm, setNoteForm] = useState({
+    title: '',
+    content: '',
     color: '#5C8374',
     tags: [],
     isShared: true
@@ -65,7 +65,15 @@ function Notes() {
     queryKey: ['notes', userId],
     queryFn: async () => {
       if (!userEmail) return [];
-      return await ascent.entities.Note.filter({ created_by: userEmail });
+      const result = await ascent.entities.Note.filter({ created_by: userEmail });
+      const allNotes = Array.isArray(result) ? result : [];
+
+      // Filter based on granular permissions if they exist
+      if (user.permissions?.allowedNoteIds && Array.isArray(user.permissions.allowedNoteIds)) {
+        return allNotes.filter(n => user.permissions.allowedNoteIds.includes(n.id || n._id));
+      }
+
+      return allNotes;
     },
     enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
@@ -112,9 +120,9 @@ function Notes() {
 
   const openEditNote = useCallback((note) => {
     setEditingNote(note);
-    setNoteForm({ 
-      title: note.title, 
-      content: note.content, 
+    setNoteForm({
+      title: note.title,
+      content: note.content,
       color: note.color || '#5C8374',
       tags: note.tags || [],
       isShared: note.isShared !== false
@@ -158,9 +166,9 @@ function Notes() {
   }, [newTag, noteForm.tags]);
 
   const removeTag = useCallback((tagToRemove) => {
-    setNoteForm(prev => ({ 
-      ...prev, 
-      tags: prev.tags.filter(tag => tag !== tagToRemove) 
+    setNoteForm(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
     }));
   }, []);
 
@@ -216,24 +224,24 @@ function Notes() {
               </p>
             </div>
             {canEdit && (
-            <Button
-              onClick={openNewNote}
-              size="sm"
-              className={cn(
-                "bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-6 sm:h-10 text-xs sm:text-base px-2.5 sm:px-4 py-1 sm:py-2",
-                "w-auto rounded-md shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 sm:gap-2"
-              )}
-            >
-              <Plus className={cn("w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0")} />
-              <span className="whitespace-nowrap">{t('newNote') || 'New Note'}</span>
-            </Button>
+              <Button
+                onClick={openNewNote}
+                size="sm"
+                className={cn(
+                  "bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-6 sm:h-10 text-xs sm:text-base px-2.5 sm:px-4 py-1 sm:py-2",
+                  "w-auto rounded-md shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 sm:gap-2"
+                )}
+              >
+                <Plus className={cn("w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0")} />
+                <span className="whitespace-nowrap">{t('newNote') || 'New Note'}</span>
+              </Button>
             )}
           </div>
 
           {/* Search */}
           <div className={cn("relative max-w-md w-full", isRTL && "mr-auto ml-0")}>
             <Search className={cn(
-              "absolute top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4", 
+              "absolute top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4",
               colors.textTertiary,
               isRTL ? "right-2 sm:right-3" : "left-2 sm:left-3"
             )} />
@@ -264,7 +272,7 @@ function Notes() {
             {pinnedNotes.length > 0 && (
               <div className="mb-3 sm:mb-8">
                 <h2 className={cn(
-                  "text-[10px] sm:text-sm font-medium mb-1.5 sm:mb-4 flex items-center gap-1 sm:gap-2", 
+                  "text-[10px] sm:text-sm font-medium mb-1.5 sm:mb-4 flex items-center gap-1 sm:gap-2",
                   colors.textTertiary,
                   isRTL && "flex-row-reverse justify-end"
                 )}>
@@ -273,9 +281,9 @@ function Notes() {
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-4">
                   {pinnedNotes.map(note => (
-                    <NoteCard 
-                      key={note.id} 
-                      note={note} 
+                    <NoteCard
+                      key={note.id}
+                      note={note}
                       onEdit={openEditNote}
                       onDelete={deleteNoteMutation.mutate}
                       onTogglePin={(id, isPinned) => togglePinMutation.mutate({ id, isPinned })}
@@ -300,9 +308,9 @@ function Notes() {
                 )}
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-4">
                   {unpinnedNotes.map(note => (
-                    <NoteCard 
-                      key={note.id} 
-                      note={note} 
+                    <NoteCard
+                      key={note.id}
+                      note={note}
                       onEdit={openEditNote}
                       onDelete={deleteNoteMutation.mutate}
                       onTogglePin={(id, isPinned) => togglePinMutation.mutate({ id, isPinned })}
@@ -321,7 +329,7 @@ function Notes() {
 
         {/* Note Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent 
+          <DialogContent
             className={cn("max-w-4xl w-[95vw] sm:w-full max-h-[80vh] sm:max-h-[75vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-3 sm:p-6", colors.bgSecondary, colors.border)}
             dir={isRTL ? 'rtl' : 'ltr'}
           >
@@ -376,7 +384,7 @@ function Notes() {
                 </label>
                 <div className="flex gap-1 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
                   {noteForm.tags.map(tag => (
-                    <span 
+                    <span
                       key={tag}
                       className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs bg-[#5C8374]/20 text-[#5C8374]"
                     >
@@ -396,9 +404,9 @@ function Notes() {
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                     className={cn("flex-1 h-7 sm:h-10 text-xs sm:text-sm", colors.bgPrimary, colors.border, colors.textPrimary)}
                   />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={addTag}
                     className={cn("h-7 sm:h-10 px-2 sm:px-4", colors.border, colors.textSecondary)}
                   >
@@ -427,8 +435,8 @@ function Notes() {
                   </div>
                 )}
                 <div className="flex gap-1.5 sm:gap-2 flex-1 justify-end">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={closeDialog}
                     className={cn("h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4", colors.border, colors.textSecondary)}
                   >
@@ -480,7 +488,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
   }), [note.color, theme, isRTL]);
 
   return (
-    <Card 
+    <Card
       className={cn(
         "group cursor-pointer transition-all hover:shadow-lg relative overflow-hidden",
         colors.cardBorder
@@ -505,7 +513,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
         {note.tags?.length > 0 && (
           <div className="flex gap-0.5 sm:gap-1 mt-1 sm:mt-3 flex-wrap items-center">
             {note.tags.slice(0, 2).map(tag => (
-              <span 
+              <span
                 key={tag}
                 className="inline-flex items-center gap-0.5 px-1 sm:px-2 py-0 sm:py-0.5 rounded-full text-[9px] sm:text-xs"
                 style={{ backgroundColor: `${note.color}30`, color: note.color }}
@@ -540,42 +548,42 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
 
         {/* Action Buttons */}
         {canEdit && (
-        <div 
-          className={cn(
-            "absolute top-0.5 sm:top-2 flex gap-0.5 sm:gap-1 transition-opacity",
-            isRTL ? "left-0.5 sm:left-2" : "right-0.5 sm:right-2",
-            showActions ? "opacity-100" : "opacity-0"
-          )}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={handleTogglePin}
+          <div
             className={cn(
-              "p-0.5 sm:p-1.5 rounded-full transition-colors",
-              note.isPinned 
-                ? "bg-[#5C8374] text-white" 
-                : cn(colors.bgSecondary, colors.textSecondary, "hover:bg-[#5C8374]/20")
+              "absolute top-0.5 sm:top-2 flex gap-0.5 sm:gap-1 transition-opacity",
+              isRTL ? "left-0.5 sm:left-2" : "right-0.5 sm:right-2",
+              showActions ? "opacity-100" : "opacity-0"
             )}
-            title={note.isPinned ? (t('unpin') || 'Unpin') : (t('pin') || 'Pin')}
+            onClick={(e) => e.stopPropagation()}
           >
-            {note.isPinned ? <PinOff className="w-2.5 h-2.5 sm:w-4 sm:h-4" /> : <Pin className="w-2.5 h-2.5 sm:w-4 sm:h-4" />}
-          </button>
-          <button
-            onClick={handleDelete}
-            className={cn(
-              "p-0.5 sm:p-1.5 rounded-full transition-colors",
-              colors.bgSecondary, "text-red-400 hover:bg-red-400/20"
-            )}
-            title={t('delete') || 'Delete'}
-          >
-            <Trash2 className="w-2.5 h-2.5 sm:w-4 sm:h-4" />
-          </button>
-        </div>
+            <button
+              onClick={handleTogglePin}
+              className={cn(
+                "p-0.5 sm:p-1.5 rounded-full transition-colors",
+                note.isPinned
+                  ? "bg-[#5C8374] text-white"
+                  : cn(colors.bgSecondary, colors.textSecondary, "hover:bg-[#5C8374]/20")
+              )}
+              title={note.isPinned ? (t('unpin') || 'Unpin') : (t('pin') || 'Pin')}
+            >
+              {note.isPinned ? <PinOff className="w-2.5 h-2.5 sm:w-4 sm:h-4" /> : <Pin className="w-2.5 h-2.5 sm:w-4 sm:h-4" />}
+            </button>
+            <button
+              onClick={handleDelete}
+              className={cn(
+                "p-0.5 sm:p-1.5 rounded-full transition-colors",
+                colors.bgSecondary, "text-red-400 hover:bg-red-400/20"
+              )}
+              title={t('delete') || 'Delete'}
+            >
+              <Trash2 className="w-2.5 h-2.5 sm:w-4 sm:h-4" />
+            </button>
+          </div>
         )}
 
         {/* Pin indicator */}
         {note.isPinned && (
-          <Pin 
+          <Pin
             className={cn("absolute top-0.5 sm:top-2 w-3.5 h-3.5 sm:w-5 sm:h-5", isRTL ? "left-0.5 sm:left-2" : "right-0.5 sm:right-2")}
             style={{ color: note.color }}
           />

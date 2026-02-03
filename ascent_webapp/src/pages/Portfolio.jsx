@@ -53,7 +53,14 @@ export default function Portfolio() {
       }
       try {
         const result = await ascent.entities.Account.list('-created_date', 1000);
-        return Array.isArray(result) ? result : [];
+        const allAccounts = Array.isArray(result) ? result : [];
+
+        // Filter based on granular permissions if they exist
+        if (user.permissions?.allowedAccountIds && Array.isArray(user.permissions.allowedAccountIds)) {
+          return allAccounts.filter(acc => user.permissions.allowedAccountIds.includes(acc.id || acc._id));
+        }
+
+        return allAccounts;
       } catch (error) {
         console.error('Error fetching accounts:', error);
         return [];

@@ -29,6 +29,7 @@ function Expenses() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('editExpenses');
   const canEditBudgets = hasPermission('editBudgets');
+  const canViewBudgets = hasPermission('viewBudgets');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonths, setSelectedMonths] = useState([(new Date().getMonth() + 1).toString()]); // Array of selected months
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -223,7 +224,7 @@ function Expenses() {
       created_by,
       ...transactionFields
     } = transaction;
-    
+
     const duplicatedTransaction = {
       ...transactionFields,
       date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
@@ -231,7 +232,7 @@ function Expenses() {
       id: undefined,
       _id: undefined,
     };
-    
+
     setEditingTransaction(duplicatedTransaction);
     setAddDialogOpen(true);
   }, []);
@@ -239,7 +240,7 @@ function Expenses() {
   const handleAddTransaction = useCallback(async (transactionData) => {
     // Check if we're editing an existing transaction (has valid ID)
     const isEditing = editingTransaction && editingTransaction.id && editingTransaction._id;
-    
+
     if (isEditing) {
       // Editing existing transaction
       await updateTransactionMutation.mutateAsync({ id: editingTransaction.id, data: transactionData });
@@ -256,16 +257,16 @@ function Expenses() {
         const startDate = parseISO(cleanData.recurringStartDate);
         const endDate = parseISO(cleanData.recurringEndDate);
         const dayOfMonth = startDate.getDate();
-        
+
         // Generate all monthly dates between start and end
         const monthlyDates = eachMonthOfInterval({ start: startDate, end: endDate });
-        
+
         // Create a transaction for each month, using the same day of month
         const transactionsToCreate = [];
         for (const monthDate of monthlyDates) {
           // Use the same day of month, but handle months with fewer days (e.g., Jan 31 -> Feb 28)
           const transactionDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayOfMonth);
-          
+
           // Only add if the date is within the end date range
           if (transactionDate <= endDate && transactionDate >= startDate) {
             transactionsToCreate.push({
@@ -286,14 +287,14 @@ function Expenses() {
           for (const transaction of transactionsToCreate) {
             await createTransactionMutation.mutateAsync(transaction);
           }
-          
+
           // Show single success message with count and refresh
           queryClient.invalidateQueries({ queryKey: ['transactions'] });
           setAddDialogOpen(false);
           setEditingTransaction(null);
           setIsCreatingRecurring(false);
           const translationKey = t('recurringTransactionsCreated');
-          const successMessage = translationKey !== 'recurringTransactionsCreated' 
+          const successMessage = translationKey !== 'recurringTransactionsCreated'
             ? translationKey.replace('{count}', transactionsToCreate.length)
             : `${transactionsToCreate.length} monthly recurring transactions created successfully`;
           toast.success(successMessage);
@@ -319,7 +320,7 @@ function Expenses() {
   const selectedPeriodTransactions = useMemo(() => {
     const selectedYearNum = parseInt(selectedYear);
     const hasSelectedMonths = selectedMonths && selectedMonths.length > 0;
-    
+
     if (hasSelectedMonths) {
       // Filter by selected months/year
       const selectedMonthNums = selectedMonths.map(m => parseInt(m));
@@ -328,7 +329,7 @@ function Expenses() {
         const d = parseISO(t.date);
         const transactionYear = getYear(d);
         const transactionMonth = getMonth(d) + 1; // getMonth returns 0-11, we need 1-12
-        
+
         return transactionYear === selectedYearNum && selectedMonthNums.includes(transactionMonth);
       });
     } else {
@@ -345,10 +346,10 @@ function Expenses() {
   // Get selected period label
   const selectedPeriodLabel = useMemo(() => {
     const hasSelectedMonths = selectedMonths && selectedMonths.length > 0;
-    
+
     if (hasSelectedMonths) {
-      const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 
-                         'july', 'august', 'september', 'october', 'november', 'december'];
+      const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december'];
       if (selectedMonths.length === 1) {
         const monthKey = monthKeys[parseInt(selectedMonths[0]) - 1] || '';
         return `${t(monthKey)} ${selectedYear}`;
@@ -382,7 +383,7 @@ function Expenses() {
             <div className="flex gap-1 sm:gap-2">
               {canEdit && (
                 <>
-                  <Button 
+                  <Button
                     onClick={() => setCategoryDialogOpen(true)}
                     variant="outline"
                     size="sm"
@@ -391,16 +392,22 @@ function Expenses() {
                     <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
                     <span className="hidden md:inline">Categories</span>
                   </Button>
-                  <Button 
-                    onClick={() => setBudgetDialogOpen(true)}
-                    variant="outline"
-                    size="sm"
-                    className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
-                  >
-                    <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                    <span className="hidden md:inline">Budgets</span>
-                  </Button>
-                  <Button 
+                </>
+              )}
+              {canViewBudgets && (
+                <Button
+                  onClick={() => setBudgetDialogOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
+                >
+                  <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                  <span className="hidden md:inline">Budgets</span>
+                </Button>
+              )}
+              {canEdit && (
+                <>
+                  <Button
                     onClick={() => {
                       setEditingTransaction(null);
                       setAddDialogOpen(true);
@@ -499,7 +506,7 @@ function Expenses() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel 
+              <AlertDialogCancel
                 onClick={() => {
                   setDeleteDialogOpen(false);
                   setTransactionToDelete(null);
