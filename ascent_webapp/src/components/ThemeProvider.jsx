@@ -1877,8 +1877,18 @@ const isPublicRoute = (pathname) => {
 export function ThemeProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = React.useRef(false); // Track if we've already loaded user
 
   const loadUser = useCallback(async () => {
+    // Prevent duplicate loads - only load once per session
+    if (hasLoadedRef.current) {
+      console.log('[ThemeProvider] User already loaded, skipping duplicate load');
+      return user;
+    }
+    
+    console.log('[ThemeProvider] Loading user for the first time');
+    hasLoadedRef.current = true;
+    
     // Skip auth check on public routes
     const pathname = window.location.pathname;
     if (isPublicRoute(pathname)) {
@@ -1900,14 +1910,18 @@ export function ThemeProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadUser();
-  }, [loadUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Function to refresh user data (called after settings update)
   const refreshUser = useCallback(async () => {
+    console.log('[ThemeProvider] refreshUser called - forcing reload');
+    // Reset the ref to allow reload
+    hasLoadedRef.current = false;
     const updatedUser = await loadUser();
     return updatedUser;
   }, [loadUser]);

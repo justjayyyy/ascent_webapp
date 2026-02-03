@@ -8,6 +8,7 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -33,19 +34,46 @@ const LayoutWrapper = React.memo(({ children, currentPageName }) => Layout ?
   </Layout>
   : <ErrorBoundary><Suspense fallback={<SkeletonPage />}>{children}</Suspense></ErrorBoundary>);
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin, hasPermission, permissions } = useAuth();
+const PermissionGuard = ({ pageName, children }) => {
+  const { hasPermission, permissions } = useAuth();
+
   const navigate = React.useMemo(() => {
     // Determine the first available page for the user
     if (!permissions) return 'Portfolio'; // Owner goes to Portfolio
-    
+
     if (permissions.viewPortfolio) return 'Portfolio';
     if (permissions.viewExpenses) return 'Expenses';
     if (permissions.viewNotes) return 'Notes';
     if (permissions.viewSettings) return 'Settings';
-    
+
     return null; // No access
   }, [permissions]);
+
+  const permissionMap = {
+    'Portfolio': 'viewPortfolio',
+    'Expenses': 'viewExpenses',
+    'Notes': 'viewNotes',
+    'Settings': 'viewSettings',
+    'Dashboard': 'viewDashboard',
+  };
+
+  const requiredPermission = permissionMap[pageName];
+
+  // If no specific permission required or user has permission, render content
+  if (!requiredPermission || hasPermission(requiredPermission)) {
+    return children;
+  }
+
+  if (!navigate) {
+    return <div className="p-8 text-center text-white">You do not have access to any pages. Please contact your workspace owner.</div>;
+  }
+
+  // Redirect to the first available page
+  return <Navigate to={`/${navigate}`} replace />;
+};
+
+const AuthenticatedApp = () => {
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
 
   // Show loading spinner while checking auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -72,31 +100,6 @@ const AuthenticatedApp = () => {
     navigateToLogin();
     return null;
   }
-
-  // Permission Guard Component
-  const PermissionGuard = ({ pageName, children }) => {
-    const permissionMap = {
-      'Portfolio': 'viewPortfolio',
-      'Expenses': 'viewExpenses',
-      'Notes': 'viewNotes',
-      'Settings': 'viewSettings',
-      'Dashboard': 'viewDashboard',
-    };
-
-    const requiredPermission = permissionMap[pageName];
-    
-    // If no specific permission required or user has permission, render content
-    if (!requiredPermission || hasPermission(requiredPermission)) {
-      return children;
-    }
-
-    if (!navigate) {
-       return <div className="p-8 text-center text-white">You do not have access to any pages. Please contact your workspace owner.</div>;
-    }
-
-    // Redirect to the first available page
-    return <Navigate to={`/${navigate}`} replace />;
-  };
 
   // Render the main app
   return (
@@ -132,24 +135,26 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
-            <Route path="/*" element={
-              <>
-                <NavigationTracker />
-                <AuthenticatedApp />
-              </>
-            } />
-          </Routes>
-        </Router>
-        <Toaster />
-        <SonnerToaster position="top-right" richColors />
-        <Analytics />
-        <SpeedInsights />
+        <ThemeProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+              <Route path="/*" element={
+                <>
+                  <NavigationTracker />
+                  <AuthenticatedApp />
+                </>
+              } />
+            </Routes>
+          </Router>
+          <Toaster />
+          <SonnerToaster position="top-right" richColors />
+          <Analytics />
+          <SpeedInsights />
+        </ThemeProvider>
       </QueryClientProvider>
     </AuthProvider>
   )

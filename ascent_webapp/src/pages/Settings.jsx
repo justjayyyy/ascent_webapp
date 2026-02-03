@@ -39,11 +39,11 @@ export default function Settings() {
 
   // Store previous workspace name to detect actual changes
   const prevWorkspaceNameRef = useRef(currentWorkspace?.name);
-  
+
   useEffect(() => {
     const currentName = currentWorkspace?.name;
     const prevName = prevWorkspaceNameRef.current;
-    
+
     // Only update if the name value actually changed (not just the object reference)
     if (currentName && currentName !== prevName) {
       console.log('[Settings] Workspace name changed, updating input value');
@@ -61,7 +61,7 @@ export default function Settings() {
       setEditingFullName(false);
       return;
     }
-    
+
     try {
       await updateUserMutation.mutateAsync({ full_name: fullNameValue.trim() });
       setEditingFullName(false);
@@ -89,7 +89,7 @@ export default function Settings() {
     onSuccess: async () => {
       // Refresh to ensure we have the latest from server
       await refreshUser();
-      queryClient.invalidateQueries();
+      // Don't invalidate all queries - the optimistic update and refreshUser() already handle the state
       toast.success('Settings updated!');
     },
     onError: async (error) => {
@@ -211,25 +211,25 @@ export default function Settings() {
   const inviteUserMutation = useMutation({
     mutationFn: async (data) => {
       if (!currentWorkspace) throw new Error('No active workspace');
-      
+
       const inviteData = {
         email: data.invitedEmail,
         role: 'viewer', // Default role
         permissions: data.permissions,
         displayName: data.displayName
       };
-      
+
       const result = await ascent.workspaces.invite(currentWorkspace.id || currentWorkspace._id, inviteData);
-      
+
       // Send email logic (reuse existing logic but adapted)
       // For now, let's assume the backend handles it or we just show success
       // The backend response contains the workspace with updated members
-      
+
       // We can reuse the email sending logic here if we want client-side sending
       // But let's keep it simple for now and trust the backend invitation creation
-      
+
       // ... (Email sending logic omitted for brevity, can be re-added if needed)
-      
+
       return result;
     },
     onSuccess: async () => {
@@ -249,7 +249,7 @@ export default function Settings() {
     if (!currentWorkspace?.members) return [];
     const filtered = currentWorkspace.members
       .filter(m => m.userId !== user?.id && m.userId !== user?._id && m.email !== user?.email);
-    
+
     return filtered.map(m => ({
       id: m._id || m.userId,
       invitedEmail: m.email,
@@ -261,8 +261,8 @@ export default function Settings() {
   }, [
     // Use stringified members to ensure stable comparison
     currentWorkspace?.members ? JSON.stringify(currentWorkspace.members) : null,
-    user?.id, 
-    user?._id, 
+    user?.id,
+    user?._id,
     user?.email
   ]);
 
@@ -277,10 +277,10 @@ export default function Settings() {
     onMutate: async ({ id, data }) => {
       // Optimistic update - update UI immediately BEFORE server responds
       console.log('[Settings] Applying optimistic UI update');
-      
+
       // Snapshot the previous value in case we need to rollback
       const previousWorkspace = currentWorkspace;
-      
+
       // Optimistically update the local state immediately
       if (currentWorkspace?.members) {
         const updatedMembers = currentWorkspace.members.map(member => {
@@ -289,11 +289,11 @@ export default function Settings() {
           }
           return member;
         });
-        
+
         // Update only the members array to trigger minimal re-render
         setCurrentWorkspace(prev => ({ ...prev, members: updatedMembers }));
       }
-      
+
       // Return context with previous value for potential rollback
       return { previousWorkspace };
     },
@@ -319,14 +319,14 @@ export default function Settings() {
     onMutate: async (id) => {
       // Optimistic update - remove user from UI immediately
       const previousWorkspace = currentWorkspace;
-      
+
       if (currentWorkspace?.members) {
         const updatedMembers = currentWorkspace.members.filter(
           member => (member._id || member.userId) !== id
         );
         setCurrentWorkspace(prev => ({ ...prev, members: updatedMembers }));
       }
-      
+
       return { previousWorkspace };
     },
     onSuccess: () => {
@@ -374,211 +374,215 @@ export default function Settings() {
         <div className="space-y-4">
           {/* Grid for compact cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Profile Information */}
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-[#5C8374]" />
-                <CardTitle className={colors.accentText}>{t('profileInformation')}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className={colors.textSecondary}>{t('fullName')}</Label>
-                <div className="flex items-center gap-2">
-                  <User className={cn("w-4 h-4", colors.textTertiary)} />
-                  <Input
-                    value={fullNameValue}
-                    onChange={(e) => setFullNameValue(e.target.value)}
-                    disabled={!editingFullName}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && editingFullName) {
-                        handleSaveFullName();
-                      } else if (e.key === 'Escape' && editingFullName) {
-                        handleCancelEditFullName();
-                      }
-                    }}
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingFullName && "ring-2 ring-[#5C8374]")}
-                  />
-                  {editingFullName ? (
-                    <div className="flex items-center gap-1">
+            {/* Profile Information */}
+            <Card className={cn(colors.cardBg, colors.cardBorder)}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <User className="w-5 h-5 text-[#5C8374]" />
+                  <CardTitle className={colors.accentText}>{t('profileInformation')}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className={colors.textSecondary}>{t('fullName')}</Label>
+                  <div className="flex items-center gap-2">
+                    <User className={cn("w-4 h-4", colors.textTertiary)} />
+                    <Input
+                      value={fullNameValue}
+                      onChange={(e) => setFullNameValue(e.target.value)}
+                      disabled={!editingFullName}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && editingFullName) {
+                          handleSaveFullName();
+                        } else if (e.key === 'Escape' && editingFullName) {
+                          handleCancelEditFullName();
+                        }
+                      }}
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingFullName && "ring-2 ring-[#5C8374]")}
+                    />
+                    {editingFullName ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={handleSaveFullName}
+                          className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
+                        >
+                          <Check className="w-4 h-4 text-green-400" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={handleCancelEditFullName}
+                          className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
+                        >
+                          <X className="w-4 h-4 text-red-400" />
+                        </Button>
+                      </div>
+                    ) : (
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={handleSaveFullName}
-                        className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
+                        onClick={() => setEditingFullName(true)}
+                        className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
                       >
-                        <Check className="w-4 h-4 text-green-400" />
+                        <Edit2 className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={handleCancelEditFullName}
-                        className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
-                      >
-                        <X className="w-4 h-4 text-red-400" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setEditingFullName(true)}
-                      className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label className={colors.textSecondary}>{t('email')}</Label>
-                <div className="flex items-center gap-2">
-                  <Mail className={cn("w-4 h-4", colors.textTertiary)} />
-                  <Input
-                    value={user?.email || ''}
-                    disabled
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
-                  />
+                <div className="space-y-2">
+                  <Label className={colors.textSecondary}>{t('email')}</Label>
+                  <div className="flex items-center gap-2">
+                    <Mail className={cn("w-4 h-4", colors.textTertiary)} />
+                    <Input
+                      value={user?.email || ''}
+                      disabled
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label className={colors.textSecondary}>{t('role')}</Label>
-                <div className="flex items-center gap-2">
-                  <Shield className={cn("w-4 h-4", colors.textTertiary)} />
-                  <Input
-                    value={user?.role || 'user'}
-                    disabled
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary, "capitalize")}
-                  />
+                <div className="space-y-2">
+                  <Label className={colors.textSecondary}>{t('role')}</Label>
+                  <div className="flex items-center gap-2">
+                    <Shield className={cn("w-4 h-4", colors.textTertiary)} />
+                    <Input
+                      value={user?.role || 'user'}
+                      disabled
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, "capitalize")}
+                    />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Preferences */}
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Globe className="w-5 h-5 text-[#5C8374]" />
-                <CardTitle className={colors.accentText}>{t('preferences')}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                <div>
-                  <p className={cn("font-medium", colors.textPrimary)}>{t('language')}</p>
-                  <p className={cn("text-sm", colors.textTertiary)}>{t('displayLanguage')}</p>
+            {/* Preferences */}
+            <Card className={cn(colors.cardBg, colors.cardBorder)}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Globe className="w-5 h-5 text-[#5C8374]" />
+                  <CardTitle className={colors.accentText}>{t('preferences')}</CardTitle>
                 </div>
-                <Select
-                  value={user?.language || 'en'}
-                  onValueChange={(value) => updateUserMutation.mutate({ language: value })}
-                >
-                  <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    <SelectItem value="en" className={colors.textPrimary}>English</SelectItem>
-                    <SelectItem value="he" className={colors.textPrimary}>עברית</SelectItem>
-                    <SelectItem value="ru" className={colors.textPrimary}>Русский</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                <div>
-                  <p className={cn("font-medium", colors.textPrimary)}>{t('defaultCurrency')}</p>
-                  <p className={cn("text-sm", colors.textTertiary)}>{t('primaryCurrencyForPortfolio')}</p>
-                </div>
-                <Select
-                  value={user?.currency || 'USD'}
-                  onValueChange={(value) => updateUserMutation.mutate({ currency: value })}
-                >
-                  <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    <SelectItem value="USD" className={colors.textPrimary}>USD ($)</SelectItem>
-                    <SelectItem value="EUR" className={colors.textPrimary}>EUR (€)</SelectItem>
-                    <SelectItem value="GBP" className={colors.textPrimary}>GBP (£)</SelectItem>
-                    <SelectItem value="ILS" className={colors.textPrimary}>ILS (₪)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className={cn("font-medium", colors.textPrimary)}>{t('theme')}</p>
-                  <p className={cn("text-sm", colors.textTertiary)}>{t('appColorScheme')}</p>
-                </div>
-                <Select
-                  value={user?.theme || 'dark'}
-                  onValueChange={(value) => updateUserMutation.mutate({ theme: value })}
-                >
-                  <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    <SelectItem value="dark" className={colors.textPrimary}>{t('dark')}</SelectItem>
-                    <SelectItem value="light" className={colors.textPrimary}>{t('light')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-
-          {/* Notifications */}
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Bell className="w-5 h-5 text-[#5C8374]" />
-                <CardTitle className={colors.accentText}>{t('notifications')}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
                   <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('priceAlerts')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('getNotifiedPriceChanges')}</p>
+                    <p className={cn("font-medium", colors.textPrimary)}>{t('language')}</p>
+                    <p className={cn("text-sm", colors.textTertiary)}>{t('displayLanguage')}</p>
                   </div>
-                  <Switch
-                    checked={user?.priceAlerts || false}
-                    onCheckedChange={(checked) => updateUserMutation.mutate({ priceAlerts: checked })}
-                  />
+                  <Select
+                    value={user?.language || 'en'}
+                    onValueChange={(value) => updateUserMutation.mutate({ language: value })}
+                  >
+                    <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      <SelectItem value="en" className={colors.textPrimary}>English</SelectItem>
+                      <SelectItem value="he" className={colors.textPrimary}>עברית</SelectItem>
+                      <SelectItem value="ru" className={colors.textPrimary}>Русский</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
                   <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('dailySummary')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('receiveDailyReports')}</p>
+                    <p className={cn("font-medium", colors.textPrimary)}>{t('defaultCurrency')}</p>
+                    <p className={cn("text-sm", colors.textTertiary)}>{t('primaryCurrencyForPortfolio')}</p>
                   </div>
-                  <Switch
-                    checked={user?.dailySummary !== false}
-                    onCheckedChange={(checked) => updateUserMutation.mutate({ dailySummary: checked })}
-                  />
-                </div>
-                <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                  <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('weeklySummary')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('receiveWeeklyReports')}</p>
-                  </div>
-                  <Switch
-                    checked={user?.weeklyReports !== false}
-                    onCheckedChange={(checked) => updateUserMutation.mutate({ weeklyReports: checked })}
-                  />
+                  <Select
+                    value={user?.currency || 'USD'}
+                    onValueChange={(value) => updateUserMutation.mutate({ currency: value })}
+                  >
+                    <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      <SelectItem value="USD" className={colors.textPrimary}>USD ($)</SelectItem>
+                      <SelectItem value="EUR" className={colors.textPrimary}>EUR (€)</SelectItem>
+                      <SelectItem value="GBP" className={colors.textPrimary}>GBP (£)</SelectItem>
+                      <SelectItem value="ILS" className={colors.textPrimary}>ILS (₪)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-center justify-between py-3">
                   <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('emailNotifications')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('receiveImportantUpdates')}</p>
+                    <p className={cn("font-medium", colors.textPrimary)}>{t('theme')}</p>
+                    <p className={cn("text-sm", colors.textTertiary)}>{t('appColorScheme')}</p>
                   </div>
-                  <Switch
-                    checked={user?.emailNotifications !== false}
-                    onCheckedChange={(checked) => updateUserMutation.mutate({ emailNotifications: checked })}
-                  />
+                  <Select
+                    value={user?.theme || 'dark'}
+                    onValueChange={(value) => updateUserMutation.mutate({ theme: value })}
+                  >
+                    <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      <SelectItem value="dark" className={colors.textPrimary}>{t('dark')}</SelectItem>
+                      <SelectItem value="light" className={colors.textPrimary}>{t('light')}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+
+            {/* Notifications */}
+            <Card className={cn(colors.cardBg, colors.cardBorder)}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Bell className="w-5 h-5 text-[#5C8374]" />
+                  <CardTitle className={colors.accentText}>{t('notifications')}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
+                    <div>
+                      <p className={cn("font-medium", colors.textPrimary)}>{t('priceAlerts')}</p>
+                      <p className={cn("text-sm", colors.textTertiary)}>{t('getNotifiedPriceChanges')}</p>
+                    </div>
+                    <Switch
+                      checked={user?.priceAlerts || false}
+                      onCheckedChange={(checked) => updateUserMutation.mutate({ priceAlerts: checked })}
+                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
+                    />
+                  </div>
+                  <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
+                    <div>
+                      <p className={cn("font-medium", colors.textPrimary)}>{t('dailySummary')}</p>
+                      <p className={cn("text-sm", colors.textTertiary)}>{t('receiveDailyReports')}</p>
+                    </div>
+                    <Switch
+                      checked={user?.dailySummary !== false}
+                      onCheckedChange={(checked) => updateUserMutation.mutate({ dailySummary: checked })}
+                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
+                    />
+                  </div>
+                  <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
+                    <div>
+                      <p className={cn("font-medium", colors.textPrimary)}>{t('weeklySummary')}</p>
+                      <p className={cn("text-sm", colors.textTertiary)}>{t('receiveWeeklyReports')}</p>
+                    </div>
+                    <Switch
+                      checked={user?.weeklyReports !== false}
+                      onCheckedChange={(checked) => updateUserMutation.mutate({ weeklyReports: checked })}
+                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <div>
+                      <p className={cn("font-medium", colors.textPrimary)}>{t('emailNotifications')}</p>
+                      <p className={cn("text-sm", colors.textTertiary)}>{t('receiveImportantUpdates')}</p>
+                    </div>
+                    <Switch
+                      checked={user?.emailNotifications !== false}
+                      onCheckedChange={(checked) => updateUserMutation.mutate({ emailNotifications: checked })}
+                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Card Management */}
@@ -586,72 +590,72 @@ export default function Settings() {
 
           {/* Workspace Management */}
           {isOwner && (
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-[#5C8374]" />
-                <CardTitle className={colors.accentText}>{t('workspaceSettings') || 'Workspace Settings'}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className={colors.textSecondary}>{t('workspaceName') || 'Workspace Name'}</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={workspaceNameValue}
-                    onChange={(e) => setWorkspaceNameValue(e.target.value)}
-                    disabled={!editingWorkspaceName}
-                    className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingWorkspaceName && "ring-2 ring-[#5C8374]")}
-                  />
-                  {editingWorkspaceName ? (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={handleSaveWorkspaceName}
-                        className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
-                      >
-                        <Check className="w-4 h-4 text-green-400" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          setWorkspaceNameValue(currentWorkspace?.name || '');
-                          setEditingWorkspaceName(false);
-                        }}
-                        className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
-                      >
-                        <X className="w-4 h-4 text-red-400" />
-                      </Button>
-                    </div>
-                  ) : (
-                    isOwner && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEditingWorkspaceName(true)}
-                        className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    )
-                  )}
+            <Card className={cn(colors.cardBg, colors.cardBorder)}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-[#5C8374]" />
+                  <CardTitle className={colors.accentText}>{t('workspaceSettings') || 'Workspace Settings'}</CardTitle>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className={colors.textSecondary}>{t('workspaceName') || 'Workspace Name'}</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={workspaceNameValue}
+                      onChange={(e) => setWorkspaceNameValue(e.target.value)}
+                      disabled={!editingWorkspaceName}
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingWorkspaceName && "ring-2 ring-[#5C8374]")}
+                    />
+                    {editingWorkspaceName ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={handleSaveWorkspaceName}
+                          className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
+                        >
+                          <Check className="w-4 h-4 text-green-400" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setWorkspaceNameValue(currentWorkspace?.name || '');
+                            setEditingWorkspaceName(false);
+                          }}
+                          className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
+                        >
+                          <X className="w-4 h-4 text-red-400" />
+                        </Button>
+                      </div>
+                    ) : (
+                      isOwner && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditingWorkspaceName(true)}
+                          className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                      )
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Shared Access */}
           {isOwner && (
-          <SharedUsersSection
-            sharedUsers={sharedUsers}
-            onInvite={handleInviteUser}
-            onUpdate={handleUpdateUser}
-            onDelete={handleDeleteUser}
-            canManageUsers={canManageUsers}
-          />
+            <SharedUsersSection
+              sharedUsers={sharedUsers}
+              onInvite={handleInviteUser}
+              onUpdate={handleUpdateUser}
+              onDelete={handleDeleteUser}
+              canManageUsers={canManageUsers}
+            />
           )}
 
           {/* Export */}
@@ -678,12 +682,12 @@ export default function Settings() {
             <CardContent className="p-6">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-3">
-                  <img 
-                    src={theme === 'dark' 
+                  <img
+                    src={theme === 'dark'
                       ? "/logo-dark.png"
                       : "/logo-light.png"
                     }
-                    alt="Ascend Logo" 
+                    alt="Ascend Logo"
                     className="w-24 h-24 object-contain"
                     style={{ filter: 'brightness(1.1) saturate(1.2)' }}
                   />
@@ -694,7 +698,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="h-16 md:h-8"></div>
       </div>
     </div>

@@ -281,7 +281,10 @@ function LayoutContent({ children, currentPageName }) {
                     
                     {/* Theme Toggle */}
                     <div 
-                      onClick={() => handleThemeChange(theme !== 'dark')}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleThemeChange(theme !== 'dark');
+                      }}
                       className={cn("px-3 py-[5px] flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
                     >
                       <div className="flex items-center gap-2">
@@ -291,13 +294,17 @@ function LayoutContent({ children, currentPageName }) {
                       <Switch 
                         checked={theme === 'dark'} 
                         onCheckedChange={handleThemeChange}
+                        onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
                     
                     {/* Blur Values Toggle */}
                     <div 
-                      onClick={() => handleBlurValuesChange(!user?.blurValues)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleBlurValuesChange(!user?.blurValues);
+                      }}
                       className={cn("px-3 py-[5px] flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
                     >
                       <div className="flex items-center gap-2">
@@ -307,6 +314,7 @@ function LayoutContent({ children, currentPageName }) {
                       <Switch 
                         checked={user?.blurValues || false} 
                         onCheckedChange={handleBlurValuesChange}
+                        onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
@@ -431,7 +439,10 @@ function LayoutContent({ children, currentPageName }) {
 
               {/* Theme Toggle */}
               <div 
-                onClick={() => handleThemeChange(theme !== 'dark')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleThemeChange(theme !== 'dark');
+                }}
                 className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
               >
                 <div className="flex items-center gap-2">
@@ -441,13 +452,17 @@ function LayoutContent({ children, currentPageName }) {
                 <Switch 
                   checked={theme === 'dark'} 
                   onCheckedChange={handleThemeChange}
+                  onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
               {/* Blur Values Toggle */}
               <div 
-                onClick={() => handleBlurValuesChange(!user?.blurValues)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleBlurValuesChange(!user?.blurValues);
+                }}
                 className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
               >
                 <div className="flex items-center gap-2">
@@ -457,6 +472,7 @@ function LayoutContent({ children, currentPageName }) {
                 <Switch 
                   checked={user?.blurValues || false} 
                   onCheckedChange={handleBlurValuesChange}
+                  onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -573,9 +589,5 @@ function LayoutContent({ children, currentPageName }) {
 }
 
 export default function Layout({ children, currentPageName }) {
-  return (
-    <ThemeProvider>
-      <LayoutContent children={children} currentPageName={currentPageName} />
-    </ThemeProvider>
-  );
+  return <LayoutContent children={children} currentPageName={currentPageName} />;
 }
