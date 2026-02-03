@@ -22,7 +22,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, register, loginWithGoogle } = useAuth();
+  const { login, register, loginWithGoogle, isAuthenticated } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(redirectUrl);
+    }
+  }, [isAuthenticated, navigate, redirectUrl]);
 
   // Get browser language for login page (before user is authenticated)
   const browserLang = navigator.language?.split('-')[0] || 'en';

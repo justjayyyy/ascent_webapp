@@ -141,8 +141,15 @@ export const AuthProvider = ({ children }) => {
       // Skip auth check on public routes
       const pathname = window.location.pathname;
       if (isPublicRoute(pathname)) {
-        setIsLoadingAuth(false);
-        setIsAuthenticated(false);
+        // If we have a token (e.g. just logged in and about to redirect, or manually visited login),
+        // don't force logout immediately. Verify the session instead.
+        if (ascent.auth.isAuthenticated()) {
+          console.log('[AuthContext] Public route but authenticated, verifying session...');
+          await checkUserAuth();
+        } else {
+          setIsLoadingAuth(false);
+          setIsAuthenticated(false);
+        }
         return;
       }
 
