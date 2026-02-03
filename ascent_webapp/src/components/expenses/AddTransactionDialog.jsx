@@ -17,12 +17,12 @@ import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 /**
  * @typedef {Object} AddTransactionDialogProps
- * @property {boolean} isOpen
+ * @property {boolean} open
  * @property {Function} onClose
- * @property {Function} onSave
- * @property {Object} initialData
+ * @property {Function} onSubmit
+ * @property {boolean} isLoading
  * @property {Array} categories
- * @property {Array} cards
+ * @property {Object} editTransaction
  * @property {Array} accounts
  */
 
@@ -30,12 +30,12 @@ import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
  * @param {AddTransactionDialogProps} props
  */
 export default function AddTransactionDialog({
-  isOpen,
+  open,
   onClose,
-  onSave,
-  initialData,
+  onSubmit,
+  isLoading,
   categories = [],
-  cards = [],
+  editTransaction = null,
   accounts = []
 }) {
   const { user, t, language, colors } = useTheme();
