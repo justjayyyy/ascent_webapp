@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
@@ -209,41 +210,44 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                     onCheckedChange={() => togglePermission('viewPortfolio')}
                   />
                 </div>
-                {formData.permissions.viewPortfolio && (
-                  <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2", colors.bgSecondary, colors.border)}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold uppercase opacity-70">Select Accounts</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs px-2"
-                        onClick={() => toggleAllResources('allowedAccountIds', accounts)}
-                      >
-                        {accounts.length > 0 && accounts.every(i => (formData.permissions.allowedAccountIds || []).includes(i.id)) ? 'Deselect All' : 'Select All'}
-                      </Button>
+
+                <Collapsible open={formData.permissions.viewPortfolio}>
+                  <CollapsibleContent>
+                    <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold uppercase opacity-70">{t('selectAccounts')}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => toggleAllResources('allowedAccountIds', accounts)}
+                        >
+                          {accounts.length > 0 && accounts.every(i => (formData.permissions.allowedAccountIds || []).includes(i.id)) ? t('deselectAll') : t('selectAll')}
+                        </Button>
+                      </div>
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                        {isLoadingAccounts ? (
+                          <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> {t('loadingAccounts')}</div>
+                        ) : accounts.length === 0 ? (
+                          <p className="text-xs italic opacity-70">{t('noAccountsFound')}</p>
+                        ) : (
+                          accounts.map(acc => (
+                            <div key={acc.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`acc-${acc.id}`}
+                                checked={(formData.permissions.allowedAccountIds || []).includes(acc.id)}
+                                onCheckedChange={() => toggleResourceId('allowedAccountIds', acc.id)}
+                                className="w-4 h-4"
+                              />
+                              <Label htmlFor={`acc-${acc.id}`} className="font-normal cursor-pointer">{acc.name}</Label>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                      {isLoadingAccounts ? (
-                        <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Loading accounts...</div>
-                      ) : accounts.length === 0 ? (
-                        <p className="text-xs italic opacity-70">No accounts found</p>
-                      ) : (
-                        accounts.map(acc => (
-                          <div key={acc.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`acc-${acc.id}`}
-                              checked={(formData.permissions.allowedAccountIds || []).includes(acc.id)}
-                              onCheckedChange={() => toggleResourceId('allowedAccountIds', acc.id)}
-                              className="w-4 h-4"
-                            />
-                            <Label htmlFor={`acc-${acc.id}`} className="font-normal cursor-pointer">{acc.name}</Label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
               <div className="flex items-center justify-between py-2">
@@ -261,55 +265,58 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
               <div className="space-y-2">
                 <div className="flex items-center justify-between py-2">
                   <div>
-                    <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewNotes') || 'View Notes'}</p>
-                    <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeNotes') || 'Can see notes'}</p>
+                    <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewNotes')}</p>
+                    <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeNotes')}</p>
                   </div>
                   <Switch
                     checked={formData.permissions.viewNotes}
                     onCheckedChange={() => togglePermission('viewNotes')}
                   />
                 </div>
-                {formData.permissions.viewNotes && (
-                  <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2", colors.bgSecondary, colors.border)}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold uppercase opacity-70">Select Notes</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs px-2"
-                        onClick={() => toggleAllResources('allowedNoteIds', notes)}
-                      >
-                        {notes.length > 0 && notes.every(i => (formData.permissions.allowedNoteIds || []).includes(i.id)) ? 'Deselect All' : 'Select All'}
-                      </Button>
+
+                <Collapsible open={formData.permissions.viewNotes}>
+                  <CollapsibleContent>
+                    <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold uppercase opacity-70">{t('selectNotes')}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => toggleAllResources('allowedNoteIds', notes)}
+                        >
+                          {notes.length > 0 && notes.every(i => (formData.permissions.allowedNoteIds || []).includes(i.id)) ? t('deselectAll') : t('selectAll')}
+                        </Button>
+                      </div>
+                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                        {isLoadingNotes ? (
+                          <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> {t('loadingNotes')}</div>
+                        ) : notes.length === 0 ? (
+                          <p className="text-xs italic opacity-70">{t('noNotesFound')}</p>
+                        ) : (
+                          notes.map(note => (
+                            <div key={note.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`note-${note.id}`}
+                                checked={(formData.permissions.allowedNoteIds || []).includes(note.id)}
+                                onCheckedChange={() => toggleResourceId('allowedNoteIds', note.id)}
+                                className="w-4 h-4"
+                              />
+                              <Label htmlFor={`note-${note.id}`} className="font-normal cursor-pointer text-xs">{note.title || 'Untitled'}</Label>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                      {isLoadingNotes ? (
-                        <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Loading notes...</div>
-                      ) : notes.length === 0 ? (
-                        <p className="text-xs italic opacity-70">No notes found</p>
-                      ) : (
-                        notes.map(note => (
-                          <div key={note.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`note-${note.id}`}
-                              checked={(formData.permissions.allowedNoteIds || []).includes(note.id)}
-                              onCheckedChange={() => toggleResourceId('allowedNoteIds', note.id)}
-                              className="w-4 h-4"
-                            />
-                            <Label htmlFor={`note-${note.id}`} className="font-normal cursor-pointer text-xs">{note.title || 'Untitled'}</Label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editNotes') || 'Edit Notes'}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canCreateEditNotes') || 'Can create and edit notes'}</p>
+                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editNotes')}</p>
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('canAddEditNotes')}</p>
                 </div>
                 <Switch
                   checked={formData.permissions.editNotes}
@@ -341,8 +348,8 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewBudgets') || 'View Budgets'}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeBudgets') || 'Can see budgets'}</p>
+                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewBudgets')}</p>
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeBudgets')}</p>
                 </div>
                 <Switch
                   checked={formData.permissions.viewBudgets}
@@ -352,8 +359,8 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editBudgets') || 'Edit Budgets'}</p>
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('canEditBudgets') || 'Can create and edit budgets'}</p>
+                  <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editBudgets')}</p>
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('canAddEditBudgets')}</p>
                 </div>
                 <Switch
                   checked={formData.permissions.editBudgets}

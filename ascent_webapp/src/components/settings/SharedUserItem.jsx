@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Mail, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { useQuery } from '@tanstack/react-query';
@@ -43,10 +44,6 @@ const SharedUserItem = memo(function SharedUserItem({
         ...user.permissions,
         [key]: !user.permissions[key],
       };
-
-      // If turning ON viewPortfolio, default to ALL accounts if none selected? 
-      // Or empty? Let's assume empty means NONE, unless we want to initialize it.
-      // For now, let's keep it simple: just toggle the boolean.
 
       onUpdate(user.id, { permissions: updatedPermissions });
     } catch (e) {
@@ -106,11 +103,31 @@ const SharedUserItem = memo(function SharedUserItem({
   }, [user.id, onDelete]);
 
   const permissionsList = [
-    { key: 'viewPortfolio', label: 'viewPortfolio', subResource: 'allowedAccountIds', items: accounts, isLoading: isLoadingAccounts, itemName: 'name' },
+    {
+      key: 'viewPortfolio',
+      label: 'viewPortfolio',
+      subResource: 'allowedAccountIds',
+      items: accounts,
+      isLoading: isLoadingAccounts,
+      itemName: 'name',
+      selectLabel: 'selectAccounts',
+      emptyLabel: 'noAccountsFound',
+      loadingLabel: 'loadingAccounts'
+    },
     { key: 'editPortfolio', label: 'editPortfolio' },
     { key: 'viewExpenses', label: 'viewExpenses' },
     { key: 'editExpenses', label: 'editExpenses' },
-    { key: 'viewNotes', label: 'viewNotes', subResource: 'allowedNoteIds', items: notes, isLoading: isLoadingNotes, itemName: 'title' },
+    {
+      key: 'viewNotes',
+      label: 'viewNotes',
+      subResource: 'allowedNoteIds',
+      items: notes,
+      isLoading: isLoadingNotes,
+      itemName: 'title',
+      selectLabel: 'selectNotes',
+      emptyLabel: 'noNotesFound',
+      loadingLabel: 'loadingNotes'
+    },
     { key: 'editNotes', label: 'editNotes' },
     { key: 'viewBudgets', label: 'viewBudgets' },
     { key: 'editBudgets', label: 'editBudgets' },
@@ -174,54 +191,58 @@ const SharedUserItem = memo(function SharedUserItem({
                 />
               </div>
 
-              {/* Granular Permissions Selection */}
-              {user.permissions?.[perm.key] && perm.subResource && (
-                <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2", colors.bgSecondary, colors.border)}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={cn("text-xs font-semibold uppercase", colors.textTertiary)}>
-                      {t('selectItems') || 'Select Items'}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                      onClick={() => toggleAllResources(perm.subResource, perm.items)}
-                    >
-                      {perm.items.length > 0 && perm.items.every(i => (user.permissions?.[perm.subResource] || []).includes(i.id))
-                        ? (t('deselectAll') || 'Deselect All')
-                        : (t('selectAll') || 'Select All')
-                      }
-                    </Button>
-                  </div>
+              {/* Granular Permissions Selection using Collapsible */}
+              {perm.subResource && (
+                <Collapsible open={!!user.permissions?.[perm.key]}>
+                  <CollapsibleContent>
+                    <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={cn("text-xs font-semibold uppercase", colors.textTertiary)}>
+                          {t(perm.selectLabel) || 'Select Items'}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => toggleAllResources(perm.subResource, perm.items)}
+                        >
+                          {perm.items.length > 0 && perm.items.every(i => (user.permissions?.[perm.subResource] || []).includes(i.id))
+                            ? (t('deselectAll') || 'Deselect All')
+                            : (t('selectAll') || 'Select All')
+                          }
+                        </Button>
+                      </div>
 
-                  {perm.isLoading ? (
-                    <div className="flex items-center gap-2 text-xs py-2">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Loading...
-                    </div>
-                  ) : perm.items.length === 0 ? (
-                    <p className={cn("text-xs italic", colors.textTertiary)}>No items found</p>
-                  ) : (
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                      {perm.items.map(item => (
-                        <div key={item.id} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`${perm.subResource}-${item.id}`}
-                            checked={(user.permissions?.[perm.subResource] || []).includes(item.id)}
-                            onCheckedChange={() => toggleResourceId(perm.subResource, item.id)}
-                            className="w-4 h-4"
-                          />
-                          <Label
-                            htmlFor={`${perm.subResource}-${item.id}`}
-                            className={cn("text-sm cursor-pointer font-normal", colors.textSecondary)}
-                          >
-                            {item[perm.itemName] || 'Untitled'}
-                          </Label>
+                      {perm.isLoading ? (
+                        <div className="flex items-center gap-2 text-xs py-2">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          {t(perm.loadingLabel) || 'Loading...'}
                         </div>
-                      ))}
+                      ) : perm.items.length === 0 ? (
+                        <p className={cn("text-xs italic", colors.textTertiary)}>{t(perm.emptyLabel) || 'No items found'}</p>
+                      ) : (
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                          {perm.items.map(item => (
+                            <div key={item.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`${perm.subResource}-${item.id}-${user.id}`} // Unique ID
+                                checked={(user.permissions?.[perm.subResource] || []).includes(item.id)}
+                                onCheckedChange={() => toggleResourceId(perm.subResource, item.id)}
+                                className="w-4 h-4"
+                              />
+                              <Label
+                                htmlFor={`${perm.subResource}-${item.id}-${user.id}`}
+                                className={cn("text-sm cursor-pointer font-normal", colors.textSecondary)}
+                              >
+                                {item[perm.itemName] || 'Untitled'}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </div>
           ))}

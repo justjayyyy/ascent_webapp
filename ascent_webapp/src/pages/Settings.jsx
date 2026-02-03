@@ -185,13 +185,27 @@ export default function Settings() {
       if (!currentWorkspace) return;
       return ascent.workspaces.update(currentWorkspace.id || currentWorkspace._id, { name });
     },
+    onMutate: async (name) => {
+      // Optimistic update - update UI immediately
+      const previousWorkspace = currentWorkspace;
+
+      if (currentWorkspace) {
+        setCurrentWorkspace(prev => ({ ...prev, name: name }));
+      }
+
+      return { previousWorkspace };
+    },
     onSuccess: async () => {
-      // Refresh workspaces to update name in background
+      // Refresh workspaces to update name in background/ensure consistency
       await refreshWorkspaces();
       setEditingWorkspaceName(false);
       toast.success('Workspace name updated!');
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousWorkspace) {
+        setCurrentWorkspace(context.previousWorkspace);
+      }
       toast.error('Failed to update workspace name');
     }
   });
