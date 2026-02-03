@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 
 export default function Settings() {
   const { user: themeUser, theme, colors, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
-  const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission } = useAuth();
+  const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission, refreshWorkspaces } = useAuth();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -238,7 +238,36 @@ export default function Settings() {
       // Refresh workspaces to update members list in background
       await refreshWorkspaces();
     },
-    onError: (error) => {
+    onMutate: async (data) => {
+      // Optimistic update - show new user immediately
+      const previousWorkspace = currentWorkspace;
+
+      if (currentWorkspace) {
+        setInviteDialogOpen(false); // Close dialog immediately
+
+        const newMember = {
+          _id: `temp-${Date.now()}`,
+          userId: `temp-${Date.now()}`,
+          email: data.invitedEmail,
+          status: 'pending',
+          role: 'viewer', // Default role
+          permissions: data.permissions || {},
+          displayName: data.displayName
+        };
+
+        setCurrentWorkspace(prev => ({
+          ...prev,
+          members: [...(prev.members || []), newMember]
+        }));
+      }
+
+      return { previousWorkspace };
+    },
+    onError: (error, variables, context) => {
+      console.error('Invite error:', error);
+      if (context?.previousWorkspace) {
+        setCurrentWorkspace(context.previousWorkspace);
+      }
       toast.error(error.message || 'Failed to send invitation');
     }
   });
