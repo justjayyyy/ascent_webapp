@@ -232,8 +232,14 @@ export default function Settings() {
 
       return result;
     },
-    onSuccess: async () => {
-      toast.success('Invitation sent successfully!');
+    onSuccess: async (data) => {
+      // The backend now returns { message, workspace, emailSent, emailError }
+      if (data && data.emailSent === false) {
+        toast.warning(`Invitation created, but email failed: ${data.emailError || 'SMTP error'}`);
+      } else {
+        toast.success('Invitation sent successfully!');
+      }
+
       setInviteDialogOpen(false);
       // Refresh workspaces to update members list in background
       await refreshWorkspaces();

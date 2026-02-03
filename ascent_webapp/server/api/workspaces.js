@@ -35,7 +35,7 @@ export default async function handler(req, res) {
           const workspaces = await Workspace.find({
             'members.userId': user._id
           }).sort('-createdAt').lean();
-          
+
           return success(res, workspaces);
         }
 
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
         if (action === 'invite') {
           // Invite member
           if (!id) return error(res, 'Workspace ID required', 400);
-          
+
           const { email, role, permissions } = req.body;
           if (!email) return error(res, 'Email required', 400);
 
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
           if (!workspace) return unauthorized(res, 'Not authorized to invite to this workspace');
 
           const normalizedEmail = email.toLowerCase().trim();
-          
+
           // Check if already a member
           const existingMember = workspace.members.find(m => m.email === normalizedEmail);
           if (existingMember) {
@@ -75,22 +75,22 @@ export default async function handler(req, res) {
           });
 
           await workspace.save();
-          
+
           // Get the newly added member to get their ID (token)
           const newMember = workspace.members.find(m => m.email === normalizedEmail);
-          
+
           if (newMember) {
             const token = newMember._id;
             const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
             const inviteLink = `${origin}/accept-invitation/${token}`;
-            
+
             // Determine language based on inviter's preference (user.language)
             const language = user.language || 'en';
-            
+
             let emailSubject = '';
             let emailBody = '';
             let emailHtml = '';
-            
+
             if (language === 'he') {
               // Hebrew Template
               emailSubject = `הזמנה להצטרף ל-${workspace.name}`;
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
                 בברכה,
                 צוות Ascent
               `;
-              
+
               emailHtml = `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: rtl; text-align: right;">
                   <div style="text-align: center; margin-bottom: 20px;">
@@ -148,7 +148,7 @@ export default async function handler(req, res) {
                 С уважением,
                 Команда Ascent
               `;
-              
+
               emailHtml = `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: ltr;">
                   <div style="text-align: center; margin-bottom: 20px;">
@@ -189,7 +189,7 @@ export default async function handler(req, res) {
                 Best regards,
                 The Ascent Team
               `;
-              
+
               emailHtml = `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; direction: ltr;">
                   <div style="text-align: center; margin-bottom: 20px;">
@@ -216,26 +216,31 @@ export default async function handler(req, res) {
               `;
             }
 
-            // Send email asynchronously (don't block response)
-            sendEmail({
+            // Send email and wait for result to provide feedback
+            const emailResult = await sendEmail({
               to: normalizedEmail,
               subject: emailSubject,
               body: emailBody,
               html: emailHtml
-            }).then(result => {
-              if (!result.sent) {
-                console.error('Failed to send invitation email:', result.error || result.message);
-              } else {
-                console.log('Invitation email sent to:', normalizedEmail);
-              }
+            });
+
+            if (!emailResult.sent) {
+              console.error('Failed to send invitation email:', emailResult.error || emailResult.message);
+            } else {
+              console.log('Invitation email sent to:', normalizedEmail);
+            }
+
+            return success(res, {
+              message: emailResult.sent ? 'Invitation sent' : 'Invitation created (Email failed)',
+              workspace,
+              emailSent: emailResult.sent,
+              emailError: emailResult.error || emailResult.message
             });
           }
-          
-          return success(res, { message: 'Invitation sent', workspace });
         } else if (action === 'accept') {
-            // Accept invitation logic here if needed via POST
-            // Usually handled via a separate token-based endpoint or just by logging in if we auto-add
-            return error(res, 'Use the invitation link to accept', 400);
+          // Accept invitation logic here if needed via POST
+          // Usually handled via a separate token-based endpoint or just by logging in if we auto-add
+          return error(res, 'Use the invitation link to accept', 400);
         } else {
           // Create new workspace
           const { name } = req.body;
@@ -271,42 +276,42 @@ export default async function handler(req, res) {
 
       case 'PUT':
         if (!id) return error(res, 'Workspace ID required', 400);
-        
+
         if (action === 'updateMember') {
-           const { memberId } = req.query;
-           const { role, permissions } = req.body;
-           
-           if (!memberId) return error(res, 'Member ID required', 400);
+          const { memberId } = req.query;
+          const { role, permissions } = req.body;
 
-           const workspace = await Workspace.findOne({
-             _id: id,
-             'members.userId': user._id,
-             'members.role': { $in: ['owner', 'admin'] }
-           });
+          if (!memberId) return error(res, 'Member ID required', 400);
 
-           if (!workspace) return unauthorized(res, 'Not authorized');
+          const workspace = await Workspace.findOne({
+            _id: id,
+            'members.userId': user._id,
+            'members.role': { $in: ['owner', 'admin'] }
+          });
 
-           const memberIndex = workspace.members.findIndex(m => (m._id && m._id.toString() === memberId) || (m.userId && m.userId.toString() === memberId));
-           if (memberIndex === -1) return notFound(res, 'Member not found');
+          if (!workspace) return unauthorized(res, 'Not authorized');
 
-           // Prevent modifying owner
-           if (workspace.members[memberIndex].role === 'owner' && workspace.members[memberIndex].userId.toString() !== user._id.toString()) {
-             // Only owner can modify themselves? No, owner shouldn't be modified easily.
-             // Let's just prevent demoting the last owner.
-           }
+          const memberIndex = workspace.members.findIndex(m => (m._id && m._id.toString() === memberId) || (m.userId && m.userId.toString() === memberId));
+          if (memberIndex === -1) return notFound(res, 'Member not found');
 
-           if (role) workspace.members[memberIndex].role = role;
-           if (permissions) workspace.members[memberIndex].permissions = permissions;
+          // Prevent modifying owner
+          if (workspace.members[memberIndex].role === 'owner' && workspace.members[memberIndex].userId.toString() !== user._id.toString()) {
+            // Only owner can modify themselves? No, owner shouldn't be modified easily.
+            // Let's just prevent demoting the last owner.
+          }
 
-           await workspace.save();
-           return success(res, workspace);
+          if (role) workspace.members[memberIndex].role = role;
+          if (permissions) workspace.members[memberIndex].permissions = permissions;
+
+          await workspace.save();
+          return success(res, workspace);
         }
 
         const { name } = req.body;
-        
+
         const updatedWorkspace = await Workspace.findOneAndUpdate(
-          { 
-            _id: id, 
+          {
+            _id: id,
             'members.userId': user._id,
             'members.role': 'owner' // Only owner can rename for now
           },
@@ -315,34 +320,34 @@ export default async function handler(req, res) {
         );
 
         if (!updatedWorkspace) return unauthorized(res, 'Not authorized to update this workspace');
-        
+
         return success(res, updatedWorkspace);
 
       case 'DELETE':
         if (!id) return error(res, 'Workspace ID required', 400);
 
         if (action === 'removeMember') {
-           const { memberId } = req.query;
-           if (!memberId) return error(res, 'Member ID required', 400);
+          const { memberId } = req.query;
+          if (!memberId) return error(res, 'Member ID required', 400);
 
-           const workspace = await Workspace.findOne({
-             _id: id,
-             'members.userId': user._id,
-             'members.role': { $in: ['owner', 'admin'] }
-           });
+          const workspace = await Workspace.findOne({
+            _id: id,
+            'members.userId': user._id,
+            'members.role': { $in: ['owner', 'admin'] }
+          });
 
-           if (!workspace) return unauthorized(res, 'Not authorized');
+          if (!workspace) return unauthorized(res, 'Not authorized');
 
-           // Prevent removing self if owner (must delete workspace instead)
-           // Actually, owner can leave if there is another owner.
-           
-           workspace.members = workspace.members.filter(m => {
-             const mId = m._id ? m._id.toString() : (m.userId ? m.userId.toString() : null);
-             return mId !== memberId;
-           });
+          // Prevent removing self if owner (must delete workspace instead)
+          // Actually, owner can leave if there is another owner.
 
-           await workspace.save();
-           return success(res, workspace);
+          workspace.members = workspace.members.filter(m => {
+            const mId = m._id ? m._id.toString() : (m.userId ? m.userId.toString() : null);
+            return mId !== memberId;
+          });
+
+          await workspace.save();
+          return success(res, workspace);
         }
 
         // Only owner can delete workspace
