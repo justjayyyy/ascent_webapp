@@ -159,9 +159,9 @@ function LayoutContent({ children, currentPageName }) {
               <DropdownMenu open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[#5C8374]/10 transition-colors w-full">
-                    <img 
+                    <img
                       src={theme === 'dark' ? "/logo-dark.png" : "/logo-light.png"}
-                      alt="Ascend Logo" 
+                      alt="Ascend Logo"
                       className="w-12 h-12 object-contain"
                       style={{ filter: 'brightness(1.1) saturate(1.2)' }}
                     />
@@ -179,11 +179,11 @@ function LayoutContent({ children, currentPageName }) {
                 {workspaces.length > 1 && (
                   <DropdownMenuContent className={cn("w-56", colors.cardBg, colors.cardBorder)}>
                     {workspaces.map(ws => (
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         key={ws.id || ws._id}
                         onClick={() => switchWorkspace(ws.id || ws._id)}
                         className={cn(
-                          "cursor-pointer", 
+                          "cursor-pointer",
                           (currentWorkspace?.id === ws.id || currentWorkspace?._id === ws._id) && "bg-[#5C8374]/10"
                         )}
                       >
@@ -195,7 +195,7 @@ function LayoutContent({ children, currentPageName }) {
               </DropdownMenu>
             )}
           </div>
-          
+
           {/* Collapse Button on Edge */}
           {!sidebarCollapsed && (
             <button
@@ -208,7 +208,7 @@ function LayoutContent({ children, currentPageName }) {
               {isRTL ? <ChevronRight className="w-4 h-4 text-white" /> : <ChevronLeft className="w-4 h-4 text-white" />}
             </button>
           )}
-          
+
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navigation.map((item) => {
               const isActive = currentPageName === item.page;
@@ -232,7 +232,7 @@ function LayoutContent({ children, currentPageName }) {
                 </Link>
               );
             })}
-            
+
             {/* OPTION 1: Calendar in Sidebar - ENABLED */}
             <div className="pt-2 border-t border-[#5C8374]/20 mt-2">
               {SidebarCalendarButton && <SidebarCalendarButton className={sidebarCollapsed ? "justify-center" : ""} />}
@@ -259,8 +259,8 @@ function LayoutContent({ children, currentPageName }) {
                       <ChevronUp className={cn("w-4 h-4 flex-shrink-0", colors.textTertiary)} />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    side="top" 
+                  <DropdownMenuContent
+                    side="top"
                     align="center"
                     sideOffset={8}
                     className={cn("w-[240px] max-w-[calc(100vw-2rem)] mb-0 rounded-xl", colors.cardBg, colors.cardBorder)}
@@ -273,14 +273,14 @@ function LayoutContent({ children, currentPageName }) {
                         {permissions ? t('sharedUser') : t('owner')}
                       </p>
                     </div>
-                    
+
                     {/* Custom Separator - 93% width */}
                     <div className="flex justify-center py-1">
                       <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
                     </div>
-                    
+
                     {/* Theme Toggle */}
-                    <div 
+                    <div
                       onClick={(e) => {
                         e.preventDefault();
                         handleThemeChange(theme !== 'dark');
@@ -291,16 +291,16 @@ function LayoutContent({ children, currentPageName }) {
                         {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                         <span className="text-sm">{t('darkMode')}</span>
                       </div>
-                      <Switch 
-                        checked={theme === 'dark'} 
+                      <Switch
+                        checked={theme === 'dark'}
                         onCheckedChange={handleThemeChange}
                         onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
-                    
+
                     {/* Blur Values Toggle */}
-                    <div 
+                    <div
                       onClick={(e) => {
                         e.preventDefault();
                         handleBlurValuesChange(!user?.blurValues);
@@ -311,42 +311,40 @@ function LayoutContent({ children, currentPageName }) {
                         {user?.blurValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         <span className="text-sm">{t('blurValues')}</span>
                       </div>
-                      <Switch 
-                        checked={user?.blurValues || false} 
+                      <Switch
+                        checked={user?.blurValues || false}
                         onCheckedChange={handleBlurValuesChange}
                         onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
-                    
+
                     {/* Custom Separator - 93% width */}
                     <div className="flex justify-center py-1">
                       <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
                     </div>
-                    
+
                     {/* Settings */}
-                    {hasPermission('viewSettings') && (
-                      <>
-                        <DropdownMenuItem asChild>
-                          <Link 
-                            to={createPageUrl('Settings')} 
-                            className={cn("flex items-center gap-2 px-3 py-[5px] cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <SettingsIcon className="w-4 h-4" />
-                            <span className="text-sm">{t('settings')}</span>
-                          </Link>
-                        </DropdownMenuItem>
-                        
-                        {/* Custom Separator - 93% width */}
-                        <div className="flex justify-center py-1">
-                          <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
-                        </div>
-                      </>
-                    )}
-                    
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to={createPageUrl('Settings')}
+                          className={cn("flex items-center gap-2 px-3 py-[5px] cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <SettingsIcon className="w-4 h-4" />
+                          <span className="text-sm">{t('settings')}</span>
+                        </Link>
+                      </DropdownMenuItem>
+
+                      {/* Custom Separator - 93% width */}
+                      <div className="flex justify-center py-1">
+                        <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
+                      </div>
+                    </>
+
                     {/* Logout */}
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={handleLogout}
                       className={cn("flex items-center justify-center gap-2 px-3 py-[5px] cursor-pointer text-red-500 hover:text-red-600 focus:text-red-500 rounded-lg transition-colors")}
                     >
@@ -385,12 +383,12 @@ function LayoutContent({ children, currentPageName }) {
         colors.border
       )}>
         <div className="flex items-center justify-center h-16 px-4">
-          <img 
-            src={theme === 'dark' 
+          <img
+            src={theme === 'dark'
               ? "/logo-dark.png"
               : "/logo-light.png"
             }
-            alt="Ascend Logo" 
+            alt="Ascend Logo"
             className="w-16 h-16 object-contain"
             style={{ filter: 'brightness(1.1) saturate(1.2)' }}
           />
@@ -414,7 +412,7 @@ function LayoutContent({ children, currentPageName }) {
         className={cn(
           "md:hidden fixed top-16 bottom-16 z-50 w-1/2 overflow-y-auto transition-transform duration-300 ease-out",
           isRTL ? "left-0" : "right-0",
-          mobileMenuOpen 
+          mobileMenuOpen
             ? (isRTL ? "translate-x-0" : "translate-x-0")
             : (isRTL ? "-translate-x-full" : "translate-x-full"),
           colors.bgSecondary,
@@ -424,83 +422,81 @@ function LayoutContent({ children, currentPageName }) {
       >
         {user && (
           <div className={cn("p-4", colors.bgSecondary)}>
-              {/* User Info */}
-              <div className="flex items-center justify-center mb-3 pb-3 border-b border-[#5C8374]/20">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#5C8374] flex items-center justify-center text-white font-semibold">
-                  {user.full_name?.[0] || user.email[0].toUpperCase()}
-                </div>
-                <div className="ml-3 flex-1 min-w-0">
-                  <p className={cn("text-sm font-medium truncate", colors.textPrimary)}>{user.full_name || t('user')}</p>
-                  <p className={cn("text-xs truncate", colors.textTertiary)}>
-                    {permissions ? t('sharedUser') : t('owner')}
-                  </p>
-                </div>
+            {/* User Info */}
+            <div className="flex items-center justify-center mb-3 pb-3 border-b border-[#5C8374]/20">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#5C8374] flex items-center justify-center text-white font-semibold">
+                {user.full_name?.[0] || user.email[0].toUpperCase()}
               </div>
-
-              {/* Theme Toggle */}
-              <div 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleThemeChange(theme !== 'dark');
-                }}
-                className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
-              >
-                <div className="flex items-center gap-2">
-                  {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                  <span className="text-sm">{t('darkMode')}</span>
-                </div>
-                <Switch 
-                  checked={theme === 'dark'} 
-                  onCheckedChange={handleThemeChange}
-                  onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                  onClick={(e) => e.stopPropagation()}
-                />
+              <div className="ml-3 flex-1 min-w-0">
+                <p className={cn("text-sm font-medium truncate", colors.textPrimary)}>{user.full_name || t('user')}</p>
+                <p className={cn("text-xs truncate", colors.textTertiary)}>
+                  {permissions ? t('sharedUser') : t('owner')}
+                </p>
               </div>
-
-              {/* Blur Values Toggle */}
-              <div 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleBlurValuesChange(!user?.blurValues);
-                }}
-                className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
-              >
-                <div className="flex items-center gap-2">
-                  {user?.blurValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  <span className="text-sm">{t('blurValues')}</span>
-                </div>
-                <Switch 
-                  checked={user?.blurValues || false} 
-                  onCheckedChange={handleBlurValuesChange}
-                  onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-
-              {/* Settings */}
-              {hasPermission('viewSettings') && (
-                <Link
-                  to={createPageUrl('Settings')}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn("flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
-                >
-                  <SettingsIcon className="w-4 h-4" />
-                  <span className="text-sm">{t('settings')}</span>
-                </Link>
-              )}
-
-              {/* Logout */}
-              <button
-                onClick={handleLogout}
-                className={cn(
-                  "w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-red-500 hover:text-red-600"
-                )}
-              >
-                <LogOut className="w-4 h-4" />
-                {t('logout')}
-              </button>
             </div>
-          )}
+
+            {/* Theme Toggle */}
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                handleThemeChange(theme !== 'dark');
+              }}
+              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
+            >
+              <div className="flex items-center gap-2">
+                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                <span className="text-sm">{t('darkMode')}</span>
+              </div>
+              <Switch
+                checked={theme === 'dark'}
+                onCheckedChange={handleThemeChange}
+                onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Blur Values Toggle */}
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                handleBlurValuesChange(!user?.blurValues);
+              }}
+              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
+            >
+              <div className="flex items-center gap-2">
+                {user?.blurValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span className="text-sm">{t('blurValues')}</span>
+              </div>
+              <Switch
+                checked={user?.blurValues || false}
+                onCheckedChange={handleBlurValuesChange}
+                onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Settings */}
+            <Link
+              to={createPageUrl('Settings')}
+              onClick={() => setMobileMenuOpen(false)}
+              className={cn("flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span className="text-sm">{t('settings')}</span>
+            </Link>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-red-500 hover:text-red-600"
+              )}
+            >
+              <LogOut className="w-4 h-4" />
+              {t('logout')}
+            </button>
+          </div>
+        )}
       </div>
 
 
@@ -508,7 +504,7 @@ function LayoutContent({ children, currentPageName }) {
       {/* Main Content */}
       <main className={cn(
         "min-h-screen pt-16 md:pt-0 transition-all duration-300",
-        isRTL 
+        isRTL
           ? (sidebarCollapsed ? "md:pr-20" : "md:pr-64")
           : (sidebarCollapsed ? "md:pl-20" : "md:pl-64")
       )}>
@@ -519,7 +515,7 @@ function LayoutContent({ children, currentPageName }) {
 
       {/* OPTION 2: Floating Calendar Button - DISABLED */}
       {/* <FloatingCalendarButton /> */}
-      
+
       {/* OPTION 3: Header Calendar Button - DISABLED */}
       {/* <div className={cn(
         "fixed top-4 z-50",
@@ -558,7 +554,7 @@ function LayoutContent({ children, currentPageName }) {
               );
             })}
           </nav>
-          
+
           {/* Menu Button */}
           <div className={cn("border-l px-2", colors.border)}>
             <button
@@ -580,9 +576,9 @@ function LayoutContent({ children, currentPageName }) {
       </div>
 
       {/* Welcome Dialog for First Login */}
-      {WelcomeDialog && <WelcomeDialog 
-        open={showWelcomeDialog} 
-        onClose={() => setShowWelcomeDialog(false)} 
+      {WelcomeDialog && <WelcomeDialog
+        open={showWelcomeDialog}
+        onClose={() => setShowWelcomeDialog(false)}
       />}
     </div>
   );

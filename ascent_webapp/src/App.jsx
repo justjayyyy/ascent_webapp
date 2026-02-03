@@ -53,7 +53,7 @@ const PermissionGuard = ({ pageName, children }) => {
     'Portfolio': 'viewPortfolio',
     'Expenses': 'viewExpenses',
     'Notes': 'viewNotes',
-    'Settings': 'viewSettings',
+    // 'Settings': 'viewSettings', // Exposed to all authenticated users, internally gated
     'Dashboard': 'viewDashboard',
   };
 
