@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ascent } from '@/api/client';
+import { useAuth } from '@/lib/AuthContext';
 
 const ThemeContext = createContext();
 
@@ -77,14 +78,14 @@ export const translations = {
     sessionExpiringSoon: 'Your session will expire in 1 minute due to inactivity.',
     ascend: 'Ascent',
     ascendTagline: 'Rise above your financial goals',
-    
+
     // User Menu
     owner: 'Owner',
     sharedUser: 'Shared User',
     darkMode: 'Dark Mode',
     blurValues: 'Blur Values',
     user: 'User',
-    
+
     // Common
     loading: 'Loading...',
     save: 'Save',
@@ -112,7 +113,7 @@ export const translations = {
     confirmDeletePosition: 'Are you sure you want to delete this position? This action cannot be undone.',
     confirmDeleteDayTrade: 'Are you sure you want to delete this day trade? This action cannot be undone.',
     confirmDeleteAllPositions: 'Are you sure you want to delete all positions for {symbol}? This action cannot be undone.',
-    
+
     // Login/Register
     welcome: 'Welcome',
     signInToAccount: 'Sign in to your account or create a new one',
@@ -142,7 +143,7 @@ export const translations = {
     registrationFailed: 'Registration failed',
     googleSignInFailed: 'Google sign-in failed',
     continueWithGoogle: 'Continue with Google',
-    
+
     // Payment Methods
     paymentMethod: 'Payment Method',
     selectPaymentMethod: 'Select payment method',
@@ -152,7 +153,7 @@ export const translations = {
     card: 'Card',
     cash: 'Cash',
     transfer: 'Transfer',
-    
+
     // Dashboard
     yourCompleteFinancialOverview: 'Your complete financial overview',
     customize: 'Customize',
@@ -181,7 +182,7 @@ export const translations = {
     setYourFirstGoal: 'Set Your First Goal',
     accountSummary: 'Account Summary',
     noAccountsYet: 'No accounts yet. Create your first account to get started.',
-    
+
     // Portfolio
     investmentAccounts: 'Investment Accounts',
     addAccount: 'Add Account',
@@ -203,7 +204,7 @@ export const translations = {
     accountDeletedSuccessfully: 'Account deleted successfully!',
     failedToDeleteAccount: 'Failed to delete account',
     done: 'Done',
-    
+
     // Success/Error Messages
     goalCreatedSuccessfully: 'Goal created successfully!',
     goalUpdatedSuccessfully: 'Goal updated successfully!',
@@ -229,7 +230,7 @@ export const translations = {
     failedToDeleteCategory: 'Failed to delete category',
     pleaseFillAllFields: 'Please fill in all fields',
     last4DigitsMustBe4: 'Last 4 digits must be exactly 4 numbers',
-    
+
     // Expenses
     incomeExpenseTracking: 'Income & Expense Tracking',
     manageYourFinances: 'Manage your finances and track spending',
@@ -310,7 +311,7 @@ export const translations = {
     salary: 'Salary',
     investmentIncome: 'Investment Income',
     other: 'Other',
-    
+
     // Category Manager
     manageCategories: 'Manage Categories',
     addManageCategoriesDesc: 'Add and manage categories for your transactions',
@@ -321,7 +322,7 @@ export const translations = {
     categoryExists: 'Category already exists',
     noCategoriesYet: 'No categories yet. Add your first category above.',
     both: 'Both',
-    
+
     // Legal Pages
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
@@ -399,7 +400,7 @@ export const translations = {
     governingLaw: 'Governing Law',
     governingLawText: 'These Terms shall be governed by and construed in accordance with applicable laws, without regard to its conflict of law provisions.',
     contactUsTermsText: 'If you have any questions about these Terms of Service, please contact us through the application settings or support channels.',
-    
+
     // Settings
     manageAccountPreferences: 'Manage your account and preferences',
     profileInformation: 'Profile Information',
@@ -612,7 +613,7 @@ export const translations = {
     pending: 'pending',
     accepted: 'accepted',
     revoked: 'revoked',
-    
+
     // Budget
     budgetTracking: 'Budget Tracking',
     manageBudgets: 'Manage Budgets',
@@ -631,7 +632,7 @@ export const translations = {
     perMonth: '/month',
     alertAt: 'Alert at',
     selectCategory: 'Select a category',
-    
+
     // Period Selector
     year: 'Year',
     currentMonth: 'Current Month',
@@ -641,13 +642,13 @@ export const translations = {
     yearlyView: 'Yearly view',
     months: 'months',
     all: 'All',
-    
+
     // Expense View
     cardPayments: 'Card Payments',
     cashPayments: 'Cash Payments',
     showing: 'Showing',
     of: 'of',
-    
+
     // Months
     january: 'January',
     february: 'February',
@@ -746,14 +747,14 @@ export const translations = {
     sessionExpiringSoon: 'החיבור שלך יפוג בעוד דקה בשל חוסר פעילות.',
     ascend: 'Ascent',
     ascendTagline: 'התעלה מעל יעדיך הפיננסיים',
-    
+
     // User Menu
     owner: 'בעלים',
     sharedUser: 'משתמש משותף',
     darkMode: 'מצב כהה',
     blurValues: 'טשטש ערכים',
     user: 'משתמש',
-    
+
     // Common
     loading: 'טוען...',
     save: 'שמור',
@@ -781,7 +782,7 @@ export const translations = {
     confirmDeletePosition: 'האם אתה בטוח שברצונך למחוק את הפוזיציה הזו? פעולה זו לא ניתנת לביטול.',
     confirmDeleteDayTrade: 'האם אתה בטוח שברצונך למחוק את המסחר היומי הזה? פעולה זו לא ניתנת לביטול.',
     confirmDeleteAllPositions: 'האם אתה בטוח שברצונך למחוק את כל הפוזיציות עבור {symbol}? פעולה זו לא ניתנת לביטול.',
-    
+
     // Login/Register
     welcome: 'ברוכים הבאים',
     signInToAccount: 'התחבר לחשבון שלך או צור חשבון חדש',
@@ -811,7 +812,7 @@ export const translations = {
     registrationFailed: 'ההרשמה נכשלה',
     googleSignInFailed: 'ההתחברות עם גוגל נכשלה',
     continueWithGoogle: 'המשך עם גוגל',
-    
+
     // Payment Methods
     paymentMethod: 'אמצעי תשלום',
     selectPaymentMethod: 'בחר אמצעי תשלום',
@@ -821,7 +822,7 @@ export const translations = {
     card: 'כרטיס',
     cash: 'מזומן',
     transfer: 'העברה',
-    
+
     // Dashboard
     yourCompleteFinancialOverview: 'סקירה פינסית מלאה',
     customize: 'התאמה אישית',
@@ -850,7 +851,7 @@ export const translations = {
     setYourFirstGoal: 'הגדר יעד ראשון',
     accountSummary: 'סיכום חשבונות',
     noAccountsYet: 'אין חשבונות עדיין. צור את החשבון הראשון שלך',
-    
+
     // Portfolio
     investmentAccounts: 'חשבונות השקעה',
     addAccount: 'הוסף חשבון',
@@ -872,7 +873,7 @@ export const translations = {
     accountDeletedSuccessfully: 'החשבון נמחק בהצלחה!',
     failedToDeleteAccount: 'מחיקת החשבון נכשלה',
     done: 'סיום',
-    
+
     // Success/Error Messages
     goalCreatedSuccessfully: 'היעד נוצר בהצלחה!',
     goalUpdatedSuccessfully: 'היעד עודכן בהצלחה!',
@@ -898,7 +899,7 @@ export const translations = {
     failedToDeleteCategory: 'מחיקת הקטגוריה נכשלה',
     pleaseFillAllFields: 'אנא מלא את כל השדות',
     last4DigitsMustBe4: '4 ספרות אחרונות חייבות להיות בדיוק 4 מספרים',
-    
+
     // Expenses
     incomeExpenseTracking: 'מעקב הכנסות והוצאות',
     manageYourFinances: 'נהל את הכספים שלך ועקוב אחר ההוצאות',
@@ -979,7 +980,7 @@ export const translations = {
     salary: 'משכורת',
     investmentIncome: 'הכנסות מהשקעות',
     other: 'אחר',
-    
+
     // Category Manager
     manageCategories: 'ניהול קטגוריות',
     addManageCategoriesDesc: 'הוסף ונהל קטגוריות לתנועות שלך',
@@ -990,7 +991,7 @@ export const translations = {
     categoryExists: 'קטגוריה כבר קיימת',
     noCategoriesYet: 'אין קטגוריות עדיין. הוסף את הקטגוריה הראשונה למעלה.',
     both: 'שניהם',
-    
+
     // Settings
     manageAccountPreferences: 'נהל את החשבון וההעדפות שלך',
     profileInformation: 'מידע אישי',
@@ -1204,7 +1205,7 @@ export const translations = {
     pending: 'ממתין',
     accepted: 'אושר',
     revoked: 'בוטל',
-    
+
     // Budget
     budgetTracking: 'מעקב תקציב',
     manageBudgets: 'ניהול תקציבים',
@@ -1223,7 +1224,7 @@ export const translations = {
     perMonth: '/חודש',
     alertAt: 'התראה ב-',
     selectCategory: 'בחר קטגוריה',
-    
+
     // Period Selector
     year: 'שנה',
     currentMonth: 'החודש הנוכחי',
@@ -1233,13 +1234,13 @@ export const translations = {
     yearlyView: 'תצוגה שנתית',
     months: 'חודשים',
     all: 'הכל',
-    
+
     // Expense View
     cardPayments: 'תשלומי כרטיס',
     cashPayments: 'תשלומי מזומן',
     showing: 'מציג',
     of: 'מתוך',
-    
+
     // Months
     january: 'ינואר',
     february: 'פברואר',
@@ -1338,14 +1339,14 @@ export const translations = {
     sessionExpiringSoon: 'Ваша сессия истечёт через 1 минуту из-за неактивности.',
     ascend: 'Ascent',
     ascendTagline: 'Поднимитесь выше своих финансовых целей',
-    
+
     // User Menu
     owner: 'Владелец',
     sharedUser: 'Общий пользователь',
     darkMode: 'Тёмный режим',
     blurValues: 'Размыть значения',
     user: 'Пользователь',
-    
+
     // Common
     loading: 'Загрузка...',
     save: 'Сохранить',
@@ -1373,7 +1374,7 @@ export const translations = {
     confirmDeletePosition: 'Вы уверены, что хотите удалить эту позицию? Это действие нельзя отменить.',
     confirmDeleteDayTrade: 'Вы уверены, что хотите удалить эту дневную сделку? Это действие нельзя отменить.',
     confirmDeleteAllPositions: 'Вы уверены, что хотите удалить все позиции для {symbol}? Это действие нельзя отменить.',
-    
+
     // Login/Register
     welcome: 'Добро пожаловать',
     signInToAccount: 'Войдите в свой аккаунт или создайте новый',
@@ -1403,7 +1404,7 @@ export const translations = {
     registrationFailed: 'Ошибка регистрации',
     googleSignInFailed: 'Ошибка входа через Google',
     continueWithGoogle: 'Продолжить с Google',
-    
+
     // Payment Methods
     paymentMethod: 'Способ оплаты',
     selectPaymentMethod: 'Выберите способ оплаты',
@@ -1413,7 +1414,7 @@ export const translations = {
     card: 'Карта',
     cash: 'Наличные',
     transfer: 'Перевод',
-    
+
     // Dashboard
     yourCompleteFinancialOverview: 'Полный финансовый обзор',
     customize: 'Настроить',
@@ -1442,7 +1443,7 @@ export const translations = {
     setYourFirstGoal: 'Установите первую цель',
     accountSummary: 'Сводка счетов',
     noAccountsYet: 'Счетов пока нет. Создайте свой первый счет',
-    
+
     // Portfolio
     investmentAccounts: 'Инвестиционные счета',
     addAccount: 'Добавить счет',
@@ -1464,7 +1465,7 @@ export const translations = {
     accountDeletedSuccessfully: 'Счет успешно удален!',
     failedToDeleteAccount: 'Не удалось удалить счет',
     done: 'Готово',
-    
+
     // Success/Error Messages
     goalCreatedSuccessfully: 'Цель успешно создана!',
     goalUpdatedSuccessfully: 'Цель успешно обновлена!',
@@ -1490,7 +1491,7 @@ export const translations = {
     failedToDeleteCategory: 'Не удалось удалить категорию',
     pleaseFillAllFields: 'Пожалуйста, заполните все поля',
     last4DigitsMustBe4: 'Последние 4 цифры должны состоять ровно из 4 цифр',
-    
+
     // Expenses
     incomeExpenseTracking: 'Учет доходов и расходов',
     manageYourFinances: 'Управляйте финансами и отслеживайте расходы',
@@ -1571,7 +1572,7 @@ export const translations = {
     salary: 'Зарплата',
     investmentIncome: 'Инвестиционный доход',
     other: 'Другое',
-    
+
     // Category Manager
     manageCategories: 'Управление категориями',
     addManageCategoriesDesc: 'Добавить и управлять категориями транзакций',
@@ -1582,7 +1583,7 @@ export const translations = {
     categoryExists: 'Категория уже существует',
     noCategoriesYet: 'Категорий пока нет. Добавьте первую категорию выше.',
     both: 'Оба',
-    
+
     // Settings
     manageAccountPreferences: 'Управление аккаунтом и настройками',
     profileInformation: 'Информация профиля',
@@ -1796,7 +1797,7 @@ export const translations = {
     pending: 'ожидание',
     accepted: 'принят',
     revoked: 'отозван',
-    
+
     // Budget
     budgetTracking: 'Отслеживание бюджета',
     manageBudgets: 'Управление бюджетами',
@@ -1815,7 +1816,7 @@ export const translations = {
     perMonth: '/месяц',
     alertAt: 'Оповещение при',
     selectCategory: 'Выберите категорию',
-    
+
     // Period Selector
     year: 'Год',
     currentMonth: 'Текущий месяц',
@@ -1825,13 +1826,13 @@ export const translations = {
     yearlyView: 'Годовой вид',
     months: 'месяцев',
     all: 'Все',
-    
+
     // Expense View
     cardPayments: 'Платежи картой',
     cashPayments: 'Платежи наличными',
     showing: 'Показано',
     of: 'из',
-    
+
     // Months
     january: 'Январь',
     february: 'Февраль',
@@ -1875,61 +1876,22 @@ const isPublicRoute = (pathname) => {
 };
 
 export function ThemeProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const hasLoadedRef = React.useRef(false); // Track if we've already loaded user
+  const { user, setUser, checkAppState } = useAuth();
 
-  const loadUser = useCallback(async () => {
-    // Prevent duplicate loads - only load once per session
-    if (hasLoadedRef.current) {
-      console.log('[ThemeProvider] User already loaded, skipping duplicate load');
-      return user;
-    }
-    
-    console.log('[ThemeProvider] Loading user for the first time');
-    hasLoadedRef.current = true;
-    
-    // Skip auth check on public routes
-    const pathname = window.location.pathname;
-    if (isPublicRoute(pathname)) {
-      setLoading(false);
-      return null;
-    }
-
-    try {
-      const currentUser = await ascent.auth.me();
-      setUser(currentUser);
-      return currentUser;
-    } catch (error) {
-      // Silently fail on public routes or 401 errors
-      if (isPublicRoute(pathname) || error.status === 401 || error.status === 403) {
-        return null;
-      }
-      console.error('Failed to load user');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  // Legacy loading state compatibility - though mostly handled by AuthContext now
+  const loading = false;
 
   // Function to refresh user data (called after settings update)
   const refreshUser = useCallback(async () => {
-    console.log('[ThemeProvider] refreshUser called - forcing reload');
-    // Reset the ref to allow reload
-    hasLoadedRef.current = false;
-    const updatedUser = await loadUser();
-    return updatedUser;
-  }, [loadUser]);
+    console.log('[ThemeProvider] refreshUser called - delegating to AuthContext');
+    await checkAppState();
+    return user;
+  }, [checkAppState, user]);
 
   // Function to update user locally (for instant UI feedback)
   const updateUserLocal = useCallback((updates) => {
     setUser(prev => prev ? { ...prev, ...updates } : null);
-  }, []);
+  }, [setUser]);
 
   const theme = user?.theme || 'dark';
   const language = user?.language || 'en';
@@ -1978,7 +1940,7 @@ export function ThemeProvider({ children }) {
     loading,
     refreshUser,
     updateUserLocal,
-  }), [user, theme, language, isRTL, colors, t, loading, refreshUser, updateUserLocal]);
+  }), [user, setUser, theme, language, isRTL, colors, t, loading, refreshUser, updateUserLocal]);
 
   return (
     <ThemeContext.Provider value={value}>
