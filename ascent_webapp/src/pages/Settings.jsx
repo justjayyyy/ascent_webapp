@@ -621,7 +621,7 @@ export default function Settings() {
           </div>
 
           {/* Card Management */}
-          {hasPermission('editExpenses') && <CardManagement user={user} />}
+          {hasPermission('manageCards') && <CardManagement user={user} />}
 
           {/* Workspace Management */}
           {isOwner && (

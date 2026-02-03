@@ -7,37 +7,39 @@ import { cn } from '@/lib/utils';
 import AccountCard from '../components/portfolio/AccountCard';
 import AddAccountDialog from '../components/portfolio/AddAccountDialog';
 import { useTheme } from '../components/ThemeProvider';
+import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import BlurValue from '../components/BlurValue';
 
 export default function Portfolio() {
   const { user, colors, t } = useTheme();
+  const { hasPermission } = useAuth();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const queryClient = useQueryClient();
-  
+
   // Memoize user identifiers to prevent unnecessary effect runs
   const userId = useMemo(() => user?._id || user?.id, [user?._id, user?.id]);
   const userEmail = useMemo(() => user?.email, [user?.email]);
-  
+
   // Refetch accounts when user changes (e.g., after login)
   React.useEffect(() => {
     if (userId && userEmail) {
       const queryKey = ['accounts', userId, userEmail];
-      
+
       // Remove any cached data for this query key first
-      queryClient.removeQueries({ 
+      queryClient.removeQueries({
         queryKey,
         exact: true
       });
-      
+
       // Then invalidate and refetch
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[0] === 'accounts'
       });
     } else if (!user) {
       // User logged out - clear all account queries
-      queryClient.removeQueries({ 
+      queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] === 'accounts'
       });
     }
@@ -89,7 +91,7 @@ export default function Portfolio() {
       try {
         // Backend automatically sets created_by from authenticated user
         const account = await ascent.entities.Account.create(accountData);
-        
+
         const accountId = account.id || account._id?.toString();
         const accountWithId = accountId ? { ...account, id: accountId } : account;
 
@@ -112,7 +114,7 @@ export default function Portfolio() {
         } else if (!accountId && accountData.initialInvestment > 0) {
           console.warn('Skipping initial cash position because account ID is missing', account);
         }
-        
+
         return accountWithId;
       } catch (error) {
         console.error('Account creation failed:', error);
@@ -122,20 +124,20 @@ export default function Portfolio() {
     onSuccess: async (account) => {
       // Close dialog first
       setAddDialogOpen(false);
-      
+
       // Ensure account has id field
       const accountId = account?.id || account?._id?.toString();
       const accountWithId = accountId ? { ...account, id: accountId } : account;
-      
+
       if (!accountId) {
         console.warn('Received account response without an ID. Cache update may be incomplete.', account);
       }
-      
+
       // Show success message
       toast.success(t('accountCreatedSuccessfully'));
-      
+
       const exactQueryKey = ['accounts', user?._id || user?.id, user?.email];
-      
+
       // Optimistically update the cache
       queryClient.setQueryData(exactQueryKey, (oldAccounts = []) => {
         if (!Array.isArray(oldAccounts)) {
@@ -154,12 +156,12 @@ export default function Portfolio() {
         }
         return accountId ? [accountWithId, ...oldAccounts] : oldAccounts;
       });
-      
+
       // Invalidate queries - React Query will refetch in background
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[0] === 'accounts'
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => query.queryKey[0] === 'positions'
       });
     },
@@ -174,7 +176,7 @@ export default function Portfolio() {
       // Delete all positions in this account first
       const positions = allPositions.filter(p => p.accountId === accountId);
       await Promise.all(positions.map(p => ascent.entities.Position.delete(p.id)));
-      
+
       // Delete the account
       await ascent.entities.Account.delete(accountId);
     },
@@ -190,7 +192,7 @@ export default function Portfolio() {
 
   const calculateAccountMetrics = useCallback((account) => {
     const positions = allPositions.filter(p => p.accountId === account.id);
-    
+
     let totalValue = 0;
     let totalCostBasis = 0;
 
@@ -198,7 +200,7 @@ export default function Portfolio() {
       const currentPrice = position.currentPrice || position.averageBuyPrice;
       const marketValue = position.quantity * currentPrice;
       const costBasis = position.quantity * position.averageBuyPrice;
-      
+
       totalValue += marketValue;
       totalCostBasis += costBasis;
     });
@@ -238,7 +240,7 @@ export default function Portfolio() {
   }, [accounts, accountMetricsMap]);
 
   const overallPnLPercent = useMemo(() => {
-    return overallMetrics.totalValue > 0 
+    return overallMetrics.totalValue > 0
       ? ((overallMetrics.totalPnL / (overallMetrics.totalValue - overallMetrics.totalPnL)) * 100)
       : 0;
   }, [overallMetrics]);
@@ -262,27 +264,31 @@ export default function Portfolio() {
               <p className={cn("text-sm md:text-base", colors.textTertiary)}>{t('trackAndManageAccounts')}</p>
             </div>
             <div className="flex gap-2">
-              <Button
-                onClick={() => setEditMode(!editMode)}
-                variant="outline"
-                className={cn(
-                  "bg-transparent hover:bg-[#5C8374]/20",
-                  colors.border,
-                  colors.textSecondary,
-                  editMode && "bg-[#5C8374]/20"
-                )}
-              >
-                <Edit2 className="w-5 h-5 mr-2" />
-                <span className="hidden sm:inline">{editMode ? t('done') : t('edit')}</span>
-              </Button>
-              <Button
-                onClick={() => setAddDialogOpen(true)}
-                className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white shadow-lg"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                <span className="hidden sm:inline">{t('addAccount')}</span>
-                <span className="sm:hidden">{t('add')}</span>
-              </Button>
+              {hasPermission('editPortfolio') && (
+                <>
+                  <Button
+                    onClick={() => setEditMode(!editMode)}
+                    variant="outline"
+                    className={cn(
+                      "bg-transparent hover:bg-[#5C8374]/20",
+                      colors.border,
+                      colors.textSecondary,
+                      editMode && "bg-[#5C8374]/20"
+                    )}
+                  >
+                    <Edit2 className="w-5 h-5 mr-2" />
+                    <span className="hidden sm:inline">{editMode ? t('done') : t('edit')}</span>
+                  </Button>
+                  <Button
+                    onClick={() => setAddDialogOpen(true)}
+                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white shadow-lg"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    <span className="hidden sm:inline">{t('addAccount')}</span>
+                    <span className="sm:hidden">{t('add')}</span>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -328,13 +334,15 @@ export default function Portfolio() {
               <p className={cn("mb-6", colors.textTertiary)}>
                 {t('noAccountsCreateFirst')}
               </p>
-              <Button
-                onClick={() => setAddDialogOpen(true)}
-                className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                {t('createYourFirstAccount')}
-              </Button>
+              {hasPermission('editPortfolio') && (
+                <Button
+                  onClick={() => setAddDialogOpen(true)}
+                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  {t('createYourFirstAccount')}
+                </Button>
+              )}
             </div>
           </div>
         ) : (
