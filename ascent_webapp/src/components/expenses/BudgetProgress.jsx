@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTheme, translateCategory } from '../ThemeProvider';
+import { useTheme } from '../ThemeProvider';
+import { translateCategory } from '@/lib/translations';
 import BlurValue from '../BlurValue';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
@@ -28,7 +29,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
     const yearNum = parseInt(selectedYear);
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
-    
+
     if (selectedMonths && selectedMonths.length > 0) {
       // Filter by selected months - only show budgets for those specific months
       const monthNums = selectedMonths.map(m => parseInt(m));
@@ -54,12 +55,12 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
   const spendingByCategory = useMemo(() => {
     if (!selectedYear) return {};
     const yearNum = parseInt(selectedYear);
-    
+
     let periodTransactions = transactions.filter(t => {
       if (!t.date || t.type !== 'Expense') return false;
       const transDate = new Date(t.date);
       const transYear = transDate.getFullYear();
-      
+
       if (selectedMonths && selectedMonths.length > 0) {
         // Filter by selected months
         const transMonth = transDate.getMonth() + 1; // getMonth returns 0-11
@@ -76,9 +77,9 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       if (!spending[t.category]) {
         spending[t.category] = 0;
       }
-      
+
       let amountToUse = 0;
-      
+
       // Use stored converted amount if available
       if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
         amountToUse = t.amountInGlobalCurrency;
@@ -89,7 +90,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
         // Fallback: convert on the fly for older transactions without stored conversion
         amountToUse = convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
       }
-      
+
       spending[t.category] += amountToUse;
     });
 
@@ -103,7 +104,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       if (budget.currency !== userCurrency && rates && Object.keys(rates).length > 0) {
         budgetLimit = convertCurrency(budget.monthlyLimit, budget.currency, userCurrency, rates);
       }
-      
+
       const spent = spendingByCategory[budget.category] || 0;
       const percentage = budgetLimit > 0 ? (spent / budgetLimit) * 100 : 0;
       const remaining = budgetLimit - spent;
@@ -125,7 +126,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
         originalCurrency: budget.currency, // Keep original currency for display
       };
     })
-    .sort((a, b) => b.displayPercentage - a.displayPercentage);
+      .sort((a, b) => b.displayPercentage - a.displayPercentage);
   }, [filteredBudgets, spendingByCategory, userCurrency, rates, convertCurrency]);
 
   // Don't show the module if there are no budgets for the selected period
@@ -133,7 +134,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
   if (filteredBudgets.length === 0) {
     return null;
   }
-  
+
   if (budgetData.length === 0) {
     return null;
   }
@@ -171,21 +172,21 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                   </BlurValue>
                 </span>
               </div>
-              
-              <Progress 
-                value={budget.percentage} 
+
+              <Progress
+                value={budget.percentage}
                 className={cn("h-2", colors.bgTertiary)}
                 indicatorClassName={
-                  budget.isOverBudget 
-                    ? "bg-red-500" 
+                  budget.isOverBudget
+                    ? "bg-red-500"
                     : budget.isAtLimit
-                    ? "bg-orange-500"
-                    : budget.isNearLimit 
-                    ? "bg-yellow-500" 
-                    : "bg-green-500"
+                      ? "bg-orange-500"
+                      : budget.isNearLimit
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
                 }
               />
-              
+
               <div className="flex items-center justify-between text-sm">
                 <span className={colors.textTertiary}>
                   <BlurValue blur={user?.blurValues}>

@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Plus, Trash2, Edit, Target, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTheme, translateCategory } from '../ThemeProvider';
+import { useTheme } from '../ThemeProvider';
+import { translateCategory } from '@/lib/translations';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
 
@@ -26,14 +27,14 @@ const MONTHS = [
   { value: 12, labelKey: 'december' },
 ];
 
-export default function BudgetManager({ 
-  open, 
-  onClose, 
+export default function BudgetManager({
+  open,
+  onClose,
   budgets,
   categories = [],
-  onAdd, 
-  onUpdate, 
-  onDelete, 
+  onAdd,
+  onUpdate,
+  onDelete,
   isLoading,
   selectedYear,
   selectedMonths = [],
@@ -43,12 +44,12 @@ export default function BudgetManager({
   const { currentWorkspace } = useAuth();
   const isOwner = currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
   const [editingBudget, setEditingBudget] = useState(null);
-  
+
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const displayYear = selectedYear ? parseInt(selectedYear) : currentYear;
   const displayMonth = selectedMonths && selectedMonths.length === 1 ? parseInt(selectedMonths[0]) : currentMonth;
-  
+
   // Calculate available categories (filter by selected period)
   const usedCategories = useMemo(() => {
     if (selectedMonths && selectedMonths.length > 0) {
@@ -63,13 +64,13 @@ export default function BudgetManager({
         .map(b => b.category);
     }
   }, [budgets, displayYear, selectedMonths]);
-  
-  const expenseCategories = useMemo(() => 
+
+  const expenseCategories = useMemo(() =>
     categories.filter(cat => cat.type === 'Expense' || cat.type === 'Both'),
     [categories]
   );
-  
-  const availableCategories = useMemo(() => 
+
+  const availableCategories = useMemo(() =>
     expenseCategories.filter(cat => !usedCategories.includes(cat.name)),
     [expenseCategories, usedCategories]
   );
@@ -96,7 +97,7 @@ export default function BudgetManager({
       }));
     }
   }, [open, availableCategories, editingBudget, user?.currency, displayYear, displayMonth]);
-  
+
   // Update form data when selected period changes
   useEffect(() => {
     if (open && !editingBudget) {
@@ -111,7 +112,7 @@ export default function BudgetManager({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.monthlyLimit || parseFloat(formData.monthlyLimit) <= 0) {
       return;
     }
@@ -174,7 +175,7 @@ export default function BudgetManager({
   };
 
   // Get available categories when editing (include the current budget's category)
-  const editAvailableCategories = editingBudget 
+  const editAvailableCategories = editingBudget
     ? expenseCategories.filter(cat => !usedCategories.includes(cat.name) || cat.name === editingBudget.category)
     : availableCategories;
 
@@ -200,145 +201,145 @@ export default function BudgetManager({
               <p className={cn("text-xs sm:text-sm mt-1", colors.textTertiary)}>{t('deleteBudgetToAddNew')}</p>
             </div>
           ) : (
-          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
-            {/* ... form fields ... */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
-                <Select 
-                  value={formData.category} 
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  disabled={editingBudget !== null}
-                >
-                  <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                    <SelectValue placeholder={t('selectCategory')} />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    {editAvailableCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.name} className={colors.textPrimary}>
-                        {translateCategory(category.name, language)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="1000"
-                  value={formData.monthlyLimit}
-                  onChange={(e) => setFormData({ ...formData, monthlyLimit: e.target.value })}
-                  className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
-                <Input
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  placeholder={currentYear.toString()}
-                  value={formData.year}
-                  onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || currentYear })}
-                  className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-                />
-              </div>
-
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
-                <Select 
-                  value={formData.month?.toString()} 
-                  onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
-                >
-                  <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                    <SelectValue placeholder={t('selectMonth') || 'Select month'} />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    {MONTHS.map((month) => (
-                      <SelectItem key={month.value} value={month.value.toString()} className={colors.textPrimary}>
-                        {t(month.labelKey)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
-              <Input
-                type="number"
-                min="1"
-                max="100"
-                placeholder="80"
-                value={formData.alertThreshold}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Allow empty string for typing, but clamp to valid range
-                  const numValue = value === '' ? '' : Math.min(100, Math.max(1, parseInt(value) || 80));
-                  setFormData({ ...formData, alertThreshold: numValue });
-                }}
-                className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
-              />
-              <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
-                {t('alertThresholdHelp')}
-              </p>
-            </div>
-
-            {isOwner && (
-              <div className="flex items-center justify-between py-2 px-1">
-                <div className="flex items-center gap-2">
-                  {formData.isShared ? (
-                    <Eye className={cn("w-4 h-4", colors.textSecondary)} />
-                  ) : (
-                    <EyeOff className={cn("w-4 h-4", colors.textTertiary)} />
-                  )}
-                  <Label htmlFor="isShared" className={cn("text-sm cursor-pointer", colors.textSecondary)}>
-                    {t('shareWithTeam') || 'Share with team'}
-                  </Label>
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
+              {/* ... form fields ... */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    disabled={editingBudget !== null}
+                  >
+                    <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue placeholder={t('selectCategory')} />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      {editAvailableCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.name} className={colors.textPrimary}>
+                          {translateCategory(category.name, language)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Switch
-                  id="isShared"
-                  checked={formData.isShared}
-                  onCheckedChange={(checked) => setFormData({ ...formData, isShared: checked })}
-                />
-              </div>
-            )}
 
-            <div className="flex gap-2 sm:gap-3">
-              {editingBudget && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCancel}
-                  className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
-                >
-                  {t('cancel')}
-                </Button>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="1000"
+                    value={formData.monthlyLimit}
+                    onChange={(e) => setFormData({ ...formData, monthlyLimit: e.target.value })}
+                    className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
+                  <Input
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    placeholder={currentYear.toString()}
+                    value={formData.year}
+                    onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || currentYear })}
+                    className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
+                  <Select
+                    value={formData.month?.toString()}
+                    onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
+                  >
+                    <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                      <SelectValue placeholder={t('selectMonth') || 'Select month'} />
+                    </SelectTrigger>
+                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                      {MONTHS.map((month) => (
+                        <SelectItem key={month.value} value={month.value.toString()} className={colors.textPrimary}>
+                          {t(month.labelKey)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  placeholder="80"
+                  value={formData.alertThreshold}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty string for typing, but clamp to valid range
+                    const numValue = value === '' ? '' : Math.min(100, Math.max(1, parseInt(value) || 80));
+                    setFormData({ ...formData, alertThreshold: numValue });
+                  }}
+                  className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
+                />
+                <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
+                  {t('alertThresholdHelp')}
+                </p>
+              </div>
+
+              {isOwner && (
+                <div className="flex items-center justify-between py-2 px-1">
+                  <div className="flex items-center gap-2">
+                    {formData.isShared ? (
+                      <Eye className={cn("w-4 h-4", colors.textSecondary)} />
+                    ) : (
+                      <EyeOff className={cn("w-4 h-4", colors.textTertiary)} />
+                    )}
+                    <Label htmlFor="isShared" className={cn("text-sm cursor-pointer", colors.textSecondary)}>
+                      {t('shareWithTeam') || 'Share with team'}
+                    </Label>
+                  </div>
+                  <Switch
+                    id="isShared"
+                    checked={formData.isShared}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isShared: checked })}
+                  />
+                </div>
               )}
-              <Button
-                type="submit"
-                disabled={isLoading || !formData.monthlyLimit || !formData.category || !formData.year || !formData.month}
-                className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
-                ) : editingBudget ? (
-                  <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                ) : (
-                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+
+              <div className="flex gap-2 sm:gap-3">
+                {editingBudget && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancel}
+                    className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                  >
+                    {t('cancel')}
+                  </Button>
                 )}
-                {editingBudget ? t('updateBudget') : t('addBudget')}
-              </Button>
-            </div>
-          </form>
+                <Button
+                  type="submit"
+                  disabled={isLoading || !formData.monthlyLimit || !formData.category || !formData.year || !formData.month}
+                  className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                  ) : editingBudget ? (
+                    <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                  ) : (
+                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                  )}
+                  {editingBudget ? t('updateBudget') : t('addBudget')}
+                </Button>
+              </div>
+            </form>
           )
         )}
 

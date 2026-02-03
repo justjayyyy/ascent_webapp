@@ -8,20 +8,35 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Repeat } from 'lucide-react';
 import { format, addMonths, startOfMonth, parseISO, isBefore, isAfter, eachMonthOfInterval } from 'date-fns';
-import { useTheme, translateCategory } from '../ThemeProvider';
+import { useTheme } from '../ThemeProvider';
+import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { ascent } from '@/api/client';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
-export default function AddTransactionDialog({ 
-  open, 
-  onClose, 
-  onSubmit, 
-  isLoading, 
-  accounts = [],
+/**
+ * @typedef {Object} AddTransactionDialogProps
+ * @property {boolean} isOpen
+ * @property {Function} onClose
+ * @property {Function} onSave
+ * @property {Object} initialData
+ * @property {Array} categories
+ * @property {Array} cards
+ * @property {Array} accounts
+ */
+
+/**
+ * @param {AddTransactionDialogProps} props
+ */
+export default function AddTransactionDialog({
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
   categories = [],
-  editTransaction = null 
+  cards = [],
+  accounts = []
 }) {
   const { user, t, language, colors } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates, isLoading: isLoadingRates } = useCurrencyConversion();
@@ -58,16 +73,16 @@ export default function AddTransactionDialog({
   const conversionInfo = useMemo(() => {
     const amount = parseFloat(formData.amount) || 0;
     const transactionCurrency = formData.currency || 'USD';
-    
+
     if (!amount || amount === 0) {
       return { convertedAmount: 0, exchangeRate: null, needsConversion: false };
     }
 
     if (transactionCurrency === userCurrency) {
-      return { 
-        convertedAmount: amount, 
-        exchangeRate: 1, 
-        needsConversion: false 
+      return {
+        convertedAmount: amount,
+        exchangeRate: 1,
+        needsConversion: false
       };
     }
 
@@ -76,7 +91,7 @@ export default function AddTransactionDialog({
     }
 
     const convertedAmount = convertCurrency(amount, transactionCurrency, userCurrency, rates);
-    
+
     // Calculate exchange rate: how many units of global currency per 1 unit of transaction currency
     let exchangeRate = null;
     if (transactionCurrency === 'USD' && rates[userCurrency]) {
@@ -89,10 +104,10 @@ export default function AddTransactionDialog({
       exchangeRate = rateToUSD * rates[userCurrency];
     }
 
-    return { 
-      convertedAmount, 
-      exchangeRate, 
-      needsConversion: true 
+    return {
+      convertedAmount,
+      exchangeRate,
+      needsConversion: true
     };
   }, [formData.amount, formData.currency, userCurrency, rates, convertCurrency]);
 
@@ -201,7 +216,7 @@ export default function AddTransactionDialog({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validate()) {
       return;
     }
@@ -217,7 +232,7 @@ export default function AddTransactionDialog({
 
   // Filter categories based on transaction type
   const getFilteredCategories = () => {
-    return categories.filter(cat => 
+    return categories.filter(cat =>
       cat.type === formData.type || cat.type === 'Both'
     );
   };
@@ -270,12 +285,12 @@ export default function AddTransactionDialog({
 
             <div className="space-y-1 sm:space-y-2">
               <Label htmlFor="type" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
-              <Select 
-                value={formData.type} 
+              <Select
+                value={formData.type}
                 onValueChange={(value) => {
                   const availableCategories = categories.filter(cat => cat.type === value || cat.type === 'Both');
-                  setFormData({ 
-                    ...formData, 
+                  setFormData({
+                    ...formData,
                     type: value,
                     category: availableCategories.length > 0 ? availableCategories[0].name : '',
                     isRecurring: value === 'Income' ? false : formData.isRecurring // Remove recurring for Income
@@ -409,8 +424,8 @@ export default function AddTransactionDialog({
                 id="isRecurring"
                 checked={formData.isRecurring}
                 onCheckedChange={(checked) => {
-                  setFormData({ 
-                    ...formData, 
+                  setFormData({
+                    ...formData,
                     isRecurring: checked,
                     recurringStartDate: checked ? formData.recurringStartDate : format(new Date(), 'yyyy-MM-dd'),
                     recurringEndDate: checked ? formData.recurringEndDate : format(addMonths(new Date(), 11), 'yyyy-MM-dd'),
@@ -419,8 +434,8 @@ export default function AddTransactionDialog({
                 }}
                 className={cn(colors.border)}
               />
-              <Label 
-                htmlFor="isRecurring" 
+              <Label
+                htmlFor="isRecurring"
                 className={cn("text-xs sm:text-sm cursor-pointer flex items-center gap-1.5", colors.textSecondary)}
               >
                 <Repeat className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -520,8 +535,8 @@ export default function AddTransactionDialog({
                 <Label htmlFor="relatedAccount" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
                   {t('relatedAccount')}
                 </Label>
-                <Select 
-                  value={formData.relatedAccountId} 
+                <Select
+                  value={formData.relatedAccountId}
                   onValueChange={(value) => setFormData({ ...formData, relatedAccountId: value })}
                 >
                   <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
@@ -545,8 +560,8 @@ export default function AddTransactionDialog({
               <Label htmlFor="relatedAccount" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
                 {t('relatedAccount')}
               </Label>
-              <Select 
-                value={formData.relatedAccountId} 
+              <Select
+                value={formData.relatedAccountId}
                 onValueChange={(value) => setFormData({ ...formData, relatedAccountId: value })}
               >
                 <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>

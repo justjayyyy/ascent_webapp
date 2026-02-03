@@ -6,22 +6,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Filter, X, Search } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import { useTheme, translateCategory } from '../ThemeProvider';
+import { useTheme } from '../ThemeProvider';
+import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 
 export default function TransactionFilters({ filters, onFilterChange, onClearFilters, categories = [], searchQuery = '', onSearchChange }) {
   const { t, language, colors, isRTL } = useTheme();
-  const hasActiveFilters = filters.type !== 'all' || 
-                          filters.category !== 'all' || 
-                          filters.dateFrom || 
-                          filters.dateTo ||
-                          searchQuery;
+  const hasActiveFilters = filters.type !== 'all' ||
+    filters.category !== 'all' ||
+    filters.dateFrom ||
+    filters.dateTo ||
+    searchQuery;
 
   const handleQuickFilter = (range) => {
     const today = new Date();
     let dateFrom, dateTo;
 
-    switch(range) {
+    switch (range) {
       case 'today':
         dateFrom = format(today, 'yyyy-MM-dd');
         dateTo = format(today, 'yyyy-MM-dd');
@@ -80,8 +81,8 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
               value={searchQuery}
               onChange={(e) => onSearchChange?.(e.target.value)}
               className={cn(
-                colors.bgTertiary, 
-                colors.border, 
+                colors.bgTertiary,
+                colors.border,
                 colors.textPrimary,
                 isRTL ? "pr-10 text-right" : "pl-10"
               )}

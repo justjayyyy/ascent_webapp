@@ -6,7 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCard, Banknote, ArrowLeftRight, MoreVertical, Copy, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useTheme, translateCategory } from '../ThemeProvider';
+import { useTheme } from '../ThemeProvider';
+import { translateCategory } from '@/lib/translations';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const categoryColors = {
@@ -68,17 +69,17 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
     if (transaction.currency === userCurrency) {
       return null; // No conversion needed
     }
-    
+
     // Use stored converted amount if available
     if (transaction.amountInGlobalCurrency !== null && transaction.amountInGlobalCurrency !== undefined) {
       return transaction.amountInGlobalCurrency;
     }
-    
+
     // Fallback: calculate on the fly if rates are available
     if (rates && Object.keys(rates).length > 0) {
       return convertCurrency(transaction.amount, transaction.currency || 'USD', userCurrency, rates);
     }
-    
+
     return null;
   }, [transaction.amount, transaction.currency, transaction.amountInGlobalCurrency, userCurrency, rates, convertCurrency]);
 
@@ -108,7 +109,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
             ) : (
               <TrendingDown className="w-4 h-4 text-red-400 flex-shrink-0" />
             )}
-            
+
             {/* Main Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -127,7 +128,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                   {transaction.description}
                 </h3>
               </div>
-              
+
               <div className={cn("flex items-center gap-2 text-xs", colors.textTertiary)}>
                 <div className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
@@ -168,7 +169,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                 </span>
               )}
             </div>
-            
+
             {/* 3-dots Dropdown Menu */}
             {canEdit && (
               <DropdownMenu>
@@ -181,8 +182,8 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                     <MoreVertical className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  align="end" 
+                <DropdownMenuContent
+                  align="end"
                   className={cn(colors.cardBg, colors.cardBorder, "min-w-[160px]")}
                 >
                   <DropdownMenuItem
@@ -218,7 +219,27 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
 
 TransactionItem.displayName = 'TransactionItem';
 
-function TransactionList({ transactions, onEdit, onDelete, onDuplicate, cards = [], canEdit = true }) {
+/**
+ * @typedef {Object} TransactionListProps
+ * @property {Array} transactions
+ * @property {Array} cards
+ * @property {Function} onEdit
+ * @property {Function} onDelete
+ * @property {Function} onDuplicate
+ * @property {boolean} canEdit
+ */
+
+/**
+ * @param {TransactionListProps} props
+ */
+function TransactionList({
+  transactions,
+  cards = [],
+  onEdit,
+  onDelete,
+  onDuplicate,
+  canEdit = true
+}) {
   const { t, language, colors, user } = useTheme();
 
   const handleEdit = useCallback((transaction) => {

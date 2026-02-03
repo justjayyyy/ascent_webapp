@@ -9,19 +9,20 @@ import TransactionList from './TransactionList';
 import BudgetProgress from './BudgetProgress';
 import BlurValue from '../BlurValue';
 import { cn } from '@/lib/utils';
-import { useTheme, translateCategory } from '../ThemeProvider';
+import { useTheme } from '../ThemeProvider';
+import { translateCategory } from '@/lib/translations';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 const COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
 const CARD_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#14B8A6', '#EF4444', '#6366F1', '#F97316'];
 
-function ExpenseMonthView({ 
-  transactions, 
-  budgets, 
+function ExpenseMonthView({
+  transactions,
+  budgets,
   cards,
   categories = [],
-  onEdit, 
+  onEdit,
   onDelete,
   onDuplicate,
   isLoading,
@@ -33,14 +34,14 @@ function ExpenseMonthView({
   const { user, colors, t, language, theme, isRTL } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'USD';
-  
+
   // Fetch exchange rates on mount
   useEffect(() => {
     if (userCurrency) {
       fetchExchangeRates('USD');
     }
   }, [userCurrency, fetchExchangeRates]);
-  
+
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -69,24 +70,24 @@ function ExpenseMonthView({
         const paymentMethod = (t.paymentMethod || '').toLowerCase();
         const type = (t.type || '').toLowerCase();
         const date = (t.date || '').toLowerCase();
-        
-        const matches = description.includes(query) || 
-                       category.includes(query) || 
-                       notes.includes(query) ||
-                       amount.includes(query) ||
-                       paymentMethod.includes(query) ||
-                       type.includes(query) ||
-                       date.includes(query);
-        
+
+        const matches = description.includes(query) ||
+          category.includes(query) ||
+          notes.includes(query) ||
+          amount.includes(query) ||
+          paymentMethod.includes(query) ||
+          type.includes(query) ||
+          date.includes(query);
+
         if (!matches) return false;
       }
-      
+
       // Category filter
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-      
+
       return true;
     });
-    
+
     return filtered;
   }, [transactions, debouncedSearchQuery, categoryFilter]);
 
@@ -172,9 +173,9 @@ function ExpenseMonthView({
       if (!categoryTotals[t.category]) {
         categoryTotals[t.category] = 0;
       }
-      
+
       let amountToUse = 0;
-      
+
       // Use stored converted amount if available
       if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
         amountToUse = t.amountInGlobalCurrency;
@@ -185,7 +186,7 @@ function ExpenseMonthView({
         // Fallback: convert on the fly for older transactions without stored conversion
         amountToUse = convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
       }
-      
+
       categoryTotals[t.category] += amountToUse;
     });
 
@@ -199,7 +200,7 @@ function ExpenseMonthView({
   // Payment methods breakdown (uses all transactions for totals, using stored converted amounts)
   const paymentMethodsBreakdown = useMemo(() => {
     const expenseTransactions = transactions.filter(t => t.type === 'Expense');
-    
+
     const getConvertedAmount = (t) => {
       // Use stored converted amount if available
       if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
@@ -215,35 +216,35 @@ function ExpenseMonthView({
       }
       return 0;
     };
-    
+
     // Calculate total for percentage calculation
     const totalExpenses = expenseTransactions.reduce((sum, t) => sum + getConvertedAmount(t), 0);
-    
+
     // Group by payment method
     const methodGroups = {};
     const cardIdToIndex = new Map(); // Track card color assignment
-    
+
     expenseTransactions.forEach(t => {
       const amount = getConvertedAmount(t);
       if (amount <= 0) return;
-      
+
       const method = t.paymentMethod || 'Other';
-      
+
       if (method === 'Card' && t.cardId) {
         // For cards, group by cardId
         const card = cards.find(c => c.id === t.cardId);
-        const cardName = card 
+        const cardName = card
           ? (user?.blurValues ? '••••••' : `${card.name || card.cardName || 'Card'} •••• ${card.lastFourDigits || ''}`)
           : 'Card';
         const key = `Card_${t.cardId}`;
-        
+
         if (!methodGroups[key]) {
           // Assign a color index to this card if not already assigned
           if (!cardIdToIndex.has(t.cardId)) {
             cardIdToIndex.set(t.cardId, cardIdToIndex.size);
           }
           const colorIndex = cardIdToIndex.get(t.cardId);
-          
+
           methodGroups[key] = {
             method: 'Card',
             name: cardName,
@@ -270,7 +271,7 @@ function ExpenseMonthView({
         methodGroups[method].count += 1;
       }
     });
-    
+
     // Convert to array and calculate percentages, format for pie chart
     const breakdown = Object.values(methodGroups)
       .map(item => ({
@@ -280,7 +281,7 @@ function ExpenseMonthView({
         name: item.name // For pie chart
       }))
       .sort((a, b) => b.total - a.total);
-    
+
     return { breakdown, totalExpenses };
   }, [transactions, userCurrency, rates, convertCurrency, cards, user?.blurValues]);
 
@@ -382,21 +383,21 @@ function ExpenseMonthView({
                         const displayName = name.length > 12 ? name.substring(0, 10) + '...' : name;
                         return (
                           <g>
-                            <text 
-                              x={x} 
-                              y={y - 6} 
-                              fill={theme === 'light' ? '#1e293b' : '#ffffff'} 
-                              textAnchor={x > cx ? 'start' : 'end'} 
+                            <text
+                              x={x}
+                              y={y - 6}
+                              fill={theme === 'light' ? '#1e293b' : '#ffffff'}
+                              textAnchor={x > cx ? 'start' : 'end'}
                               dominantBaseline="central"
                               style={{ fontSize: '11px', fontWeight: '500' }}
                             >
                               {`${displayName} ${percentStr}%`}
                             </text>
-                            <text 
-                              x={x} 
-                              y={y + 8} 
-                              fill={theme === 'light' ? '#64748b' : '#9ca3af'} 
-                              textAnchor={x > cx ? 'start' : 'end'} 
+                            <text
+                              x={x}
+                              y={y + 8}
+                              fill={theme === 'light' ? '#64748b' : '#9ca3af'}
+                              textAnchor={x > cx ? 'start' : 'end'}
                               dominantBaseline="central"
                               style={{ fontSize: '10px', fontWeight: '400' }}
                             >
@@ -428,8 +429,8 @@ function ExpenseMonthView({
                           }
                         };
                         return (
-                          <Cell 
-                            key={`cell-${index}`} 
+                          <Cell
+                            key={`cell-${index}`}
                             fill={getMethodColor()}
                             stroke={theme === 'light' ? '#ffffff' : '#092635'}
                             strokeWidth={2}
@@ -476,8 +477,8 @@ function ExpenseMonthView({
                   return (
                     <div key={`${entry.method}_${entry.cardId || index}`} className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
-                        <div 
-                          className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0" 
+                        <div
+                          className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: color }}
                         />
                         <span className={cn("text-xs sm:text-sm truncate", colors.textSecondary)}>
@@ -504,7 +505,7 @@ function ExpenseMonthView({
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Budget Progress */}
-        <BudgetProgress 
+        <BudgetProgress
           budgets={budgets}
           transactions={transactions}
           formatCurrency={formatCurrency}
@@ -550,21 +551,21 @@ function ExpenseMonthView({
                           const displayName = categoryName.length > 12 ? categoryName.substring(0, 10) + '...' : categoryName;
                           return (
                             <g>
-                              <text 
-                                x={x} 
-                                y={y - 6} 
-                                fill={theme === 'light' ? '#1e293b' : '#ffffff'} 
-                                textAnchor={x > cx ? 'start' : 'end'} 
+                              <text
+                                x={x}
+                                y={y - 6}
+                                fill={theme === 'light' ? '#1e293b' : '#ffffff'}
+                                textAnchor={x > cx ? 'start' : 'end'}
                                 dominantBaseline="central"
                                 style={{ fontSize: '11px', fontWeight: '500' }}
                               >
                                 {`${displayName} ${percentStr}%`}
                               </text>
-                              <text 
-                                x={x} 
-                                y={y + 8} 
-                                fill={theme === 'light' ? '#64748b' : '#9ca3af'} 
-                                textAnchor={x > cx ? 'start' : 'end'} 
+                              <text
+                                x={x}
+                                y={y + 8}
+                                fill={theme === 'light' ? '#64748b' : '#9ca3af'}
+                                textAnchor={x > cx ? 'start' : 'end'}
                                 dominantBaseline="central"
                                 style={{ fontSize: '10px', fontWeight: '400' }}
                               >
@@ -580,8 +581,8 @@ function ExpenseMonthView({
                         paddingAngle={2}
                       >
                         {categoryData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
+                          <Cell
+                            key={`cell-${index}`}
                             fill={COLORS[index % COLORS.length]}
                             stroke={theme === 'light' ? '#ffffff' : '#092635'}
                             strokeWidth={2}
@@ -612,8 +613,8 @@ function ExpenseMonthView({
                     return (
                       <div key={entry.name} className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
                           <span className={cn("text-sm truncate", colors.textSecondary)}>
@@ -711,8 +712,8 @@ function ExpenseMonthView({
                   {t('allCategories')}
                 </SelectItem>
                 {categories.map((category) => (
-                  <SelectItem 
-                    key={category.id || category.name} 
+                  <SelectItem
+                    key={category.id || category.name}
                     value={category.nameKey || category.name}
                     className={cn(colors.textPrimary, "hover:bg-[#5C8374]/20 focus:bg-[#5C8374]/20")}
                   >

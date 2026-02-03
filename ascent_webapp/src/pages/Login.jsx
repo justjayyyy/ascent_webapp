@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { translations } from '@/components/ThemeProvider';
+import { translations } from '@/lib/translations';
 
 // Google Client ID - set this in your .env file as VITE_GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -23,18 +23,18 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { login, register, loginWithGoogle } = useAuth();
-  
+
   // Get browser language for login page (before user is authenticated)
   const browserLang = navigator.language?.split('-')[0] || 'en';
   const lang = ['en', 'he', 'ru'].includes(browserLang) ? browserLang : 'en';
   const t = (key) => translations[lang]?.[key] || translations.en?.[key] || key;
 
   const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [registerData, setRegisterData] = useState({ 
-    email: '', 
-    password: '', 
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
     confirmPassword: '',
-    full_name: '' 
+    full_name: ''
   });
 
   // Get redirect URL, but exclude public pages (terms-of-service, privacy-policy, login)
@@ -48,14 +48,14 @@ export default function Login() {
     const originalHtmlOverflow = document.documentElement.style.overflow;
     const originalBodyHeight = document.body.style.height;
     const originalHtmlHeight = document.documentElement.style.height;
-    
+
     document.body.style.overflow = 'hidden';
     document.body.style.height = '100dvh';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.height = '100dvh';
-    
+
     return () => {
       document.body.style.overflow = originalBodyOverflow;
       document.body.style.height = originalBodyHeight;
@@ -135,13 +135,13 @@ export default function Login() {
             // Store the calendar access token
             localStorage.setItem('googleCalendarToken', response.access_token);
             localStorage.setItem('googleCalendarTokenExpiry', String(Date.now() + 3600000)); // 1 hour
-            
+
             // Get user info from Google
             const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
               headers: { 'Authorization': `Bearer ${response.access_token}` }
             });
             const userInfo = await userInfoResponse.json();
-            
+
             // Login with the user info
             await loginWithGoogle(response.access_token, GOOGLE_CLIENT_ID, userInfo);
             toast.success(t('welcomeBack'));
@@ -152,7 +152,7 @@ export default function Login() {
           }
         } else if (response.error) {
           console.error('Google OAuth error:', response.error);
-          
+
           // Provide more specific error messages
           if (response.error === 'access_denied') {
             toast.error('Access denied. Please grant permissions to sign in with Google.');
@@ -261,9 +261,9 @@ export default function Login() {
       <div className="w-full max-w-md flex flex-col items-center justify-center max-h-full overflow-hidden pt-2 sm:pt-0 pb-2">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
-          <img 
+          <img
             src="/logo-dark.png"
-            alt="Ascend Logo" 
+            alt="Ascend Logo"
             className="object-contain mx-auto mb-1 sm:mb-3 h-[70px] sm:h-[120px] w-auto"
             style={{ filter: 'brightness(1.1) saturate(1.2)' }}
           />
@@ -290,9 +290,9 @@ export default function Login() {
                     const buttonContainer = document.getElementById('google-signin-button');
                     if (buttonContainer) {
                       const googleButton = buttonContainer.querySelector('div[role="button"]');
-                        if (googleButton) {
-                          // Click the hidden Google button to trigger ID token flow
-                          googleButton.click();
+                      if (googleButton) {
+                        // Click the hidden Google button to trigger ID token flow
+                        googleButton.click();
                       } else {
                         setIsGoogleLoading(false);
                         toast.error('Google Sign-In not ready. Please wait a moment and try again.');
@@ -308,22 +308,22 @@ export default function Login() {
                   {isGoogleLoading ? (
                     <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                   ) : (
-                    <img 
-                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                      alt="Google" 
+                    <img
+                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                      alt="Google"
                       className="w-4 h-4 sm:w-5 sm:h-5"
                     />
                   )}
                   {isGoogleLoading ? t('signingIn') : t('continueWithGoogle')}
                 </button>
-                
+
                 {/* Hidden Google Sign-In Button - used to trigger ID token flow */}
-                <div 
-                  id="google-signin-button" 
+                <div
+                  id="google-signin-button"
                   className="hidden"
                   style={{ minHeight: '44px' }}
                 />
-                
+
                 {/* Divider */}
                 <div className="relative my-2 sm:my-6">
                   <div className="absolute inset-0 flex items-center">
@@ -338,13 +338,13 @@ export default function Login() {
 
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-[#092635] h-9 sm:h-10">
-                <TabsTrigger 
-                  value="login" 
+                <TabsTrigger
+                  value="login"
                   className="text-xs sm:text-sm data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
                 >
                   {t('login')}
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="register"
                   className="text-xs sm:text-sm data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
                 >
@@ -387,8 +387,8 @@ export default function Login() {
                       </button>
                     </div>
                   </div>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
                     disabled={isLoading}
                   >
@@ -467,8 +467,8 @@ export default function Login() {
                       />
                     </div>
                   </div>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
                     disabled={isLoading}
                   >
@@ -493,15 +493,15 @@ export default function Login() {
             By signing in, you agree to our
           </p>
           <div className="flex items-center justify-center gap-2 sm:gap-4 flex-wrap">
-            <Link 
-              to="/privacy-policy" 
+            <Link
+              to="/privacy-policy"
               className="text-xs sm:text-sm text-[#9EC8B9] hover:text-[#5C8374] underline transition-colors"
             >
               {t('privacyPolicy') || 'Privacy Policy'}
             </Link>
             <span className="text-[#5C8374]">•</span>
-            <Link 
-              to="/terms-of-service" 
+            <Link
+              to="/terms-of-service"
               className="text-xs sm:text-sm text-[#9EC8B9] hover:text-[#5C8374] underline transition-colors"
             >
               {t('termsOfService') || 'Terms of Service'}
