@@ -24,7 +24,15 @@ export function ThemeProvider({ children }) {
   }, [setUser]);
 
   const theme = user?.theme || 'dark';
-  const language = user?.language || 'en';
+
+  // Determine language: user preference > browser preference > default 'en'
+  const getBrowserLanguage = () => {
+    if (typeof navigator === 'undefined') return 'en';
+    const browserLang = navigator.language?.split('-')[0];
+    return ['en', 'he', 'ru'].includes(browserLang) ? browserLang : 'en';
+  };
+
+  const language = user?.language || getBrowserLanguage();
   const isRTL = language === 'he';
 
   const t = useCallback((key) => translations[language]?.[key] || translations.en[key] || key, [language]);

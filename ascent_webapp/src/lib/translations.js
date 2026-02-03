@@ -1881,20 +1881,7 @@ export const translations = {
   },
 };
 
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/privacy-policy', '/terms-of-service', '/accept-invitation'];
 
-const isPublicRoute = (pathname) => {
-  return PUBLIC_ROUTES.some(route => {
-    if (route.includes(':')) {
-      // Handle dynamic routes like /accept-invitation/:token
-      const routePattern = route.replace(/:[^/]+/g, '[^/]+');
-      const regex = new RegExp(`^${routePattern}`);
-      return regex.test(pathname);
-    }
-    return pathname.startsWith(route);
-  });
-};
 
 export function translateCategory(categoryNameOrKey, language = 'en') {
   // Translation keys (used by default categories from API)
