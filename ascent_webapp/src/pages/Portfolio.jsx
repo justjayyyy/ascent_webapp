@@ -10,9 +10,12 @@ import { useTheme } from '../components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import BlurValue from '../components/BlurValue';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 export default function Portfolio() {
   const { user, colors, t } = useTheme();
+  const userCurrency = user?.currency || 'USD';
+  const { convertCurrency, fetchExchangeRates } = useCurrencyConversion();
   const { hasPermission } = useAuth();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -44,6 +47,13 @@ export default function Portfolio() {
       });
     }
   }, [userId, userEmail, user, queryClient]);
+
+  // Fetch exchange rates on mount
+  React.useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['accounts', user?._id || user?.id, user?.email],
@@ -205,8 +215,12 @@ export default function Portfolio() {
 
     positions.forEach(position => {
       const currentPrice = position.currentPrice || position.averageBuyPrice;
-      const marketValue = position.quantity * currentPrice;
-      const costBasis = position.quantity * position.averageBuyPrice;
+
+      const rawMarketValue = position.quantity * currentPrice;
+      const rawCostBasis = position.quantity * position.averageBuyPrice;
+
+      const marketValue = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
+      const costBasis = convertCurrency(rawCostBasis, position.currency || 'USD', userCurrency);
 
       totalValue += marketValue;
       totalCostBasis += costBasis;
