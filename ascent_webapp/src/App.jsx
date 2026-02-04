@@ -10,10 +10,10 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import Login from './pages/Login';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-import AcceptInvitation from './pages/AcceptInvitation';
+const Login = React.lazy(() => import('./pages/Login'));
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
+const AcceptInvitation = React.lazy(() => import('./pages/AcceptInvitation'));
 import { Toaster as SonnerToaster } from 'sonner';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { SkeletonPage } from '@/components/ui/skeleton-card';
@@ -138,10 +138,26 @@ function App() {
         <ThemeProvider>
           <Router>
             <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+              <Route path="/login" element={
+                <Suspense fallback={<SkeletonPage />}>
+                  <Login />
+                </Suspense>
+              } />
+              <Route path="/privacy-policy" element={
+                <Suspense fallback={<SkeletonPage />}>
+                  <PrivacyPolicy />
+                </Suspense>
+              } />
+              <Route path="/terms-of-service" element={
+                <Suspense fallback={<SkeletonPage />}>
+                  <TermsOfService />
+                </Suspense>
+              } />
+              <Route path="/accept-invitation/:token" element={
+                <Suspense fallback={<SkeletonPage />}>
+                  <AcceptInvitation />
+                </Suspense>
+              } />
               <Route path="/*" element={
                 <>
                   <NavigationTracker />
