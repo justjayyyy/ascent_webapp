@@ -210,8 +210,10 @@ export default function Portfolio() {
   const calculateAccountMetrics = useCallback((account) => {
     const positions = allPositions.filter(p => p.accountId === account.id);
 
-    let totalValue = 0;
-    let totalCostBasis = 0;
+    let totalValue = 0; // Account Currency
+    let totalCostBasis = 0; // Account Currency
+    let totalValueUser = 0; // User Currency
+    let totalCostBasisUser = 0; // User Currency
 
     positions.forEach(position => {
       const currentPrice = position.currentPrice || position.averageBuyPrice;
@@ -219,18 +221,34 @@ export default function Portfolio() {
       const rawMarketValue = position.quantity * currentPrice;
       const rawCostBasis = position.quantity * position.averageBuyPrice;
 
-      const marketValue = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
-      const costBasis = convertCurrency(rawCostBasis, position.currency || 'USD', userCurrency);
+      // 1. Convert to Account Currency (for AccountCard)
+      const marketValueAccount = convertCurrency(rawMarketValue, position.currency || 'USD', account.baseCurrency || 'USD');
+      const costBasisAccount = convertCurrency(rawCostBasis, position.currency || 'USD', account.baseCurrency || 'USD');
 
-      totalValue += marketValue;
-      totalCostBasis += costBasis;
+      totalValue += marketValueAccount;
+      totalCostBasis += costBasisAccount;
+
+      // 2. Convert to User Currency (for Overall Summary)
+      const marketValueUser = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
+      const costBasisUser = convertCurrency(rawCostBasis, position.currency || 'USD', userCurrency);
+
+      totalValueUser += marketValueUser;
+      totalCostBasisUser += costBasisUser;
     });
 
     const totalPnL = totalValue - totalCostBasis;
     const totalPnLPercent = totalCostBasis > 0 ? (totalPnL / totalCostBasis) * 100 : 0;
 
-    return { totalValue, totalPnL, totalPnLPercent };
-  }, [allPositions]);
+    const totalPnLUser = totalValueUser - totalCostBasisUser;
+
+    return {
+      totalValue,
+      totalPnL,
+      totalPnLPercent,
+      totalValueUser,
+      totalPnLUser
+    };
+  }, [allPositions, userCurrency, convertCurrency]);
 
   const formatCurrency = useCallback((value, currency) => {
     return new Intl.NumberFormat('en-US', {
@@ -252,10 +270,10 @@ export default function Portfolio() {
 
   const overallMetrics = useMemo(() => {
     return accounts.reduce((acc, account) => {
-      const metrics = accountMetricsMap.get(account.id) || { totalValue: 0, totalPnL: 0 };
+      const metrics = accountMetricsMap.get(account.id) || { totalValueUser: 0, totalPnLUser: 0 };
       return {
-        totalValue: acc.totalValue + metrics.totalValue,
-        totalPnL: acc.totalPnL + metrics.totalPnL,
+        totalValue: acc.totalValue + (metrics.totalValueUser || 0),
+        totalPnL: acc.totalPnL + (metrics.totalPnLUser || 0),
       };
     }, { totalValue: 0, totalPnL: 0 });
   }, [accounts, accountMetricsMap]);
