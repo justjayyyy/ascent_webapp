@@ -37,6 +37,14 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, redirectUrl]);
 
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    full_name: ''
+  });
+
   // Prevent body scrolling on mobile
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow;
