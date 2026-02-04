@@ -19,6 +19,7 @@ import NetWorthWidget from '../components/dashboard/widgets/NetWorthWidget';
 import AccountAllocationWidget from '../components/dashboard/widgets/AccountAllocationWidget';
 import AssetAllocationWidget from '../components/dashboard/widgets/AssetAllocationWidget';
 import { useTheme } from '../components/ThemeProvider';
+import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import { toast } from 'sonner';
 
 // Default widget configuration - 2 columns layout with standard sizes
@@ -47,6 +48,14 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const saveTimeoutRef = useRef(null);
   const isInitialMount = useRef(true);
+  const { convertCurrency, fetchExchangeRates, isLoading: ratesLoading } = useCurrencyConversion();
+
+  // Fetch exchange rates on mount
+  useEffect(() => {
+    if (userCurrency) {
+      fetchExchangeRates('USD');
+    }
+  }, [userCurrency, fetchExchangeRates]);
 
   // Measure the actual container width for the grid
   useEffect(() => {
@@ -60,20 +69,20 @@ export default function Dashboard() {
         }
       }
     };
-    
+
     // Measure after layout is complete
     const timer1 = setTimeout(measureWidth, 50);
     const timer2 = setTimeout(measureWidth, 200);
     const timer3 = setTimeout(measureWidth, 500);
-    
+
     window.addEventListener('resize', measureWidth);
-    
+
     // Use ResizeObserver for more accurate measurements
     const resizeObserver = new ResizeObserver(measureWidth);
     if (gridContainerRef.current) {
       resizeObserver.observe(gridContainerRef.current);
     }
-    
+
     return () => {
       window.removeEventListener('resize', measureWidth);
       resizeObserver.disconnect();
@@ -192,7 +201,7 @@ export default function Dashboard() {
       // Delete all existing widgets
       const existing = await ascent.entities.DashboardWidget.list();
       await Promise.all(existing.map(w => ascent.entities.DashboardWidget.delete(w.id)));
-      
+
       // Create new widgets without IDs
       const widgetsToCreate = widgets.map(({ id, created_by, created_date, updated_date, ...widget }) => widget);
       await ascent.entities.DashboardWidget.bulkCreate(widgetsToCreate);
@@ -216,15 +225,21 @@ export default function Dashboard() {
   const calculateTotalMetrics = () => {
     const accountsWithPositions = accounts.map(account => {
       const accountPositions = positions.filter(p => p.accountId === account.id);
-      
+
       let totalValue = 0;
       let totalCostBasis = 0;
 
       accountPositions.forEach(position => {
         const currentPrice = position.currentPrice || position.averageBuyPrice;
-        const marketValue = position.quantity * currentPrice;
-        const costBasis = position.quantity * position.averageBuyPrice;
-        
+
+        // Calculate values in original currency
+        const rawMarketValue = position.quantity * currentPrice;
+        const rawCostBasis = position.quantity * position.averageBuyPrice;
+
+        // Convert to user's currency
+        const marketValue = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
+        const costBasis = convertCurrency(rawCostBasis, position.currency || 'USD', userCurrency);
+
         totalValue += marketValue;
         totalCostBasis += costBasis;
       });
@@ -246,7 +261,8 @@ export default function Dashboard() {
     const cashPositions = positions.filter(p => p.assetType === 'Cash');
     const totalCash = cashPositions.reduce((sum, p) => {
       const price = p.currentPrice || p.averageBuyPrice;
-      return sum + (p.quantity * price);
+      const rawValue = p.quantity * price;
+      return sum + convertCurrency(rawValue, p.currency || 'USD', userCurrency);
     }, 0);
     const totalInvested = totalPortfolioValue - totalCash;
 
@@ -281,8 +297,9 @@ export default function Dashboard() {
     const assetGroups = {};
     positions.forEach(position => {
       const currentPrice = position.currentPrice || position.averageBuyPrice;
-      const marketValue = position.quantity * currentPrice;
-      
+      const rawMarketValue = position.quantity * currentPrice;
+      const marketValue = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
+
       if (!assetGroups[position.assetType]) {
         assetGroups[position.assetType] = 0;
       }
@@ -300,8 +317,8 @@ export default function Dashboard() {
     const thisMonth = new Date();
     const thisMonthTransactions = transactions.filter(t => {
       const transDate = parseISO(t.date);
-      return transDate.getMonth() === thisMonth.getMonth() && 
-             transDate.getFullYear() === thisMonth.getFullYear();
+      return transDate.getMonth() === thisMonth.getMonth() &&
+        transDate.getFullYear() === thisMonth.getFullYear();
     });
 
     const totalIncome = thisMonthTransactions
@@ -311,12 +328,8 @@ export default function Dashboard() {
         if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
           return sum + t.amountInGlobalCurrency;
         }
-        // Fallback: only use amount if currency matches user's currency
-        if (t.currency === userCurrency) {
-          return sum + t.amount;
-        }
-        // Skip transactions in different currencies without converted amount
-        return sum;
+        // Fallback: convert currency if no stored amount
+        return sum + convertCurrency(t.amount, t.currency || 'USD', userCurrency);
       }, 0);
 
     const totalExpenses = thisMonthTransactions
@@ -326,12 +339,8 @@ export default function Dashboard() {
         if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
           return sum + t.amountInGlobalCurrency;
         }
-        // Fallback: only use amount if currency matches user's currency
-        if (t.currency === userCurrency) {
-          return sum + t.amount;
-        }
-        // Skip transactions in different currencies without converted amount
-        return sum;
+        // Fallback: convert currency if no stored amount
+        return sum + convertCurrency(t.amount, t.currency || 'USD', userCurrency);
       }, 0);
 
     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
@@ -350,7 +359,7 @@ export default function Dashboard() {
     const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 365;
     const data = [];
     const currentPortfolioValue = metrics.totalPortfolioValue;
-    
+
     // Find the earliest position/account creation date
     const positionDates = positions
       .filter(p => p.created_date)
@@ -361,20 +370,23 @@ export default function Dashboard() {
     const transactionDates = transactions
       .filter(t => t.date)
       .map(t => parseISO(t.date));
-    
+
     const allDates = [...positionDates, ...accountDates, ...transactionDates];
-    const earliestDate = allDates.length > 0 
+    const earliestDate = allDates.length > 0
       ? new Date(Math.min(...allDates.map(d => d.getTime())))
       : new Date();
-    
+
     // Calculate total invested from positions
-    const totalInvested = positions.reduce((sum, p) => sum + (p.quantity * p.averageBuyPrice), 0);
+    const totalInvested = positions.reduce((sum, p) => {
+      const rawCost = p.quantity * p.averageBuyPrice;
+      return sum + convertCurrency(rawCost, p.currency || 'USD', userCurrency);
+    }, 0);
     const totalPnL = currentPortfolioValue - totalInvested;
     const daysSinceStart = Math.max(1, Math.floor((new Date() - earliestDate) / 86400000));
-    
+
     for (let i = days; i >= 0; i--) {
       const date = subDays(new Date(), i);
-      
+
       // Show 0 before any financial activity
       if (date < earliestDate) {
         data.push({
@@ -384,7 +396,7 @@ export default function Dashboard() {
         });
         continue;
       }
-      
+
       // Calculate cumulative expenses up to this date (using stored converted amounts)
       const cumulativeExpenses = transactions
         .filter(t => t.type === 'Expense' && parseISO(t.date) <= date)
@@ -394,7 +406,7 @@ export default function Dashboard() {
             : (t.currency === userCurrency ? t.amount : t.amount);
           return sum + amountToUse;
         }, 0);
-      
+
       // Calculate cumulative income up to this date (using stored converted amounts)
       const cumulativeIncome = transactions
         .filter(t => t.type === 'Income' && parseISO(t.date) <= date)
@@ -404,24 +416,24 @@ export default function Dashboard() {
             : (t.currency === userCurrency ? t.amount : t.amount);
           return sum + amountToUse;
         }, 0);
-      
+
       // Calculate portfolio value based on position dates
       const daysFromStart = Math.floor((date - earliestDate) / 86400000);
       const progressRatio = daysSinceStart > 0 ? daysFromStart / daysSinceStart : 1;
-      
+
       const daysSeed = date.getTime() / 86400000;
       const variation = (seededRandom(daysSeed) - 0.5) * 0.01;
-      
+
       const portfolioValue = totalInvested + (totalPnL * progressRatio) + (totalInvested * variation);
       const netWorth = portfolioValue + (cumulativeIncome - cumulativeExpenses);
-      
+
       data.push({
         date: format(date, days <= 30 ? 'MMM dd' : 'MMM'),
         netWorth: Math.max(0, netWorth),
         portfolio: Math.max(0, portfolioValue),
       });
     }
-    
+
     return data;
   }, [accounts, positions, transactions, userCurrency]);
 
@@ -429,15 +441,15 @@ export default function Dashboard() {
   const getBenchmarkComparison = () => {
     const metrics = calculateTotalMetrics();
     const portfolioReturn = metrics.totalPnLPercent;
-    
+
     // Use a fixed S&P 500 benchmark based on current year
     // Average S&P 500 YTD return (deterministic based on current month)
     const currentMonth = new Date().getMonth();
     const sp500MonthlyReturns = [1.5, 2.8, 4.2, 5.5, 6.8, 7.2, 8.1, 8.5, 9.2, 10.1, 10.8, 11.5];
     const sp500Return = sp500MonthlyReturns[currentMonth];
-    
+
     const difference = portfolioReturn - sp500Return;
-    
+
     return {
       portfolioReturn,
       sp500Return,
@@ -449,7 +461,7 @@ export default function Dashboard() {
   // Generate historical data for portfolio value over time
   const getHistoricalData = (range = '30d') => {
     const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 365;
-    
+
     // Use real snapshots if available
     if (snapshots.length > 0) {
       // Filter snapshots for the selected time range
@@ -457,7 +469,7 @@ export default function Dashboard() {
       const relevantSnapshots = snapshots
         .filter(s => new Date(s.date) >= cutoffDate)
         .sort((a, b) => new Date(a.date) - new Date(b.date));
-      
+
       if (relevantSnapshots.length > 0) {
         return relevantSnapshots.map(snapshot => ({
           date: format(new Date(snapshot.date), days <= 30 ? 'MMM dd' : 'MMM'),
@@ -473,9 +485,9 @@ export default function Dashboard() {
     const accountDates = accounts
       .filter(a => a.created_date)
       .map(a => new Date(a.created_date));
-    
+
     const allDates = [...positionDates, ...accountDates];
-    const earliestDate = allDates.length > 0 
+    const earliestDate = allDates.length > 0
       ? new Date(Math.min(...allDates.map(d => d.getTime())))
       : new Date(); // If no dates, use today
 
@@ -483,16 +495,19 @@ export default function Dashboard() {
     const metrics = calculateTotalMetrics();
     const data = [];
     const currentValue = metrics.totalPortfolioValue;
-    const totalCost = positions.reduce((sum, p) => sum + (p.quantity * p.averageBuyPrice), 0);
-    
+    const totalCost = positions.reduce((sum, p) => {
+      const rawCost = p.quantity * p.averageBuyPrice;
+      return sum + convertCurrency(rawCost, p.currency || 'USD', userCurrency);
+    }, 0);
+
     // Calculate average daily return from P&L
     const totalPnL = currentValue - totalCost;
     const daysSinceStart = Math.max(1, Math.floor((new Date() - earliestDate) / 86400000));
     const avgDailyReturn = totalCost > 0 ? (totalPnL / totalCost) / daysSinceStart : 0;
-    
+
     for (let i = days; i >= 0; i--) {
       const date = subDays(new Date(), i);
-      
+
       // Show 0 before the first deposit/position
       if (date < earliestDate) {
         data.push({
@@ -501,26 +516,26 @@ export default function Dashboard() {
         });
         continue;
       }
-      
+
       const daysSeed = date.getTime() / 86400000;
-      
+
       // Deterministic small daily variation
       const dailyVariation = (seededRandom(daysSeed) - 0.5) * 0.01;
-      
+
       // Calculate days since start for this point
       const daysFromStart = Math.floor((date - earliestDate) / 86400000);
       const totalDaysFromStart = Math.floor((new Date() - earliestDate) / 86400000);
-      
+
       // Linear growth from cost basis to current value
       const progressRatio = totalDaysFromStart > 0 ? daysFromStart / totalDaysFromStart : 1;
       const value = totalCost + (totalPnL * progressRatio) + (totalCost * dailyVariation);
-      
+
       data.push({
         date: format(date, days <= 30 ? 'MMM dd' : 'MMM'),
         value: Math.max(0, value),
       });
     }
-    
+
     return data;
   };
 
@@ -545,13 +560,13 @@ export default function Dashboard() {
   // Handle layout changes from the grid
   const handleLayoutChange = useCallback((currentLayout, allLayouts) => {
     if (!currentLayout || currentLayout.length === 0) return;
-    
+
     // Skip saving on initial mount (first 2 layout changes are from initialization)
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
-    
+
     setLocalWidgets(prev => {
       const current = prev || serverWidgets || DEFAULT_WIDGETS;
       const updated = current.map(widget => {
@@ -586,9 +601,9 @@ export default function Dashboard() {
   const netWorthData = React.useMemo(() => getNetWorthData(timeRange), [getNetWorthData, timeRange]);
   const benchmarkData = React.useMemo(() => getBenchmarkComparison(), [metrics.totalPnLPercent]);
 
-  const enabledWidgets = (dashboardWidgets || []).filter(w => 
-    w && 
-    w.enabled && 
+  const enabledWidgets = (dashboardWidgets || []).filter(w =>
+    w &&
+    w.enabled &&
     w.widgetType &&
     typeof w.x !== 'undefined' &&
     typeof w.y !== 'undefined' &&
@@ -610,7 +625,7 @@ export default function Dashboard() {
       minH: 2,
       maxH: 6,
     }));
-    
+
     return {
       lg: lgLayout,
       md: lgLayout,
@@ -776,10 +791,10 @@ export default function Dashboard() {
                 {metrics.accountsWithPositions.length > 0 ? (
                   <div className="space-y-4">
                     {metrics.accountsWithPositions.map((account, idx) => {
-                      const percentage = metrics.totalPortfolioValue > 0 
-                        ? (account.totalValue / metrics.totalPortfolioValue) * 100 
+                      const percentage = metrics.totalPortfolioValue > 0
+                        ? (account.totalValue / metrics.totalPortfolioValue) * 100
                         : 0;
-                      
+
                       return (
                         <div key={account.id} className={cn("flex items-center justify-between py-3 border-b last:border-0", colors.borderLight)}>
                           <div className="flex items-center gap-3">
@@ -808,7 +823,7 @@ export default function Dashboard() {
                       );
                     })}
                   </div>
-                  ) : (
+                ) : (
                   <div className={cn("text-center py-8", colors.textTertiary)}>
                     No accounts yet. Create your first account to get started.
                   </div>
@@ -902,7 +917,7 @@ export default function Dashboard() {
                 </BlurValue>
               </p>
               <p className={cn("text-sm mt-1", colors.textTertiary)}>
-                {metrics.totalPortfolioValue > 0 
+                {metrics.totalPortfolioValue > 0
                   ? ((metrics.totalInvested / metrics.totalPortfolioValue) * 100).toFixed(1)
                   : 0}% {t('ofPortfolio')}
               </p>
@@ -923,7 +938,7 @@ export default function Dashboard() {
                 </BlurValue>
               </p>
               <p className={cn("text-sm mt-1", colors.textTertiary)}>
-                {metrics.totalPortfolioValue > 0 
+                {metrics.totalPortfolioValue > 0
                   ? ((metrics.totalCash / metrics.totalPortfolioValue) * 100).toFixed(1)
                   : 0}% {t('ofPortfolio')}
               </p>
