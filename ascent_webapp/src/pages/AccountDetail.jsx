@@ -382,8 +382,17 @@ export default function AccountDetail() {
 
   const handleRefreshPrices = async () => {
     // Filter positions to only include those for this account
-    const accountPositions = positions.filter(p => p.accountId === accountId);
-    if (accountPositions.length === 0) return;
+    // AND exclude Options/Cash from auto-refresh (as we don't have option data, and Cash is static)
+    const accountPositions = positions.filter(p =>
+      p.accountId === accountId &&
+      p.assetType !== 'Option' &&
+      p.assetType !== 'Cash'
+    );
+
+    if (accountPositions.length === 0) {
+      toast.info('No stocks/ETFs to refresh. Options must be updated manually.');
+      return;
+    }
 
     setRefreshingPrices(true);
     try {

@@ -144,6 +144,16 @@ Ascent Team`;
             <pre style="margin: 10px 0; font-family: inherit; white-space: pre-wrap;">${topCategories}</pre>
           </div>
           ` : ''}
+
+          ${positions.some(p => p.assetType === 'Option') ? `
+          <div style="background: #fff8e1; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+            <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🔔 Action Required: Update Option Prices</h2>
+            <p style="margin: 5px 0;">We noticed you have options in your portfolio. Since real-time option data is limited, please ensure your option prices are up to date to maintain accurate portfolio valuation.</p>
+            <div style="margin-top: 15px;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/portfolio" style="background-color: #ffc107; color: #000; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; display: inline-block;">Update Prices Now</a>
+            </div>
+          </div>
+          ` : ''}
         `;
 
         const emailHtml = getEmailTemplate({
