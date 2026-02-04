@@ -25,25 +25,17 @@ export default function Login() {
   const { login, register, loginWithGoogle, isAuthenticated } = useAuth();
   const { t } = useTheme();
 
+  // Get redirect URL, but exclude public pages (terms-of-service, privacy-policy, login)
+  const rawRedirectUrl = searchParams.get('redirect') || '/Portfolio';
+  const publicPages = ['/terms-of-service', '/privacy-policy', '/login'];
+  const redirectUrl = publicPages.includes(rawRedirectUrl) ? '/Portfolio' : rawRedirectUrl;
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate(redirectUrl);
     }
   }, [isAuthenticated, navigate, redirectUrl]);
-
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [registerData, setRegisterData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    full_name: ''
-  });
-
-  // Get redirect URL, but exclude public pages (terms-of-service, privacy-policy, login)
-  const rawRedirectUrl = searchParams.get('redirect') || '/Portfolio';
-  const publicPages = ['/terms-of-service', '/privacy-policy', '/login'];
-  const redirectUrl = publicPages.includes(rawRedirectUrl) ? '/Portfolio' : rawRedirectUrl;
 
   // Prevent body scrolling on mobile
   useEffect(() => {
