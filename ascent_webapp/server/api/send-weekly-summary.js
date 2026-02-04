@@ -39,8 +39,87 @@ export default async function handler(req, res) {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
 
+    // Translations for email content
+    const translations = {
+      en: {
+        weeklySummaryTitle: 'Weekly Portfolio Summary',
+        portfolioOverview: '📊 Portfolio Overview',
+        totalValue: 'Total Value',
+        totalCost: 'Total Cost',
+        totalPnL: 'Total P&L',
+        accounts: 'Accounts',
+        positions: 'Positions',
+        thisWeekActivity: "💰 This Week's Activity",
+        expenses: 'Expenses',
+        income: 'Income',
+        net: 'Net',
+        transactions: 'Transactions',
+        topExpenseCategories: '📈 Top Expense Categories',
+        actionRequiredOptions: '🔔 Action Required: Update Option Prices',
+        optionsNotice: 'We noticed you have options in your portfolio. Since real-time option data is limited, please ensure your option prices are up to date to maintain accurate portfolio valuation.',
+        updatePricesNow: 'Update Prices Now',
+        viewDashboard: 'View Dashboard',
+        hello: 'Hello',
+        emailIntro: "Here's your weekly portfolio summary for the week ending",
+        weekEnding: 'Week ending',
+        bestRegards: 'Best regards,',
+        ascentTeam: 'Ascent Team'
+      },
+      he: {
+        weeklySummaryTitle: 'סיכום תיק שבועי',
+        portfolioOverview: '📊 סקירה כללית של התיק',
+        totalValue: 'שווי כולל',
+        totalCost: 'עלות כוללת',
+        totalPnL: 'רווח/הפסד כולל',
+        accounts: 'חשבונות',
+        positions: 'פוזיציות',
+        thisWeekActivity: "💰 פעילות השבוע",
+        expenses: 'הוצאות',
+        income: 'הכנסות',
+        net: 'נטו',
+        transactions: 'עסקאות',
+        topExpenseCategories: '📈 קטגוריות הוצאה מובילות',
+        actionRequiredOptions: '🔔 פעולה נדרשת: עדכון מחירי אופציות',
+        optionsNotice: 'שמנו לב שיש לך אופציות בתיק. מכיוון שנתוני אופציות בזמן אמת מוגבלים, אנא וודא שמחירי האופציות שלך מעודכנים כדי לשמור על הערכת שווי מדויקת.',
+        updatePricesNow: 'עדכן מחירים עכשיו',
+        viewDashboard: 'צפה בלוח הבקרה',
+        hello: 'שלום',
+        emailIntro: 'הנה סיכום התיק השבועי שלך לשבוע המסתייים ב-',
+        weekEnding: 'שבוע מסתיים ב-',
+        bestRegards: 'בברכה,',
+        ascentTeam: 'צוות Ascent'
+      },
+      ru: {
+        weeklySummaryTitle: 'Еженедельная сводка портфеля',
+        portfolioOverview: '📊 Обзор портфеля',
+        totalValue: 'Общая стоимость',
+        totalCost: 'Общая стоимость покупки',
+        totalPnL: 'Общий P&L',
+        accounts: 'Счета',
+        positions: 'Позиции',
+        thisWeekActivity: "💰 Активность за неделю",
+        expenses: 'Расходы',
+        income: 'Доходы',
+        net: 'Личный доход',
+        transactions: 'Транзакции',
+        topExpenseCategories: '📈 Топ категорий расходов',
+        actionRequiredOptions: '🔔 Требуется действие: Обновите цены опционов',
+        optionsNotice: 'Мы заметили, что в вашем портфеле есть опционы. Поскольку данные об опционах в реальном времени ограничены, пожалуйста, убедитесь, что цены актуальны.',
+        updatePricesNow: 'Обновить цены сейчас',
+        viewDashboard: 'Перейти к панели',
+        hello: 'Здравствуйте',
+        emailIntro: 'Вот ваша еженедельная сводка портфеля за неделю, заканчивающуюся',
+        weekEnding: 'Неделя заканчивается',
+        bestRegards: 'С уважением,',
+        ascentTeam: 'Команда Ascent'
+      }
+    };
+
     for (const user of users) {
       try {
+        const lang = user.language || 'en';
+        const t = (key) => translations[lang][key] || translations['en'][key];
+
         // Get user's accounts and positions
         const accounts = await Account.find({ created_by: user.email });
         const positions = await Position.find({ created_by: user.email });
@@ -81,7 +160,7 @@ export default async function handler(req, res) {
 
         const currency = user.currency || 'USD';
         const formatCurrency = (amount) => {
-          return new Intl.NumberFormat('en-US', {
+          return new Intl.NumberFormat(lang === 'he' ? 'he-IL' : (lang === 'ru' ? 'ru-RU' : 'en-US'), {
             style: 'currency',
             currency: currency,
             minimumFractionDigits: 2,
@@ -89,79 +168,90 @@ export default async function handler(req, res) {
           }).format(amount || 0);
         };
 
+        // Format date based on locale
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const formattedDate = new Date().toLocaleDateString(lang === 'he' ? 'he-IL' : (lang === 'ru' ? 'ru-RU' : 'en-US'), dateOptions);
+
         const topCategories = Object.entries(expensesByCategory)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5)
           .map(([cat, amount]) => `• ${cat}: ${formatCurrency(amount)}`)
           .join('\n');
 
-        const emailBody = `Hello ${user.full_name || 'User'},
+        const emailBody = `${t('hello')} ${user.full_name || 'User'},
 
-Here's your weekly portfolio summary for the week ending ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}:
+${t('emailIntro')} ${formattedDate}:
 
-📊 Portfolio Overview:
-• Total Value: ${formatCurrency(totalValue)}
-• Total Cost: ${formatCurrency(totalCost)}
-• Total P&L: ${formatCurrency(totalPnl)} (${pnlPercent > 0 ? '+' : ''}${pnlPercent}%)
-• Accounts: ${accounts.length}
-• Positions: ${positions.length}
+${t('portfolioOverview')}:
+• ${t('totalValue')}: ${formatCurrency(totalValue)}
+• ${t('totalCost')}: ${formatCurrency(totalCost)}
+• ${t('totalPnL')}: ${formatCurrency(totalPnl)} (${pnlPercent > 0 ? '+' : ''}${pnlPercent}%)
+• ${t('accounts')}: ${accounts.length}
+• ${t('positions')}: ${positions.length}
 
-💰 This Week's Activity:
-• Expenses: ${formatCurrency(weekExpenses)}
-• Income: ${formatCurrency(weekIncome)}
-• Net: ${formatCurrency(weekIncome - weekExpenses)}
-• Transactions: ${weekTransactions.length}
+${t('thisWeekActivity')}:
+• ${t('expenses')}: ${formatCurrency(weekExpenses)}
+• ${t('income')}: ${formatCurrency(weekIncome)}
+• ${t('net')}: ${formatCurrency(weekIncome - weekExpenses)}
+• ${t('transactions')}: ${weekTransactions.length}
 
-${topCategories ? `\nTop Expense Categories:\n${topCategories}` : ''}
+${topCategories ? `\n${t('topExpenseCategories')}:\n${topCategories}` : ''}
+${positions.some(p => p.assetType === 'Option') ? `
+${t('actionRequiredOptions')}
+${t('optionsNotice')}
+${process.env.NEXT_PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/portfolio
+` : ''}
 
-Best regards,
-Ascent Team`;
+${t('bestRegards')}
+${t('ascentTeam')}`;
 
         const summaryContent = `
-          <p>Hello <strong>${user.full_name || 'User'}</strong>,</p>
-          <p>Here's your weekly portfolio summary for the week ending ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-          
-          <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50;">
-            <h2 style="color: #092635; margin-top: 0; font-size: 18px;">📊 Portfolio Overview</h2>
-            <p style="margin: 5px 0;"><strong>Total Value:</strong> ${formatCurrency(totalValue)}</p>
-            <p style="margin: 5px 0;"><strong>Total Cost:</strong> ${formatCurrency(totalCost)}</p>
-            <p style="margin: 5px 0;"><strong>Total P&L:</strong> <span style="color: ${totalPnl >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">${formatCurrency(totalPnl)} (${pnlPercent > 0 ? '+' : ''}${pnlPercent}%)</span></p>
-            <p style="margin: 5px 0;"><strong>Accounts:</strong> ${accounts.length}</p>
-            <p style="margin: 5px 0;"><strong>Positions:</strong> ${positions.length}</p>
-          </div>
-          
-          <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
-            <h2 style="color: #092635; margin-top: 0; font-size: 18px;">💰 This Week's Activity</h2>
-            <p style="margin: 5px 0;"><strong>Expenses:</strong> ${formatCurrency(weekExpenses)}</p>
-            <p style="margin: 5px 0;"><strong>Income:</strong> ${formatCurrency(weekIncome)}</p>
-            <p style="margin: 5px 0;"><strong>Net:</strong> <span style="color: ${(weekIncome - weekExpenses) >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">${formatCurrency(weekIncome - weekExpenses)}</span></p>
-            <p style="margin: 5px 0;"><strong>Transactions:</strong> ${weekTransactions.length}</p>
-          </div>
-          
-          ${topCategories ? `
-          <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
-            <h2 style="color: #092635; margin-top: 0; font-size: 18px;">📈 Top Expense Categories</h2>
-            <pre style="margin: 10px 0; font-family: inherit; white-space: pre-wrap;">${topCategories}</pre>
-          </div>
-          ` : ''}
-
-          ${positions.some(p => p.assetType === 'Option') ? `
-          <div style="background: #fff8e1; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-            <h2 style="color: #092635; margin-top: 0; font-size: 18px;">🔔 Action Required: Update Option Prices</h2>
-            <p style="margin: 5px 0;">We noticed you have options in your portfolio. Since real-time option data is limited, please ensure your option prices are up to date to maintain accurate portfolio valuation.</p>
-            <div style="margin-top: 15px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/portfolio" style="background-color: #ffc107; color: #000; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; display: inline-block;">Update Prices Now</a>
+          <div dir="${lang === 'he' ? 'rtl' : 'ltr'}" style="text-align: ${lang === 'he' ? 'right' : 'left'}">
+            <p>${t('hello')} <strong>${user.full_name || 'User'}</strong>,</p>
+            <p>${t('emailIntro')} ${formattedDate}</p>
+            
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-${lang === 'he' ? 'right' : 'left'}: 4px solid #4caf50;">
+              <h2 style="color: #092635; margin-top: 0; font-size: 18px;">${t('portfolioOverview')}</h2>
+              <p style="margin: 5px 0;"><strong>${t('totalValue')}:</strong> ${formatCurrency(totalValue)}</p>
+              <p style="margin: 5px 0;"><strong>${t('totalCost')}:</strong> ${formatCurrency(totalCost)}</p>
+              <p style="margin: 5px 0;"><strong>${t('totalPnL')}:</strong> <span style="color: ${totalPnl >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">${formatCurrency(totalPnl)} (${pnlPercent > 0 ? '+' : ''}${pnlPercent}%)</span></p>
+              <p style="margin: 5px 0;"><strong>${t('accounts')}:</strong> ${accounts.length}</p>
+              <p style="margin: 5px 0;"><strong>${t('positions')}:</strong> ${positions.length}</p>
             </div>
+            
+            <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0; border-${lang === 'he' ? 'right' : 'left'}: 4px solid #ff9800;">
+              <h2 style="color: #092635; margin-top: 0; font-size: 18px;">${t('thisWeekActivity')}</h2>
+              <p style="margin: 5px 0;"><strong>${t('expenses')}:</strong> ${formatCurrency(weekExpenses)}</p>
+              <p style="margin: 5px 0;"><strong>${t('income')}:</strong> ${formatCurrency(weekIncome)}</p>
+              <p style="margin: 5px 0;"><strong>${t('net')}:</strong> <span style="color: ${(weekIncome - weekExpenses) >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">${formatCurrency(weekIncome - weekExpenses)}</span></p>
+              <p style="margin: 5px 0;"><strong>${t('transactions')}:</strong> ${weekTransactions.length}</p>
+            </div>
+            
+            ${topCategories ? `
+            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-${lang === 'he' ? 'right' : 'left'}: 4px solid #2196f3;">
+              <h2 style="color: #092635; margin-top: 0; font-size: 18px;">${t('topExpenseCategories')}</h2>
+              <pre style="margin: 10px 0; font-family: inherit; white-space: pre-wrap;">${topCategories}</pre>
+            </div>
+            ` : ''}
+
+            ${positions.some(p => p.assetType === 'Option') ? `
+            <div style="background: #fff8e1; padding: 20px; border-radius: 8px; margin: 20px 0; border-${lang === 'he' ? 'right' : 'left'}: 4px solid #ffc107;">
+              <h2 style="color: #092635; margin-top: 0; font-size: 18px;">${t('actionRequiredOptions')}</h2>
+              <p style="margin: 5px 0;">${t('optionsNotice')}</p>
+              <div style="margin-top: 15px;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}/portfolio" style="background-color: #ffc107; color: #000; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; display: inline-block;">${t('updatePricesNow')}</a>
+              </div>
+            </div>
+            ` : ''}
           </div>
-          ` : ''}
         `;
 
         const emailHtml = getEmailTemplate({
-          language: user.language || 'en',
-          title: 'Weekly Portfolio Summary',
+          language: lang,
+          title: t('weeklySummaryTitle'),
           body: summaryContent,
           cta: {
-            text: 'View Dashboard',
+            text: t('viewDashboard'),
             link: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'
           }
         });
@@ -169,7 +259,7 @@ Ascent Team`;
         // Send email using the send-email integration
         const emailResult = await sendEmail({
           to: user.email,
-          subject: `Weekly Portfolio Summary - ${new Date().toLocaleDateString()}`,
+          subject: `${t('weeklySummaryTitle')} - ${formattedDate}`,
           body: emailBody,
           html: emailHtml
         });

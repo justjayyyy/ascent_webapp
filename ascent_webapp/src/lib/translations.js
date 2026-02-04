@@ -443,6 +443,7 @@ export const translations = {
     // Account Detail
     backToPortfolio: 'Back to Portfolio',
     refreshPrices: 'Refresh Prices',
+    noStocksToRefresh: 'No stocks/ETFs to refresh. Options must be updated manually.',
     addPosition: 'Add Position',
     allocation: 'Allocation',
     topHoldings: 'Top Holdings',
@@ -453,6 +454,8 @@ export const translations = {
     noPositionsYetAddFirst: 'No positions yet. Add your first position to get started.',
     accountNotFound: 'Account not found',
     currentPrice: 'Current Price',
+    currentMarketPrice: 'Current Market Price',
+    overrideAutoPrice: 'Manually update the current market price for this position.',
 
     // Add Account Dialog
     addNewAccount: 'Add New Account',
@@ -1043,6 +1046,7 @@ export const translations = {
     // Account Detail
     backToPortfolio: 'חזרה לתיק',
     refreshPrices: 'רענן מחירים',
+    noStocksToRefresh: 'אין מניות/תעודות סל לרענון. יש לעדכן אופציות ידנית.',
     addPosition: 'הוסף פוזיציה',
     allocation: 'חלוקה',
     topHoldings: 'אחזקות מובילות',
@@ -1121,6 +1125,8 @@ export const translations = {
     noPortfolioTransactionsYet: 'אין עסקאות עדיין',
     transactionsWillAppear: 'עסקאות קנייה, מכירה והפקדה יופיעו כאן',
     price: 'מחיר',
+    currentMarketPrice: 'מחיר שוק נוכחי',
+    overrideAutoPrice: 'עדכן ידנית את מחיר השוק הנוכחי עבור פוזיציה זו.',
     total: 'סה"כ',
 
     // Dashboard Customization
@@ -1644,6 +1650,7 @@ export const translations = {
     // Account Detail
     backToPortfolio: 'Вернуться к портфелю',
     refreshPrices: 'Обновить цены',
+    noStocksToRefresh: 'Нет акций/ETF для обновления. Опционы необходимо обновлять вручную.',
     addPosition: 'Добавить позицию',
     allocation: 'Распределение',
     topHoldings: 'Топ активов',
@@ -1654,6 +1661,8 @@ export const translations = {
     noPositionsYetAddFirst: 'Позиций пока нет. Добавьте первую позицию',
     accountNotFound: 'Счет не найден',
     currentPrice: 'Текущая цена',
+    currentMarketPrice: 'Текущая рыночная цена',
+    overrideAutoPrice: 'Обновить текущую рыночную цену для этой позиции вручную.',
 
     // Add Account Dialog
     addNewAccount: 'Добавить новый счет',

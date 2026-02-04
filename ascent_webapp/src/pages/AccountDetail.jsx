@@ -390,7 +390,7 @@ export default function AccountDetail() {
     );
 
     if (accountPositions.length === 0) {
-      toast.info('No stocks/ETFs to refresh. Options must be updated manually.');
+      toast.info(t('noStocksToRefresh') || 'No stocks/ETFs to refresh. Options must be updated manually.');
       return;
     }
 
