@@ -265,7 +265,7 @@ export default function Login() {
       <div className="w-full max-w-md flex flex-col items-center justify-center my-auto pt-2 sm:pt-0 pb-2">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
-          <AscentLogo alt="Ascent logo" className="mx-auto mb-1 sm:mb-3 w-16 sm:w-32 pt-2 [@media(max-height:720px)]:!w-16" />
+          <AscentLogo alt="Ascent logo" className="mx-auto mt-6 mb-1 sm:mt-8 sm:mb-3 w-16 sm:w-32 [@media(max-height:720px)]:!w-16" />
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground mb-1 sm:mb-2">{t('ascend')}</h1>
           <p className="text-xs sm:text-base text-muted-foreground">{t('ascendTagline')}</p>
         </div>
