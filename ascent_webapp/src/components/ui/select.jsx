@@ -5,6 +5,7 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { popperCollisionPadding } from "@/lib/safeArea"
 
 const Select = SelectPrimitive.Root
 
@@ -60,6 +61,7 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
         className
       )}
       position={position}
+      collisionPadding={popperCollisionPadding()}
       {...props}>
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport
