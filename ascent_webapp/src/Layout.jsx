@@ -163,7 +163,7 @@ function LayoutContent({ children, currentPageName }) {
       {/* Mobile Header */}
       <div className={cn(
         "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top safe-area-inset-x",
-        "bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70",
+        "bg-card",
         colors.border
       )}>
         <div className="relative flex items-center justify-center h-16 px-4">

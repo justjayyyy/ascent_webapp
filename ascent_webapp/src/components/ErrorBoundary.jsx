@@ -40,7 +40,7 @@ class ErrorBoundary extends React.Component {
       }
 
       return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))]">
           <Card className="max-w-lg w-full bg-card border-primary/30">
             <CardHeader className="text-center pb-2">
               <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-danger/20 flex items-center justify-center">

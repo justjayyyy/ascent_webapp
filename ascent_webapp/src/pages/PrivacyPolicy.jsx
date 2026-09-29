@@ -61,7 +61,7 @@ export default function PrivacyPolicy() {
   };
 
   return (
-    <div className={`min-h-screen p-4 md:p-8 ${colors.bgPrimary}`}>
+    <div className={`min-h-screen p-4 md:p-8 pt-[calc(1rem+var(--safe-top))] md:pt-8 pb-[calc(1rem+env(safe-area-inset-bottom))] ${colors.bgPrimary}`}>
       <div className="max-w-4xl mx-auto py-8">
         <div className={`rounded-xl border p-6 md:p-8 ${colors.cardBg} ${colors.cardBorder}`}>
           <div className="flex items-center gap-3 mb-6">

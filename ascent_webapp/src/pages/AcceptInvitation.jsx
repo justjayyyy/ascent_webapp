@@ -173,7 +173,7 @@ export default function AcceptInvitation() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <Card className="bg-card border-primary/30 max-w-md w-full">
           <CardContent className="p-6 text-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
@@ -203,7 +203,7 @@ export default function AcceptInvitation() {
   if (invitation?.permissions?.manageUsers) permissionsList.push('Manage Users');
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <Card className="bg-card border-primary/30 max-w-md w-full">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">

@@ -25,18 +25,37 @@ export function popperCollisionPadding() {
   return cached;
 }
 
-// Some iOS versions report env(safe-area-inset-top) as 0 in a home-screen app until
-// the first layout. Fall back to a typical notch height so the header never sits
-// under the status bar.
-export function ensureStandaloneTopInset() {
-  if (typeof window === 'undefined') return;
-  const standalone = window.navigator.standalone === true;
-  const iphone = /iPhone/.test(navigator.userAgent);
-  if (!standalone || !iphone) return;
+const readEnvTop = () => {
   const probe = document.createElement('div');
   probe.style.cssText = 'position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top)';
   document.body.appendChild(probe);
   const inset = parseFloat(getComputedStyle(probe).paddingTop) || 0;
   probe.remove();
-  if (inset < 20) document.documentElement.style.setProperty('--safe-top', 'calc(47px + 0.5rem)');
+  return inset;
+};
+
+// Some iOS versions report env(safe-area-inset-top) as 0 in a home-screen app (at
+// launch, after resume, or after rotating back) even though the page runs under the
+// notch / Dynamic Island. Re-measure on every lifecycle event and, for a notched iPhone
+// in portrait, fall back to a typical status-bar height so the header, dialogs and pages
+// never sit under it. Landscape has no top cut-out, so the fallback is dropped there.
+export function ensureStandaloneTopInset() {
+  if (typeof window === 'undefined') return;
+  const root = document.documentElement;
+  const apply = () => {
+    const standalone = window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+    const iphone = /iPhone/.test(navigator.userAgent);
+    const portrait = window.innerHeight > window.innerWidth;
+    const notched = Math.max(screen.width, screen.height) >= 812;
+    root.style.removeProperty('--safe-top');
+    if (!standalone || !iphone || !portrait || !notched) return;
+    if (readEnvTop() < 20) root.style.setProperty('--safe-top', 'calc(47px + 0.5rem)');
+  };
+  const run = () => { cached = undefined; apply(); };
+  const start = () => { run(); requestAnimationFrame(run); setTimeout(run, 400); };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  window.addEventListener('orientationchange', () => setTimeout(run, 150));
+  window.addEventListener('resize', run);
+  window.addEventListener('pageshow', run);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run(); });
 }
