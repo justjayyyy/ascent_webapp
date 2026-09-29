@@ -108,7 +108,10 @@ export default function NoteEditor({
 
   const isMobileSheet = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches;
   // On iPhone the keyboard scrolls the page under a fixed sheet; pin it to the visible area instead
-  const style = isMobileSheet && vv ? { height: vv.height, marginTop: vv.top } : undefined;
+  // Only when the keyboard is actually up: on an installed iPhone app the viewport values can be off
+  // by the status-bar height otherwise, which pushes the top bar under the notch.
+  const keyboardUp = vv && typeof window !== 'undefined' && window.innerHeight - vv.height > 120;
+  const style = isMobileSheet && keyboardUp ? { height: vv.height, maxHeight: vv.height, marginTop: vv.top } : undefined;
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
   const overdue = isOverdue(note.reminder);
   const pickFiles = (e) => { actions.addFiles(noteId, e.target.files); e.target.value = ''; };
@@ -148,7 +151,7 @@ export default function NoteEditor({
             className={cn(
               'note-surface relative flex w-full min-h-0 flex-col overflow-hidden border text-foreground shadow-2xl',
               'h-dvh sm:h-auto sm:max-h-[min(44rem,88dvh)] sm:max-w-2xl sm:rounded-3xl',
-              'pt-[var(--safe-top)] sm:pt-0',
+              'pt-[max(var(--safe-top),env(safe-area-inset-top),0px)] sm:pt-0',
               color === 'default' && 'border-border/60 bg-popover'
             )}
           >
