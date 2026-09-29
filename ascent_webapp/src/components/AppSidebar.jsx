@@ -61,8 +61,11 @@ function Avatar({ user, className }) {
 export default function AppSidebar({
   navigation,
   currentPageName,
-  collapsed,
+  collapsed: collapsedProp,
   onToggleCollapsed,
+  mobile = false,
+  open = false,
+  onNavigate,
   onOpenCalendar,
   calendarOpen,
   onLogout,
@@ -71,6 +74,7 @@ export default function AppSidebar({
 }) {
   const { user, theme, isRTL, t } = useTheme();
   const { permissions, workspaces, currentWorkspace, switchWorkspace } = useAuth();
+  const collapsed = mobile ? false : collapsedProp;
   const tipSide = isRTL ? 'left' : 'right';
 
   // Sliding active indicator: measure the active item and glide a highlight to it.
@@ -134,10 +138,20 @@ export default function AppSidebar({
     <TooltipProvider delayDuration={100}>
       <div
         className={cn(
-          'group/sb relative z-30 hidden shrink-0 md:sticky md:top-0 md:block md:h-dvh',
-          'transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
-          collapsed ? 'md:w-20' : 'md:w-[17rem]',
+          'group/sb z-30',
+          mobile
+            ? cn(
+                'fixed start-0 z-40 w-[17rem] md:hidden top-[calc(4rem+env(safe-area-inset-top))] bottom-[calc(4rem+env(safe-area-inset-bottom))]',
+                'transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+                open ? 'translate-x-0' : (isRTL ? 'translate-x-full' : '-translate-x-full'),
+              )
+            : cn(
+                'relative hidden shrink-0 md:sticky md:top-0 md:block md:h-dvh',
+                'transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
+                collapsed ? 'md:w-20' : 'md:w-[17rem]',
+              ),
         )}
+        inert={mobile && !open ? '' : undefined}
       >
       <aside
         aria-label={t('mainNavigation')}
@@ -164,7 +178,7 @@ export default function AppSidebar({
                   )}
                   aria-label={canSwitch ? t('switchWorkspace') : undefined}
                 >
-                  <AscentLogo motion="hover" className="w-10 shrink-0" />
+                  <AscentLogo motion="full" className="w-10 shrink-0" />
                   <span className={cn('min-w-0 flex-1 transition-opacity duration-200', collapsed ? 'pointer-events-none w-0 opacity-0' : 'opacity-100 delay-100')}>
                     <span className="block truncate text-sm font-semibold leading-tight text-foreground">{workspaceName}</span>
                     <span className="block truncate text-xs text-muted-foreground">
@@ -226,6 +240,7 @@ export default function AppSidebar({
                       ref={setItemRef(item.page)}
                       to={createPageUrl(item.page)}
                       aria-current={isActive ? 'page' : undefined}
+                      onClick={onNavigate}
                       className={cn(itemBase, isActive ? 'text-foreground' : 'text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground')}
                     >
                       <Icon className={cn('h-5 w-5 shrink-0 transition-colors duration-200', isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} />
@@ -245,7 +260,7 @@ export default function AppSidebar({
                 <button
                   type="button"
                   ref={setItemRef('__calendar')}
-                  onClick={onOpenCalendar}
+                  onClick={() => { onNavigate?.(); onOpenCalendar(); }}
                   aria-haspopup="dialog"
                   className={cn(itemBase, calendarOpen ? 'text-foreground' : 'text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground')}
                 >
@@ -327,6 +342,8 @@ export default function AppSidebar({
         </div>
       </aside>
 
+      {!mobile && (
+      <>
       {/* Edge handle: a hairline you can grab anywhere along the border, plus a round chevron knob */}
       <button
         type="button"
@@ -358,6 +375,8 @@ export default function AppSidebar({
           />
         </span>
       </button>
+      </>
+      )}
       </div>
     </TooltipProvider>
   );

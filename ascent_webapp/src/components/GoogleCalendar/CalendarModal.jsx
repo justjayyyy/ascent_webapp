@@ -385,7 +385,7 @@ export default function CalendarModal({ open, onOpenChange }) {
         onKeyDown={onKeyDown}
         onEscapeKeyDown={(e) => { if (composer) { e.preventDefault(); setComposer(null); } }}
         dir={isRTL ? 'rtl' : 'ltr'}
-        className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[1400px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[min(92dvh,980px)] sm:rounded-3xl"
+        className="flex h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[calc(100vw-1rem)] max-w-[1400px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[min(92dvh,980px)] sm:rounded-3xl"
       >
         <DialogTitle className="sr-only">{t('calendar')}</DialogTitle>
         <DialogDescription className="sr-only">{t('calendarDescription')}</DialogDescription>

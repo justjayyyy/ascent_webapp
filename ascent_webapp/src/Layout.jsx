@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { PieChart, Receipt, Settings as SettingsIcon, LogOut, Menu, X, StickyNote, CalendarDays, Moon, Sun, Eye, EyeOff } from 'lucide-react';
+import { PieChart, Receipt, Menu, X, StickyNote } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
-import { Switch } from '@/components/ui/switch';
 import WelcomeDialog from './components/WelcomeDialog';
 import InstallHint from './components/InstallHint';
 import AscentLogo from '@/components/AscentLogo';
@@ -19,8 +18,8 @@ const CalendarModal = lazy(() => import('@/components/GoogleCalendar/CalendarMod
 const SIDEBAR_KEY = 'ascent.sidebarCollapsed';
 
 function LayoutContent({ children, currentPageName }) {
-  const { user, theme, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
-  const { permissions, hasPermission } = useAuth();
+  const { user, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
+  const { hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === '1'; } catch { return false; }
@@ -146,112 +145,23 @@ function LayoutContent({ children, currentPageName }) {
         colors.border
       )}>
         <div className="flex items-center justify-center h-16 px-4">
-          <AscentLogo motion="hover" alt="Ascent logo" className="w-14" />
+          <AscentLogo motion="full" alt="Ascent logo" className="w-14" />
         </div>
       </div>
 
-      {/* Mobile Menu - Only Settings (Pages are in bottom nav) */}
-      <div
-        className={cn(
-          "md:hidden fixed top-[calc(4rem+env(safe-area-inset-top))] bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 w-1/2 overflow-y-auto transition-transform duration-300 ease-out",
-          "end-0",
-          mobileMenuOpen
-            ? (isRTL ? "translate-x-0" : "translate-x-0")
-            : (isRTL ? "-translate-x-full" : "translate-x-full"),
-          colors.bgSecondary,
-          colors.border,
-          isRTL ? "border-r" : "border-l"
-        )}
-      >
-        {user && (
-          <div className={cn("p-4", colors.bgSecondary)}>
-            {/* User Info */}
-            <div className="flex items-center justify-center mb-3 pb-3 border-b border-border">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
-                {user.full_name?.[0] || user.email[0].toUpperCase()}
-              </div>
-              <div className="ms-3 flex-1 min-w-0">
-                <p className={cn("text-sm font-medium truncate", colors.textPrimary)}>{user.full_name || t('user')}</p>
-                <p className={cn("text-xs truncate", colors.textTertiary)}>
-                  {permissions ? t('sharedUser') : t('owner')}
-                </p>
-              </div>
-            </div>
-
-            {/* Theme Toggle */}
-            <div
-              onClick={(e) => {
-                e.preventDefault();
-                handleThemeChange(theme !== 'dark');
-              }}
-              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-accent transition-colors cursor-pointer", colors.textPrimary)}
-            >
-              <div className="flex items-center gap-2">
-                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                <span className="text-sm">{t('darkMode')}</span>
-              </div>
-              <Switch aria-label={t('darkMode')}
-                checked={theme === 'dark'}
-                onCheckedChange={handleThemeChange}
-                onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-
-            {/* Blur Values Toggle */}
-            <div
-              onClick={(e) => {
-                e.preventDefault();
-                handleBlurValuesChange(!user?.blurValues);
-              }}
-              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-accent transition-colors cursor-pointer", colors.textPrimary)}
-            >
-              <div className="flex items-center gap-2">
-                {user?.blurValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                <span className="text-sm">{t('blurValues')}</span>
-              </div>
-              <Switch aria-label={t('blurValues')}
-                checked={user?.blurValues || false}
-                onCheckedChange={handleBlurValuesChange}
-                onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-
-            {/* Calendar */}
-            <button
-              onClick={() => { setMobileMenuOpen(false); setCalendarOpen(true); }}
-              className={cn("w-full flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-accent transition-colors text-start", colors.textPrimary)}
-            >
-              <CalendarDays className="w-4 h-4" />
-              <span className="text-sm">{t('calendar')}</span>
-            </button>
-
-            {/* Settings */}
-            <Link
-              to={createPageUrl('Settings')}
-              onClick={() => setMobileMenuOpen(false)}
-              className={cn("flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-accent transition-colors", colors.textPrimary)}
-            >
-              <SettingsIcon className="w-4 h-4" />
-              <span className="text-sm">{t('settings')}</span>
-            </Link>
-
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              className={cn(
-                "w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-danger hover:text-danger/80"
-              )}
-            >
-              <LogOut className="w-4 h-4" />
-              {t('logout')}
-            </button>
-          </div>
-        )}
-      </div>
-
-
+      {/* Mobile: the same sidebar, as a drawer that pushes the page */}
+      <AppSidebar
+        mobile
+        open={mobileMenuOpen}
+        onNavigate={() => setMobileMenuOpen(false)}
+        navigation={navigation}
+        currentPageName={currentPageName}
+        onOpenCalendar={() => setCalendarOpen(true)}
+        calendarOpen={calendarOpen}
+        onLogout={handleLogout}
+        onThemeChange={handleThemeChange}
+        onBlurChange={handleBlurValuesChange}
+      />
 
       {/* Main Content */}
       <main
@@ -259,7 +169,7 @@ function LayoutContent({ children, currentPageName }) {
         className={cn(
           "min-h-dvh min-w-0 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           // On phones the menu sheet pushes the page aside instead of covering it
-          mobileMenuOpen && (isRTL ? "translate-x-1/2" : "-translate-x-1/2")
+          mobileMenuOpen && (isRTL ? "-translate-x-[17rem]" : "translate-x-[17rem]")
         )}
       >
         <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">

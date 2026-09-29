@@ -166,7 +166,12 @@ function App() {
             </Routes>
           </Router>
           <Toaster />
-          <SonnerToaster position="top-right" richColors />
+          <SonnerToaster
+            position="top-right"
+            richColors
+            offset={{ top: 'calc(env(safe-area-inset-top) + 16px)', right: 16 }}
+            mobileOffset={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: 12, right: 12 }}
+          />
           <Analytics />
           <SpeedInsights />
         </ThemeProvider>
