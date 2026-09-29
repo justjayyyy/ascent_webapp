@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import AscentLogo from '@/components/AscentLogo';
 
 // Google Client ID - set this in your .env file as VITE_GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -260,24 +261,19 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-background flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <div className="w-full max-w-md flex flex-col items-center justify-center max-h-full overflow-hidden pt-2 sm:pt-0 pb-2">
+    <div className="bg-background flex justify-center p-2 sm:p-4 overflow-y-auto overflow-x-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <div className="w-full max-w-md flex flex-col items-center justify-center my-auto pt-2 sm:pt-0 pb-2">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
-          <img
-            src="/logo-dark.png"
-            alt="Ascent logo"
-            className="object-contain mx-auto mb-1 sm:mb-3 h-[70px] sm:h-[120px] w-auto"
-            style={{ filter: 'brightness(1.1) saturate(1.2)' }}
-          />
-          <h1 className="text-2xl sm:text-4xl font-bold text-muted-foreground mb-1 sm:mb-2">{t('ascend')}</h1>
-          <p className="text-xs sm:text-base text-primary">{t('ascendTagline')}</p>
+          <AscentLogo alt="Ascent logo" className="mx-auto mb-1 sm:mb-3 w-16 sm:w-32 pt-2 [@media(max-height:720px)]:!w-16" />
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground mb-1 sm:mb-2">{t('ascend')}</h1>
+          <p className="text-xs sm:text-base text-muted-foreground">{t('ascendTagline')}</p>
         </div>
 
         <Card className="bg-card border-primary/30 mb-2 sm:mb-0 flex-shrink-0 w-full">
           <CardHeader className="text-center pb-2 sm:pb-6">
-            <CardTitle className="text-base sm:text-xl text-muted-foreground">{t('welcome')}</CardTitle>
-            <CardDescription className="text-xs sm:text-sm text-primary">
+            <CardTitle className="text-base sm:text-xl text-foreground">{t('welcome')}</CardTitle>
+            <CardDescription className="text-xs sm:text-sm text-muted-foreground">
               {t('signInToAccount')}
             </CardDescription>
           </CardHeader>
@@ -492,8 +488,8 @@ export default function Login() {
 
         {/* Footer with legal links */}
         <div className="mt-2 sm:mt-4 text-center flex-shrink-0">
-          <p className="text-xs sm:text-sm text-primary mb-1 sm:mb-2">
-            By signing in, you agree to our
+          <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2">
+            {t('agreeToTerms')}
           </p>
           <div className="flex items-center justify-center gap-2 sm:gap-4 flex-wrap">
             <Link

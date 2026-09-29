@@ -30,7 +30,7 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, linkedAccount
   const formatCurrency = (value, currency) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || user?.currency || 'USD',
+      currency: currency || user?.currency || 'ILS',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value || 0);

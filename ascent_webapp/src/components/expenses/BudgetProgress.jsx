@@ -11,7 +11,7 @@ import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [] }) {
   const { colors, language, user, t } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
 
   // Fetch exchange rates on mount
   useEffect(() => {

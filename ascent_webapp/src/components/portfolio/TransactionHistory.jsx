@@ -83,7 +83,7 @@ export default function TransactionHistory({ transactions = [], isLoading, accou
     const config = typeConfig[type];
     if (!config) return type;
     
-    const lang = user?.language || 'en';
+    const lang = user?.language || 'he';
     if (lang === 'he') return config.labelHe;
     if (lang === 'ru') return config.labelRu;
     return config.label;

@@ -35,7 +35,7 @@ function ExpenseMonthView({
 }) {
   const { user, colors, t, language, theme, isRTL } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
   const palette = useDonutPalette();
   const numLocale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
 
@@ -125,7 +125,7 @@ function ExpenseMonthView({
   const formatCurrency = useCallback((value, currency) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || user?.currency || 'USD',
+      currency: currency || user?.currency || 'ILS',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value || 0);
@@ -325,7 +325,7 @@ function ExpenseMonthView({
                 <p className={cn("mt-1.5 truncate text-base font-bold tracking-tight sm:mt-3 sm:text-2xl lg:text-3xl", tone)}>
                   {user?.blurValues ? <BlurValue blur /> : (
                     <NumberFlow value={value} locales={numLocale} trend={0}
-                      format={{ style: 'currency', currency: user?.currency || 'USD', maximumFractionDigits: 0 }} />
+                      format={{ style: 'currency', currency: user?.currency || 'ILS', maximumFractionDigits: 0 }} />
                   )}
                 </p>
               </CardContent>

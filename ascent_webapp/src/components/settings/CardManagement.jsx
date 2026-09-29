@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CreditCard, Plus, Trash2, Edit2, X, Check } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Pencil } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import BlurValue from '../BlurValue';
+import { Section, Group } from './SettingsShell';
 
-export default function CardManagement({ user: propUser }) {
-  const { colors, t, user } = useTheme();
+const EMPTY = { name: '', lastFourDigits: '', type: 'credit' };
+
+export default function CardManagement({ user: propUser, index }) {
+  const { t, user } = useTheme();
   const [isAdding, setIsAdding] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
-  const [formData, setFormData] = useState({ name: '', lastFourDigits: '', type: 'credit' });
+  const [formData, setFormData] = useState(EMPTY);
   const queryClient = useQueryClient();
 
   const { data: cards = [] } = useQuery({
@@ -29,12 +30,17 @@ export default function CardManagement({ user: propUser }) {
     enabled: !!(propUser || user),
   });
 
+  const close = () => {
+    setIsAdding(false);
+    setEditingCard(null);
+    setFormData(EMPTY);
+  };
+
   const createCardMutation = useMutation({
     mutationFn: (data) => ascent.entities.Card.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
-      setIsAdding(false);
-      setFormData({ name: '', lastFourDigits: '', type: 'credit' });
+      close();
       toast.success(t('cardAddedSuccessfully'));
     },
   });
@@ -43,8 +49,7 @@ export default function CardManagement({ user: propUser }) {
     mutationFn: ({ id, data }) => ascent.entities.Card.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
-      setEditingCard(null);
-      setFormData({ name: '', lastFourDigits: '', type: 'credit' });
+      close();
       toast.success(t('cardUpdatedSuccessfully'));
     },
   });
@@ -57,169 +62,139 @@ export default function CardManagement({ user: propUser }) {
     },
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = (e) => {
+    e.preventDefault();
     if (!formData.name || !formData.lastFourDigits) {
       toast.error(t('pleaseFillAllFields'));
       return;
     }
-
     if (formData.lastFourDigits.length !== 4 || !/^\d+$/.test(formData.lastFourDigits)) {
       toast.error(t('last4DigitsMustBe4'));
       return;
     }
-
-    if (editingCard) {
-      updateCardMutation.mutate({ id: editingCard.id, data: formData });
-    } else {
-      createCardMutation.mutate(formData);
-    }
+    if (editingCard) updateCardMutation.mutate({ id: editingCard.id, data: formData });
+    else createCardMutation.mutate(formData);
   };
 
   const handleEdit = (card) => {
     setEditingCard(card);
-    setFormData({
-      name: card.name,
-      lastFourDigits: card.lastFourDigits,
-      type: card.type,
-    });
+    setFormData({ name: card.name, lastFourDigits: card.lastFourDigits, type: card.type });
     setIsAdding(true);
   };
 
-  const handleCancel = () => {
-    setIsAdding(false);
-    setEditingCard(null);
-    setFormData({ name: '', lastFourDigits: '', type: 'credit' });
-  };
+  const saving = createCardMutation.isPending || updateCardMutation.isPending;
 
   return (
-    <Card className={cn(colors.cardBg, colors.cardBorder)}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CreditCard className="w-5 h-5 text-primary" />
-            <CardTitle className={colors.accentText}>{t('paymentCards')}</CardTitle>
-          </div>
-          {!isAdding && (
-            <Button
-              onClick={() => setIsAdding(true)}
-              size="sm"
-              className="bg-primary hover:bg-primary/80 text-primary-foreground"
-            >
-              <Plus className="w-4 h-4 me-2" />
-              {t('addCard')}
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
+    <Section
+      id="cards"
+      index={index}
+      icon={CreditCard}
+      title={t('paymentCards')}
+      description={t('setCardsDesc')}
+      action={!isAdding && (
+        <Button onClick={() => setIsAdding(true)} className="h-11 shrink-0 rounded-xl sm:h-9">
+          <Plus className="me-1.5 h-4 w-4" aria-hidden="true" />
+          {t('addCard')}
+        </Button>
+      )}
+    >
+      <Group>
         {isAdding && (
-          <div className={cn("mb-4 p-4 rounded-lg border", colors.bgTertiary, colors.border)}>
-            <div className="space-y-3">
-              <div>
-                <Label className={colors.textSecondary}>{t('cardName')}</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Chase Sapphire, Amex Gold..."
-                  className={cn(colors.bgPrimary, colors.border, colors.textPrimary)}
-                />
-              </div>
-              <div>
-                <Label className={colors.textSecondary}>{t('lastFourDigits')}</Label>
-                <Input
-                  value={formData.lastFourDigits}
-                  onChange={(e) => setFormData({ ...formData, lastFourDigits: e.target.value })}
-                  placeholder="1234"
-                  maxLength={4}
-                  className={cn(colors.bgPrimary, colors.border, colors.textPrimary)}
-                />
-              </div>
-              <div>
-                <Label className={colors.textSecondary}>{t('cardType')}</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) => setFormData({ ...formData, type: value })}
-                >
-                  <SelectTrigger className={cn(colors.bgPrimary, colors.border, colors.textPrimary)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    <SelectItem value="credit" className={colors.textPrimary}>{t('credit')}</SelectItem>
-                    <SelectItem value="debit" className={colors.textPrimary}>{t('debit')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleSubmit}
-                  className="bg-primary hover:bg-primary/80 text-primary-foreground flex-1"
-                >
-                  <Check className="w-4 h-4 me-2" />
-                  {editingCard ? 'Update' : 'Add'}
-                </Button>
-                <Button
-                  onClick={handleCancel}
-                  variant="outline"
-                  className={cn("flex-1", colors.border, colors.textSecondary)}
-                >
-                  <X className="w-4 h-4 me-2" />
-                  Cancel
-                </Button>
-              </div>
+          <form onSubmit={handleSubmit} className="grid gap-4 bg-muted/30 px-4 py-4 sm:grid-cols-[1fr_7rem_8rem] sm:px-5 animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none">
+            <div className="space-y-1.5">
+              <Label htmlFor="card-name">{t('cardName')}</Label>
+              <Input
+                id="card-name"
+                autoFocus
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Chase Sapphire, Amex Gold..."
+                className="h-11 rounded-xl sm:h-10"
+              />
             </div>
-          </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="card-last4">{t('lastFourDigits')}</Label>
+              <Input
+                id="card-last4"
+                inputMode="numeric"
+                value={formData.lastFourDigits}
+                onChange={(e) => setFormData({ ...formData, lastFourDigits: e.target.value.replace(/\D/g, '') })}
+                placeholder="1234"
+                maxLength={4}
+                className="h-11 rounded-xl tabular-nums sm:h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="card-type">{t('cardType')}</Label>
+              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
+                <SelectTrigger id="card-type" className="h-11 rounded-xl sm:h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="credit">{t('credit')}</SelectItem>
+                  <SelectItem value="debit">{t('debit')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 sm:col-span-3 sm:justify-end">
+              <Button type="button" variant="ghost" onClick={close} className="h-11 flex-1 rounded-xl sm:h-10 sm:flex-none">
+                {t('cancel')}
+              </Button>
+              <Button type="submit" disabled={saving} className="h-11 flex-1 rounded-xl sm:h-10 sm:flex-none">
+                {t('save')}
+              </Button>
+            </div>
+          </form>
         )}
 
-        {cards.length > 0 ? (
-          <div className="space-y-2">
-            {cards.map((card) => (
-              <div
-                key={card.id}
-                className={cn("flex items-center justify-between p-3 rounded-lg border", colors.bgTertiary, colors.border)}
-              >
-                <div className="flex items-center gap-3">
-                  <CreditCard className={cn("w-5 h-5", colors.accentText)} />
-                  <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>
-                      {user?.blurValues ? (
-                        <BlurValue blur={true}>••••••</BlurValue>
-                      ) : (
-                        <>{card.name || ''} - {card.lastFourDigits || ''}</>
-                      )}
-                    </p>
-                    <p className={cn("text-sm capitalize", colors.textTertiary)}>{card.type}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleEdit(card)}
-                    size="icon"
-                    variant="ghost"
-                    className={colors.textSecondary}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() => deleteCardMutation.mutate(card.id)}
-                    size="icon"
-                    variant="ghost"
-                    className="text-danger hover:text-danger"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          !isAdding && (
-            <div className={cn("text-center py-6", colors.textTertiary)}>
-              <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>{t('noCardsYet')}</p>
+        {cards.map((card) => (
+          <div key={card.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <CreditCard className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground">
+                {user?.blurValues ? (
+                  <BlurValue blur={true}>••••••</BlurValue>
+                ) : (
+                  <>
+                    {card.name}
+                    <span className="ms-2 tabular-nums text-muted-foreground" dir="ltr">•••• {card.lastFourDigits}</span>
+                  </>
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground">{t(card.type) || card.type}</p>
             </div>
-          )
+            <Button
+              onClick={() => handleEdit(card)}
+              size="icon"
+              variant="ghost"
+              aria-label={t('edit')}
+              className="h-11 w-11 rounded-xl text-muted-foreground hover:text-foreground sm:h-9 sm:w-9"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => deleteCardMutation.mutate(card.id)}
+              size="icon"
+              variant="ghost"
+              aria-label={t('delete')}
+              className="h-11 w-11 rounded-xl text-danger hover:bg-danger/15 hover:text-danger sm:h-9 sm:w-9"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+
+        {cards.length === 0 && !isAdding && (
+          <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <CreditCard className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="max-w-xs text-sm text-muted-foreground text-pretty">{t('noCardsYet')}</p>
+          </div>
         )}
-      </CardContent>
-    </Card>
+      </Group>
+    </Section>
   );
 }

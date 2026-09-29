@@ -30,7 +30,7 @@ const accountTypeColors = {
 function AccountCard({ account, totalValue, totalPnL, totalPnLPercent, editMode, onDelete }) {
   const { user, t, colors } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
   const accountCurrency = account.baseCurrency || 'USD';
   
   useEffect(() => {

@@ -3,6 +3,8 @@ import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 import { translations, translateCategory } from '../lib/translations';
 
+export const PALETTES = ['indigo', 'gold', 'graphite', 'ivory', 'burgundy', 'slate', 'twilight'];
+
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
@@ -14,7 +16,7 @@ export function ThemeProvider({ children }) {
   // Function to refresh user data (called after settings update)
   const refreshUser = useCallback(async () => {
     console.log('[ThemeProvider] refreshUser called - delegating to AuthContext');
-    await checkAppState();
+    await checkAppState({ silent: true });
     return user;
   }, [checkAppState, user]);
 
@@ -25,14 +27,8 @@ export function ThemeProvider({ children }) {
 
   const theme = user?.theme || 'dark';
 
-  // Determine language: user preference > browser preference > default 'en'
-  const getBrowserLanguage = () => {
-    if (typeof navigator === 'undefined') return 'en';
-    const browserLang = navigator.language?.split('-')[0];
-    return ['en', 'he', 'ru'].includes(browserLang) ? browserLang : 'en';
-  };
-
-  const language = user?.language || getBrowserLanguage();
+  // Language: user preference > default 'he'
+  const language = user?.language || 'he';
   const isRTL = language === 'he';
 
   // Keep <html lang/dir> in sync with the selected language
@@ -41,12 +37,13 @@ export function ThemeProvider({ children }) {
     document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
   }, [language, isRTL]);
 
-  // Color palette (indigo | gold), stored per device. Legacy ?palette=... URL param still works.
+  // Color palette, stored per device. Legacy ?palette=... URL param still works.
   const [palette, setPaletteState] = useState(() => {
     try {
       const q = new URLSearchParams(window.location.search).get('palette');
-      if (q === 'gold' || q === 'indigo') localStorage.setItem('ascent_palette', q);
-      return localStorage.getItem('ascent_palette') === 'gold' ? 'gold' : 'indigo';
+      if (PALETTES.includes(q)) localStorage.setItem('ascent_palette', q);
+      const saved = localStorage.getItem('ascent_palette');
+      return PALETTES.includes(saved) ? saved : 'indigo';
     } catch { return 'indigo'; }
   });
 
@@ -56,7 +53,7 @@ export function ThemeProvider({ children }) {
   }, []);
 
   useLayoutEffect(() => {
-    if (palette === 'gold') document.documentElement.dataset.palette = 'gold';
+    if (palette !== 'indigo') document.documentElement.dataset.palette = palette;
     else delete document.documentElement.dataset.palette;
   }, [palette]);
 

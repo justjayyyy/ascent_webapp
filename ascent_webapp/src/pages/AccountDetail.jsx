@@ -27,7 +27,7 @@ export default function AccountDetail() {
   const { colors, theme, t, user: themeUser } = useTheme();
   const { hasPermission } = useAuth();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
-  const userCurrency = themeUser?.currency || 'USD';
+  const userCurrency = themeUser?.currency || 'ILS';
   const [user, setUser] = useState(null);
   const [accountId, setAccountId] = useState(null);
   const [addPositionOpen, setAddPositionOpen] = useState(false);

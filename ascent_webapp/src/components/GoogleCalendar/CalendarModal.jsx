@@ -1,1342 +1,580 @@
-// @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus, 
-  X,
-  Clock,
-  MapPin,
-  RefreshCw,
-  Trash2,
-  Check,
-  Grid,
-  List,
-  Menu
+import {
+  addDays, addMonths, subMonths, addWeeks, subWeeks, subDays, addMinutes, startOfMonth, endOfMonth,
+  startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, format, parseISO,
+} from 'date-fns';
+import {
+  CalendarDays, Check, ChevronLeft, ChevronRight, Layers, LogOut, Plus, RefreshCw, Sparkles,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
-import { toast } from 'sonner';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  addMonths, 
-  subMonths, 
-  startOfWeek, 
-  endOfWeek, 
-  parseISO, 
-  addDays,
-  subDays,
-  addWeeks,
-  subWeeks,
-  setHours,
-  setMinutes,
-  getHours,
-  getMinutes,
-  differenceInMinutes,
-  addMinutes
-} from 'date-fns';
+import TimeGrid from './TimeGrid';
+import MonthGrid from './MonthGrid';
+import MiniMonth from './MiniMonth';
+import AgendaPanel from './AgendaPanel';
+import EventComposer from './EventComposer';
+import { LOCALES, weekStartsOnFor, normalizeItem, buildDayMap, dayKey } from './calendarUtils';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
+const HOLIDAY_CALENDAR = 'en.jewish#holiday@group.v.calendar.google.com';
+const LAYERS_KEY = 'ascent.calendar.layers';
+const VIEWS = ['day', 'week', 'month'];
 
-// Hours to display (6 AM to 10 PM)
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 6);
-const HOUR_HEIGHT = 60; // pixels per hour
+const iconBtn = 'grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 
-// Google Calendar color palette (colorId -> hex color)
-const GOOGLE_CALENDAR_COLORS = {
-  '1': '#7986CB',  // Lavender
-  '2': '#33B679',  // Sage
-  '3': '#8E24AA',  // Grape
-  '4': '#E67C73',  // Flamingo
-  '5': '#F6BF26',  // Banana
-  '6': '#F4511E',  // Tangerine
-  '7': '#039BE5',  // Peacock
-  '8': '#616161',  // Graphite
-  '9': '#3F51B5',  // Blueberry
-  '10': '#0B8043', // Basil
-  '11': '#D50000', // Tomato
-  'default': '#5C8374', // Our app color
+const readLayers = () => {
+  try { return { event: true, task: true, holiday: true, ...JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}') }; } catch { return { event: true, task: true, holiday: true }; }
 };
 
-export default function CalendarModal({ open, onOpenChange }) {
-  const { colors, t, theme, isRTL } = useTheme();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [events, setEvents] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [holidays, setHolidays] = useState([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [calendarColors, setCalendarColors] = useState({});
-  const [accessToken, setAccessToken] = useState(null);
-  const [view, setView] = useState('month');
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [eventForm, setEventForm] = useState({
-    summary: '',
-    description: '',
-    location: '',
-    start: '',
-    end: '',
-    allDay: false,
-  });
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm] = useState({
-    title: '',
-    notes: '',
-    due: '',
-  });
-  
-  // Drag state
-  const [draggingEvent, setDraggingEvent] = useState(null);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [resizingEvent, setResizingEvent] = useState(null);
-  const dayColumnRef = useRef(null);
+/** First-run screen: what you get, plus the Google button. */
+function ConnectScreen({ t, onConnect }) {
+  const perks = [t('calPerk1'), t('calPerk2'), t('calPerk3')];
+  return (
+    <div className="grid h-full place-items-center overflow-y-auto p-6">
+      <div className="grid w-full max-w-4xl items-center gap-10 md:grid-cols-2">
+        <div>
+          <span className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/30">
+            <CalendarDays className="h-6 w-6" />
+          </span>
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-foreground">{t('connectCalendar')}</h2>
+          <p className="mt-3 max-w-md text-base text-muted-foreground">{t('connectCalendarDesc')}</p>
+          <ul className="mt-6 space-y-2.5">
+            {perks.map((p) => (
+              <li key={p} className="flex items-center gap-3 text-sm text-foreground/90">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-success/15 text-success"><Check className="h-3 w-3" /></span>
+                {p}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={onConnect}
+            className="mt-8 inline-flex h-12 items-center gap-3 rounded-xl border border-border bg-white px-5 text-sm font-semibold text-slate-800 shadow-sm transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-5 w-5" />
+            {t('connectWithGoogle')}
+          </button>
+        </div>
 
-  // Check for existing token on mount
+        {/* Decorative preview */}
+        <div aria-hidden="true" className="relative hidden md:block">
+          <div className="absolute -inset-6 rounded-[2rem] opacity-70 blur-2xl" style={{ background: 'radial-gradient(60% 60% at 50% 40%, hsl(var(--glow) / 0.28), transparent 70%)' }} />
+          <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card p-4 shadow-[0_30px_80px_-30px_hsl(0_0%_0%/0.6)]">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="h-3 w-24 rounded-full bg-foreground/15" />
+              <span className="h-6 w-16 rounded-lg bg-primary/25" />
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {Array.from({ length: 21 }, (_, i) => (
+                <div key={i} className={cn('h-14 rounded-lg bg-foreground/[0.04] p-1', i === 9 && 'ring-1 ring-primary/50 bg-primary/[0.08]')}>
+                  {[2, 5, 9, 11, 16].includes(i) && (
+                    <span className="block h-2 rounded-full" style={{ background: ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--primary))', 'hsl(var(--chart-4))', 'hsl(var(--chart-3))'][[2, 5, 9, 11, 16].indexOf(i)] }} />
+                  )}
+                  {[5, 9].includes(i) && <span className="mt-1 block h-2 w-2/3 rounded-full bg-foreground/15" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CalendarModal({ open, onOpenChange }) {
+  const { t, language, isRTL } = useTheme();
+  const locale = LOCALES[language] || LOCALES.en;
+  const weekStartsOn = weekStartsOnFor(language);
+
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [view, setView] = useState('month');
+  const [layers, setLayers] = useState(readLayers);
+
+  const [accessToken, setAccessToken] = useState(null);
+  const [rawEvents, setRawEvents] = useState([]);
+  const [rawTasks, setRawTasks] = useState([]);
+  const [rawHolidays, setRawHolidays] = useState([]);
+  const [colorMap, setColorMap] = useState({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [composer, setComposer] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const tokenRef = useRef(null);
+  const loadedRange = useRef(null);
+  const isAuthenticated = !!accessToken;
+
+  useEffect(() => { tokenRef.current = accessToken; }, [accessToken]);
+
+  // Restore a still-valid token
   useEffect(() => {
-    const storedToken = localStorage.getItem('googleCalendarToken');
-    const tokenExpiry = localStorage.getItem('googleCalendarTokenExpiry');
-    
-    if (storedToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
-      setAccessToken(storedToken);
-      setIsAuthenticated(true);
-    }
+    try {
+      const token = localStorage.getItem('googleCalendarToken');
+      const expiry = localStorage.getItem('googleCalendarTokenExpiry');
+      if (token && expiry && Date.now() < parseInt(expiry, 10)) setAccessToken(token);
+    } catch { /* storage unavailable */ }
   }, []);
 
-  // Fetch events when authenticated
-  useEffect(() => {
-    if (isAuthenticated && accessToken && open) {
-      const timeoutId = setTimeout(() => {
-        fetchEvents();
-      }, 300);
-      return () => clearTimeout(timeoutId);
+  const clearSession = useCallback(() => {
+    try {
+      localStorage.removeItem('googleCalendarToken');
+      localStorage.removeItem('googleCalendarTokenExpiry');
+    } catch { /* storage unavailable */ }
+    loadedRange.current = null;
+    setAccessToken(null);
+    setRawEvents([]); setRawTasks([]); setRawHolidays([]);
+  }, []);
+
+  const gcal = useCallback(async (action, { method = 'GET', params = {}, body } = {}) => {
+    const qs = new URLSearchParams({ action, ...params });
+    const res = await fetch(`/api/integrations/google-calendar?${qs}`, {
+      method,
+      headers: { Authorization: `Bearer ${tokenRef.current}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401) {
+      clearSession();
+      toast.error(t('calendarSessionExpired'));
+      throw new Error('unauthorized');
     }
-  }, [isAuthenticated, accessToken, currentDate, open]);
+    return res;
+  }, [clearSession, t]);
 
   const handleGoogleAuth = useCallback(() => {
     if (!window.google || !GOOGLE_CLIENT_ID) {
-      toast.error('Google Sign-In not available');
+      toast.error(t('calGoogleUnavailable'));
       return;
     }
-
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: CALENDAR_SCOPES,
       callback: (response) => {
         if (response.access_token) {
           setAccessToken(response.access_token);
-          setIsAuthenticated(true);
-          localStorage.setItem('googleCalendarToken', response.access_token);
-          localStorage.setItem('googleCalendarTokenExpiry', String(Date.now() + 3600000));
-          toast.success(t('calendarConnected') || 'Google Calendar connected!');
+          try {
+            localStorage.setItem('googleCalendarToken', response.access_token);
+            localStorage.setItem('googleCalendarTokenExpiry', String(Date.now() + 3600000));
+          } catch { /* storage unavailable */ }
+          toast.success(t('calendarConnected'));
         } else if (response.error) {
-          toast.error('Failed to connect to Google Calendar');
+          toast.error(t('calSaveFailed'));
         }
       },
     });
-
-    tokenClient.requestAccessToken({ prompt: 'consent' }); // Force consent to get new scopes
+    tokenClient.requestAccessToken({ prompt: 'consent' }); // consent again so new scopes are granted
   }, [t]);
 
-  const disconnectCalendar = useCallback(() => {
-    localStorage.removeItem('googleCalendarToken');
-    localStorage.removeItem('googleCalendarTokenExpiry');
-    setAccessToken(null);
-    setIsAuthenticated(false);
-    setEvents([]);
-    setTasks([]);
-    setHolidays([]);
-    toast.success(t('calendarDisconnected') || 'Calendar disconnected');
-  }, [t]);
+  const disconnect = useCallback(() => {
+    clearSession();
+    setComposer(null);
+    toast.success(t('calendarDisconnected'));
+  }, [clearSession, t]);
 
-  const fetchEvents = async (showLoading = true) => {
-    if (!accessToken) return;
-    
-    // Never show loading spinner - calendar loads immediately
-    // Only set isRefreshing for the refresh button animation
+  // ---- Data -------------------------------------------------------------
+  const fetchAll = useCallback(async (center = new Date()) => {
+    if (!tokenRef.current) return;
     setIsRefreshing(true);
-    
+    const from = startOfMonth(subMonths(center, 3));
+    const to = endOfMonth(addMonths(center, 3));
+    loadedRange.current = { from, to };
+    const range = { timeMin: from.toISOString(), timeMax: to.toISOString() };
     try {
-      // Fetch 6 months of data (3 before, 3 after)
-      const start = startOfMonth(subMonths(currentDate, 3));
-      const end = endOfMonth(addMonths(currentDate, 3));
-      
-      // Fetch events, colors, tasks, and Jewish holidays in parallel
-      const [eventsRes, colorsRes, tasksRes, holidaysRes] = await Promise.allSettled([
-        // Regular events
-        fetch(
-          `/api/integrations/google-calendar?action=list-events&timeMin=${start.toISOString()}&timeMax=${end.toISOString()}&maxResults=500`,
-          { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        ),
-        // Calendar colors
-        fetch(
-          `/api/integrations/google-calendar?action=get-colors`,
-          { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        ),
-        // Tasks
-        fetch(
-          `/api/integrations/google-calendar?action=list-tasks`,
-          { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        ),
-        // Jewish Holidays calendar
-        fetch(
-          `/api/integrations/google-calendar?action=list-events&calendarId=en.jewish%23holiday%40group.v.calendar.google.com&timeMin=${start.toISOString()}&timeMax=${end.toISOString()}&maxResults=100`,
-          { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        ),
+      const [ev, colors, tasks, hol] = await Promise.allSettled([
+        gcal('list-events', { params: { ...range, maxResults: 500 } }),
+        gcal('get-colors'),
+        gcal('list-tasks'),
+        gcal('list-events', { params: { ...range, maxResults: 100, calendarId: HOLIDAY_CALENDAR } }),
       ]);
-      
-      // Process events
-      if (eventsRes.status === 'fulfilled' && eventsRes.value.ok) {
-        const data = await eventsRes.value.json();
-        setEvents(Array.isArray(data) ? data : []);
-      } else if (eventsRes.status === 'fulfilled' && eventsRes.value.status === 401) {
-        localStorage.removeItem('googleCalendarToken');
-        localStorage.removeItem('googleCalendarTokenExpiry');
-        setIsAuthenticated(false);
-        setAccessToken(null);
-        toast.error(t('calendarSessionExpired') || 'Calendar session expired. Please reconnect.');
-        return;
-      }
-      
-      // Process colors
-      if (colorsRes.status === 'fulfilled' && colorsRes.value.ok) {
-        const colorData = await colorsRes.value.json();
-        if (colorData.event) {
-          const colors = {};
-          Object.entries(colorData.event).forEach(([id, color]) => {
-            colors[id] = color.background;
-          });
-          setCalendarColors(colors);
-        }
-      }
-      
-      // Process tasks
-      if (tasksRes.status === 'fulfilled' && tasksRes.value.ok) {
-        const taskData = await tasksRes.value.json();
-        setTasks(Array.isArray(taskData) ? taskData : []);
-      }
-      
-      // Process Jewish holidays
-      if (holidaysRes.status === 'fulfilled' && holidaysRes.value.ok) {
-        const holidayData = await holidaysRes.value.json();
-        setHolidays(Array.isArray(holidayData) ? holidayData.map(h => ({ ...h, isHoliday: true })) : []);
-      }
-      
-    } catch (error) {
-      console.error('Failed to fetch calendar data:', error);
+      const json = async (r) => (r.status === 'fulfilled' && r.value.ok ? r.value.json() : null);
+      const [evData, colorData, taskData, holData] = await Promise.all([json(ev), json(colors), json(tasks), json(hol)]);
+      if (Array.isArray(evData)) setRawEvents(evData);
+      if (colorData?.event) setColorMap(Object.fromEntries(Object.entries(colorData.event).map(([id, c]) => [id, c.background])));
+      if (Array.isArray(taskData)) setRawTasks(taskData);
+      if (Array.isArray(holData)) setRawHolidays(holData);
+    } catch (err) {
+      if (err.message !== 'unauthorized') console.error('Failed to fetch calendar data:', err);
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [gcal]);
 
-  const createEvent = async () => {
-    if (!eventForm.summary) {
-      toast.error(t('eventTitleRequired') || 'Event title is required');
-      return;
-    }
-
-    try {
-      const event = {
-        summary: eventForm.summary,
-        description: eventForm.description,
-        location: eventForm.location,
-        start: eventForm.allDay 
-          ? { date: eventForm.start }
-          : { dateTime: new Date(eventForm.start).toISOString() },
-        end: eventForm.allDay
-          ? { date: eventForm.end || eventForm.start }
-          : { dateTime: new Date(eventForm.end || eventForm.start).toISOString() },
-      };
-
-      const response = await fetch(`/api/integrations/google-calendar?action=create-event`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      });
-
-      if (response.ok) {
-        toast.success(t('eventCreated') || 'Event created!');
-        setShowEventForm(false);
-        resetEventForm();
-        fetchEvents();
-      } else {
-        toast.error('Failed to create event');
-      }
-    } catch (error) {
-      console.error('Failed to create event:', error);
-      toast.error('Failed to create event');
-    }
-  };
-
-  const createTask = async () => {
-    if (!taskForm.title) {
-      toast.error(t('taskTitleRequired') || 'Task title is required');
-      return;
-    }
-
-    try {
-      const task = {
-        title: taskForm.title,
-        notes: taskForm.notes,
-      };
-      
-      // Format due date for Google Tasks API (RFC 3339 format)
-      if (taskForm.due) {
-        task.due = new Date(taskForm.due).toISOString();
-      }
-      
-      const response = await fetch(`/api/integrations/google-calendar?action=create-task`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(task),
-      });
-
-      const responseData = await response.json();
-
-      if (response.ok) {
-        toast.success(t('taskCreated') || 'Task created!');
-        setShowTaskForm(false);
-        resetTaskForm();
-        fetchEvents();
-      } else {
-        console.error('Task creation failed:', responseData);
-        toast.error(responseData.message || 'Failed to create task');
-      }
-    } catch (error) {
-      console.error('Failed to create task:', error);
-      toast.error('Failed to create task');
-    }
-  };
-
-  const resetTaskForm = () => {
-    setTaskForm({
-      title: '',
-      notes: '',
-      due: format(selectedDate, 'yyyy-MM-dd'),
-    });
-  };
-
-  const updateEvent = async (eventId = editingEvent?.id, eventData = null) => {
-    const id = eventId || editingEvent?.id;
-    if (!id) return;
-
-    const data = eventData || {
-      summary: eventForm.summary,
-      description: eventForm.description,
-      location: eventForm.location,
-      start: eventForm.allDay 
-        ? { date: eventForm.start }
-        : { dateTime: new Date(eventForm.start).toISOString() },
-      end: eventForm.allDay
-        ? { date: eventForm.end || eventForm.start }
-        : { dateTime: new Date(eventForm.end || eventForm.start).toISOString() },
-    };
-
-    try {
-      const response = await fetch(`/api/integrations/google-calendar?action=update-event&eventId=${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        if (!eventData) {
-          toast.success(t('eventUpdated') || 'Event updated!');
-          setShowEventForm(false);
-          setEditingEvent(null);
-          resetEventForm();
-        }
-        fetchEvents();
-      } else {
-        toast.error('Failed to update event');
-      }
-    } catch (error) {
-      console.error('Failed to update event:', error);
-      toast.error('Failed to update event');
-    }
-  };
-
-  const deleteEvent = async (eventId) => {
-    try {
-      const response = await fetch(`/api/integrations/google-calendar?action=delete-event&eventId=${eventId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-      });
-
-      if (response.ok) {
-        toast.success(t('eventDeleted') || 'Event deleted!');
-        setShowEventForm(false);
-        setEditingEvent(null);
-        fetchEvents();
-      } else {
-        toast.error('Failed to delete event');
-      }
-    } catch (error) {
-      console.error('Failed to delete event:', error);
-      toast.error('Failed to delete event');
-    }
-  };
-
-  const resetEventForm = () => {
-    setEventForm({
-      summary: '',
-      description: '',
-      location: '',
-      start: '',
-      end: '',
-      allDay: false,
-    });
-    setEditingEvent(null);
-  };
-
-  const openEditEvent = (event, e) => {
-    if (e) e.stopPropagation();
-    setEditingEvent(event);
-    setEventForm({
-      summary: event.summary || '',
-      description: event.description || '',
-      location: event.location || '',
-      start: event.start?.dateTime 
-        ? format(parseISO(event.start.dateTime), "yyyy-MM-dd'T'HH:mm")
-        : event.start?.date || '',
-      end: event.end?.dateTime 
-        ? format(parseISO(event.end.dateTime), "yyyy-MM-dd'T'HH:mm")
-        : event.end?.date || '',
-      allDay: !!event.start?.date,
-    });
-    setShowEventForm(true);
-  };
-
-  const openNewEvent = (date = selectedDate, hour = 9) => {
-    setEditingEvent(null);
-    const startTime = new Date(date);
-    startTime.setHours(hour, 0, 0, 0);
-    const endTime = new Date(date);
-    endTime.setHours(hour + 1, 0, 0, 0);
-    
-    setEventForm({
-      summary: '',
-      description: '',
-      location: '',
-      start: format(startTime, "yyyy-MM-dd'T'HH:mm"),
-      end: format(endTime, "yyyy-MM-dd'T'HH:mm"),
-      allDay: false,
-    });
-    setShowEventForm(true);
-  };
-
-  // Handle date click - switch to day view instantly (no loading)
-  const handleDateClick = (day) => {
-    setSelectedDate(day);
-    setCurrentDate(day);
-    setView('day'); // Switch to day view on click - no loading delay
-  };
-
-  // Navigation handlers
-  const navigatePrev = () => {
-    if (view === 'month') setCurrentDate(subMonths(currentDate, 1));
-    else if (view === 'week') setCurrentDate(subWeeks(currentDate, 1));
-    else setCurrentDate(subDays(currentDate, 1));
-  };
-
-  const navigateNext = () => {
-    if (view === 'month') setCurrentDate(addMonths(currentDate, 1));
-    else if (view === 'week') setCurrentDate(addWeeks(currentDate, 1));
-    else setCurrentDate(addDays(currentDate, 1));
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
-    setSelectedDate(new Date());
-  };
-
-  // Get event color
-  const getEventColor = useCallback((event) => {
-    if (event.isHoliday) return '#3F51B5'; // Blue for Jewish holidays
-    if (event.isTask) return '#F6BF26'; // Yellow for tasks
-    
-    // Use custom colors from API if available
-    if (event.colorId && calendarColors[event.colorId]) {
-      return calendarColors[event.colorId];
-    }
-    // Fallback to our predefined colors
-    if (event.colorId && GOOGLE_CALENDAR_COLORS[event.colorId]) {
-      return GOOGLE_CALENDAR_COLORS[event.colorId];
-    }
-    return GOOGLE_CALENDAR_COLORS.default;
-  }, [calendarColors]);
-
-  // Get all items (events + tasks + holidays) for a specific date
-  const getEventsForDate = useCallback((date) => {
-    const dayEvents = events.filter(event => {
-      const eventStart = event.start?.dateTime 
-        ? parseISO(event.start.dateTime)
-        : event.start?.date 
-          ? parseISO(event.start.date)
-          : null;
-      return eventStart && isSameDay(eventStart, date);
-    });
-    
-    // Add Jewish holidays for this date
-    const dayHolidays = holidays.filter(h => {
-      const holidayDate = h.start?.date ? parseISO(h.start.date) : null;
-      return holidayDate && isSameDay(holidayDate, date);
-    });
-    
-    // Add tasks due this date
-    const dayTasks = tasks.filter(task => {
-      if (!task.due) return false;
-      try {
-        // Google Tasks API returns due date in RFC 3339 format
-        // Parse it and compare just the date part
-        const dueDate = parseISO(task.due);
-        return isSameDay(dueDate, date);
-      } catch (e) {
-        console.warn('Failed to parse task due date:', task.due, e);
-        return false;
-      }
-    }).map(task => ({
-      ...task,
-      isTask: true,
-      summary: task.title,
-      start: { date: task.due?.split('T')[0] || task.due },
-    }));
-    
-    return [...dayHolidays, ...dayEvents, ...dayTasks];
-  }, [events, holidays, tasks]);
-
-  // Get events for a specific hour on a date
-  const getEventsForHour = useCallback((date, hour) => {
-    return events.filter(event => {
-      if (!event.start?.dateTime) return false;
-      const eventStart = parseISO(event.start.dateTime);
-      return isSameDay(eventStart, date) && getHours(eventStart) === hour;
-    });
-  }, [events]);
-
-  // Calculate event position and height for time-based views
-  const getEventStyle = useCallback((event) => {
-    if (!event.start?.dateTime || !event.end?.dateTime) return {};
-    
-    const start = parseISO(event.start.dateTime);
-    const end = parseISO(event.end.dateTime);
-    const startHour = getHours(start);
-    const startMinutes = getMinutes(start);
-    const duration = Math.max(differenceInMinutes(end, start), 30);
-    
-    const top = ((startHour - 6) * 60 + startMinutes) * (HOUR_HEIGHT / 60);
-    const height = Math.max(duration * (HOUR_HEIGHT / 60), 25);
-    
-    return { top: `${top}px`, height: `${height}px` };
-  }, []);
-
-  // Drag handlers for events
-  const handleEventDragStart = (event, e) => {
-    e.stopPropagation();
-    setDraggingEvent(event);
-    const eventStart = parseISO(event.start.dateTime);
-    const startMinutes = getHours(eventStart) * 60 + getMinutes(eventStart);
-    setDragOffset(startMinutes - 6 * 60); // Offset from 6 AM
-  };
-
-  const handleEventDrag = useCallback((e) => {
-    if (!draggingEvent || !dayColumnRef.current) return;
-    
-    const rect = dayColumnRef.current.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const minutes = Math.round((y / HOUR_HEIGHT) * 60);
-    const snappedMinutes = Math.round(minutes / 15) * 15; // Snap to 15-minute intervals
-    const newStartMinutes = Math.max(0, Math.min(snappedMinutes, 16 * 60)); // 6 AM to 10 PM
-    
-    setDragOffset(newStartMinutes);
-  }, [draggingEvent]);
-
-  const handleEventDragEnd = useCallback(async () => {
-    if (!draggingEvent) return;
-    
-    const originalStart = parseISO(draggingEvent.start.dateTime);
-    const originalEnd = parseISO(draggingEvent.end.dateTime);
-    const duration = differenceInMinutes(originalEnd, originalStart);
-    
-    const newStartHour = Math.floor((dragOffset + 6 * 60) / 60);
-    const newStartMinute = (dragOffset + 6 * 60) % 60;
-    
-    const newStart = setMinutes(setHours(currentDate, newStartHour), newStartMinute);
-    const newEnd = addMinutes(newStart, duration);
-    
-    // Update the event
-    await updateEvent(draggingEvent.id, {
-      summary: draggingEvent.summary,
-      description: draggingEvent.description,
-      location: draggingEvent.location,
-      start: { dateTime: newStart.toISOString() },
-      end: { dateTime: newEnd.toISOString() },
-    });
-    
-    setDraggingEvent(null);
-    setDragOffset(0);
-  }, [draggingEvent, dragOffset, currentDate, updateEvent]);
-
-  // Resize handlers
-  const handleResizeStart = (event, e) => {
-    e.stopPropagation();
-    setResizingEvent(event);
-  };
-
-  const handleResize = useCallback((e) => {
-    if (!resizingEvent || !dayColumnRef.current) return;
-    
-    const rect = dayColumnRef.current.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const minutes = Math.round((y / HOUR_HEIGHT) * 60);
-    const snappedMinutes = Math.round(minutes / 15) * 15;
-    
-    // Update local state for visual feedback
-    const eventStart = parseISO(resizingEvent.start.dateTime);
-    const startMinutes = (getHours(eventStart) - 6) * 60 + getMinutes(eventStart);
-    const newDuration = Math.max(snappedMinutes - startMinutes, 15);
-    
-    setResizingEvent(prev => ({
-      ...prev,
-      _tempDuration: newDuration
-    }));
-  }, [resizingEvent]);
-
-  const handleResizeEnd = useCallback(async () => {
-    if (!resizingEvent) return;
-    
-    const eventStart = parseISO(resizingEvent.start.dateTime);
-    const newDuration = resizingEvent._tempDuration || differenceInMinutes(parseISO(resizingEvent.end.dateTime), eventStart);
-    const newEnd = addMinutes(eventStart, newDuration);
-    
-    await updateEvent(resizingEvent.id, {
-      summary: resizingEvent.summary,
-      description: resizingEvent.description,
-      location: resizingEvent.location,
-      start: { dateTime: eventStart.toISOString() },
-      end: { dateTime: newEnd.toISOString() },
-    });
-    
-    setResizingEvent(null);
-  }, [resizingEvent, updateEvent]);
-
-  // Mouse move/up handlers for drag/resize
+  // Load when opened, and again when navigating close to the edge of what is loaded
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (draggingEvent) handleEventDrag(e);
-      if (resizingEvent) handleResize(e);
+    if (!open || !isAuthenticated) return undefined;
+    const r = loadedRange.current;
+    const needed = !r || currentDate < addMonths(r.from, 1) || currentDate > subMonths(r.to, 1);
+    if (!needed) return undefined;
+    const id = setTimeout(() => fetchAll(currentDate), 200);
+    return () => clearTimeout(id);
+  }, [open, isAuthenticated, currentDate, fetchAll]);
+
+  const allItems = useMemo(() => [
+    ...rawEvents.map((e) => normalizeItem(e, 'event', colorMap)),
+    ...rawTasks.map((e) => normalizeItem(e, 'task', colorMap)),
+    ...rawHolidays.map((e) => normalizeItem(e, 'holiday', colorMap)),
+  ].filter(Boolean), [rawEvents, rawTasks, rawHolidays, colorMap]);
+
+  const items = useMemo(() => allItems.filter((i) => layers[i.kind]), [allItems, layers]);
+  const dayMap = useMemo(() => buildDayMap(items), [items]);
+  const selectedItems = dayMap.get(dayKey(selectedDate)) || [];
+
+  const toggleLayer = (kind) => setLayers((prev) => {
+    const next = { ...prev, [kind]: !prev[kind] };
+    try { localStorage.setItem(LAYERS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+    return next;
+  });
+
+  // ---- Mutations --------------------------------------------------------
+  const eventBody = (form, base) => {
+    const { colorId: _c, start: _s, end: _e, ...rest } = base || {};
+    const startVal = form.start;
+    const endVal = form.end || form.start;
+    const body = {
+      ...rest,
+      summary: form.title.trim(),
+      description: form.description,
+      location: form.location,
+      start: form.allDay ? { date: startVal } : { dateTime: new Date(startVal).toISOString() },
+      end: form.allDay
+        ? { date: format(addDays(parseISO(endVal), 1), 'yyyy-MM-dd') } // Google's all-day end is exclusive
+        : { dateTime: new Date(endVal).toISOString() },
     };
-    
-    const handleMouseUp = () => {
-      if (draggingEvent) handleEventDragEnd();
-      if (resizingEvent) handleResizeEnd();
-    };
-    
-    if (draggingEvent || resizingEvent) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [draggingEvent, resizingEvent, handleEventDrag, handleEventDragEnd, handleResize, handleResizeEnd]);
-
-  // Calendar calculations
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-
-  // Week view days
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekDays = eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
-
-  const weekDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  // Get header text based on view
-  const getHeaderText = () => {
-    if (view === 'month') return format(currentDate, 'MMMM yyyy');
-    if (view === 'week') return `${format(weekStart, 'MMM d')} - ${format(addDays(weekStart, 6), 'MMM d, yyyy')}`;
-    return format(currentDate, 'EEEE, MMMM d, yyyy');
+    if (form.colorId) body.colorId = form.colorId;
+    return body;
   };
 
-  // Render draggable event for day view
-  const renderDayViewEvent = (event, index) => {
-    const isDragging = draggingEvent?.id === event.id;
-    const isResizing = resizingEvent?.id === event.id;
-    
-    let style = getEventStyle(event);
-    
-    if (isDragging) {
-      style = {
-        ...style,
-        top: `${dragOffset * (HOUR_HEIGHT / 60)}px`,
-        opacity: 0.8,
-        zIndex: 100,
-      };
+  const saveForm = async (form, item) => {
+    if (!form.title.trim()) {
+      toast.error(form.kind === 'task' ? t('taskTitleRequired') : t('eventTitleRequired'));
+      return;
     }
-    
-    if (isResizing && resizingEvent._tempDuration) {
-      style = {
-        ...style,
-        height: `${resizingEvent._tempDuration * (HOUR_HEIGHT / 60)}px`,
-      };
+    if (form.kind === 'event' && form.end && form.start && new Date(form.end) < new Date(form.start)) {
+      toast.error(t('calSaveFailed'));
+      return;
     }
-    
-    return (
-      <div
-        key={event.id || index}
-        className={cn(
-          "absolute start-1 end-4 px-2 py-1 rounded overflow-hidden select-none",
-          "hover:opacity-90 transition-opacity",
-          (isDragging || isResizing) && "shadow-lg",
-          event.isHoliday ? "cursor-default" : "cursor-move"
-        )}
-        style={{ 
-          backgroundColor: getEventColor(event), 
-          color: '#fff',
-          ...style
-        }}
-        onClick={(e) => openEditEvent(event, e)}
-        onMouseDown={(e) => handleEventDragStart(event, e)}
-        title={`${event.summary} - Drag to move, drag bottom edge to resize`}
-      >
-        {/* Drag handle */}
-        <div className="absolute top-0 start-0 end-0 h-4 flex items-center justify-center cursor-move opacity-50 hover:opacity-100">
-          <Menu className="w-3 h-3 rotate-90" />
-        </div>
-        
-        <div className="font-medium text-sm truncate mt-2">{event.summary}</div>
-        <div className="text-xs opacity-75">
-          {format(parseISO(event.start.dateTime), 'h:mm a')} - 
-          {event.end?.dateTime && format(parseISO(event.end.dateTime), 'h:mm a')}
-        </div>
-        {event.location && (
-          <div className="text-xs opacity-75 flex items-center gap-1 mt-1">
-            <MapPin className="w-3 h-3" />
-            {event.location}
-          </div>
-        )}
-        
-        {/* Resize handle */}
-        <div 
-          className="absolute bottom-0 start-0 end-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/40 transition-colors"
-          onMouseDown={(e) => { e.stopPropagation(); handleResizeStart(event, e); }}
-          title="Drag to resize"
-        />
-      </div>
-    );
+    setSaving(true);
+    try {
+      let res;
+      if (form.kind === 'task') {
+        const task = { title: form.title.trim(), notes: form.description };
+        if (form.due) task.due = `${form.due}T00:00:00.000Z`;
+        res = await gcal('create-task', { method: 'POST', body: task });
+      } else if (item) {
+        res = await gcal('update-event', { method: 'PUT', params: { eventId: item.id }, body: eventBody(form, item.raw) });
+      } else {
+        res = await gcal('create-event', { method: 'POST', body: eventBody(form) });
+      }
+      if (!res.ok) throw new Error('save failed');
+      toast.success(form.kind === 'task' ? t('taskCreated') : item ? t('eventUpdated') : t('eventCreated'));
+      setComposer(null);
+      fetchAll(currentDate);
+    } catch (err) {
+      if (err.message !== 'unauthorized') toast.error(t('calSaveFailed'));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const deleteItem = async (item) => {
+    setSaving(true);
+    try {
+      const res = await gcal('delete-event', { method: 'DELETE', params: { eventId: item.id } });
+      if (!res.ok) throw new Error('delete failed');
+      setRawEvents((prev) => prev.filter((e) => e.id !== item.id));
+      toast.success(t('eventDeleted'));
+      setComposer(null);
+    } catch (err) {
+      if (err.message !== 'unauthorized') toast.error(t('calSaveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Drag-to-move / resize from the time grid: update instantly, sync in the background
+  const commitTime = async (item, start, end) => {
+    const patch = { start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() } };
+    setRawEvents((prev) => prev.map((e) => (e.id === item.id ? { ...e, ...patch } : e)));
+    try {
+      const res = await gcal('update-event', { method: 'PUT', params: { eventId: item.id }, body: { ...item.raw, ...patch } });
+      if (!res.ok) throw new Error('update failed');
+    } catch (err) {
+      if (err.message !== 'unauthorized') toast.error(t('calSaveFailed'));
+      fetchAll(currentDate);
+    }
+  };
+
+  // ---- Navigation -------------------------------------------------------
+  const goTo = (date) => { setCurrentDate(date); setSelectedDate(date); };
+  const step = (dir) => {
+    if (view === 'month') {
+      const next = dir > 0 ? addMonths(currentDate, 1) : subMonths(currentDate, 1);
+      const anchor = isSameMonth(next, new Date()) ? new Date() : startOfMonth(next);
+      setCurrentDate(next); setSelectedDate(anchor);
+    } else if (view === 'week') {
+      goTo(dir > 0 ? addWeeks(currentDate, 1) : subWeeks(currentDate, 1));
+    } else {
+      goTo(dir > 0 ? addDays(currentDate, 1) : subDays(currentDate, 1));
+    }
+  };
+  const goToday = () => goTo(new Date());
+  const openDay = (day) => { goTo(day); setView('day'); };
+  const selectDay = (day) => {
+    setSelectedDate(day);
+    if (view === 'month' && !isSameMonth(day, currentDate)) setCurrentDate(day);
+  };
+
+  const openNew = (start) => {
+    let base = start;
+    if (!base) {
+      base = new Date(selectedDate);
+      base.setHours(isSameDay(selectedDate, new Date()) ? Math.min(new Date().getHours() + 1, 22) : 9, 0, 0, 0);
+    }
+    setComposer({ start: base, end: addMinutes(base, 60) });
+  };
+  const openItem = (item) => setComposer({ item });
+
+  // Keyboard shortcuts (t, d, w, m, n, arrows)
+  const onKeyDown = (e) => {
+    if (composer || e.ctrlKey || e.metaKey || e.altKey) return;
+    const el = e.target;
+    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+    const k = e.key.toLowerCase();
+    if (k === 't') goToday();
+    else if (k === 'd') setView('day');
+    else if (k === 'w') setView('week');
+    else if (k === 'm') setView('month');
+    else if (k === 'n') { e.preventDefault(); openNew(); }
+    else if (e.key === 'ArrowRight') step(isRTL ? -1 : 1);
+    else if (e.key === 'ArrowLeft') step(isRTL ? 1 : -1);
+  };
+
+  // ---- Derived view data ------------------------------------------------
+  const monthDays = useMemo(() => eachDayOfInterval({
+    start: startOfWeek(startOfMonth(currentDate), { weekStartsOn }),
+    end: endOfWeek(endOfMonth(currentDate), { weekStartsOn }),
+  }), [currentDate, weekStartsOn]);
+  const weekStart = startOfWeek(currentDate, { weekStartsOn });
+  const weekDays = useMemo(() => eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) }), [weekStart.getTime()]);
+
+  const title = useMemo(() => {
+    if (view === 'month') return { main: format(currentDate, 'LLLL', { locale }), sub: format(currentDate, 'yyyy') };
+    if (view === 'week') {
+      const end = addDays(weekStart, 6);
+      return { main: `${format(weekStart, 'd MMM', { locale })} – ${format(end, 'd MMM', { locale })}`, sub: format(end, 'yyyy') };
+    }
+    return { main: format(currentDate, 'EEEE, d MMMM', { locale }), sub: format(currentDate, 'yyyy') };
+  }, [view, currentDate, weekStart, locale]);
+
+  const Prev = isRTL ? ChevronRight : ChevronLeft;
+  const Next = isRTL ? ChevronLeft : ChevronRight;
+  const viewLabels = { day: t('day'), week: t('week'), month: t('month') };
+  const layerDefs = [
+    { key: 'event', label: t('calEvents'), color: 'hsl(var(--primary))' },
+    { key: 'task', label: t('calTasks'), color: 'hsl(var(--chart-4))' },
+    { key: 'holiday', label: t('calHolidays'), color: 'hsl(var(--chart-2))' },
+  ];
 
   if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className={cn(
-          "max-w-6xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0",
-          colors.bgSecondary, 
-          colors.border
-        )}
+      <DialogContent
+        onKeyDown={onKeyDown}
+        onEscapeKeyDown={(e) => { if (composer) { e.preventDefault(); setComposer(null); } }}
+        dir={isRTL ? 'rtl' : 'ltr'}
+        className="flex h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[1400px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[min(92dvh,980px)] sm:rounded-3xl"
       >
-        {/* Header */}
-        <DialogHeader className={cn("flex flex-row items-center justify-between p-4 border-b", colors.border)}>
-          <div className="flex items-center gap-2">
-            <CalendarIcon className={cn("w-5 h-5", colors.accentText)} />
-            <DialogTitle className={cn("font-semibold text-base", colors.textPrimary)}>
-              {t('googleCalendar') || 'Google Calendar'}
-            </DialogTitle>
-          </div>
-          <DialogDescription className="sr-only">
-            {t('calendarDescription') || 'View and manage your Google Calendar events'}
-          </DialogDescription>
-          
-        </DialogHeader>
+        <DialogTitle className="sr-only">{t('calendar')}</DialogTitle>
+        <DialogDescription className="sr-only">{t('calendarDescription')}</DialogDescription>
 
-        <div className="flex-1 overflow-hidden">
-          {!isAuthenticated ? (
-            // Auth Screen
-            <div className="flex flex-col items-center justify-center h-full py-12">
-              <CalendarIcon className={cn("w-16 h-16 mb-4", colors.accentText)} />
-              <h3 className={cn("text-xl font-semibold mb-2", colors.textPrimary)}>
-                {t('connectCalendar') || 'Connect Your Calendar'}
-              </h3>
-              <p className={cn("text-center mb-6 max-w-md", colors.textSecondary)}>
-                {t('connectCalendarDesc') || 'Connect your Google Calendar to view and manage your events directly from the app.'}
-              </p>
-              <Button
-                onClick={handleGoogleAuth}
-                className="bg-[#4285F4] hover:bg-[#357ABD] text-white"
-              >
-                <img 
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                  alt="Google" 
-                  className="w-5 h-5 me-2"
+        {isRefreshing && <div className="absolute inset-x-0 top-0 z-30 h-0.5 animate-pulse bg-primary" role="progressbar" aria-label={t('refresh')} />}
+
+        {!isAuthenticated ? (
+          <ConnectScreen t={t} onConnect={handleGoogleAuth} />
+        ) : (
+          <>
+            {/* Toolbar */}
+            <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-3 py-3 pe-12 sm:px-5 sm:pe-14">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={goToday}
+                  className="h-9 rounded-xl border border-input px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t('today')}
+                </button>
+                <button type="button" onClick={() => step(-1)} aria-label={t('calPrev')} className={iconBtn}><Prev className="h-4 w-4" /></button>
+                <button type="button" onClick={() => step(1)} aria-label={t('calNext')} className={iconBtn}><Next className="h-4 w-4" /></button>
+                <h2 key={`${view}-${title.main}`} aria-live="polite" className="ms-1 min-w-0 truncate text-lg font-bold capitalize tracking-tight text-foreground animate-in fade-in-0 duration-200 sm:text-xl">
+                  {title.main} <span className="font-normal text-muted-foreground">{title.sub}</span>
+                </h2>
+              </div>
+
+              <div className="ms-auto flex items-center gap-1.5">
+                <div role="tablist" aria-label={t('calView')} className="relative grid grid-cols-3 rounded-xl bg-foreground/[0.06] p-1">
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-1 start-1 w-[calc((100%-0.5rem)/3)] rounded-lg bg-popover shadow-sm ring-1 ring-border/60 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+                    style={{ transform: `translateX(${(isRTL ? -1 : 1) * VIEWS.indexOf(view) * 100}%)` }}
+                  />
+                  {VIEWS.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      role="tab"
+                      aria-selected={view === v}
+                      onClick={() => setView(v)}
+                      className={cn(
+                        'relative z-10 h-8 rounded-lg px-3.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        view === v ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {viewLabels[v]}
+                    </button>
+                  ))}
+                </div>
+
+                <button type="button" onClick={() => fetchAll(currentDate)} disabled={isRefreshing} aria-label={t('refresh')} title={t('refresh')} className={iconBtn}>
+                  <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+                </button>
+                <button type="button" onClick={disconnect} aria-label={t('disconnect')} title={t('disconnect')} className={cn(iconBtn, 'hover:text-danger')}>
+                  <LogOut className="h-4 w-4 rtl:rotate-180" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openNew()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-[0_6px_20px_-6px_hsl(var(--glow)/0.55)] transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('newEvent')}</span>
+                  <span className="sr-only sm:hidden">{t('newEvent')}</span>
+                </button>
+              </div>
+            </header>
+
+            <div className="flex min-h-0 flex-1">
+              {/* Side panel (desktop) */}
+              <aside className="hidden w-[19rem] shrink-0 space-y-6 overflow-y-auto border-e border-border/60 p-5 lg:block">
+                <MiniMonth
+                  currentDate={currentDate}
+                  selectedDate={selectedDate}
+                  dayMap={dayMap}
+                  locale={locale}
+                  weekStartsOn={weekStartsOn}
+                  isRTL={isRTL}
+                  t={t}
+                  onPick={(d) => { if (view === 'month') selectDay(d); else goTo(d); }}
                 />
-                {t('connectWithGoogle') || 'Connect with Google'}
-              </Button>
-            </div>
-          ) : showEventForm ? (
-            // Event Form
-            <div className={cn("p-4 overflow-y-auto max-h-[70vh]", isRTL && "text-right")} dir={isRTL ? 'rtl' : 'ltr'}>
-              <div className={cn("flex items-center justify-between mb-4", isRTL && "flex-row-reverse")}>
-                <h3 className={cn("text-lg font-semibold", colors.textPrimary)}>
-                  {editingEvent ? (t('editEvent') || 'Edit Event') : (t('newEvent') || 'New Event')}
-                </h3>
-              </div>
-
-              <div className="space-y-4 max-w-xl">
-                <div>
-                  <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('eventTitle') || 'Title'}</Label>
-                  <Input
-                    value={eventForm.summary}
-                    onChange={(e) => setEventForm(prev => ({ ...prev, summary: e.target.value }))}
-                    placeholder={t('eventTitlePlaceholder') || 'Add title'}
-                    className={cn(colors.bgPrimary, colors.border, colors.textPrimary, isRTL && "text-right")}
-                    dir={isRTL ? 'rtl' : 'ltr'}
-                  />
-                </div>
-
-                <div className={cn("grid grid-cols-1 sm:grid-cols-2 gap-4", isRTL && "direction-rtl")}>
-                  <div>
-                    <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('startTime') || 'Start'}</Label>
-                    <Input
-                      type={eventForm.allDay ? 'date' : 'datetime-local'}
-                      value={eventForm.start}
-                      onChange={(e) => setEventForm(prev => ({ ...prev, start: e.target.value }))}
-                      className={cn(colors.bgPrimary, colors.border, colors.textPrimary)}
-                    />
-                  </div>
-                  <div>
-                    <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('endTime') || 'End'}</Label>
-                    <Input
-                      type={eventForm.allDay ? 'date' : 'datetime-local'}
-                      value={eventForm.end}
-                      onChange={(e) => setEventForm(prev => ({ ...prev, end: e.target.value }))}
-                      className={cn(colors.bgPrimary, colors.border, colors.textPrimary)}
-                    />
-                  </div>
-                </div>
-
-                <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse justify-end")}>
-                  <input
-                    type="checkbox"
-                    id="allDay"
-                    checked={eventForm.allDay}
-                    onChange={(e) => setEventForm(prev => ({ ...prev, allDay: e.target.checked }))}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor="allDay" className={colors.textSecondary}>
-                    {t('allDayEvent') || 'All day event'}
-                  </Label>
-                </div>
 
                 <div>
-                  <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('location') || 'Location'}</Label>
-                  <div className="relative">
-                    <MapPin className={cn(
-                      "absolute top-1/2 -translate-y-1/2 w-4 h-4", 
-                      colors.textTertiary,
-                      "start-3"
-                    )} />
-                    <Input
-                      value={eventForm.location}
-                      onChange={(e) => setEventForm(prev => ({ ...prev, location: e.target.value }))}
-                      placeholder={t('addLocation') || 'Add location'}
-                      className={cn(
-                        colors.bgPrimary, colors.border, colors.textPrimary,
-                        "ps-10"
-                      )}
-                      dir={isRTL ? 'rtl' : 'ltr'}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('description') || 'Description'}</Label>
-                  <Textarea
-                    value={eventForm.description}
-                    onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder={t('addDescription') || 'Add description'}
-                    rows={3}
-                    className={cn(colors.bgPrimary, colors.border, colors.textPrimary, isRTL && "text-right")}
-                    dir={isRTL ? 'rtl' : 'ltr'}
-                  />
-                </div>
-
-                <div className={cn("flex gap-2 pt-4", isRTL && "flex-row-reverse")}>
-                  {editingEvent && (
-                    <Button
-                      variant="outline"
-                      onClick={() => deleteEvent(editingEvent.id)}
-                      className="text-danger border-danger/50 hover:bg-danger/10"
-                    >
-                      <Trash2 className={cn("w-4 h-4", "me-2")} />
-                      {t('delete') || 'Delete'}
-                    </Button>
-                  )}
-                  <div className="flex-1" />
-                  <Button
-                    variant="outline"
-                    onClick={() => { setShowEventForm(false); resetEventForm(); }}
-                    className={cn(colors.border, colors.textSecondary)}
-                  >
-                    {t('cancel') || 'Cancel'}
-                  </Button>
-                  <Button
-                    onClick={editingEvent ? () => updateEvent() : createEvent}
-                    className="bg-primary hover:bg-primary/80 text-primary-foreground"
-                  >
-                    <Check className={cn("w-4 h-4", "me-2")} />
-                    {editingEvent ? (t('save') || 'Save') : (t('create') || 'Create')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : showTaskForm ? (
-            // Task Form
-            <div className={cn("p-4 overflow-y-auto max-h-[70vh]", isRTL && "text-right")} dir={isRTL ? 'rtl' : 'ltr'}>
-              <div className={cn("flex items-center justify-between mb-4", isRTL && "flex-row-reverse")}>
-                <h3 className={cn("text-lg font-semibold", colors.textPrimary)}>
-                  {t('newTask') || 'New Task'}
-                </h3>
-              </div>
-
-              <div className="space-y-4 max-w-xl">
-                <div>
-                  <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('taskTitle') || 'Task Title'}</Label>
-                  <Input
-                    value={taskForm.title}
-                    onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder={t('taskTitlePlaceholder') || 'Add task title'}
-                    className={cn(colors.bgPrimary, colors.border, colors.textPrimary, isRTL && "text-right")}
-                    dir={isRTL ? 'rtl' : 'ltr'}
-                  />
-                </div>
-
-                <div>
-                  <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('dueDate') || 'Due Date'}</Label>
-                  <Input
-                    type="date"
-                    value={taskForm.due}
-                    onChange={(e) => setTaskForm(prev => ({ ...prev, due: e.target.value }))}
-                    className={cn(colors.bgPrimary, colors.border, colors.textPrimary)}
-                  />
-                </div>
-
-                <div>
-                  <Label className={cn(colors.textSecondary, isRTL && "block text-right")}>{t('notes') || 'Notes'}</Label>
-                  <Textarea
-                    value={taskForm.notes}
-                    onChange={(e) => setTaskForm(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder={t('addNotes') || 'Add notes'}
-                    rows={3}
-                    className={cn(colors.bgPrimary, colors.border, colors.textPrimary, isRTL && "text-right")}
-                    dir={isRTL ? 'rtl' : 'ltr'}
-                  />
-                </div>
-
-                <div className={cn("flex gap-2 pt-4", isRTL && "flex-row-reverse")}>
-                  <div className="flex-1" />
-                  <Button
-                    variant="outline"
-                    onClick={() => { setShowTaskForm(false); resetTaskForm(); }}
-                    className={cn(colors.border, colors.textSecondary)}
-                  >
-                    {t('cancel') || 'Cancel'}
-                  </Button>
-                  <Button
-                    onClick={createTask}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                  >
-                    <Check className={cn("w-4 h-4", "me-2")} />
-                    {t('create') || 'Create'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Calendar Views
-            <div className="flex flex-col h-full">
-              {/* Calendar Navigation & View Switcher */}
-              <div className={cn("flex items-center justify-between px-4 py-3 border-b flex-wrap gap-2", colors.border)}>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={navigatePrev}
-                    className={colors.textSecondary}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={navigateNext}
-                    className={colors.textSecondary}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                  <h3 className={cn("text-lg font-semibold min-w-[200px]", colors.textPrimary)}>
-                    {getHeaderText()}
-                  </h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToToday}
-                    className={cn("ms-2", colors.border, colors.textSecondary)}
-                  >
-                    {t('today') || 'Today'}
-                  </Button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* View Switcher */}
-                  <div className={cn("flex rounded-lg overflow-hidden border", colors.border)}>
-                    <button
-                      onClick={() => setView('day')}
-                      className={cn(
-                        "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 transition-colors",
-                        view === 'day' 
-                          ? "bg-primary text-primary-foreground" 
-                          : cn(colors.textSecondary, "hover:bg-primary/20")
-                      )}
-                    >
-                      <CalendarIcon className="w-4 h-4" />
-                      {t('day') || 'Day'}
-                    </button>
-                    <button
-                      onClick={() => setView('week')}
-                      className={cn(
-                        "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 transition-colors border-x",
-                        colors.border,
-                        view === 'week' 
-                          ? "bg-primary text-primary-foreground" 
-                          : cn(colors.textSecondary, "hover:bg-primary/20")
-                      )}
-                    >
-                      <List className="w-4 h-4" />
-                      {t('week') || 'Week'}
-                    </button>
-                    <button
-                      onClick={() => setView('month')}
-                      className={cn(
-                        "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 transition-colors",
-                        view === 'month' 
-                          ? "bg-primary text-primary-foreground" 
-                          : cn(colors.textSecondary, "hover:bg-primary/20")
-                      )}
-                    >
-                      <Grid className="w-4 h-4" />
-                      {t('month') || 'Month'}
-                    </button>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label={t('refresh')}
-                    onClick={fetchEvents}
-                    disabled={isRefreshing}
-                    className={cn(colors.border, colors.textSecondary)}
-                    title={t('refresh') || 'Refresh'}
-                  >
-                    <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={disconnectCalendar}
-                    className={cn(colors.border, "text-danger hover:bg-danger/10")}
-                    title={t('disconnect') || 'Disconnect Calendar'}
-                  >
-                    {t('reconnect') || 'Reconnect'}
-                  </Button>
-
-                  <Button
-                    onClick={() => openNewEvent()}
-                    className="bg-primary hover:bg-primary/80 text-primary-foreground"
-                  >
-                    <Plus className="w-4 h-4 me-2" />
-                    {t('newEvent') || 'New Event'}
-                  </Button>
-
-                  <Button
-                    onClick={() => {
-                      setTaskForm(prev => ({ ...prev, due: format(selectedDate, 'yyyy-MM-dd') }));
-                      setShowTaskForm(true);
-                    }}
-                    variant="outline"
-                    className={cn(colors.border, "text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20")}
-                  >
-                    <Check className="w-4 h-4 me-2" />
-                    {t('newTask') || 'New Task'}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Calendar Content */}
-              <div className="flex-1 overflow-auto">
-                {view === 'month' ? (
-                  // Month View
-                  <div className="p-4">
-                    {/* Week day headers */}
-                    <div className="grid grid-cols-7 mb-2">
-                      {weekDayNames.map(day => (
-                        <div
-                          key={day}
-                          className={cn("text-center text-sm font-medium py-2", colors.textTertiary)}
+                  <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <Layers className="h-3.5 w-3.5" aria-hidden="true" />{t('calLayers')}
+                  </p>
+                  <div className="space-y-0.5">
+                    {layerDefs.map((l) => (
+                      <button
+                        key={l.key}
+                        type="button"
+                        role="switch"
+                        aria-checked={layers[l.key]}
+                        onClick={() => toggleLayer(l.key)}
+                        className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-start text-sm text-foreground transition-colors hover:bg-foreground/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span
+                          className="grid h-4 w-4 place-items-center rounded-[5px] border-2 transition-colors"
+                          style={{ borderColor: l.color, background: layers[l.key] ? l.color : 'transparent' }}
                         >
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Calendar days */}
-                    <div className="grid grid-cols-7 gap-1">
-                      {calendarDays.map((day, index) => {
-                        const dayEvents = getEventsForDate(day);
-                        const isCurrentMonth = isSameMonth(day, currentDate);
-                        const isToday = isSameDay(day, new Date());
-                        const isSelected = isSameDay(day, selectedDate);
-
-                        return (
-                          <div
-                            key={index}
-                            onClick={() => handleDateClick(day)}
-                            className={cn(
-                              "min-h-[100px] p-1 rounded-lg cursor-pointer transition-all border",
-                              isCurrentMonth ? colors.bgPrimary : 'opacity-40',
-                              isToday && "ring-2 ring-primary",
-                              isSelected && "bg-primary/20",
-                              'border-border',
-                              "hover:bg-primary/10 hover:scale-[1.02]"
-                            )}
-                          >
-                            <div className={cn(
-                              "text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full",
-                              isToday ? "bg-primary text-primary-foreground" : colors.textPrimary
-                            )}>
-                              {format(day, 'd')}
-                            </div>
-                            <div className="space-y-0.5">
-                              {dayEvents.slice(0, 3).map((event, i) => (
-                                <div
-                                  key={event.id || i}
-                                  onClick={(e) => !event.isHoliday && openEditEvent(event, e)}
-                                  className={cn(
-                                    "text-xs px-1 py-0.5 rounded truncate hover:opacity-80",
-                                    event.isHoliday ? "cursor-default italic" : "cursor-pointer",
-                                    event.isTask && "border-l-2 border-yellow-400"
-                                  )}
-                                  style={{ backgroundColor: getEventColor(event), color: '#fff' }}
-                                  title={`${event.isHoliday ? '✡️ ' : event.isTask ? '✓ ' : ''}${event.summary}`}
-                                >
-                                  {event.start?.dateTime && (
-                                    <span className="opacity-75 me-1">
-                                      {format(parseISO(event.start.dateTime), 'h:mm')}
-                                    </span>
-                                  )}
-                                  {event.isHoliday && '✡️ '}
-                                  {event.isTask && '✓ '}
-                                  {event.summary}
-                                </div>
-                              ))}
-                              {dayEvents.length > 3 && (
-                                <div className={cn("text-xs", colors.textTertiary)}>
-                                  +{dayEvents.length - 3} more
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          {layers[l.key] && <Check className="h-3 w-3 text-white" />}
+                        </span>
+                        <span className={cn(!layers[l.key] && 'text-muted-foreground')}>{l.label}</span>
+                      </button>
+                    ))}
                   </div>
-                ) : view === 'week' ? (
-                  // Week View
-                  <div className="flex flex-col h-full">
-                    {/* Week day headers */}
-                    <div className={cn("grid grid-cols-8 border-b sticky top-0 z-10", colors.bgSecondary, colors.border)}>
-                      <div className="w-16" />
-                      {weekDays.map((day, i) => (
-                        <div
-                          key={i}
-                          onClick={() => { setCurrentDate(day); setView('day'); }}
-                          className={cn(
-                            "text-center py-2 cursor-pointer hover:bg-primary/10 transition-colors",
-                            isSameDay(day, new Date()) && "bg-primary/20"
-                          )}
-                        >
-                          <div className={cn("text-xs", colors.textTertiary)}>
-                            {format(day, 'EEE')}
-                          </div>
-                          <div className={cn(
-                            "text-lg font-semibold w-8 h-8 mx-auto flex items-center justify-center rounded-full",
-                            isSameDay(day, new Date()) ? "bg-primary text-primary-foreground" : colors.textPrimary
-                          )}>
-                            {format(day, 'd')}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                </div>
 
-                    {/* Time grid */}
-                    <div className="flex-1 overflow-y-auto">
-                      <div className="relative">
-                        {HOURS.map(hour => (
-                          <div key={hour} className={cn("grid grid-cols-8 border-b", colors.border)} style={{ height: `${HOUR_HEIGHT}px` }}>
-                            <div className={cn("w-16 text-xs text-end pe-2 pt-1", colors.textTertiary)}>
-                              {format(setHours(new Date(), hour), 'h a')}
-                            </div>
-                            {weekDays.map((day, dayIndex) => {
-                              const hourEvents = getEventsForHour(day, hour);
-                              return (
-                                <div
-                                  key={dayIndex}
-                                  onClick={() => openNewEvent(day, hour)}
-                                  className={cn(
-                                    "border-l relative cursor-pointer hover:bg-primary/5",
-                                    colors.border,
-                                    isSameDay(day, new Date()) && "bg-primary/5"
-                                  )}
-                                >
-                                  {hourEvents.map((event, i) => (
-                                    <div
-                                      key={event.id || i}
-                                      onClick={(e) => !event.isHoliday && openEditEvent(event, e)}
-                                      className={cn(
-                                        "absolute start-0 end-1 text-xs px-1 py-0.5 rounded overflow-hidden z-10",
-                                        event.isHoliday ? "cursor-default" : "cursor-pointer"
-                                      )}
-                                      style={{ 
-                                        backgroundColor: getEventColor(event), 
-                                        color: '#fff',
-                                        top: `${getMinutes(parseISO(event.start.dateTime))}px`,
-                                        minHeight: '20px'
-                                      }}
-                                      title={event.summary}
-                                    >
-                                      <div className="font-medium truncate">
-                                        {event.isHoliday && '✡️ '}
-                                        {event.isTask && '✓ '}
-                                        {event.summary}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  // Day View with drag/resize
-                  <div className="flex h-full">
-                    {/* Time column */}
-                    <div className="w-16 flex-shrink-0">
-                      {HOURS.map(hour => (
-                        <div key={hour} className={cn("text-xs text-end pe-2 pt-1", colors.textTertiary)} style={{ height: `${HOUR_HEIGHT}px` }}>
-                          {format(setHours(new Date(), hour), 'h a')}
-                        </div>
-                      ))}
-                    </div>
+                <AgendaPanel
+                  date={selectedDate}
+                  items={selectedItems}
+                  lang={language}
+                  locale={locale}
+                  t={t}
+                  onOpen={openItem}
+                  onNew={() => openNew()}
+                />
 
-                    {/* Day column */}
-                    <div 
-                      ref={dayColumnRef}
-                      className="flex-1 relative border-l" 
-                      style={{ borderColor: 'hsl(var(--border))' }}
-                    >
-                      {/* Hour lines */}
-                      {HOURS.map(hour => (
-                        <div
-                          key={hour}
-                          onClick={() => openNewEvent(currentDate, hour)}
-                          className={cn(
-                            "border-b cursor-pointer hover:bg-primary/5",
-                            colors.border
-                          )}
-                          style={{ height: `${HOUR_HEIGHT}px` }}
-                        />
-                      ))}
-
-                      {/* Events with drag/resize */}
-                      <div className="absolute inset-0 pointer-events-none">
-                        {getEventsForDate(currentDate)
-                          .filter(event => event.start?.dateTime)
-                          .map((event, i) => (
-                            <div key={event.id || i} className="pointer-events-auto">
-                              {renderDayViewEvent(event, i)}
-                            </div>
-                          ))}
-                      </div>
-
-                      {/* All-day events */}
-                      {getEventsForDate(currentDate).filter(e => e.start?.date).length > 0 && (
-                        <div className={cn("absolute top-0 start-0 end-0 p-2 border-b z-20", colors.bgSecondary, colors.border)}>
-                          <div className={cn("text-xs font-medium mb-1", colors.textTertiary)}>All-day</div>
-                          {getEventsForDate(currentDate)
-                            .filter(e => e.start?.date)
-                            .map((event, i) => (
-                              <div
-                                key={event.id || i}
-                                onClick={(e) => !event.isHoliday && openEditEvent(event, e)}
-                                className={cn(
-                                  "text-xs px-2 py-1 rounded mb-1",
-                                  event.isHoliday ? "cursor-default italic" : "cursor-pointer"
-                                )}
-                                style={{ backgroundColor: getEventColor(event), color: '#fff' }}
-                              >
-                                {event.isHoliday && '✡️ '}
-                                {event.isTask && '✓ '}
-                                {event.summary}
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {view !== 'month' && (
+                  <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />{t('calDragHint')}
+                  </p>
                 )}
-              </div>
+              </aside>
 
-              {/* Hint text */}
-              {view === 'day' && (
-                <div className={cn("px-4 py-2 text-xs border-t", colors.border, colors.textTertiary)}>
-                  💡 Tip: Drag events to move them, drag the bottom edge to resize. Click empty time slots to create new events.
+              {/* Main view */}
+              <main className="min-h-0 min-w-0 flex-1">
+                <div key={view} className="h-full animate-in fade-in-0 duration-200">
+                  {view === 'month' ? (
+                    <div className="h-full overflow-y-auto p-3 sm:p-5 lg:overflow-hidden">
+                      <div className="lg:h-full">
+                        <MonthGrid
+                          days={monthDays}
+                          currentDate={currentDate}
+                          selectedDate={selectedDate}
+                          dayMap={dayMap}
+                          lang={language}
+                          locale={locale}
+                          t={t}
+                          onSelect={selectDay}
+                          onOpen={openItem}
+                          onOpenDay={openDay}
+                        />
+                      </div>
+                      <AgendaPanel
+                        className="mt-5 lg:hidden"
+                        date={selectedDate}
+                        items={selectedItems}
+                        lang={language}
+                        locale={locale}
+                        t={t}
+                        onOpen={openItem}
+                        onNew={() => openNew()}
+                      />
+                    </div>
+                  ) : (
+                    <TimeGrid
+                      days={view === 'week' ? weekDays : [currentDate]}
+                      dayMap={dayMap}
+                      lang={language}
+                      locale={locale}
+                      t={t}
+                      onCreate={openNew}
+                      onOpen={openItem}
+                      onCommit={commitTime}
+                      onDayClick={view === 'week' ? openDay : undefined}
+                    />
+                  )}
                 </div>
-              )}
+              </main>
             </div>
-          )}
-        </div>
+
+            {composer && (
+              <EventComposer
+                key={composer.item?.id || `new-${composer.start?.getTime()}`}
+                request={composer}
+                onClose={() => setComposer(null)}
+                onSave={saveForm}
+                onDelete={deleteItem}
+                saving={saving}
+                t={t}
+                lang={language}
+                locale={locale}
+                isRTL={isRTL}
+              />
+            )}
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

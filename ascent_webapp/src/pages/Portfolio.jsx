@@ -14,7 +14,7 @@ import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 export default function Portfolio() {
   const { user, colors, t } = useTheme();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
   const { convertCurrency, fetchExchangeRates } = useCurrencyConversion();
   const { hasPermission } = useAuth();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -253,7 +253,7 @@ export default function Portfolio() {
   const formatCurrency = useCallback((value, currency) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || user?.currency || 'USD',
+      currency: currency || user?.currency || 'ILS',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value || 0);

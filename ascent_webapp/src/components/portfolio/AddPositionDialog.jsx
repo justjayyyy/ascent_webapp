@@ -15,7 +15,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDay
   const [deductFromCash, setDeductFromCash] = useState(true);
 
   // Ensure we have a valid currency code
-  const currency = accountCurrency || user?.currency || 'USD';
+  const currency = accountCurrency || user?.currency || 'ILS';
 
   // Format currency helper function
   const formatCurrency = (value, currencyCode = currency) => {

@@ -1,185 +1,96 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ascent } from '@/api/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, User, Mail, Shield, Bell, Globe, Edit2, Check, X, Users } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Loader2, User, Bell, Palette, Users, CreditCard, Database, LogOut, Search, X, Lock, Mail, SearchX, UserCircle,
+} from 'lucide-react';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import ImportExportSection from '../components/settings/ImportExportSection';
 import SharedUsersSection from '../components/settings/SharedUsersSection';
 import InviteUserDialog from '../components/settings/InviteUserDialog';
 import CardManagement from '../components/settings/CardManagement';
+import ThemePicker from '../components/settings/ThemePicker';
+import SettingsNav, { useActiveSection } from '../components/settings/SettingsNav';
+import { Section, Group, Row, Segmented, EditableField } from '../components/settings/SettingsShell';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import AscentLogo from '@/components/AscentLogo';
+
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'he', label: 'עברית' },
+  { value: 'ru', label: 'Русский' },
+];
+
+const CURRENCIES = [
+  { value: 'USD', label: '$ USD' },
+  { value: 'EUR', label: '€ EUR' },
+  { value: 'GBP', label: '£ GBP' },
+  { value: 'ILS', label: '₪ ILS' },
+];
+
+const listQuery = (key, userId, fn) => ({
+  queryKey: [key, userId],
+  queryFn: fn,
+  enabled: !!userId,
+  staleTime: 5 * 60 * 1000,
+});
 
 export default function Settings() {
-  const { user: themeUser, theme, colors, palette, setPalette, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
-  const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission, refreshWorkspaces } = useAuth();
+  const { user: themeUser, theme, setPalette, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
+  const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission, refreshWorkspaces, logout } = useAuth();
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [editingFullName, setEditingFullName] = useState(false);
-  const [fullNameValue, setFullNameValue] = useState('');
-  const [editingWorkspaceName, setEditingWorkspaceName] = useState(false);
-  const [workspaceNameValue, setWorkspaceNameValue] = useState('');
-  const queryClient = useQueryClient();
+  const [query, setQuery] = useState('');
+  const searchRef = useRef(null);
 
   useEffect(() => {
-    if (themeUser) {
-      setUser(themeUser);
-      setFullNameValue(themeUser?.full_name || '');
-      setIsLoading(false);
-    }
+    if (themeUser) setUser(themeUser);
   }, [themeUser]);
 
-  // Store previous workspace name to detect actual changes
-  const prevWorkspaceNameRef = useRef(currentWorkspace?.name);
-
+  // "/" jumps to search, like the rest of the tools people live in.
   useEffect(() => {
-    const currentName = currentWorkspace?.name;
-    const prevName = prevWorkspaceNameRef.current;
-
-    // Only update if the name value actually changed (not just the object reference)
-    if (currentName && currentName !== prevName) {
-      console.log('[Settings] Workspace name changed, updating input value');
-      setWorkspaceNameValue(currentName);
-      prevWorkspaceNameRef.current = currentName;
-    } else if (currentName && prevName === undefined) {
-      // Initial load
-      setWorkspaceNameValue(currentName);
-      prevWorkspaceNameRef.current = currentName;
-    }
-  }, [currentWorkspace?.name]);
-
-  const handleSaveFullName = async () => {
-    if (fullNameValue.trim() === (user?.full_name || '').trim()) {
-      setEditingFullName(false);
-      return;
-    }
-
-    try {
-      await updateUserMutation.mutateAsync({ full_name: fullNameValue.trim() });
-      setEditingFullName(false);
-      toast.success(t('fullNameUpdated') || 'Full name updated successfully');
-    } catch (error) {
-      console.error('Failed to update full name:', error);
-      setFullNameValue(user?.full_name || '');
-      toast.error(t('failedToUpdateFullName') || 'Failed to update full name');
-    }
-  };
-
-  const handleCancelEditFullName = () => {
-    setFullNameValue(user?.full_name || '');
-    setEditingFullName(false);
-  };
+    const onKey = (e) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = document.activeElement;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const updateUserMutation = useMutation({
     mutationFn: async (data) => {
-      // Update locally first for instant feedback
-      updateUserLocal(data);
-      setUser(prev => ({ ...prev, ...data }));
-      // Then persist to server
+      updateUserLocal(data); // instant feedback
+      setUser((prev) => ({ ...prev, ...data }));
       return ascent.auth.updateMe(data);
     },
     onSuccess: async () => {
-      // Refresh to ensure we have the latest from server
       await refreshUser();
-      // Don't invalidate all queries - the optimistic update and refreshUser() already handle the state
-      toast.success('Settings updated!');
+      toast.success(t('setSaved'));
     },
     onError: async (error) => {
       console.error('Update error:', error);
-      // Revert on error by refreshing from server
-      await refreshUser();
+      await refreshUser(); // revert to server truth
       toast.error('Failed to update settings');
     },
   });
+  const saveUser = updateUserMutation.mutate;
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Account.list();
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: positions = [] } = useQuery({
-    queryKey: ['positions', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Position.list('-created_date', 1000);
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['transactions', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.ExpenseTransaction.list('-date', 1000);
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: notes = [] } = useQuery({
-    queryKey: ['notes', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Note.list();
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: goals = [] } = useQuery({
-    queryKey: ['goals', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.FinancialGoal.list('-created_date');
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['budgets', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Budget.list('-created_date');
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Category.list('-created_date');
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: cards = [] } = useQuery({
-    queryKey: ['cards', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Card.list();
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
+  const userId = user?.id;
+  const { data: accounts = [] } = useQuery(listQuery('accounts', userId, () => ascent.entities.Account.list()));
+  const { data: positions = [] } = useQuery(listQuery('positions', userId, () => ascent.entities.Position.list('-created_date', 1000)));
+  const { data: transactions = [] } = useQuery(listQuery('transactions', userId, () => ascent.entities.ExpenseTransaction.list('-date', 1000)));
+  const { data: notes = [] } = useQuery(listQuery('notes', userId, () => ascent.entities.Note.list()));
+  const { data: budgets = [] } = useQuery(listQuery('budgets', userId, () => ascent.entities.Budget.list('-created_date')));
+  const { data: categories = [] } = useQuery(listQuery('categories', userId, () => ascent.entities.Category.list('-created_date')));
+  const { data: cards = [] } = useQuery(listQuery('cards', userId, () => ascent.entities.Card.list()));
 
   const updateWorkspaceMutation = useMutation({
     mutationFn: async (name) => {
@@ -187,178 +98,104 @@ export default function Settings() {
       return ascent.workspaces.update(currentWorkspace.id || currentWorkspace._id, { name });
     },
     onMutate: async (name) => {
-      // Optimistic update - update UI immediately
       const previousWorkspace = currentWorkspace;
-
-      if (currentWorkspace) {
-        setCurrentWorkspace(prev => ({ ...prev, name: name }));
-      }
-
+      if (currentWorkspace) setCurrentWorkspace((prev) => ({ ...prev, name }));
       return { previousWorkspace };
     },
     onSuccess: async () => {
-      // Refresh workspaces to update name in background/ensure consistency
       await refreshWorkspaces();
-      setEditingWorkspaceName(false);
-      toast.success('Workspace name updated!');
+      toast.success(t('setSaved'));
     },
     onError: (error, variables, context) => {
-      // Rollback on error
-      if (context?.previousWorkspace) {
-        setCurrentWorkspace(context.previousWorkspace);
-      }
+      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
       toast.error('Failed to update workspace name');
-    }
+    },
   });
 
-  const isOwner = useMemo(() => {
-    return currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
-  }, [currentWorkspace?.ownerId, user?.id, user?._id]);
-
-  const handleSaveWorkspaceName = async () => {
-    if (workspaceNameValue.trim() === currentWorkspace?.name) {
-      setEditingWorkspaceName(false);
-      return;
-    }
-    await updateWorkspaceMutation.mutateAsync(workspaceNameValue.trim());
-  };
+  const isOwner = useMemo(
+    () => currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id,
+    [currentWorkspace?.ownerId, user?.id, user?._id]
+  );
 
   const inviteUserMutation = useMutation({
     mutationFn: async (data) => {
       if (!currentWorkspace) throw new Error('No active workspace');
-
-      const inviteData = {
+      return ascent.workspaces.invite(currentWorkspace.id || currentWorkspace._id, {
         email: data.invitedEmail,
-        role: 'viewer', // Default role
+        role: 'viewer',
         permissions: data.permissions,
-        displayName: data.displayName
-      };
-
-      const result = await ascent.workspaces.invite(currentWorkspace.id || currentWorkspace._id, inviteData);
-
-      // Send email logic (reuse existing logic but adapted)
-      // For now, let's assume the backend handles it or we just show success
-      // The backend response contains the workspace with updated members
-
-      // We can reuse the email sending logic here if we want client-side sending
-      // But let's keep it simple for now and trust the backend invitation creation
-
-      // ... (Email sending logic omitted for brevity, can be re-added if needed)
-
-      return result;
+        displayName: data.displayName,
+      });
     },
     onSuccess: async (data) => {
-      // The backend now returns { message, workspace, emailSent, emailError }
+      // Backend returns { message, workspace, emailSent, emailError }
       if (data && data.emailSent === false) {
         toast.warning(`Invitation created, but email failed: ${data.emailError || 'SMTP error'}`);
       } else {
         toast.success('Invitation sent successfully!');
       }
-
       setInviteDialogOpen(false);
-      // Refresh workspaces to update members list in background
       await refreshWorkspaces();
     },
     onMutate: async (data) => {
-      // Optimistic update - show new user immediately
       const previousWorkspace = currentWorkspace;
-
       if (currentWorkspace) {
-        setInviteDialogOpen(false); // Close dialog immediately
-
-        const newMember = {
-          _id: `temp-${Date.now()}`,
-          userId: `temp-${Date.now()}`,
-          email: data.invitedEmail,
-          status: 'pending',
-          role: 'viewer', // Default role
-          permissions: data.permissions || {},
-          displayName: data.displayName
-        };
-
-        setCurrentWorkspace(prev => ({
+        setInviteDialogOpen(false);
+        const tempId = `temp-${Date.now()}`;
+        setCurrentWorkspace((prev) => ({
           ...prev,
-          members: [...(prev.members || []), newMember]
+          members: [
+            ...(prev.members || []),
+            { _id: tempId, userId: tempId, email: data.invitedEmail, status: 'pending', role: 'viewer', permissions: data.permissions || {}, displayName: data.displayName },
+          ],
         }));
       }
-
       return { previousWorkspace };
     },
     onError: (error, variables, context) => {
       console.error('Invite error:', error);
-      if (context?.previousWorkspace) {
-        setCurrentWorkspace(context.previousWorkspace);
-      }
+      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
       toast.error(error.message || 'Failed to send invitation');
-    }
+    },
   });
 
-  // Map workspace members to the format expected by SharedUsersSection
-  // Stable reference unless members actually change
+  const membersKey = currentWorkspace?.members ? JSON.stringify(currentWorkspace.members) : null;
   const sharedUsers = useMemo(() => {
     if (!currentWorkspace?.members) return [];
-    const filtered = currentWorkspace.members
-      .filter(m => m.userId !== user?.id && m.userId !== user?._id && m.email !== user?.email);
-
-    return filtered.map(m => ({
-      id: m._id || m.userId,
-      invitedEmail: m.email,
-      displayName: m.email.split('@')[0],
-      status: m.status,
-      permissions: m.permissions,
-      role: m.role
-    }));
-  }, [
-    // Use stringified members to ensure stable comparison
-    currentWorkspace?.members ? JSON.stringify(currentWorkspace.members) : null,
-    user?.id,
-    user?._id,
-    user?.email
-  ]);
+    return currentWorkspace.members
+      .filter((m) => m.userId !== user?.id && m.userId !== user?._id && m.email !== user?.email)
+      .map((m) => ({
+        id: m._id || m.userId,
+        invitedEmail: m.email,
+        displayName: m.email.split('@')[0],
+        status: m.status,
+        permissions: m.permissions,
+        role: m.role,
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [membersKey, user?.id, user?._id, user?.email]);
 
   const canManageUsers = hasPermission('manageUsers');
 
   const updateSharedUserMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       if (!currentWorkspace) return;
-      console.log('[Settings] Updating member permissions in background...', { id, data });
       return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
     },
     onMutate: async ({ id, data }) => {
-      // Optimistic update - update UI immediately BEFORE server responds
-      console.log('[Settings] Applying optimistic UI update');
-
-      // Snapshot the previous value in case we need to rollback
       const previousWorkspace = currentWorkspace;
-
-      // Optimistically update the local state immediately
       if (currentWorkspace?.members) {
-        const updatedMembers = currentWorkspace.members.map(member => {
-          if ((member._id || member.userId) === id) {
-            return { ...member, ...data };
-          }
-          return member;
-        });
-
-        // Update only the members array to trigger minimal re-render
-        setCurrentWorkspace(prev => ({ ...prev, members: updatedMembers }));
+        const members = currentWorkspace.members.map((m) => ((m._id || m.userId) === id ? { ...m, ...data } : m));
+        setCurrentWorkspace((prev) => ({ ...prev, members }));
       }
-
-      // Return context with previous value for potential rollback
       return { previousWorkspace };
     },
-    onSuccess: () => {
-      console.log('[Settings] Permission update confirmed by server');
-      toast.success('Permissions updated');
-    },
+    onSuccess: () => toast.success('Permissions updated'),
     onError: (error, variables, context) => {
       console.error('[Settings] Permission update failed, rolling back:', error);
-      // Rollback to previous state on error
-      if (context?.previousWorkspace) {
-        setCurrentWorkspace(context.previousWorkspace);
-      }
+      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
       toast.error('Failed to update permissions');
-    }
+    },
   });
 
   const deleteSharedUserMutation = useMutation({
@@ -367,426 +204,324 @@ export default function Settings() {
       return ascent.workspaces.removeMember(currentWorkspace.id || currentWorkspace._id, id);
     },
     onMutate: async (id) => {
-      // Optimistic update - remove user from UI immediately
       const previousWorkspace = currentWorkspace;
-
       if (currentWorkspace?.members) {
-        const updatedMembers = currentWorkspace.members.filter(
-          member => (member._id || member.userId) !== id
-        );
-        setCurrentWorkspace(prev => ({ ...prev, members: updatedMembers }));
+        const members = currentWorkspace.members.filter((m) => (m._id || m.userId) !== id);
+        setCurrentWorkspace((prev) => ({ ...prev, members }));
       }
-
       return { previousWorkspace };
     },
-    onSuccess: () => {
-      toast.success('User access revoked!');
-    },
+    onSuccess: () => toast.success('User access revoked!'),
     onError: (error, variables, context) => {
       console.error('[Settings] Failed to remove user, rolling back:', error);
-      if (context?.previousWorkspace) {
-        setCurrentWorkspace(context.previousWorkspace);
-      }
+      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
       toast.error('Failed to remove user');
-    }
+    },
   });
 
-  // Memoize callbacks to prevent SharedUsersSection re-renders
-  const handleInviteUser = useCallback(() => {
-    setInviteDialogOpen(true);
-  }, []);
+  const handleInviteUser = useCallback(() => setInviteDialogOpen(true), []);
+  const handleUpdateUser = useCallback((id, data) => updateSharedUserMutation.mutate({ id, data }), [updateSharedUserMutation.mutate]);
+  const handleDeleteUser = useCallback((id) => deleteSharedUserMutation.mutate(id), [deleteSharedUserMutation.mutate]);
 
-  const handleUpdateUser = useCallback((id, data) => {
-    console.log('[Settings] handleUpdateUser called', { id, data });
-    updateSharedUserMutation.mutate({ id, data });
-  }, [updateSharedUserMutation.mutate]);
+  const selectLook = (id) => {
+    if (id === 'light') {
+      if (theme !== 'light') saveUser({ theme: 'light' });
+      return;
+    }
+    setPalette(id);
+    if (theme === 'light') saveUser({ theme: 'dark' });
+  };
 
-  const handleDeleteUser = useCallback((id) => {
-    deleteSharedUserMutation.mutate(id);
-  }, [deleteSharedUserMutation.mutate]);
+  // ---- search: a section shows if its title matches (then all rows) or any of its rows match ----
+  const q = query.trim().toLowerCase();
+  const hit = (...texts) => !q || texts.some((x) => x && String(x).toLowerCase().includes(q));
 
-  if (isLoading || themeLoading) {
+  const notificationRows = [
+    PORTFOLIO_ENABLED && { key: 'priceAlerts', label: t('priceAlerts'), desc: t('getNotifiedPriceChanges'), checked: user?.priceAlerts || false },
+    { key: 'dailySummary', label: t('dailySummary'), desc: t('receiveDailyReports'), checked: user?.dailySummary !== false },
+    { key: 'weeklyReports', label: t('weeklySummary'), desc: t('receiveWeeklyReports'), checked: user?.weeklyReports !== false },
+    { key: 'emailNotifications', label: t('emailNotifications'), desc: t('receiveImportantUpdates'), checked: user?.emailNotifications !== false },
+  ].filter(Boolean);
+
+  const roleLabel = permissions ? t('sharedUser') : t('owner');
+  const show = {
+    profile: hit(t('setNavProfile'), t('fullName'), t('email'), roleLabel),
+    appearance: hit(t('setNavAppearance'), t('setThemeLabel'), t('language'), t('defaultCurrency'), t('blurValues'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark')),
+    notifications: hit(t('setNavNotifications'), ...notificationRows.flatMap((r) => [r.label, r.desc])),
+    household: isOwner && hit(t('setNavHousehold'), t('workspaceName'), t('sharedAccess'), t('inviteUser')),
+    cards: hasPermission('manageCards') && hit(t('setNavCards'), t('paymentCards'), t('addCard')),
+    data: hit(t('setNavData'), t('exportData'), t('expenses'), t('notes'), 'csv'),
+    account: hit(t('setNavAccount'), t('logout')),
+  };
+  const sectionHit = (title) => !q || title.toLowerCase().includes(q);
+
+  const navItems = [
+    { id: 'profile', label: t('setNavProfile'), icon: UserCircle },
+    { id: 'appearance', label: t('setNavAppearance'), icon: Palette },
+    { id: 'notifications', label: t('setNavNotifications'), icon: Bell },
+    isOwner && { id: 'household', label: t('setNavHousehold'), icon: Users },
+    hasPermission('manageCards') && { id: 'cards', label: t('setNavCards'), icon: CreditCard },
+    { id: 'data', label: t('setNavData'), icon: Database },
+    { id: 'account', label: t('setNavAccount'), icon: User },
+  ].filter((i) => i && show[i.id]);
+
+  const [active, setActive] = useActiveSection(navItems.map((i) => i.id));
+
+  if (!user || themeLoading) {
     return (
-      <div className={cn("flex items-center justify-center min-h-screen", colors.bgPrimary)}>
-        <Loader2 className={cn("w-8 h-8 animate-spin", colors.accentText)} />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label={t('loading')} />
       </div>
     );
   }
 
+  const displayName = user.full_name || user.email?.split('@')[0] || '';
+  const initials = (displayName.match(/\p{L}/gu) || ['?']).slice(0, 2).join('').toUpperCase();
+  let order = 0;
+
   return (
-    <div className={cn("p-4 md:p-8", colors.bgPrimary)}>
-      <div className="max-w-4xl mx-auto py-4">
-        <div className="mb-6">
-          <h1 className={cn("text-3xl md:text-4xl font-bold mb-2", colors.textPrimary)}>{t('settings')}</h1>
-          <p className={colors.textTertiary}>{t('manageAccountPreferences')}</p>
+    <div className="mx-auto max-w-5xl px-4 pb-16 pt-6 md:px-8 md:pt-10">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground text-balance md:text-4xl">{t('settings')}</h1>
+          <p className="mt-1 text-muted-foreground text-pretty">{t('manageAccountPreferences')}</p>
         </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
+            placeholder={t('setSearch')}
+            aria-label={t('setSearch')}
+            aria-keyshortcuts="/"
+            className="h-11 w-full rounded-2xl border border-border bg-card ps-10 pe-11 text-base text-foreground shadow-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 md:text-sm [&::-webkit-search-cancel-button]:hidden"
+          />
+          {q ? (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); searchRef.current?.focus(); }}
+              aria-label={t('setClearSearch')}
+              className="absolute end-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <kbd
+              title={t('setShortcutHint')}
+              className="pointer-events-none absolute end-3 top-1/2 hidden h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-muted px-1.5 font-sans text-[11px] font-medium text-muted-foreground sm:flex [@media(pointer:coarse)]:hidden"
+            >
+              /
+            </kbd>
+          )}
+        </div>
+      </header>
 
-        <div className="space-y-4">
-          {/* Grid for compact cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Profile Information */}
-            <Card className={cn(colors.cardBg, colors.cardBorder)}>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-primary" />
-                  <CardTitle className={colors.accentText}>{t('profileInformation')}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className={colors.textSecondary}>{t('fullName')}</Label>
-                  <div className="flex items-center gap-2">
-                    <User className={cn("w-4 h-4", colors.textTertiary)} />
-                    <Input
-                      value={fullNameValue}
-                      onChange={(e) => setFullNameValue(e.target.value)}
-                      disabled={!editingFullName}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && editingFullName) {
-                          handleSaveFullName();
-                        } else if (e.key === 'Escape' && editingFullName) {
-                          handleCancelEditFullName();
-                        }
-                      }}
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingFullName && "ring-2 ring-primary")}
-                    />
-                    {editingFullName ? (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          aria-label={t('save')}
-                          variant="ghost"
-                          onClick={handleSaveFullName}
-                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-success/20", colors.textSecondary)}
-                        >
-                          <Check className="w-4 h-4 text-success" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          aria-label={t('cancel')}
-                          variant="ghost"
-                          onClick={handleCancelEditFullName}
-                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-danger/20", colors.textSecondary)}
-                        >
-                          <X className="w-4 h-4 text-danger" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        size="icon"
-                        aria-label={t('edit')}
-                        variant="ghost"
-                        onClick={() => setEditingFullName(true)}
-                        className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className={colors.textSecondary}>{t('email')}</Label>
-                  <div className="flex items-center gap-2">
-                    <Mail className={cn("w-4 h-4", colors.textTertiary)} />
-                    <Input
-                      value={user?.email || ''}
-                      disabled
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className={colors.textSecondary}>{t('role')}</Label>
-                  <div className="flex items-center gap-2">
-                    <Shield className={cn("w-4 h-4", colors.textTertiary)} />
-                    <Input
-                      value={permissions ? t('sharedUser') : t('owner')}
-                      disabled
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      {navItems.length > 0 && <SettingsNav variant="strip" items={navItems} active={active} onSelect={setActive} />}
 
-            {/* Preferences */}
-            <Card className={cn(colors.cardBg, colors.cardBorder)}>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-primary" />
-                  <CardTitle className={colors.accentText}>{t('preferences')}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                  <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('language')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('displayLanguage')}</p>
-                  </div>
-                  <Select
-                    value={user?.language || 'en'}
-                    onValueChange={(value) => updateUserMutation.mutate({ language: value })}
-                  >
-                    <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                      <SelectItem value="en" className={colors.textPrimary}>English</SelectItem>
-                      <SelectItem value="he" className={colors.textPrimary}>עברית</SelectItem>
-                      <SelectItem value="ru" className={colors.textPrimary}>Русский</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                  <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('defaultCurrency')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('primaryCurrencyForPortfolio')}</p>
-                  </div>
-                  <Select
-                    value={user?.currency || 'USD'}
-                    onValueChange={(value) => updateUserMutation.mutate({ currency: value })}
-                  >
-                    <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                      <SelectItem value="USD" className={colors.textPrimary}>USD ($)</SelectItem>
-                      <SelectItem value="EUR" className={colors.textPrimary}>EUR (€)</SelectItem>
-                      <SelectItem value="GBP" className={colors.textPrimary}>GBP (£)</SelectItem>
-                      <SelectItem value="ILS" className={colors.textPrimary}>ILS (₪)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className={cn("font-medium", colors.textPrimary)}>{t('theme')}</p>
-                    <p className={cn("text-sm", colors.textTertiary)}>{t('appColorScheme')}</p>
-                  </div>
-                  <Select
-                    value={user?.theme || 'dark'}
-                    onValueChange={(value) => updateUserMutation.mutate({ theme: value })}
-                  >
-                    <SelectTrigger className={cn("w-[140px]", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                      <SelectItem value="dark" className={colors.textPrimary}>{t('dark')}</SelectItem>
-                      <SelectItem value="light" className={colors.textPrimary}>{t('light')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="py-3">
-                  <p className={cn("font-medium", colors.textPrimary)}>{t('colorPalette')}</p>
-                  <p className={cn("text-sm mb-3", colors.textTertiary)}>{t('colorPaletteDesc')}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { id: 'indigo', label: t('paletteIndigo'), swatch: ['#0c0d1a', '#8b7cf8', '#22d3ee'] },
-                      { id: 'gold', label: t('paletteGold'), swatch: ['#000000', '#f5b91f', '#e07a3a'] },
-                    ].map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setPalette(p.id)}
-                        aria-pressed={palette === p.id}
-                        className={cn(
-                          "rounded-2xl border p-3 text-start transition hover:bg-foreground/5",
-                          palette === p.id ? "border-primary ring-2 ring-primary/40" : "border-border"
-                        )}
-                      >
-                        <div className="mb-2 flex h-10 overflow-hidden rounded-xl border border-border/60">
-                          {p.swatch.map((c, i) => (
-                            <span key={c} className={i === 0 ? "flex-[2]" : "flex-1"} style={{ background: c }} />
-                          ))}
-                        </div>
-                        <p className={cn("text-sm font-medium", colors.textPrimary)}>{p.label}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-12">
+        {navItems.length > 0 && <SettingsNav items={navItems} active={active} onSelect={setActive} />}
 
-
-            {/* Notifications */}
-            <Card className={cn(colors.cardBg, colors.cardBorder)}>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-primary" />
-                  <CardTitle className={colors.accentText}>{t('notifications')}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {PORTFOLIO_ENABLED && (
-                  <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                    <div>
-                      <p className={cn("font-medium", colors.textPrimary)}>{t('priceAlerts')}</p>
-                      <p className={cn("text-sm", colors.textTertiary)}>{t('getNotifiedPriceChanges')}</p>
-                    </div>
-                    <Switch aria-label={t('priceAlerts')}
-                      checked={user?.priceAlerts || false}
-                      onCheckedChange={(checked) => updateUserMutation.mutate({ priceAlerts: checked })}
-                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                    />
-                  </div>
-                  )}
-                  <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                    <div>
-                      <p className={cn("font-medium", colors.textPrimary)}>{t('dailySummary')}</p>
-                      <p className={cn("text-sm", colors.textTertiary)}>{t('receiveDailyReports')}</p>
-                    </div>
-                    <Switch aria-label={t('dailySummary')}
-                      checked={user?.dailySummary !== false}
-                      onCheckedChange={(checked) => updateUserMutation.mutate({ dailySummary: checked })}
-                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                    />
-                  </div>
-                  <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
-                    <div>
-                      <p className={cn("font-medium", colors.textPrimary)}>{t('weeklySummary')}</p>
-                      <p className={cn("text-sm", colors.textTertiary)}>{t('receiveWeeklyReports')}</p>
-                    </div>
-                    <Switch aria-label={t('weeklySummary')}
-                      checked={user?.weeklyReports !== false}
-                      onCheckedChange={(checked) => updateUserMutation.mutate({ weeklyReports: checked })}
-                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between py-3">
-                    <div>
-                      <p className={cn("font-medium", colors.textPrimary)}>{t('emailNotifications')}</p>
-                      <p className={cn("text-sm", colors.textTertiary)}>{t('receiveImportantUpdates')}</p>
-                    </div>
-                    <Switch aria-label={t('emailNotifications')}
-                      checked={user?.emailNotifications !== false}
-                      onCheckedChange={(checked) => updateUserMutation.mutate({ emailNotifications: checked })}
-                      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Card Management */}
-          {hasPermission('manageCards') && <CardManagement user={user} />}
-
-          {/* Workspace Management */}
-          {isOwner && (
-            <Card className={cn(colors.cardBg, colors.cardBorder)}>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-primary" />
-                  <CardTitle className={colors.accentText}>{t('workspaceSettings') || 'Workspace Settings'}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className={colors.textSecondary}>{t('workspaceName') || 'Workspace Name'}</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={workspaceNameValue}
-                      onChange={(e) => setWorkspaceNameValue(e.target.value)}
-                      disabled={!editingWorkspaceName}
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingWorkspaceName && "ring-2 ring-primary")}
-                    />
-                    {editingWorkspaceName ? (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          aria-label={t('save')}
-                          variant="ghost"
-                          onClick={handleSaveWorkspaceName}
-                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-success/20", colors.textSecondary)}
-                        >
-                          <Check className="w-4 h-4 text-success" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          aria-label={t('cancel')}
-                          variant="ghost"
-                          onClick={() => {
-                            setWorkspaceNameValue(currentWorkspace?.name || '');
-                            setEditingWorkspaceName(false);
-                          }}
-                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-danger/20", colors.textSecondary)}
-                        >
-                          <X className="w-4 h-4 text-danger" />
-                        </Button>
-                      </div>
-                    ) : (
-                      isOwner && (
-                        <Button
-                          size="icon"
-                          aria-label={t('edit')}
-                          variant="ghost"
-                          onClick={() => setEditingWorkspaceName(true)}
-                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                      )
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="min-w-0 space-y-10">
+          {navItems.length === 0 && (
+            <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border px-6 py-16 text-center" role="status">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <SearchX className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="text-foreground">{t('setNoResults')}</p>
+              <Button variant="secondary" onClick={() => setQuery('')} className="h-11 rounded-xl">{t('setClearSearch')}</Button>
+            </div>
           )}
 
-          {/* Shared Access */}
-          {isOwner && (
-            <SharedUsersSection
-              sharedUsers={sharedUsers}
-              onInvite={handleInviteUser}
-              onUpdate={handleUpdateUser}
-              onDelete={handleDeleteUser}
-              canManageUsers={canManageUsers}
+          {/* Profile */}
+          {show.profile && (
+            <Section id="profile" index={order++} icon={UserCircle} title={t('setNavProfile')} description={t('setProfileDesc')}>
+              <Group>
+                <div className="flex items-center gap-4 px-4 py-5 sm:px-5">
+                  <span
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-lg font-semibold text-primary"
+                    aria-hidden="true"
+                  >
+                    {initials}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-lg font-semibold tracking-tight text-foreground">{displayName}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {currentWorkspace?.name || user.email}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0 rounded-full border-primary/40 bg-primary/10 px-3 py-1 text-primary">
+                    {roleLabel}
+                  </Badge>
+                </div>
+                {(sectionHit(t('setNavProfile')) || hit(t('fullName'))) && (
+                  <Row label={t('fullName')} htmlFor="settings-full-name" wide>
+                    <EditableField
+                      id="settings-full-name"
+                      value={user.full_name || ''}
+                      placeholder={t('setNamePlaceholder')}
+                      icon={User}
+                      onSave={(v) => updateUserMutation.mutateAsync({ full_name: v })}
+                    />
+                  </Row>
+                )}
+                {(sectionHit(t('setNavProfile')) || hit(t('email'))) && (
+                  <Row label={t('email')} description={t('setEmailLocked')} wide>
+                    <div className="flex h-11 items-center gap-2 rounded-xl bg-muted/60 px-3 text-sm text-muted-foreground sm:h-10 sm:w-64" dir="ltr">
+                      <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{user.email}</span>
+                      <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    </div>
+                  </Row>
+                )}
+              </Group>
+            </Section>
+          )}
+
+          {/* Appearance */}
+          {show.appearance && (
+            <Section id="appearance" index={order++} icon={Palette} title={t('setNavAppearance')} description={t('setAppearanceDesc')}>
+              <Group>
+                {(sectionHit(t('setNavAppearance')) || hit(t('setThemeLabel'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark'))) && (
+                  <div className="px-4 py-4 sm:px-5">
+                    <p className="text-sm font-medium text-foreground">{t('setThemeLabel')}</p>
+                    <p className="mb-3 mt-0.5 text-sm text-muted-foreground">{t('setThemeDesc')}</p>
+                    <ThemePicker onSelect={selectLook} />
+                  </div>
+                )}
+                {(sectionHit(t('setNavAppearance')) || hit(t('language'))) && (
+                  <Row label={t('language')} description={t('displayLanguage')} wide>
+                    <Segmented
+                      label={t('language')}
+                      value={user.language || 'he'}
+                      onValueChange={(value) => saveUser({ language: value })}
+                      options={LANGUAGES}
+                    />
+                  </Row>
+                )}
+                {(sectionHit(t('setNavAppearance')) || hit(t('defaultCurrency'))) && (
+                  <Row label={t('defaultCurrency')} description={t('setCurrencyDesc')} wide>
+                    <Segmented
+                      label={t('defaultCurrency')}
+                      value={user.currency || 'ILS'}
+                      onValueChange={(value) => saveUser({ currency: value })}
+                      options={CURRENCIES.map((c) => ({ ...c, label: <span dir="ltr" className="tabular-nums">{c.label}</span> }))}
+                    />
+                  </Row>
+                )}
+                {(sectionHit(t('setNavAppearance')) || hit(t('blurValues'), t('setPrivacyDesc'))) && (
+                  <Row label={t('blurValues')} description={t('setPrivacyDesc')} htmlFor="settings-blur">
+                    <Switch
+                      id="settings-blur"
+                      checked={user.blurValues || false}
+                      onCheckedChange={(checked) => saveUser({ blurValues: checked })}
+                    />
+                  </Row>
+                )}
+              </Group>
+            </Section>
+          )}
+
+          {/* Notifications */}
+          {show.notifications && (
+            <Section id="notifications" index={order++} icon={Bell} title={t('setNavNotifications')} description={t('setNotificationsDesc')}>
+              <Group>
+                {notificationRows
+                  .filter((r) => sectionHit(t('setNavNotifications')) || hit(r.label, r.desc))
+                  .map((r) => (
+                    <Row key={r.key} label={r.label} description={r.desc} htmlFor={`settings-${r.key}`}>
+                      <Switch
+                        id={`settings-${r.key}`}
+                        checked={r.checked}
+                        onCheckedChange={(checked) => saveUser({ [r.key]: checked })}
+                      />
+                    </Row>
+                  ))}
+              </Group>
+            </Section>
+          )}
+
+          {/* Household: workspace + shared access */}
+          {show.household && (
+            <Section id="household" index={order++} icon={Users} title={t('setNavHousehold')} description={t('setHouseholdDesc')}>
+              <Group>
+                {(sectionHit(t('setNavHousehold')) || hit(t('workspaceName'))) && (
+                  <Row label={t('workspaceName')} htmlFor="settings-workspace-name" wide>
+                    <EditableField
+                      id="settings-workspace-name"
+                      value={currentWorkspace?.name || ''}
+                      icon={Users}
+                      onSave={(v) => updateWorkspaceMutation.mutateAsync(v)}
+                    />
+                  </Row>
+                )}
+                {(sectionHit(t('setNavHousehold')) || hit(t('sharedAccess'), t('inviteUser'))) && (
+                  <div>
+                    <SharedUsersSection
+                      sharedUsers={sharedUsers}
+                      onInvite={handleInviteUser}
+                      onUpdate={handleUpdateUser}
+                      onDelete={handleDeleteUser}
+                      canManageUsers={canManageUsers}
+                    />
+                  </div>
+                )}
+              </Group>
+            </Section>
+          )}
+
+          {/* Cards */}
+          {show.cards && <CardManagement user={user} index={order++} />}
+
+          {/* Data */}
+          {show.data && (
+            <ImportExportSection
+              index={order++}
+              accounts={accounts}
+              positions={positions}
+              transactions={transactions}
+              notes={notes}
+              budgets={budgets}
+              categories={categories}
+              cards={cards}
             />
           )}
 
-          {/* Export */}
-          <ImportExportSection
-            accounts={accounts}
-            positions={positions}
-            transactions={transactions}
-            notes={notes}
-            budgets={budgets}
-            categories={categories}
-            cards={cards}
-          />
-
-          {/* Invite User Dialog */}
-          <InviteUserDialog
-            open={inviteDialogOpen}
-            onClose={() => setInviteDialogOpen(false)}
-            onSubmit={inviteUserMutation.mutate}
-            isLoading={inviteUserMutation.isPending}
-          />
-
-          {/* Branding */}
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <img
-                    src={theme === 'dark'
-                      ? "/logo-dark.png"
-                      : "/logo-light.png"
-                    }
-                    alt="Ascent logo"
-                    className="w-24 h-24 object-contain"
-                    style={{ filter: 'brightness(1.1) saturate(1.2)' }}
-                  />
+          {/* Account */}
+          {show.account && (
+            <Section id="account" index={order++} icon={User} title={t('setNavAccount')} description={t('setAccountDesc')}>
+              <Group>
+                <Row label={t('logout')} description={t('setSignOutDesc')}>
+                  <Button
+                    variant="outline"
+                    onClick={() => logout()}
+                    className="h-11 rounded-xl border-danger/40 text-danger hover:bg-danger/10 hover:text-danger sm:h-9"
+                  >
+                    <LogOut className="me-1.5 h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />
+                    {t('logout')}
+                  </Button>
+                </Row>
+              </Group>
+              <div className="mt-8 flex items-center justify-center gap-3 text-center">
+                <AscentLogo motion="hover" className="w-12" />
+                <div className="text-start">
+                  <p className="text-sm font-medium text-foreground">Ascent</p>
+                  <p className="text-xs text-muted-foreground">{t('ascendTagline')} · v1.0.0</p>
                 </div>
-                <p className={cn("text-sm", colors.textSecondary)}>{t('ascendTagline')}</p>
-                <p className={cn("text-xs mt-2", colors.textTertiary)}>v1.0.0</p>
               </div>
-            </CardContent>
-          </Card>
+            </Section>
+          )}
         </div>
-
-        <div className="h-16 md:h-8"></div>
       </div>
+
+      <InviteUserDialog
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+        onSubmit={inviteUserMutation.mutate}
+        isLoading={inviteUserMutation.isPending}
+      />
     </div>
   );
 }

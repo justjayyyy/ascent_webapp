@@ -92,9 +92,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const checkUserAuth = useCallback(async () => {
+  // silent: background refresh (e.g. after saving a setting) must not flip isLoadingAuth,
+  // or App swaps the whole UI for the loading screen and remounts the page.
+  const checkUserAuth = useCallback(async (silent = false) => {
     try {
-      setIsLoadingAuth(true);
+      if (!silent) setIsLoadingAuth(true);
       const currentUser = await ascent.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
@@ -133,9 +135,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, [isAuthenticated, loadWorkspaces]);
 
-  const checkAppState = useCallback(async () => {
+  const checkAppState = useCallback(async (options) => {
+    const silent = options?.silent === true;
     try {
-      setIsLoadingAuth(true);
+      if (!silent) setIsLoadingAuth(true);
       setAuthError(null);
 
       // Skip auth check on public routes
@@ -145,7 +148,7 @@ export const AuthProvider = ({ children }) => {
         // don't force logout immediately. Verify the session instead.
         if (ascent.auth.isAuthenticated()) {
           console.log('[AuthContext] Public route but authenticated, verifying session...');
-          await checkUserAuth();
+          await checkUserAuth(silent);
         } else {
           setIsLoadingAuth(false);
           setIsAuthenticated(false);
@@ -155,7 +158,7 @@ export const AuthProvider = ({ children }) => {
 
       // Check if user is authenticated by checking for token
       if (ascent.auth.isAuthenticated()) {
-        await checkUserAuth();
+        await checkUserAuth(silent);
       } else {
         setIsLoadingAuth(false);
         setIsAuthenticated(false);

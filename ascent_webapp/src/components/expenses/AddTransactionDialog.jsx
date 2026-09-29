@@ -50,7 +50,7 @@ export default function AddTransactionDialog({
 }) {
   const { user, t, language, colors } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates, isLoading: isLoadingRates } = useCurrencyConversion();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
   const defaultCategory = categories.find(c => c.type === 'Expense' || c.type === 'Both');
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -58,7 +58,7 @@ export default function AddTransactionDialog({
     category: defaultCategory?.name || '',
     description: '',
     amount: '',
-    currency: user?.currency || 'USD',
+    currency: user?.currency || 'ILS',
     paymentMethod: '',
     cardId: '',
     relatedAccountId: '',
@@ -171,7 +171,7 @@ export default function AddTransactionDialog({
         category: usable(last.category) ? last.category : (defaultCategory?.name || ''),
         description: '',
         amount: '',
-        currency: last.currency || user?.currency || 'USD',
+        currency: last.currency || user?.currency || 'ILS',
         paymentMethod: last.paymentMethod || '',
         cardId: '',
         relatedAccountId: '',

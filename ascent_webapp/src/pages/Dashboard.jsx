@@ -49,7 +49,7 @@ export default function Dashboard() {
   const { user, t, language, isRTL } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const tokens = useChartTokens();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
   const blur = !!user?.blurValues;
   const userId = user?.id || user?._id;
   const userEmail = user?.email;

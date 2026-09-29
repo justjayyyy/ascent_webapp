@@ -30,7 +30,7 @@ const categoryColors = {
 
 const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true, author = null }) => {
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
-  const userCurrency = user?.currency || 'USD';
+  const userCurrency = user?.currency || 'ILS';
 
   useEffect(() => {
     if (userCurrency) {
@@ -59,7 +59,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
   const formatCurrency = useCallback((value, currency = 'USD') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || user?.currency || 'USD',
+      currency: currency || user?.currency || 'ILS',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value || 0);

@@ -79,7 +79,7 @@ export default function BudgetManager({
     category: '',
     monthlyLimit: '',
     alertThreshold: 80,
-    currency: user?.currency || 'USD',
+    currency: user?.currency || 'ILS',
     year: displayYear,
     month: displayMonth,
     isShared: true,
@@ -91,7 +91,7 @@ export default function BudgetManager({
       setFormData(prev => ({
         ...prev,
         category: availableCategories[0].name,
-        currency: user?.currency || 'USD',
+        currency: user?.currency || 'ILS',
         year: displayYear,
         month: displayMonth,
       }));
@@ -141,7 +141,7 @@ export default function BudgetManager({
       category: availableCategories.length > 0 ? availableCategories[0].name : '',
       monthlyLimit: '',
       alertThreshold: 80,
-      currency: user?.currency || 'USD',
+      currency: user?.currency || 'ILS',
       year: displayYear,
       month: displayMonth,
       isShared: true,
@@ -167,7 +167,7 @@ export default function BudgetManager({
       category: availableCategories.length > 0 ? availableCategories[0].name : '',
       monthlyLimit: '',
       alertThreshold: 80,
-      currency: user?.currency || 'USD',
+      currency: user?.currency || 'ILS',
       year: displayYear,
       month: displayMonth,
       isShared: true,
@@ -358,7 +358,7 @@ export default function BudgetManager({
                       <p className={cn("text-xs sm:text-sm", colors.textTertiary)}>
                         {new Intl.NumberFormat(language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US', {
                           style: 'currency',
-                          currency: budget.currency || user?.currency || 'USD',
+                          currency: budget.currency || user?.currency || 'ILS',
                           minimumFractionDigits: 0,
                           maximumFractionDigits: 0,
                         }).format(budget.monthlyLimit)}{t('perMonth')}

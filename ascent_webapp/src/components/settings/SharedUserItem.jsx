@@ -135,10 +135,10 @@ const SharedUserItem = memo(function SharedUserItem({
   ];
 
   return (
-    <div className={cn("p-4 rounded-lg border", colors.bgTertiary, colors.border)}>
-      <div className="flex items-start justify-between mb-3">
+    <div className="px-4 py-4 sm:px-5">
+      <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
-          <div className={cn("w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-semibold", colors.accentText)}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary">
             {user.displayName?.[0]?.toUpperCase() || user.invitedEmail[0].toUpperCase()}
           </div>
           <div>

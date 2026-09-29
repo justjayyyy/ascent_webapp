@@ -198,6 +198,251 @@ button:focus-visible {
     --glow: 36 92% 40%;
   }
 
+  /* ---- Dark: graphite (Settings > Appearance) ---- */
+  .dark[data-palette="graphite"] {
+    --background: 220 12% 5.5%;
+    --foreground: 40 20% 95%;
+    --card: 220 11% 9%;
+    --card-foreground: 40 20% 95%;
+    --popover: 220 11% 12%;
+    --popover-foreground: 40 20% 95%;
+    --primary: 42 62% 63%;
+    --primary-foreground: 220 20% 8%;
+    --secondary: 220 10% 14%;
+    --secondary-foreground: 40 20% 95%;
+    --muted: 220 10% 12%;
+    --muted-foreground: 220 8% 64%;
+    --accent: 220 12% 17%;
+    --accent-foreground: 42 70% 84%;
+    --border: 220 10% 17%;
+    --input: 220 10% 22%;
+    --ring: 42 62% 68%;
+    --chart-1: 42 62% 63%;
+    --chart-2: 212 32% 66%;
+    --chart-3: 352 42% 68%;
+    --chart-4: 150 28% 58%;
+    --chart-5: 200 38% 60%;
+    --glow: 42 62% 63%;
+    --sidebar-background: 220 12% 4.5%;
+    --sidebar-foreground: 220 8% 76%;
+    --sidebar-primary: 42 62% 63%;
+    --sidebar-primary-foreground: 220 20% 8%;
+    --sidebar-accent: 220 12% 14%;
+    --sidebar-accent-foreground: 42 70% 84%;
+    --sidebar-border: 220 10% 14%;
+    --sidebar-ring: 42 62% 68%;
+  }
+  :root[data-palette="graphite"]:not(.dark) {
+    --primary: 38 62% 36%;
+    --ring: 38 62% 36%;
+    --accent: 42 70% 92%;
+    --accent-foreground: 38 70% 22%;
+    --glow: 38 62% 36%;
+  }
+  /* Logo colours for this palette (same in light and dark) */
+  :root[data-palette="graphite"] {
+    --logo-mtn-hi: #5b6472;
+    --logo-mtn: #1c222c;
+    --logo-tint: #f7e7b8;
+    --logo-accent: #c9a24b;
+  }
+
+  /* ---- Dark: ivory (Settings > Appearance) ---- */
+  .dark[data-palette="ivory"] {
+    --background: 240 4% 5%;
+    --foreground: 42 25% 95%;
+    --card: 240 3.5% 8.5%;
+    --card-foreground: 42 25% 95%;
+    --popover: 240 3.5% 11.5%;
+    --popover-foreground: 42 25% 95%;
+    --primary: 42 35% 90%;
+    --primary-foreground: 240 6% 8%;
+    --secondary: 240 3% 13%;
+    --secondary-foreground: 42 25% 95%;
+    --muted: 240 3% 11%;
+    --muted-foreground: 240 4% 62%;
+    --accent: 240 3% 16%;
+    --accent-foreground: 42 35% 92%;
+    --border: 240 3% 16%;
+    --input: 240 3% 21%;
+    --ring: 42 35% 86%;
+    --chart-1: 42 35% 90%;
+    --chart-2: 215 18% 64%;
+    --chart-3: 20 40% 68%;
+    --chart-4: 150 20% 58%;
+    --chart-5: 270 20% 70%;
+    --glow: 42 35% 90%;
+    --sidebar-background: 240 4% 4%;
+    --sidebar-foreground: 240 4% 74%;
+    --sidebar-primary: 42 35% 90%;
+    --sidebar-primary-foreground: 240 6% 8%;
+    --sidebar-accent: 240 3% 13%;
+    --sidebar-accent-foreground: 42 35% 92%;
+    --sidebar-border: 240 3% 13%;
+    --sidebar-ring: 42 35% 86%;
+  }
+  :root[data-palette="ivory"]:not(.dark) {
+    --primary: 240 6% 22%;
+    --ring: 240 6% 22%;
+    --accent: 240 5% 93%;
+    --accent-foreground: 240 6% 14%;
+    --glow: 240 6% 22%;
+  }
+  /* Logo colours for this palette (same in light and dark) */
+  :root[data-palette="ivory"] {
+    --logo-mtn-hi: #464650;
+    --logo-mtn: #131316;
+    --logo-tint: #faf6ec;
+    --logo-accent: #c4bdae;
+  }
+
+  /* ---- Dark: burgundy (Settings > Appearance) ---- */
+  .dark[data-palette="burgundy"] {
+    --background: 345 32% 5.5%;
+    --foreground: 40 25% 95%;
+    --card: 345 24% 9%;
+    --card-foreground: 40 25% 95%;
+    --popover: 345 22% 12%;
+    --popover-foreground: 40 25% 95%;
+    --primary: 41 66% 62%;
+    --primary-foreground: 345 40% 8%;
+    --secondary: 345 16% 14%;
+    --secondary-foreground: 40 25% 95%;
+    --muted: 345 16% 12%;
+    --muted-foreground: 345 10% 65%;
+    --accent: 345 26% 16%;
+    --accent-foreground: 41 70% 84%;
+    --border: 345 18% 17%;
+    --input: 345 16% 22%;
+    --ring: 41 66% 67%;
+    --chart-1: 41 66% 62%;
+    --chart-2: 345 55% 62%;
+    --chart-3: 200 40% 62%;
+    --chart-4: 150 32% 56%;
+    --chart-5: 20 65% 62%;
+    --glow: 41 66% 62%;
+    --sidebar-background: 345 32% 4.5%;
+    --sidebar-foreground: 345 10% 76%;
+    --sidebar-primary: 41 66% 62%;
+    --sidebar-primary-foreground: 345 40% 8%;
+    --sidebar-accent: 345 24% 13%;
+    --sidebar-accent-foreground: 41 70% 84%;
+    --sidebar-border: 345 18% 13%;
+    --sidebar-ring: 41 66% 67%;
+  }
+  :root[data-palette="burgundy"]:not(.dark) {
+    --primary: 345 60% 36%;
+    --ring: 345 60% 36%;
+    --accent: 345 50% 95%;
+    --accent-foreground: 345 60% 22%;
+    --glow: 345 60% 36%;
+  }
+  /* Logo colours for this palette (same in light and dark) */
+  :root[data-palette="burgundy"] {
+    --logo-mtn-hi: #96354d;
+    --logo-mtn: #3a0e1c;
+    --logo-tint: #f6dc9c;
+    --logo-accent: #c8963a;
+  }
+
+  /* ---- Dark: slate (Settings > Appearance) ---- */
+  .dark[data-palette="slate"] {
+    --background: 218 32% 6%;
+    --foreground: 210 30% 96%;
+    --card: 218 26% 9.5%;
+    --card-foreground: 210 30% 96%;
+    --popover: 218 24% 12.5%;
+    --popover-foreground: 210 30% 96%;
+    --primary: 207 72% 72%;
+    --primary-foreground: 218 40% 9%;
+    --secondary: 218 20% 15%;
+    --secondary-foreground: 210 30% 96%;
+    --muted: 218 20% 12.5%;
+    --muted-foreground: 218 12% 66%;
+    --accent: 218 28% 17%;
+    --accent-foreground: 207 80% 88%;
+    --border: 218 22% 18%;
+    --input: 218 20% 23%;
+    --ring: 207 72% 77%;
+    --chart-1: 207 72% 72%;
+    --chart-2: 170 50% 58%;
+    --chart-3: 40 70% 64%;
+    --chart-4: 340 55% 68%;
+    --chart-5: 260 50% 72%;
+    --glow: 207 72% 72%;
+    --sidebar-background: 218 32% 5%;
+    --sidebar-foreground: 218 12% 76%;
+    --sidebar-primary: 207 72% 72%;
+    --sidebar-primary-foreground: 218 40% 9%;
+    --sidebar-accent: 218 26% 14%;
+    --sidebar-accent-foreground: 207 80% 88%;
+    --sidebar-border: 218 22% 14%;
+    --sidebar-ring: 207 72% 77%;
+  }
+  :root[data-palette="slate"]:not(.dark) {
+    --primary: 212 60% 40%;
+    --ring: 212 60% 40%;
+    --accent: 210 70% 95%;
+    --accent-foreground: 212 60% 24%;
+    --glow: 212 60% 40%;
+  }
+  /* Logo colours for this palette (same in light and dark) */
+  :root[data-palette="slate"] {
+    --logo-mtn-hi: #5d78a6;
+    --logo-mtn: #223250;
+    --logo-tint: #d8e9f9;
+    --logo-accent: #7ea8d8;
+  }
+
+  /* ---- Dark: twilight (Settings > Appearance) ---- */
+  .dark[data-palette="twilight"] {
+    --background: 238 42% 5.5%;
+    --foreground: 40 30% 96%;
+    --card: 238 34% 9%;
+    --card-foreground: 40 30% 96%;
+    --popover: 238 30% 12%;
+    --popover-foreground: 40 30% 96%;
+    --primary: 40 70% 68%;
+    --primary-foreground: 238 50% 9%;
+    --secondary: 238 24% 15%;
+    --secondary-foreground: 40 30% 96%;
+    --muted: 238 24% 12.5%;
+    --muted-foreground: 238 14% 68%;
+    --accent: 238 32% 18%;
+    --accent-foreground: 40 80% 86%;
+    --border: 238 24% 19%;
+    --input: 238 22% 24%;
+    --ring: 40 70% 73%;
+    --chart-1: 40 70% 68%;
+    --chart-2: 250 70% 74%;
+    --chart-3: 175 55% 58%;
+    --chart-4: 340 60% 70%;
+    --chart-5: 210 60% 66%;
+    --glow: 40 70% 68%;
+    --sidebar-background: 238 42% 4.5%;
+    --sidebar-foreground: 238 14% 78%;
+    --sidebar-primary: 40 70% 68%;
+    --sidebar-primary-foreground: 238 50% 9%;
+    --sidebar-accent: 238 32% 14%;
+    --sidebar-accent-foreground: 40 80% 86%;
+    --sidebar-border: 238 24% 14%;
+    --sidebar-ring: 40 70% 73%;
+  }
+  :root[data-palette="twilight"]:not(.dark) {
+    --primary: 246 55% 46%;
+    --ring: 246 55% 46%;
+    --accent: 246 60% 95%;
+    --accent-foreground: 246 55% 28%;
+    --glow: 246 55% 46%;
+  }
+  /* Logo colours for this palette (same in light and dark) */
+  :root[data-palette="twilight"] {
+    --logo-mtn-hi: #4f54ad;
+    --logo-mtn: #16184a;
+    --logo-tint: #ffeccb;
+    --logo-accent: #dfb05a;
+  }
+
   html {
     background: hsl(var(--background));
     font-family: 'Inter Variable', 'Heebo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;

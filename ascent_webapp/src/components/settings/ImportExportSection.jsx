@@ -1,15 +1,14 @@
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Download, Database, Loader2, Receipt, StickyNote, PieChart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../ThemeProvider';
-import { cn } from '@/lib/utils';
+import { Section, Group, Row } from './SettingsShell';
 
-export default function ImportExportSection({ accounts, positions, transactions, notes, budgets, categories, cards }) {
-  const { colors, t } = useTheme();
-  const [exporting, setExporting] = useState(false);
+export default function ImportExportSection({ accounts, positions, transactions, notes, budgets, categories, cards, index }) {
+  const { t } = useTheme();
+  const [exporting, setExporting] = useState(null);
 
   const formatCSV = (data, headers) => {
     const csvHeaders = headers.join(',');
@@ -39,7 +38,7 @@ export default function ImportExportSection({ accounts, positions, transactions,
   };
 
   const handleExport = async (page) => {
-    setExporting(true);
+    setExporting(page);
     try {
       let csvContent, filename;
 
@@ -81,70 +80,45 @@ export default function ImportExportSection({ accounts, positions, transactions,
       console.error('Export error:', error);
       toast.error(t('exportFailed') || 'Failed to export data');
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   };
 
 
+  const datasets = [
+    PORTFOLIO_ENABLED && {
+      key: 'portfolio', label: t('portfolio'), icon: PieChart,
+      count: (accounts?.length || 0) + (positions?.length || 0),
+    },
+    {
+      key: 'expenses', label: t('expenses'), icon: Receipt,
+      count: (transactions?.length || 0) + (budgets?.length || 0) + (categories?.length || 0) + (cards?.length || 0),
+    },
+    { key: 'notes', label: t('notes'), icon: StickyNote, count: notes?.length || 0 },
+  ].filter(Boolean);
+
   return (
-    <Card className={cn(colors.cardBg, colors.cardBorder)}>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <FileText className="w-5 h-5 text-primary" />
-          <CardTitle className={colors.accentText}>{t('exportData')}</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <p className={cn("text-sm", colors.textTertiary)}>
-          {t('downloadDataCsv')}
-        </p>
-
-        <div className={cn("grid grid-cols-2 gap-3", PORTFOLIO_ENABLED && "md:grid-cols-3")}>
-          {PORTFOLIO_ENABLED && (
-          <Button
-            onClick={() => handleExport('portfolio')}
-            disabled={exporting || (!accounts?.length && !positions?.length)}
-            variant="outline"
-            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
+    <Section id="data" index={index} icon={Database} title={t('setNavData')} description={t('setDataDesc')}>
+      <Group>
+        {datasets.map(({ key, label, icon: Icon, count }) => (
+          <Row
+            key={key}
+            label={<span className="flex items-center gap-2"><Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{label}</span>}
+            description={count ? <><span className="tabular-nums">{count}</span> {t('setItems')}</> : t('setNothingToExport')}
           >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 me-2 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4 me-2" />
-            )}
-            {t('portfolio')}
-          </Button>
-          )}
-
-          <Button
-            onClick={() => handleExport('expenses')}
-            disabled={exporting || (!transactions?.length && !budgets?.length && !categories?.length && !cards?.length)}
-            variant="outline"
-            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
-          >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 me-2 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4 me-2" />
-            )}
-            {t('expenses')}
-          </Button>
-
-          <Button
-            onClick={() => handleExport('notes')}
-            disabled={exporting || !notes?.length}
-            variant="outline"
-            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
-          >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 me-2 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4 me-2" />
-            )}
-            {t('notes')}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            <Button
+              onClick={() => handleExport(key)}
+              disabled={!!exporting || !count}
+              variant="secondary"
+              aria-label={`${t('setDownloadCsv')}: ${label}`}
+              className="h-11 rounded-xl sm:h-9"
+            >
+              {exporting === key ? <Loader2 className="h-4 w-4 animate-spin sm:me-1.5" aria-hidden="true" /> : <Download className="h-4 w-4 sm:me-1.5" aria-hidden="true" />}
+              <span className="max-sm:sr-only">{t('setDownloadCsv')}</span>
+            </Button>
+          </Row>
+        ))}
+      </Group>
+    </Section>
   );
 }

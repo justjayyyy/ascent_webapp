@@ -14,7 +14,7 @@ export default function AddAccountDialog({ open, onClose, onSubmit, isLoading, e
   const [formData, setFormData] = useState({
     name: '',
     type: 'Investment',
-    baseCurrency: user?.currency || 'USD',
+    baseCurrency: user?.currency || 'ILS',
     initialInvestment: '',
     totalDeposits: 0,
     totalWithdrawals: 0,
@@ -38,7 +38,7 @@ export default function AddAccountDialog({ open, onClose, onSubmit, isLoading, e
       setFormData({
         name: '',
         type: 'Investment',
-        baseCurrency: user?.currency || 'USD',
+        baseCurrency: user?.currency || 'ILS',
         initialInvestment: '',
         totalDeposits: 0,
         totalWithdrawals: 0,
