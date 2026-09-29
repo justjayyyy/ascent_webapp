@@ -172,13 +172,13 @@ export default function AppSidebar({
                 <button
                   type="button"
                   className={cn(
-                    'flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-start transition-colors',
+                    'flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-start transition-colors', mobile && 'ps-3',
                     canSwitch ? 'hover:bg-foreground/[0.06]' : 'cursor-default', focusRing,
                     collapsed && 'flex-none',
                   )}
                   aria-label={canSwitch ? t('switchWorkspace') : undefined}
                 >
-                  <AscentLogo motion="full" className="w-10 shrink-0" />
+                  {!mobile && <AscentLogo motion="full" className="w-10 shrink-0" />}
                   <span className={cn('min-w-0 flex-1 transition-opacity duration-200', collapsed ? 'pointer-events-none w-0 opacity-0' : 'opacity-100 delay-100')}>
                     <span className="block truncate text-sm font-semibold leading-tight text-foreground">{workspaceName}</span>
                     <span className="block truncate text-xs text-muted-foreground">
