@@ -54,38 +54,12 @@ export default defineConfig({
     // Optimize build output
     rollupOptions: {
       output: {
+        // Only split out ECharts (large, and it has no React dependency). Hand-rolled
+        // vendor groups that mixed React-dependent packages caused circular chunks and a
+        // blank production page ("Cannot set properties of undefined (setting 'Children')").
         manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            // CRITICAL: Keep React and all React-dependent libraries in main entry
-            // This ensures React is available before any vendor chunks try to use it
-            if (id.includes('react') || 
-                id.includes('react-dom') || 
-                id.includes('react-router') ||
-                id.includes('scheduler') ||
-                id.includes('@radix-ui') ||  // Radix UI depends on React
-                id.includes('recharts')) {   // Recharts depends on React
-              // Keep in main entry chunk to ensure React is available
-              return undefined;
-            }
-            
-            // Split other vendor chunks that don't directly depend on React
-            if (id.includes('@tanstack/react-query')) {
-              return 'query-vendor';
-            }
-            // Other large dependencies
-            if (id.includes('framer-motion') || id.includes('three')) {
-              return 'animation-vendor';
-            }
-            // Split lucide-react into its own chunk (large icon library)
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-            // Split heavy libraries
-            if (id.includes('lodash') || id.includes('moment') || id.includes('date-fns')) {
-              return 'utils-vendor';
-            }
-            // Default vendor chunk
-            return 'vendor';
+          if (id.includes('node_modules/echarts') || id.includes('node_modules/zrender')) {
+            return 'echarts-vendor';
           }
         },
       },
