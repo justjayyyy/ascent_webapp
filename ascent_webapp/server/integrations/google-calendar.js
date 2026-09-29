@@ -189,6 +189,30 @@ export default async function handler(req, res) {
         }
       }
 
+      case 'update-task': {
+        if (req.method !== 'PATCH' && req.method !== 'PUT') {
+          return res.status(405).json({ error: 'PATCH method required' });
+        }
+        const { tasklistId, taskId } = req.query;
+        if (!tasklistId || !taskId) {
+          return res.status(400).json({ error: 'tasklistId and taskId are required' });
+        }
+        try {
+          const tasks = google.tasks({ version: 'v1', auth: oauth2Client });
+          const response = await tasks.tasks.patch({
+            tasklist: tasklistId,
+            task: taskId,
+            requestBody: req.body,
+          });
+          return res.json(response.data);
+        } catch (taskError) {
+          if (taskError.code === 401 || taskError.message?.includes('invalid_token')) {
+            return res.status(401).json({ error: 'Invalid token', message: 'Please reconnect your Google account' });
+          }
+          return res.status(500).json({ error: 'Failed to update task', message: taskError.message });
+        }
+      }
+
       default:
         return res.status(400).json({ error: 'Invalid action. Use: list-calendars, list-events, get-event, create-event, update-event, delete-event, get-colors, list-tasks' });
     }

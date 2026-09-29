@@ -1,13 +1,68 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { format, isSameDay } from 'date-fns';
-import { MapPin, Plus, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Circle, MapPin, Plus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { chipStyle, fmtClock } from './calendarUtils';
 import { KindGlyph } from './ItemChip';
 
-export default function AgendaPanel({ date, items, lang, locale, t, onOpen, onNew, className }) {
+export default function AgendaPanel({ date, items, lang, locale, t, onOpen, onToggleTask, onNew, className }) {
   const isToday = isSameDay(date, new Date());
+  const [allDayOpen, setAllDayOpen] = useState(true);
+  const allDay = items.filter((i) => i.allDay);
+  const timed = items.filter((i) => !i.allDay);
   const kindLabel = { event: t('calEvent'), task: t('calTask'), holiday: t('calHolidays') };
+
+  const renderRow = (item) => (
+    <li key={item.id} className="flex items-stretch gap-1.5">
+                {item.kind === 'task' && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleTask(item)}
+                    aria-label={item.done ? t('calMarkNotDone') : t('calMarkDone')}
+                    aria-pressed={item.done}
+                    title={item.done ? t('calMarkNotDone') : t('calMarkDone')}
+                    className="grid w-10 shrink-0 place-items-center rounded-xl text-[var(--ev)] transition-colors hover:bg-foreground/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    style={chipStyle(item.color, 14)}
+                  >
+                    {item.done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onOpen(item)}
+                  className={cn(
+                    'flex min-w-0 flex-1 items-stretch gap-3 rounded-xl p-2.5 text-start transition-[filter]',
+                    'hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    item.done && 'opacity-60',
+                  )}
+                  style={chipStyle(item.color, 14)}
+                >
+                  <span className="tabular w-[4.25rem] shrink-0 whitespace-nowrap pt-px text-xs leading-tight text-muted-foreground">
+                    {item.allDay ? (
+                      <span className="font-medium text-foreground/80">{t('allDay')}</span>
+                    ) : (
+                      <>
+                        <span className="block font-semibold text-foreground">{fmtClock(item.start, lang)}</span>
+                        <span className="block">{fmtClock(item.end, lang)}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={cn('flex items-center gap-1.5 text-sm font-medium leading-snug text-foreground', item.done && 'line-through')}>
+                      <KindGlyph item={item} className="text-[var(--ev)]" />
+                      <span className="truncate">{item.title || t('calUntitled')}</span>
+                    </span>
+                    {item.location ? (
+                      <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />{item.location}
+                      </span>
+                    ) : item.kind !== 'event' ? (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{kindLabel[item.kind]}</span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+  );
 
   return (
     <section className={cn('flex flex-col', className)} aria-label={t('calAgenda')}>
@@ -43,46 +98,25 @@ export default function AgendaPanel({ date, items, lang, locale, t, onOpen, onNe
           <p className="text-xs text-muted-foreground">{t('calFreeDay')}</p>
         </div>
       ) : (
-        <ul className="mt-4 space-y-1.5">
-          {items.map((item) => (
-            <li key={item.id}>
+        <div className="mt-4 space-y-3">
+          {allDay.length > 0 && (
+            <div>
               <button
                 type="button"
-                onClick={() => onOpen(item)}
-                className={cn(
-                  'flex w-full items-stretch gap-3 rounded-xl p-2.5 text-start transition-[filter]',
-                  'hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  item.done && 'opacity-60',
-                )}
-                style={chipStyle(item.color, 14)}
+                onClick={() => setAllDayOpen((o) => !o)}
+                aria-expanded={allDayOpen}
+                aria-label={t('calToggleAllDay')}
+                className="flex w-full items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="tabular w-[4.25rem] shrink-0 whitespace-nowrap pt-px text-xs leading-tight text-muted-foreground">
-                  {item.allDay ? (
-                    <span className="font-medium text-foreground/80">{t('allDay')}</span>
-                  ) : (
-                    <>
-                      <span className="block font-semibold text-foreground">{fmtClock(item.start, lang)}</span>
-                      <span className="block">{fmtClock(item.end, lang)}</span>
-                    </>
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className={cn('flex items-center gap-1.5 text-sm font-medium leading-snug text-foreground', item.done && 'line-through')}>
-                    <KindGlyph item={item} className="text-[var(--ev)]" />
-                    <span className="truncate">{item.title || t('calUntitled')}</span>
-                  </span>
-                  {item.location ? (
-                    <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />{item.location}
-                    </span>
-                  ) : item.kind !== 'event' ? (
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{kindLabel[item.kind]}</span>
-                  ) : null}
-                </span>
+                <ChevronDown className={cn('h-4 w-4 transition-transform', !allDayOpen && '-rotate-90 rtl:rotate-90')} aria-hidden="true" />
+                {t('allDay')}
+                <span className="tabular rounded-full bg-foreground/[0.08] px-1.5 text-[11px]">{allDay.length}</span>
               </button>
-            </li>
-          ))}
-        </ul>
+              {allDayOpen && <ul className="mt-1.5 space-y-1.5">{allDay.map(renderRow)}</ul>}
+            </div>
+          )}
+          {timed.length > 0 && <ul className="space-y-1.5">{timed.map(renderRow)}</ul>}
+        </div>
       )}
     </section>
   );
