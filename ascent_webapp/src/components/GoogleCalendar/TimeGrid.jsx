@@ -179,7 +179,7 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
     const end = addMinutes(start, drag.durMin);
     return (
       <div
-        className="pointer-events-none absolute inset-x-0.5 z-30 overflow-hidden rounded-lg px-2 py-1 text-foreground shadow-[0_14px_34px_-10px_hsl(0_0%_0%/0.55)] ring-1 ring-[var(--ev)]"
+        className="pointer-events-none absolute inset-x-0.5 z-[3] overflow-hidden rounded-lg px-2 py-1 text-foreground shadow-[0_14px_34px_-10px_hsl(0_0%_0%/0.55)] ring-1 ring-[var(--ev)]"
         style={{
           ...chipStyle(item.color, 34),
           top: (drag.startMin / 60) * HH + 1,
@@ -196,7 +196,7 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
     <div ref={scrollRef} className="relative h-full overflow-auto overscroll-contain">
       <div className={cn(multi && 'min-w-[640px] sm:min-w-0')}>
         {/* Day headers + all-day strip */}
-        <div className="sticky top-0 z-20 border-b border-border/60 bg-popover/95 backdrop-blur-md">
+        <div className="sticky top-0 z-30 border-b border-border/60 bg-popover/95 backdrop-blur-md">
           <div className="grid" style={{ gridTemplateColumns: cols }}>
             <div className="sticky start-0 bg-popover/95" />
             {days.map((day) => {
@@ -231,11 +231,17 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
               </div>
               {perDay.map((d, i) => (
                 <div key={i} className="min-w-0 space-y-0.5 border-s border-border/40 p-1">
-                  {d.allDay.slice(0, 3).map((item) => (
+                  {d.allDay.slice(0, multi ? 3 : d.allDay.length).map((item) => (
                     <ItemChip key={item.id} item={item} lang={lang} onOpen={onOpen} untitled={t('calUntitled')} />
                   ))}
-                  {d.allDay.length > 3 && (
-                    <p className="px-1 text-[11px] text-muted-foreground">{t('calMoreCount').replace('{n}', d.allDay.length - 3)}</p>
+                  {multi && d.allDay.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => (onDayClick ? onDayClick(days[i]) : onOpen(d.allDay[3]))}
+                      className="w-full px-1 py-0.5 text-start text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      {t('calMoreCount').replace('{n}', d.allDay.length - 3)}
+                    </button>
                   )}
                 </div>
               ))}
@@ -245,7 +251,7 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
 
         {/* Time grid */}
         <div className="grid" style={{ gridTemplateColumns: cols, height: 24 * HH }}>
-          <div className="sticky start-0 z-10 bg-popover/95">
+          <div className="sticky start-0 z-10 isolate bg-popover/95">
             <div className="relative h-full">
               {HOURS.slice(1).map((h) => (
                 <span
@@ -285,7 +291,7 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
                 {drag && drag.dayIndex === i && ghost}
                 {today && (
                   <div
-                    className="pointer-events-none absolute inset-x-0 z-20"
+                    className="pointer-events-none absolute inset-x-0 z-[2]"
                     style={{ top: (minutesOfDay(now) / 60) * HH }}
                     aria-hidden="true"
                   >
