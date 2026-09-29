@@ -43,8 +43,8 @@ export function ThemeProvider({ children }) {
       const q = new URLSearchParams(window.location.search).get('palette');
       if (PALETTES.includes(q)) localStorage.setItem('ascent_palette', q);
       const saved = localStorage.getItem('ascent_palette');
-      return PALETTES.includes(saved) ? saved : 'indigo';
-    } catch { return 'indigo'; }
+      return PALETTES.includes(saved) ? saved : 'gold';
+    } catch { return 'gold'; }
   });
 
   const setPalette = useCallback((next) => {
@@ -65,6 +65,14 @@ export function ThemeProvider({ children }) {
     root.classList.toggle('dark', theme !== 'light');
     root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
   }, [theme]);
+
+  // Match the installed-app status bar / browser chrome to the rendered background
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const bg = getComputedStyle(document.body).backgroundColor;
+    if (bg) meta.setAttribute('content', bg);
+  }, [theme, palette]);
 
   // Token-based classes; values switch automatically via CSS variables (.dark)
   const colors = React.useMemo(() => ({

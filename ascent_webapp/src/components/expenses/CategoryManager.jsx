@@ -63,7 +63,7 @@ export default function CategoryManager({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6")}>
+      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-2xl w-[95vw] sm:w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6")}>
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className={cn("text-lg sm:text-xl font-bold flex items-center gap-2", colors.accentText)}>
             <Tag className="w-4 h-4 sm:w-5 sm:h-5" />

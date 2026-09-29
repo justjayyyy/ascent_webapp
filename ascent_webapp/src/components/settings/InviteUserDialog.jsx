@@ -162,7 +162,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-md max-h-[80vh] overflow-y-auto")}>
+      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-md max-h-[80dvh] overflow-y-auto")}>
         <DialogHeader>
           <DialogTitle className={cn("text-xl font-bold", colors.accentText)}>
             {t('inviteUser')}

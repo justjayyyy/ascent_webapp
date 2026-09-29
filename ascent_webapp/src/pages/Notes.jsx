@@ -331,7 +331,7 @@ function Notes() {
         {/* Note Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent
-            className={cn("max-w-4xl w-[95vw] sm:w-full max-h-[80vh] sm:max-h-[75vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-3 sm:p-6", colors.bgSecondary, colors.border)}
+            className={cn("max-w-4xl w-[95vw] sm:w-full max-h-[80dvh] sm:max-h-[75vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-3 sm:p-6", colors.bgSecondary, colors.border)}
             dir={isRTL ? 'rtl' : 'ltr'}
           >
             <DialogHeader className="pb-2 sm:pb-4">

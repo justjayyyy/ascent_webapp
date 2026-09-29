@@ -1014,7 +1014,7 @@ export default function AccountDetail() {
     : userCurrency;
 
   return (
-    <div className={cn("flex flex-col h-[calc(100vh-10rem)] md:h-auto md:min-h-screen p-4 md:p-8", colors.bgPrimary)}>
+    <div className={cn("flex flex-col h-[calc(100dvh-10rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:h-auto md:min-h-screen p-4 md:p-8", colors.bgPrimary)}>
       <div className="max-w-7xl mx-auto flex flex-col flex-1 md:flex-none md:block min-h-0 w-full">
         {/* Header */}
         <div className="mb-3 sm:mb-6 flex-shrink-0">

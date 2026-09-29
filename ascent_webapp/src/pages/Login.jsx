@@ -261,7 +261,7 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-background flex justify-center p-2 sm:p-4 overflow-y-auto overflow-x-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div className="bg-background flex justify-center p-2 sm:p-4 overflow-y-auto overflow-x-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, paddingTop: 'max(0.5rem, env(safe-area-inset-top))', paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
       <div className="w-full max-w-md flex flex-col items-center justify-center my-auto pt-2 sm:pt-0 pb-2">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">

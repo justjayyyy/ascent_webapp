@@ -132,7 +132,7 @@ export default function DashboardCustomization({ open, onClose, widgets, onSave,
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-2xl max-h-[80vh] overflow-y-auto")}>
+      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-2xl max-h-[80dvh] overflow-y-auto")}>
         <DialogHeader>
           <DialogTitle className={cn("text-xl font-bold", colors.accentText)}>
             {t('customizeDashboard')}

@@ -260,7 +260,7 @@ export default function AddTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "w-[95vw] max-w-[95vw] sm:w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-3 sm:p-6")}>
+      <DialogContent className={cn(colors.cardBg, colors.cardBorder, "w-[95vw] max-w-[95vw] sm:w-full sm:max-w-md max-h-[90dvh] overflow-y-auto p-3 sm:p-6")}>
         <DialogHeader className="pb-1.5 sm:pb-4">
           <DialogTitle className={cn("text-base sm:text-xl font-bold", colors.accentText)}>
             {editTransaction && (editTransaction.id || editTransaction._id)

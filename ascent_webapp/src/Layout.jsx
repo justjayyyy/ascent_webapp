@@ -153,7 +153,7 @@ function LayoutContent({ children, currentPageName }) {
       {/* Mobile Menu - Only Settings (Pages are in bottom nav) */}
       <div
         className={cn(
-          "md:hidden fixed top-16 bottom-16 z-50 w-1/2 overflow-y-auto transition-transform duration-300 ease-out",
+          "md:hidden fixed top-[calc(4rem+env(safe-area-inset-top))] bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 w-1/2 overflow-y-auto transition-transform duration-300 ease-out",
           "end-0",
           mobileMenuOpen
             ? (isRTL ? "translate-x-0" : "translate-x-0")
@@ -257,12 +257,12 @@ function LayoutContent({ children, currentPageName }) {
       <main
         onClick={mobileMenuOpen ? () => setMobileMenuOpen(false) : undefined}
         className={cn(
-          "min-h-dvh min-w-0 pt-16 md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          "min-h-dvh min-w-0 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           // On phones the menu sheet pushes the page aside instead of covering it
           mobileMenuOpen && (isRTL ? "translate-x-1/2" : "-translate-x-1/2")
         )}
       >
-        <div className="pb-20 md:pb-0">
+        <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
           {children}
         </div>
       </main>
