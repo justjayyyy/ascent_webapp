@@ -25,7 +25,7 @@
   border-radius: 50%;
   background: radial-gradient(closest-side, hsl(var(--primary) / 0.5), transparent 75%);
   filter: blur(6cqw);
-  animation: al-glow 2.4s ease-in-out infinite alternate;
+  animation: al-glow 3.6s ease-in-out infinite alternate;
   pointer-events: none;
 }
 
@@ -41,7 +41,7 @@
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  animation: al-float 3.6s ease-in-out infinite alternate;
+  animation: al-float 5.5s ease-in-out infinite alternate;
 }
 
 .ascent-logo .al-layer {
@@ -59,18 +59,12 @@
 
 /* Extrusion: stacked dark copies of the silhouette give the mark real thickness */
 .ascent-logo .al-depth {
-  -webkit-mask-image: url('/logo/silhouette.png');
-  mask-image: url('/logo/silhouette.png');
+  -webkit-mask-image: url('/logo/mountain-depth.png');
+  mask-image: url('/logo/mountain-depth.png');
   background: linear-gradient(180deg, var(--al-figure), var(--al-deep));
   transform: translateZ(calc(var(--k) * -0.72cqw));
 }
 
-.ascent-logo .al-outline {
-  -webkit-mask-image: url('/logo/outline.png');
-  mask-image: url('/logo/outline.png');
-  background: linear-gradient(160deg, var(--al-figure-hi), var(--al-figure));
-  transform: translateZ(1cqw);
-}
 .ascent-logo .al-mountain {
   -webkit-mask-image: url('/logo/mountain.png');
   mask-image: url('/logo/mountain.png');
@@ -79,13 +73,15 @@
     linear-gradient(180deg, var(--al-figure-hi), var(--al-figure) 60%);
   transform: translateZ(2cqw);
 }
-.ascent-logo .al-hiker {
-  -webkit-mask-image: url('/logo/hiker.png');
-  mask-image: url('/logo/hiker.png');
-  background:
-    linear-gradient(150deg, rgb(255 255 255 / 0.3), transparent 50%, rgb(0 0 0 / 0.16)),
-    linear-gradient(180deg, var(--al-hiker-hi), var(--al-hiker));
-  transform: translateZ(4.5cqw);
+/* The hiker is an SVG drawn and animated in AscentLogo.jsx; it sits in front of the mountain */
+.ascent-logo .al-hiker-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform: translateZ(8cqw);
 }
 .ascent-logo .al-accent {
   -webkit-mask-image: url('/logo/accent.png');
@@ -94,18 +90,18 @@
   transform: translateZ(2.6cqw);
 }
 .ascent-logo .al-shine {
-  -webkit-mask-image: url('/logo/silhouette.png');
-  mask-image: url('/logo/silhouette.png');
+  -webkit-mask-image: url('/logo/mountain-depth.png');
+  mask-image: url('/logo/mountain-depth.png');
   background: linear-gradient(105deg, transparent 40%, rgb(255 255 255 / 0.85) 50%, transparent 60%) 160% 0 / 260% 100% no-repeat;
   transform: translateZ(3.2cqw);
-  animation: al-shine 2.8s ease-in-out infinite;
+  animation: al-shine 5s ease-in-out infinite;
 }
 
 /* Chart bars grow from their baseline; arrow floats forward */
 .ascent-logo .al-bar {
   background: linear-gradient(180deg, var(--al-tint), var(--al-bright) 55%, var(--al-accent-deep));
   transform: translateZ(6cqw);
-  animation: al-bar1 1.6s ease-in-out infinite alternate;
+  animation: al-bar var(--al-loop, 7s) infinite;
 }
 .ascent-logo .al-bar1 {
   -webkit-mask-image: url('/logo/bar1.png');
@@ -116,46 +112,31 @@
   -webkit-mask-image: url('/logo/bar2.png');
   mask-image: url('/logo/bar2.png');
   transform-origin: 85% 81.8%;
-  animation-name: al-bar2;
-  animation-delay: -0.9s;
+  animation-delay: 0.3s;
 }
-.ascent-logo .al-arrow-outline {
-  -webkit-mask-image: url('/logo/arrow-outline.png');
-  mask-image: url('/logo/arrow-outline.png');
-  background: linear-gradient(160deg, var(--al-figure-hi), var(--al-figure));
-  transform: translateZ(10cqw);
-  transform-origin: 59% 51%;
-  animation: al-arrow-outline 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate;
-}
-.ascent-logo .al-arrow {
-  -webkit-mask-image: url('/logo/arrow.png');
-  mask-image: url('/logo/arrow.png');
-  background: linear-gradient(35deg, var(--al-accent-deep), var(--al-bright) 45%, var(--al-tint));
-  filter: drop-shadow(0 0 2cqw color-mix(in oklch, var(--al-bright) 70%, transparent));
-  transform: translateZ(11cqw);
-  transform-origin: 59% 51%;
-  animation: al-arrow 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate;
+/* The growth arrow: drawn and driven in AscentLogo.jsx */
+.ascent-logo .al-trail-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform: translateZ(7cqw);
+  filter: drop-shadow(0 0 0.8cqw color-mix(in oklch, var(--al-bright) 38%, transparent));
 }
 
 @keyframes al-float {
-  from { transform: translateY(5%) rotateY(-38deg) rotateX(12deg) rotateZ(-3deg); }
-  to   { transform: translateY(-7%) rotateY(38deg) rotateX(-9deg) rotateZ(3deg); }
+  from { transform: translateY(1.2%) rotateY(-9deg) rotateX(3deg); }
+  to   { transform: translateY(-1.8%) rotateY(9deg) rotateX(-3deg); }
 }
-@keyframes al-bar1 {
-  from { transform: translateZ(6cqw) scaleY(1); }
-  to   { transform: translateZ(6cqw) scaleY(0.4); }
-}
-@keyframes al-bar2 {
-  from { transform: translateZ(6cqw) scaleY(0.45); }
-  to   { transform: translateZ(6cqw) scaleY(1); }
-}
-@keyframes al-arrow-outline {
-  from { transform: translateZ(7cqw) scale(0.86) rotate(-2deg); }
-  to   { transform: translateZ(17cqw) scale(1.22) rotate(3deg); }
-}
-@keyframes al-arrow {
-  from { transform: translateZ(8cqw) scale(0.86) rotate(-2deg); }
-  to   { transform: translateZ(18cqw) scale(1.22) rotate(3deg); }
+/* One growth cycle: the bars rise first, hold, then ease away with the hiker's fade */
+@keyframes al-bar {
+  0%   { transform: translateZ(6cqw) scaleY(0.08); animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  26%  { transform: translateZ(6cqw) scaleY(1); animation-timing-function: ease-in-out; }
+  60%  { transform: translateZ(6cqw) scaleY(0.96); animation-timing-function: ease-in-out; }
+  84%  { transform: translateZ(6cqw) scaleY(1); animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0); }
+  100% { transform: translateZ(6cqw) scaleY(0.08); }
 }
 @keyframes al-shine {
   0%, 45% { background-position: 160% 0; }
@@ -169,28 +150,29 @@
 /* Hover mode (sidebar, headers): still until pointed at */
 .ascent-logo[data-motion='hover'] .al-float,
 .ascent-logo[data-motion='hover'] .al-bar,
-.ascent-logo[data-motion='hover'] .al-arrow-outline,
-.ascent-logo[data-motion='hover'] .al-arrow,
 .ascent-logo[data-motion='hover'] .al-shine,
 .ascent-logo[data-motion='hover'] .al-glow {
   animation-play-state: paused;
 }
 .ascent-logo[data-motion='hover']:hover .al-float,
 .ascent-logo[data-motion='hover']:hover .al-bar,
-.ascent-logo[data-motion='hover']:hover .al-arrow-outline,
-.ascent-logo[data-motion='hover']:hover .al-arrow,
 .ascent-logo[data-motion='hover']:hover .al-shine,
 .ascent-logo[data-motion='hover']:hover .al-glow {
   animation-play-state: running;
 }
 .ascent-logo[data-motion='hover'] .al-float { animation-delay: -1.8s; }
-.ascent-logo[data-motion='hover'] .al-bar2 { animation-delay: -1.6s; }
+.ascent-logo[data-motion='hover'] .al-bar,
+.ascent-logo[data-motion='hover'] .al-bar2 { animation-delay: -3.4s; }
 
 .ascent-logo[data-motion='none'] .al-float,
 .ascent-logo[data-motion='none'] .al-bar,
-.ascent-logo[data-motion='none'] .al-arrow-outline,
-.ascent-logo[data-motion='none'] .al-arrow,
 .ascent-logo[data-motion='none'] .al-shine,
 .ascent-logo[data-motion='none'] .al-glow {
   animation: none;
+}
+
+/* Without a sticker outline a white hiker vanishes on light backgrounds, so use the text colour there */
+:root:not(.dark) .ascent-logo {
+  --al-hiker-hi: color-mix(in oklch, hsl(var(--foreground)) 82%, white);
+  --al-hiker: hsl(var(--foreground));
 }

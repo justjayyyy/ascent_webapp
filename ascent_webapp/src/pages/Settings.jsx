@@ -505,7 +505,7 @@ export default function Settings() {
                 </Row>
               </Group>
               <div className="mt-8 flex items-center justify-center gap-3 text-center">
-                <AscentLogo motion="hover" className="w-12" />
+                <AscentLogo motion="full" className="w-12" />
                 <div className="text-start">
                   <p className="text-sm font-medium text-foreground">Ascent</p>
                   <p className="text-xs text-muted-foreground">{t('ascendTagline')} · v1.0.0</p>
