@@ -79,7 +79,7 @@ export default function MonthGrid({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenDay(day); }}
-                    className="px-1 text-start text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    className="shrink-0 px-1 py-0.5 text-start text-[11px] font-medium text-muted-foreground hover:text-foreground"
                   >
                     {t('calMoreCount').replace('{n}', items.length - MAX_CHIPS)}
                   </button>
