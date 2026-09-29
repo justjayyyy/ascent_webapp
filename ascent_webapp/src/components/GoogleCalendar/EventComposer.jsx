@@ -33,7 +33,7 @@ function initialForm(req) {
   };
 }
 
-export default function EventComposer({ request, onClose, onSave, onDelete, saving, t, lang, locale, isRTL }) {
+export default function EventComposer({ request, onClose, onSave, onDelete, onToggleTask, saving, t, lang, locale, isRTL }) {
   const item = request.item;
   const readOnly = !!item && !item.editable;
   const editing = !!item && item.editable;
@@ -130,7 +130,7 @@ export default function EventComposer({ request, onClose, onSave, onDelete, savi
           </button>
         </div>
 
-        <div className="space-y-4 overflow-y-auto px-5 pb-5 pt-3">
+        <div className="space-y-4 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
           {readOnly ? (
             <div className="space-y-3">
               <h2 className={cn('text-xl font-bold leading-tight tracking-tight text-foreground', item.done && 'line-through opacity-70')}>
@@ -245,6 +245,15 @@ export default function EventComposer({ request, onClose, onSave, onDelete, savi
           >
             {readOnly ? t('close') : t('cancel')}
           </button>
+          {readOnly && item.kind === 'task' && (
+            <button
+              type="button"
+              onClick={() => onToggleTask(item)}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Check className="h-4 w-4" />{item.done ? t('calMarkNotDone') : t('calMarkDone')}
+            </button>
+          )}
           {!readOnly && (
             <button
               type="submit"

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { format, isSameDay, startOfDay, differenceInMinutes, addMinutes } from 'date-fns';
-import { MapPin } from 'lucide-react';
+import { ChevronDown, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ItemChip from './ItemChip';
 import {
@@ -17,6 +17,7 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
   const justDragged = useRef(false);
   const cleanupRef = useRef(null);
   const [now, setNow] = useState(() => new Date());
+  const [allDayOpen, setAllDayOpen] = useState(true);
   const [drag, setDrag] = useState(null); // { id, mode, dayIndex, startMin, durMin }
 
   const n = days.length;
@@ -226,15 +227,32 @@ export default function TimeGrid({ days, dayMap, lang, locale, t, onCreate, onOp
 
           {hasAllDay && (
             <div className="grid border-t border-border/40" style={{ gridTemplateColumns: cols }}>
-              <div className="sticky start-0 flex items-start justify-end bg-popover/95 pe-2 pt-2 text-[11px] text-muted-foreground">
-                {t('allDay')}
-              </div>
+              <button
+                type="button"
+                onClick={() => setAllDayOpen((o) => !o)}
+                aria-expanded={allDayOpen}
+                aria-label={t('calToggleAllDay')}
+                className="sticky start-0 flex items-start justify-end gap-0.5 bg-popover/95 pe-1.5 pt-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                <span className="truncate">{t('allDay')}</span>
+                <ChevronDown className={cn('mt-px h-3.5 w-3.5 shrink-0 transition-transform', !allDayOpen && '-rotate-90 rtl:rotate-90')} aria-hidden="true" />
+              </button>
               {perDay.map((d, i) => (
                 <div key={i} className="min-w-0 space-y-0.5 border-s border-border/40 p-1">
-                  {d.allDay.slice(0, multi ? 3 : d.allDay.length).map((item) => (
+                  {!allDayOpen ? (
+                    d.allDay.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAllDayOpen(true)}
+                        className="tabular w-full rounded-md bg-foreground/[0.06] px-1 py-0.5 text-center text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        {d.allDay.length}
+                      </button>
+                    )
+                  ) : d.allDay.slice(0, multi ? 3 : d.allDay.length).map((item) => (
                     <ItemChip key={item.id} item={item} lang={lang} onOpen={onOpen} untitled={t('calUntitled')} />
                   ))}
-                  {multi && d.allDay.length > 3 && (
+                  {allDayOpen && multi && d.allDay.length > 3 && (
                     <button
                       type="button"
                       onClick={() => (onDayClick ? onDayClick(days[i]) : onOpen(d.allDay[3]))}

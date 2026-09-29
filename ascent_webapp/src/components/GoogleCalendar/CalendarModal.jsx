@@ -293,6 +293,28 @@ export default function CalendarModal({ open, onOpenChange }) {
     }
   };
 
+  // Tick a Google Task on/off: update instantly, sync in the background
+  const toggleTask = async (item) => {
+    const done = !item.done;
+    const patch = done
+      ? { status: 'completed' }
+      : { status: 'needsAction', completed: null };
+    const apply = (p) => setRawTasks((prev) => prev.map((x) => (`task:${x.id}` === item.id ? { ...x, ...p } : x)));
+    apply(patch);
+    setComposer((c) => (c?.item?.id === item.id ? null : c));
+    try {
+      const res = await gcal('update-task', {
+        method: 'PATCH',
+        params: { tasklistId: item.raw.taskListId, taskId: item.raw.id },
+        body: patch,
+      });
+      if (!res.ok) throw new Error('update failed');
+    } catch (err) {
+      apply({ status: item.raw.status, completed: item.raw.completed });
+      if (err.message !== 'unauthorized') toast.error(t('calSaveFailed'));
+    }
+  };
+
   // Drag-to-move / resize from the time grid: update instantly, sync in the background
   const commitTime = async (item, start, end) => {
     const patch = { start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() } };
@@ -385,7 +407,7 @@ export default function CalendarModal({ open, onOpenChange }) {
         onKeyDown={onKeyDown}
         onEscapeKeyDown={(e) => { if (composer) { e.preventDefault(); setComposer(null); } }}
         dir={isRTL ? 'rtl' : 'ltr'}
-        className="flex h-[calc(100dvh-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[calc(100vw-1rem)] max-w-[1400px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[min(92dvh,980px)] sm:rounded-3xl"
+        className="flex h-[calc(100dvh-4rem-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[calc(100vw-1rem)] max-w-[1400px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[min(92dvh,980px)] sm:rounded-3xl"
       >
         <DialogTitle className="sr-only">{t('calendar')}</DialogTitle>
         <DialogDescription className="sr-only">{t('calendarDescription')}</DialogDescription>
@@ -398,7 +420,7 @@ export default function CalendarModal({ open, onOpenChange }) {
           <>
             {/* Toolbar */}
             <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-3 py-3 pe-12 sm:px-5 sm:pe-14">
-              <div className="flex min-w-0 items-center gap-1.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5 max-sm:w-full">
                 <button
                   type="button"
                   onClick={goToday}
@@ -408,13 +430,13 @@ export default function CalendarModal({ open, onOpenChange }) {
                 </button>
                 <button type="button" onClick={() => step(-1)} aria-label={t('calPrev')} className={iconBtn}><Prev className="h-4 w-4" /></button>
                 <button type="button" onClick={() => step(1)} aria-label={t('calNext')} className={iconBtn}><Next className="h-4 w-4" /></button>
-                <h2 key={`${view}-${title.main}`} aria-live="polite" className="ms-1 min-w-0 truncate text-lg font-bold capitalize tracking-tight text-foreground animate-in fade-in-0 duration-200 sm:text-xl">
+                <h2 key={`${view}-${title.main}`} aria-live="polite" className="ms-1 min-w-0 truncate max-sm:order-first max-sm:basis-full max-sm:ms-0 text-lg font-bold capitalize tracking-tight text-foreground animate-in fade-in-0 duration-200 sm:text-xl">
                   {title.main} <span className="font-normal text-muted-foreground">{title.sub}</span>
                 </h2>
               </div>
 
-              <div className="ms-auto flex items-center gap-1.5">
-                <div role="tablist" aria-label={t('calView')} className="relative grid grid-cols-3 rounded-xl bg-foreground/[0.06] p-1">
+              <div className="flex items-center gap-1.5 max-sm:w-full sm:ms-auto">
+                <div role="tablist" aria-label={t('calView')} className="relative grid grid-cols-3 rounded-xl bg-foreground/[0.06] p-1 max-sm:flex-1">
                   <span
                     aria-hidden="true"
                     className="absolute inset-y-1 start-1 w-[calc((100%-0.5rem)/3)] rounded-lg bg-popover shadow-sm ring-1 ring-border/60 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
@@ -428,7 +450,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                       aria-selected={view === v}
                       onClick={() => setView(v)}
                       className={cn(
-                        'relative z-10 h-8 rounded-lg px-3.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'relative z-10 h-9 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         view === v ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
@@ -502,6 +524,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                   locale={locale}
                   t={t}
                   onOpen={openItem}
+                  onToggleTask={toggleTask}
                   onNew={() => openNew()}
                 />
 
@@ -539,6 +562,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                         locale={locale}
                         t={t}
                         onOpen={openItem}
+                        onToggleTask={toggleTask}
                         onNew={() => openNew()}
                       />
                     </div>
@@ -551,6 +575,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                       t={t}
                       onCreate={openNew}
                       onOpen={openItem}
+                      onToggleTask={toggleTask}
                       onCommit={commitTime}
                       onDayClick={view === 'week' ? openDay : undefined}
                     />
@@ -566,6 +591,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                 onClose={() => setComposer(null)}
                 onSave={saveForm}
                 onDelete={deleteItem}
+                onToggleTask={toggleTask}
                 saving={saving}
                 t={t}
                 lang={language}
