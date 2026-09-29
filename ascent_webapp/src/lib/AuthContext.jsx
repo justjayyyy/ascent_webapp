@@ -373,6 +373,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     user,
+    setUser,
     isAuthenticated,
     permissions,
     hasPermission,
@@ -393,6 +394,7 @@ export const AuthProvider = ({ children }) => {
     checkAppState
   }), [
     user,
+    setUser,
     isAuthenticated,
     permissions,
     hasPermission,
