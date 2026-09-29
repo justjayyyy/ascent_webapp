@@ -5,10 +5,11 @@ import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
 import { getNotesSync } from './notesSync';
-import { newNoteId, useOnlineStatus } from './noteUtils';
+import { MAX_FILES, newNoteId, prepareUpload, useOnlineStatus } from './noteUtils';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const CONTENT_KEYS = ['title', 'content', 'type', 'items', 'tags', 'color'];
+const FILE_ERRORS = { 'too-large': 'ntFileTooLarge' };
 
 /**
  * The signed-in person's notes for the current workspace: a live list that refreshes
@@ -19,6 +20,7 @@ export function useNotes() {
   const { currentWorkspace } = useAuth();
   const queryClient = useQueryClient();
   const online = useOnlineStatus();
+  const [uploading, setUploading] = useState(0);
 
   const userId = user?.id || user?._id;
   const workspaceId = currentWorkspace?.id || currentWorkspace?._id;
@@ -119,6 +121,8 @@ export function useNotes() {
       trashedAt: null,
       createdBy: userId,
       myAccess: 'owner',
+      attachments: [],
+      reminder: null,
       updatedByEmail: user?.email,
       created_date: now,
       updated_date: now,
@@ -164,6 +168,49 @@ export function useNotes() {
     sync.enqueue({ type: 'empty-trash', id: '*' });
   }, [update, sync, userId]);
 
+  // Files go straight to the server (not through the offline outbox), so they need a connection
+  const applyAttachments = useCallback((saved) => {
+    update(list => list.map(n => (n.id === saved.id
+      ? { ...n, attachments: saved.attachments, updatedByEmail: saved.updatedByEmail, updated_date: saved.updated_date }
+      : n)));
+  }, [update]);
+
+  const addFiles = useCallback(async (noteId, fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    if (!online) { toast.error(t('ntNeedOnline')); return; }
+    await sync.flush();
+    if (sync.pendingFor(noteId)) { toast.error(t('ntNeedOnline')); return; }
+    const existing = (queryClient.getQueryData(queryKey) || []).find(n => n.id === noteId)?.attachments?.length || 0;
+    if (existing + files.length > MAX_FILES) toast.error(t('ntTooManyFiles'));
+    setUploading(c => c + 1);
+    try {
+      for (const file of files.slice(0, Math.max(0, MAX_FILES - existing))) {
+        try {
+          const payload = await prepareUpload(file);
+          const saved = await ascent.entities.Note.uploadFile(noteId, payload);
+          applyAttachments(saved);
+        } catch (e) {
+          toast.error(t(FILE_ERRORS[e.message] || (e.status === 413 ? 'ntFileTooLarge' : 'ntUploadFailed')));
+        }
+      }
+    } finally {
+      setUploading(c => c - 1);
+    }
+  }, [online, sync, queryClient, queryKey, applyAttachments, t]);
+
+  const removeFile = useCallback(async (noteId, fileId) => {
+    if (!online) { toast.error(t('ntNeedOnline')); return; }
+    update(list => list.map(n => (n.id === noteId
+      ? { ...n, attachments: (n.attachments || []).filter(a => a.id !== fileId) } : n)));
+    try {
+      applyAttachments(await ascent.entities.Note.deleteFile(noteId, fileId));
+    } catch {
+      toast.error(t('ntUploadFailed'));
+      queryClient.invalidateQueries({ queryKey });
+    }
+  }, [online, update, applyAttachments, queryClient, queryKey, t]);
+
   return {
     notes: query.data ?? [],
     isLoading: !!scope && (!restored || (query.isPending && query.data === undefined)),
@@ -177,5 +224,8 @@ export function useNotes() {
     patchNote,
     deleteNote,
     emptyTrash,
+    addFiles,
+    removeFile,
+    uploading,
   };
 }

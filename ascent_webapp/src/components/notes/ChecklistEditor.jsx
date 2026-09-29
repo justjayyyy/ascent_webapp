@@ -46,7 +46,7 @@ function Row({ item, reorderable, readOnly, t, onChange, onRemove, onEnter, onBa
         }}
         placeholder={t('ntListItem')}
         aria-label={t('ntListItem')}
-        className={cn('py-1 text-sm leading-6', item.done && 'text-muted-foreground line-through')}
+        className={cn('py-1 text-base leading-6 sm:text-sm', item.done && 'text-muted-foreground line-through')}
       />
       {!readOnly && (
         <button

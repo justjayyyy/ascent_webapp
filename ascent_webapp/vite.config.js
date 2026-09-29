@@ -67,6 +67,8 @@ export default defineConfig({
         globIgnores: ['**/logo-dark.png', '**/logo-light.png'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        // Adds the notification-tap handler used by note reminders
+        importScripts: ['sw-notify.js'],
         skipWaiting: true,
         clientsClaim: true,
       },

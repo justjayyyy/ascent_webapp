@@ -317,6 +317,19 @@ const entities = {
     // Permanently delete everything the caller has in the trash
     async emptyTrash() {
       return request('/entities/notes?action=empty-trash', { method: 'DELETE' });
+    },
+    // File attachments: bytes travel as base64 inside JSON
+    async uploadFile(noteId, file) {
+      return request(`/entities/notes?action=file&id=${noteId}`, {
+        method: 'POST',
+        body: JSON.stringify(file)
+      });
+    },
+    async getFile(noteId, fileId) {
+      return request(`/entities/notes?action=file&id=${noteId}&fileId=${fileId}`);
+    },
+    async deleteFile(noteId, fileId) {
+      return request(`/entities/notes?action=file&id=${noteId}&fileId=${fileId}`, { method: 'DELETE' });
     }
   },
   PortfolioTransaction: createEntity('portfolio-transactions')

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Archive, Lightbulb, Tag, Trash2, Users } from 'lucide-react';
+import { Archive, Bell, Lightbulb, Tag, Trash2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -10,6 +10,7 @@ export default function NotesNav({ view, label, labels, counts, onSelect, t, var
   const main = [
     { key: 'notes', icon: Lightbulb, name: t('notes'), count: counts.notes },
     { key: 'shared', icon: Users, name: t('ntShared'), count: counts.shared },
+    { key: 'reminders', icon: Bell, name: t('ntReminders'), count: counts.reminders },
     { key: 'archive', icon: Archive, name: t('ntArchiveNav'), count: counts.archive },
     { key: 'trash', icon: Trash2, name: t('ntTrashNav'), count: counts.trash },
   ];

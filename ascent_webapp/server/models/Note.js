@@ -12,6 +12,19 @@ const collaboratorSchema = new mongoose.Schema({
   role: { type: String, enum: ['viewer', 'editor'], default: 'viewer' }
 }, { _id: false });
 
+const attachmentSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, default: '' },
+  type: { type: String, default: '' },
+  size: { type: Number, default: 0 }
+}, { _id: false });
+
+// A personal reminder: each person sets their own time for a note
+const reminderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  at: { type: Date, required: true }
+}, { _id: false });
+
 const noteSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -28,6 +41,9 @@ const noteSchema = new mongoose.Schema({
     default: 'text'
   },
   items: [itemSchema],
+  // Metadata only; the bytes are stored in NoteFile
+  attachments: [attachmentSchema],
+  reminders: [reminderSchema],
   // A palette key (see NOTE_COLORS on the client) or a legacy '#rrggbb' value
   color: {
     type: String,

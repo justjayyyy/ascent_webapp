@@ -140,7 +140,7 @@ export default function NoteComposer({ t, labels, defaultTag, onCreate, request,
                     placeholder={t('ntTakeNote')}
                     aria-label={t('noteContent')}
                     maxLength={100000}
-                    className="min-h-[4.5rem] text-sm leading-relaxed"
+                    className="min-h-[4.5rem] text-base leading-relaxed sm:text-sm"
                   />
                 )}
               </div>
