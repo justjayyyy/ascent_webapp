@@ -39,10 +39,9 @@ const PermissionGuard = ({ pageName, children }) => {
 
   const navigate = React.useMemo(() => {
     // Determine the first available page for the user
-    if (!permissions) return 'Portfolio'; // Owner goes to Portfolio
+    if (!permissions) return 'Dashboard'; // Owner goes to Dashboard
 
-    if (permissions.viewPortfolio) return 'Portfolio';
-    if (permissions.viewExpenses) return 'Expenses';
+    if (permissions.viewExpenses) return 'Dashboard';
     if (permissions.viewNotes) return 'Notes';
     if (permissions.viewSettings) return 'Settings';
 
@@ -50,11 +49,11 @@ const PermissionGuard = ({ pageName, children }) => {
   }, [permissions]);
 
   const permissionMap = {
-    'Portfolio': 'viewPortfolio',
     'Expenses': 'viewExpenses',
     'Notes': 'viewNotes',
     // 'Settings': 'viewSettings', // Exposed to all authenticated users, internally gated
-    'Dashboard': 'viewDashboard',
+    // Dashboard currently only shows expense data, so it follows the expenses permission
+    'Dashboard': 'viewExpenses',
   };
 
   const requiredPermission = permissionMap[pageName];
@@ -65,7 +64,7 @@ const PermissionGuard = ({ pageName, children }) => {
   }
 
   if (!navigate) {
-    return <div className="p-8 text-center text-white">You do not have access to any pages. Please contact your workspace owner.</div>;
+    return <div className="p-8 text-center text-foreground">You do not have access to any pages. Please contact your workspace owner.</div>;
   }
 
   // Redirect to the first available page
@@ -78,8 +77,8 @@ const AuthenticatedApp = () => {
   // Show loading spinner while checking auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#092635]">
-        <div className="w-8 h-8 border-4 border-[#5C8374] border-t-[#9EC8B9] rounded-full animate-spin"></div>
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
       </div>
     );
   }

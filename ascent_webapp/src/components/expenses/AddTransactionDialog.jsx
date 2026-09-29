@@ -14,6 +14,16 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { ascent } from '@/api/client';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { PORTFOLIO_ENABLED } from '@/lib/features';
+
+const LAST_KEY = 'ascent_last_transaction_choices';
+const readLastChoices = () => {
+  try { return JSON.parse(localStorage.getItem(LAST_KEY)) || {}; } catch { return {}; }
+};
+const rememberChoices = ({ category, paymentMethod, currency, type }) => {
+  if (type !== 'Expense') return;
+  try { localStorage.setItem(LAST_KEY, JSON.stringify({ category, paymentMethod, currency })); } catch { /* storage unavailable */ }
+};
 
 /**
  * @typedef {Object} AddTransactionDialogProps
@@ -59,6 +69,17 @@ export default function AddTransactionDialog({
   });
 
   const [errors, setErrors] = useState({});
+
+  // Category chips: last-used first, the rest behind a "more" menu
+  const { quickCategories, moreCategories } = useMemo(() => {
+    const filtered = categories.filter(cat => cat.type === formData.type || cat.type === 'Both');
+    const last = readLastChoices().category;
+    const sorted = [...filtered].sort((a, b) => (b.name === last) - (a.name === last));
+    const visible = sorted.slice(0, 6);
+    const selected = sorted.find(c => c.name === formData.category);
+    if (selected && !visible.includes(selected)) visible[visible.length - 1] = selected;
+    return { quickCategories: visible, moreCategories: sorted.filter(c => !visible.includes(c)) };
+  }, [categories, formData.type, formData.category]);
   const dateInputRef = useRef(null);
   const isInitialOpenRef = useRef(true);
 
@@ -141,15 +162,17 @@ export default function AddTransactionDialog({
       });
       // If editing and no amountInGlobalCurrency exists, we'll recalculate it on submit
     } else {
+      const last = readLastChoices();
+      const usable = (n) => categories.some(c => c.name === n && (c.type === 'Expense' || c.type === 'Both'));
       const defaultCategory = categories.find(c => c.type === 'Expense' || c.type === 'Both');
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
         type: 'Expense',
-        category: defaultCategory?.name || '',
+        category: usable(last.category) ? last.category : (defaultCategory?.name || ''),
         description: '',
         amount: '',
-        currency: user?.currency || 'USD',
-        paymentMethod: '',
+        currency: last.currency || user?.currency || 'USD',
+        paymentMethod: last.paymentMethod || '',
         cardId: '',
         relatedAccountId: '',
         isRecurring: false,
@@ -202,10 +225,6 @@ export default function AddTransactionDialog({
       }
     }
 
-    if (!formData.description.trim()) {
-      newErrors.description = t('descriptionRequired');
-    }
-
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = t('amountGreaterThanZero');
     }
@@ -221,8 +240,10 @@ export default function AddTransactionDialog({
       return;
     }
 
+    rememberChoices(formData);
     await onSubmit({
       ...formData,
+      description: formData.description.trim() || translateCategory(formData.category, language),
       amount: parseFloat(formData.amount),
       amountInGlobalCurrency: conversionInfo.convertedAmount,
       exchangeRate: conversionInfo.exchangeRate,
@@ -247,7 +268,7 @@ export default function AddTransactionDialog({
               : t('addTransactionTitle')
             }
           </DialogTitle>
-          <DialogDescription className={cn("text-[10px] sm:text-sm hidden sm:block", colors.textTertiary)}>
+          <DialogDescription className={cn("text-xs sm:text-sm hidden sm:block", colors.textTertiary)}>
             {editTransaction && (editTransaction.id || editTransaction._id)
               ? t('updateTransactionDetails')
               : t('recordNewTransaction')
@@ -256,10 +277,98 @@ export default function AddTransactionDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4 mt-1.5 sm:mt-4">
+          <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="amount" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('amount')} *</Label>
+              <Input
+                id="amount"
+                type="number"
+                inputMode="decimal"
+                autoFocus={!editTransaction}
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                className={cn("h-14 text-3xl font-semibold tabular-nums", colors.bgTertiary, colors.border, colors.textPrimary, errors.amount && 'border-danger')}
+              />
+              {errors.amount && <p className="text-xs text-danger">{errors.amount}</p>}
+              {conversionInfo.needsConversion && formData.amount && parseFloat(formData.amount) > 0 && (
+                <p className={cn("text-xs", colors.textTertiary)}>
+                  {isLoadingRates ? (
+                    <span>Loading exchange rate...</span>
+                  ) : (
+                    <>
+                      ≈ {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: userCurrency,
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(conversionInfo.convertedAmount)}
+                      {conversionInfo.exchangeRate && (
+                        <span className="ms-1">
+                          (1 {formData.currency} = {conversionInfo.exchangeRate.toFixed(4)} {userCurrency})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+
+          <div className="space-y-1 sm:space-y-2">
+            <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
+            <div role="radiogroup" aria-label={t('category')} className="flex flex-wrap gap-2">
+              {quickCategories.map((category) => {
+                const active = formData.category === category.name;
+                return (
+                  <button
+                    key={category.id || category.name}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setFormData({ ...formData, category: category.name })}
+                    className={cn(
+                      "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors sm:min-h-9 sm:px-3",
+                      active ? "border-primary bg-primary/15 text-primary" : cn(colors.border, colors.textSecondary, "hover:bg-primary/10")
+                    )}
+                  >
+                    {translateCategory(category.name, language)}
+                  </button>
+                );
+              })}
+              {moreCategories.length > 0 && (
+                <Select value="" onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                  <SelectTrigger aria-label={t('category')} className={cn("h-11 w-auto min-w-[5.5rem] rounded-full text-sm sm:h-9", colors.bgTertiary, colors.border, colors.textSecondary)}>
+                    <SelectValue placeholder="…" />
+                  </SelectTrigger>
+                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                    {moreCategories.map((category) => (
+                      <SelectItem key={category.id || category.name} value={category.name} className={colors.textPrimary}>
+                        {translateCategory(category.name, language)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1 sm:space-y-2">
+            <Label htmlFor="description" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('description')} ({t('optional')})</Label>
+            <Textarea
+              id="description"
+              placeholder={t('descriptionPlaceholder')}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className={cn("text-xs sm:text-sm min-h-[44px] sm:min-h-[60px]", colors.bgTertiary, colors.border, colors.textPrimary, errors.description && 'border-danger')}
+            />
+            {errors.description && <p className="text-xs text-danger">{errors.description}</p>}
+          </div>
+
           <div className={cn("grid gap-2 sm:gap-4", formData.isRecurring ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
             {!formData.isRecurring && (
               <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="date" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('date')} *</Label>
+                <Label htmlFor="date" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('date')} *</Label>
                 <Input
                   ref={dateInputRef}
                   id="date"
@@ -277,14 +386,14 @@ export default function AddTransactionDialog({
                       }, 0);
                     }
                   }}
-                  className={cn("h-8 sm:h-10 text-xs sm:text-sm w-full", colors.bgTertiary, colors.border, colors.textPrimary, errors.date && 'border-red-500')}
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm w-full", colors.bgTertiary, colors.border, colors.textPrimary, errors.date && 'border-danger')}
                 />
-                {errors.date && <p className="text-[9px] sm:text-xs text-red-400">{errors.date}</p>}
+                {errors.date && <p className="text-xs text-danger">{errors.date}</p>}
               </div>
             )}
 
             <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="type" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
+              <Label htmlFor="type" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
               <Select
                 value={formData.type}
                 onValueChange={(value) => {
@@ -310,61 +419,7 @@ export default function AddTransactionDialog({
 
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="category" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
-              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                  {getFilteredCategories().map((category) => (
-                    <SelectItem key={category.id} value={category.name} className={colors.textPrimary}>
-                      {translateCategory(category.name, language)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="amount" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('amount')} *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary, errors.amount && 'border-red-500')}
-              />
-              {errors.amount && <p className="text-[9px] sm:text-xs text-red-400">{errors.amount}</p>}
-              {conversionInfo.needsConversion && formData.amount && parseFloat(formData.amount) > 0 && (
-                <p className={cn("text-[9px] sm:text-xs", colors.textTertiary)}>
-                  {isLoadingRates ? (
-                    <span>Loading exchange rate...</span>
-                  ) : (
-                    <>
-                      ≈ {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: userCurrency,
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(conversionInfo.convertedAmount)}
-                      {conversionInfo.exchangeRate && (
-                        <span className="ml-1">
-                          (1 {formData.currency} = {conversionInfo.exchangeRate.toFixed(4)} {userCurrency})
-                        </span>
-                      )}
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:gap-4">
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="currency" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('currency')} *</Label>
+              <Label htmlFor="currency" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('currency')} *</Label>
               <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
                 <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue />
@@ -382,7 +437,7 @@ export default function AddTransactionDialog({
             </div>
 
             <div className="space-y-1 sm:space-y-2">
-              <Label className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('paymentMethod')} ({t('optional')})</Label>
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('paymentMethod')} ({t('optional')})</Label>
               <Select
                 value={formData.paymentMethod}
                 onValueChange={(value) => {
@@ -405,17 +460,13 @@ export default function AddTransactionDialog({
             </div>
           </div>
 
-          <div className="space-y-1 sm:space-y-2">
-            <Label htmlFor="description" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('description')} *</Label>
-            <Textarea
-              id="description"
-              placeholder={t('descriptionPlaceholder')}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className={cn("text-xs sm:text-sm min-h-[60px] sm:min-h-[80px]", colors.bgTertiary, colors.border, colors.textPrimary, errors.description && 'border-red-500')}
-            />
-            {errors.description && <p className="text-[9px] sm:text-xs text-red-400">{errors.description}</p>}
-          </div>
+
+
+
+
+
+
+
 
           {/* Recurring Transaction Toggle - Only show for Expenses */}
           {formData.type === 'Expense' && (
@@ -447,7 +498,7 @@ export default function AddTransactionDialog({
           {/* Recurring Transaction Date Range */}
           {formData.isRecurring && (
             <div className="space-y-0 sm:space-y-2 p-1 sm:p-2 pt-0 sm:pt-1 pb-0 sm:pb-2 rounded-md -my-2 sm:my-0" style={{ backgroundColor: colors.bgTertiary }}>
-              <p className={cn("text-[10px] sm:text-xs mb-0 pb-0", colors.textTertiary)}>
+              <p className={cn("text-xs mb-0 pb-0", colors.textTertiary)}>
                 {(() => {
                   const helpText = t('recurringTransactionHelp');
                   if (helpText !== 'recurringTransactionHelp') {
@@ -462,7 +513,7 @@ export default function AddTransactionDialog({
               </p>
               <div className="grid grid-cols-2 gap-0 sm:gap-4">
                 <div className="space-y-0 sm:space-y-2">
-                  <Label htmlFor="recurringStartDate" className={cn("text-[10px] sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
+                  <Label htmlFor="recurringStartDate" className={cn("text-xs sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
                     {t('fromDate') || 'From Date'} *
                   </Label>
                   <Input
@@ -474,13 +525,13 @@ export default function AddTransactionDialog({
                       setErrors({ ...errors, recurringStartDate: '' });
                     }}
                     max={formData.recurringEndDate || undefined}
-                    className={cn("h-8 sm:h-10 text-xs sm:text-sm mt-0 sm:mt-0", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringStartDate && 'border-red-500')}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm mt-0 sm:mt-0", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringStartDate && 'border-danger')}
                   />
-                  {errors.recurringStartDate && <p className="text-[9px] sm:text-xs text-red-400">{errors.recurringStartDate}</p>}
+                  {errors.recurringStartDate && <p className="text-xs text-danger">{errors.recurringStartDate}</p>}
                 </div>
 
                 <div className="space-y-0 sm:space-y-2">
-                  <Label htmlFor="recurringEndDate" className={cn("text-[10px] sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
+                  <Label htmlFor="recurringEndDate" className={cn("text-xs sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
                     {t('toDate') || 'To Date'} *
                   </Label>
                   <Input
@@ -492,9 +543,9 @@ export default function AddTransactionDialog({
                       setErrors({ ...errors, recurringEndDate: '' });
                     }}
                     min={formData.recurringStartDate || undefined}
-                    className={cn("h-8 sm:h-10 text-xs sm:text-sm mt-0 sm:mt-0", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringEndDate && 'border-red-500')}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm mt-0 sm:mt-0", colors.bgPrimary, colors.border, colors.textPrimary, errors.recurringEndDate && 'border-danger')}
                   />
-                  {errors.recurringEndDate && <p className="text-[9px] sm:text-xs text-red-400">{errors.recurringEndDate}</p>}
+                  {errors.recurringEndDate && <p className="text-xs text-danger">{errors.recurringEndDate}</p>}
                 </div>
               </div>
             </div>
@@ -503,7 +554,7 @@ export default function AddTransactionDialog({
           {formData.paymentMethod === 'Card' && (
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div className="space-y-1 sm:space-y-2">
-                <Label className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>{t('selectCard')}</Label>
+                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('selectCard')}</Label>
                 <Select
                   value={formData.cardId}
                   onValueChange={(value) => setFormData({ ...formData, cardId: value, paymentMethod: 'Card' })}
@@ -531,8 +582,9 @@ export default function AddTransactionDialog({
                 </Select>
               </div>
 
+              {PORTFOLIO_ENABLED && (
               <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="relatedAccount" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
+                <Label htmlFor="relatedAccount" className={cn("text-xs sm:text-sm", colors.textSecondary)}>
                   {t('relatedAccount')}
                 </Label>
                 <Select
@@ -552,12 +604,13 @@ export default function AddTransactionDialog({
                   </SelectContent>
                 </Select>
               </div>
+              )}
             </div>
           )}
 
-          {formData.paymentMethod !== 'Card' && (
+          {formData.paymentMethod !== 'Card' && PORTFOLIO_ENABLED && (
             <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="relatedAccount" className={cn("text-[10px] sm:text-sm", colors.textSecondary)}>
+              <Label htmlFor="relatedAccount" className={cn("text-xs sm:text-sm", colors.textSecondary)}>
                 {t('relatedAccount')}
               </Label>
               <Select
@@ -579,24 +632,24 @@ export default function AddTransactionDialog({
             </div>
           )}
 
-          <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
+          <div className="sticky -bottom-3 z-10 -mx-3 flex gap-2 bg-popover/95 px-3 pb-3 pt-3 backdrop-blur sm:static sm:mx-0 sm:gap-3 sm:bg-transparent sm:p-0 sm:pt-4 sm:backdrop-blur-none">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className={cn("flex-1 h-8 sm:h-10 text-xs sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+              className={cn("flex-1 h-11 text-sm sm:h-10 sm:text-base bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
             >
               {t('cancel')}
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="flex-1 h-8 sm:h-10 text-xs sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="flex-1 h-11 text-sm sm:h-10 sm:text-base bg-primary hover:bg-primary/80 text-primary-foreground"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 me-1 sm:me-2 animate-spin" />
                   <span className="hidden sm:inline">{editTransaction && (editTransaction.id || editTransaction._id) ? t('updating') : t('adding')}</span>
                 </>
               ) : (

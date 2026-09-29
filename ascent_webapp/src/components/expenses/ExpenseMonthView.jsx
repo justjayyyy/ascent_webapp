@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingDown, TrendingUp, DollarSign, CreditCard, Banknote, Loader2, Search, X, ChevronLeft, ChevronRight, ArrowLeftRight, Wallet } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import NumberFlow from '@number-flow/react';
+import { motion } from 'motion/react';
+import DonutChart, { useDonutPalette } from '@/components/charts/DonutChart';
 import TransactionList from './TransactionList';
 import BudgetProgress from './BudgetProgress';
 import BlurValue from '../BlurValue';
@@ -13,8 +15,8 @@ import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useHousehold } from '@/hooks/useHousehold';
 
-const COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
 const CARD_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#14B8A6', '#EF4444', '#6366F1', '#F97316'];
 
 function ExpenseMonthView({
@@ -34,6 +36,8 @@ function ExpenseMonthView({
   const { user, colors, t, language, theme, isRTL } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'USD';
+  const palette = useDonutPalette();
+  const numLocale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
 
   // Fetch exchange rates on mount
   useEffect(() => {
@@ -46,14 +50,17 @@ function ExpenseMonthView({
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [personFilter, setPersonFilter] = useState('all');
+  const { members, isShared } = useHousehold();
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
-  const hasActiveFilters = searchQuery || categoryFilter !== 'all';
+  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || personFilter !== 'all';
 
   const clearFilters = useCallback(() => {
     setSearchQuery('');
     setCategoryFilter('all');
+    setPersonFilter('all');
     setCurrentPage(1);
   }, []);
 
@@ -85,11 +92,14 @@ function ExpenseMonthView({
       // Category filter
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
 
+      // Person filter (who added it)
+      if (personFilter !== 'all' && t.created_by !== personFilter) return false;
+
       return true;
     });
 
     return filtered;
-  }, [transactions, debouncedSearchQuery, categoryFilter]);
+  }, [transactions, debouncedSearchQuery, categoryFilter, personFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
@@ -101,7 +111,7 @@ function ExpenseMonthView({
   // Reset page when filters change (using debounced search)
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, categoryFilter]);
+  }, [debouncedSearchQuery, categoryFilter, personFilter]);
 
   // Adjust current page if it's beyond total pages (e.g., after deleting last transaction on a page)
   React.useEffect(() => {
@@ -223,6 +233,7 @@ function ExpenseMonthView({
     // Group by payment method
     const methodGroups = {};
     const cardIdToIndex = new Map(); // Track card color assignment
+    const cardLabel = t('card');
 
     expenseTransactions.forEach(t => {
       const amount = getConvertedAmount(t);
@@ -233,16 +244,16 @@ function ExpenseMonthView({
       if (method === 'Card' && t.cardId) {
         // For cards, group by cardId
         const card = cards.find(c => c.id === t.cardId);
-        const cardName = card
-          ? (user?.blurValues ? '••••••' : `${card.name || card.cardName || 'Card'} •••• ${card.lastFourDigits || ''}`)
-          : 'Card';
         const key = `Card_${t.cardId}`;
+        if (!cardIdToIndex.has(t.cardId)) {
+          cardIdToIndex.set(t.cardId, cardIdToIndex.size);
+        }
+        // A card that was deleted or deactivated still gets a distinct, numbered label
+        const cardName = card
+          ? (user?.blurValues ? '••••••' : `${card.name || card.cardName || cardLabel} •••• ${card.lastFourDigits || ''}`)
+          : `${cardLabel} ${cardIdToIndex.get(t.cardId) + 1}`;
 
         if (!methodGroups[key]) {
-          // Assign a color index to this card if not already assigned
-          if (!cardIdToIndex.has(t.cardId)) {
-            cardIdToIndex.set(t.cardId, cardIdToIndex.size);
-          }
           const colorIndex = cardIdToIndex.get(t.cardId);
 
           methodGroups[key] = {
@@ -283,7 +294,7 @@ function ExpenseMonthView({
       .sort((a, b) => b.total - a.total);
 
     return { breakdown, totalExpenses };
-  }, [transactions, userCurrency, rates, convertCurrency, cards, user?.blurValues]);
+  }, [transactions, userCurrency, rates, convertCurrency, cards, user?.blurValues, t]);
 
   if (isLoading) {
     return (
@@ -294,61 +305,38 @@ function ExpenseMonthView({
   }
 
   return (
-    <div className="space-y-3 sm:space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-4">
-        <Card className={cn(colors.cardBg, colors.cardBorder)}>
-          <CardHeader className="pb-1 sm:pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
-            <div className="flex items-center justify-between">
-              <CardTitle className={cn("text-[10px] sm:text-xs md:text-sm font-medium truncate", colors.textTertiary)}>{t('income')}</CardTitle>
-              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-green-400 flex-shrink-0" />
-            </div>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6 pb-2 sm:pb-3 md:pb-6">
-            <p className="text-sm sm:text-lg md:text-xl lg:text-2xl font-bold text-green-400 truncate">
-              <BlurValue blur={user?.blurValues}>
-                {formatCurrency(metrics.totalIncome, user?.currency)}
-              </BlurValue>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(colors.cardBg, colors.cardBorder)}>
-          <CardHeader className="pb-1 sm:pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
-            <div className="flex items-center justify-between">
-              <CardTitle className={cn("text-[10px] sm:text-xs md:text-sm font-medium truncate", colors.textTertiary)}>{t('expenses')}</CardTitle>
-              <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0" />
-            </div>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6 pb-2 sm:pb-3 md:pb-6">
-            <p className="text-sm sm:text-lg md:text-xl lg:text-2xl font-bold text-red-400 truncate">
-              <BlurValue blur={user?.blurValues}>
-                {formatCurrency(metrics.totalExpenses, user?.currency)}
-              </BlurValue>
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(colors.cardBg, colors.cardBorder)}>
-          <CardHeader className="pb-1 sm:pb-2 px-2 sm:px-6 pt-2 sm:pt-6">
-            <div className="flex items-center justify-between">
-              <CardTitle className={cn("text-[10px] sm:text-xs md:text-sm font-medium truncate", colors.textTertiary)}>{t('net')}</CardTitle>
-              <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-[#5C8374] flex-shrink-0" />
-            </div>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6 pb-2 sm:pb-3 md:pb-6">
-            <p className={`text-sm sm:text-lg md:text-xl lg:text-2xl font-bold truncate ${metrics.netAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              <BlurValue blur={user?.blurValues}>
-                {formatCurrency(metrics.netAmount, user?.currency)}
-              </BlurValue>
-            </p>
-          </CardContent>
-        </Card>
+    <div className="flex flex-col gap-3 sm:gap-6">
+      {/* Summary tiles */}
+      <div className="order-1 grid grid-cols-3 gap-2 sm:gap-4">
+        {[
+          { key: 'income', label: t('income'), value: metrics.totalIncome, Icon: TrendingUp, tone: 'text-success', chip: 'bg-success/15' },
+          { key: 'expenses', label: t('expenses'), value: metrics.totalExpenses, Icon: TrendingDown, tone: 'text-danger', chip: 'bg-danger/15' },
+          { key: 'net', label: t('net'), value: metrics.netAmount, Icon: DollarSign, tone: metrics.netAmount >= 0 ? 'text-success' : 'text-danger', chip: 'bg-primary/15' },
+        ].map(({ key, label, value, Icon, tone, chip }, i) => (
+          <motion.div key={key} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}>
+            <Card>
+              <CardContent className="p-3 sm:p-5">
+                <div className="flex items-center justify-between gap-1">
+                  <span className={cn("truncate text-xs sm:text-sm", colors.textTertiary)}>{label}</span>
+                  <span className={cn("hidden h-7 w-7 shrink-0 place-items-center rounded-lg sm:grid", chip, key === 'net' ? 'text-primary' : tone)}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+                <p className={cn("mt-1.5 truncate text-base font-bold tracking-tight sm:mt-3 sm:text-2xl lg:text-3xl", tone)}>
+                  {user?.blurValues ? <BlurValue blur /> : (
+                    <NumberFlow value={value} locales={numLocale} trend={0}
+                      format={{ style: 'currency', currency: user?.currency || 'USD', maximumFractionDigits: 0 }} />
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
       {/* Payment Methods Breakdown - Pie Chart */}
       {paymentMethodsBreakdown.breakdown.length > 0 && (
-        <Card className={cn(colors.cardBg, colors.cardBorder)}>
+        <Card className={cn(colors.cardBg, colors.cardBorder, "order-4 md:order-2")}>
           <CardHeader className="pb-2 sm:pb-2">
             <CardTitle className={cn("text-sm sm:text-base", colors.accentText)}>
               {t('expensesByPaymentMethod') || 'Expenses by Payment Method'}
@@ -358,101 +346,19 @@ function ExpenseMonthView({
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               {/* Pie Chart */}
               <div className="w-full sm:w-1/2 flex-shrink-0 sm:flex-shrink">
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie
-                      data={paymentMethodsBreakdown.breakdown}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={(props) => {
-                        const { value } = props;
-                        const total = paymentMethodsBreakdown.totalExpenses;
-                        if (total === 0) return false;
-                        const percent = (value / total) * 100;
-                        return percent >= 0.1;
-                      }}
-                      label={(props) => {
-                        const { name, value, x, y, cx } = props;
-                        const total = paymentMethodsBreakdown.totalExpenses;
-                        if (total === 0) return null;
-                        const percent = (value / total) * 100;
-                        if (percent < 0.1 || value === 0) return null;
-                        const percentStr = percent < 1 ? percent.toFixed(1) : percent.toFixed(0);
-                        const amountStr = user?.blurValues ? '••••' : formatCurrency(value, userCurrency);
-                        // Truncate long names
-                        const displayName = name.length > 12 ? name.substring(0, 10) + '...' : name;
-                        return (
-                          <g>
-                            <text
-                              x={x}
-                              y={y - 6}
-                              fill={theme === 'light' ? '#1e293b' : '#ffffff'}
-                              textAnchor={x > cx ? 'start' : 'end'}
-                              dominantBaseline="central"
-                              style={{ fontSize: '11px', fontWeight: '500' }}
-                            >
-                              {`${displayName} ${percentStr}%`}
-                            </text>
-                            <text
-                              x={x}
-                              y={y + 8}
-                              fill={theme === 'light' ? '#64748b' : '#9ca3af'}
-                              textAnchor={x > cx ? 'start' : 'end'}
-                              dominantBaseline="central"
-                              style={{ fontSize: '10px', fontWeight: '400' }}
-                            >
-                              {amountStr}
-                            </text>
-                          </g>
-                        );
-                      }}
-                      outerRadius={60}
-                      innerRadius={20}
-                      fill="#8884d8"
-                      dataKey="value"
-                      paddingAngle={2}
-                    >
-                      {paymentMethodsBreakdown.breakdown.map((entry, index) => {
-                        const getMethodColor = () => {
-                          // For cards, use the assigned color
-                          if (entry.method === 'Card' && entry.color) {
-                            return entry.color;
-                          }
-                          // For other methods, use default colors
-                          switch (entry.method) {
-                            case 'Cash': return '#10B981'; // emerald-400
-                            case 'Transfer': return '#A78BFA'; // purple-400
-                            case 'Paybox': return '#F59E0B'; // orange-400
-                            case 'PayPal': return '#06B6D4'; // cyan-400
-                            case 'Bit': return '#EAB308'; // yellow-400
-                            default: return '#9CA3AF'; // gray-400
-                          }
-                        };
-                        return (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={getMethodColor()}
-                            stroke={theme === 'light' ? '#ffffff' : '#092635'}
-                            strokeWidth={2}
-                          />
-                        );
-                      })}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
-                        border: `1px solid ${theme === 'light' ? '#e2e8f0' : '#5C8374'}`,
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
-                      itemStyle={{ color: theme === 'light' ? '#1e293b' : '#ffffff' }}
-                      formatter={(value, name) => [
-                        user?.blurValues ? '••••••' : formatCurrency(value, userCurrency),
-                        name
-                      ]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <DonutChart
+                  height={190}
+                  ariaLabel={t('expensesByPaymentMethod')}
+                  blur={!!user?.blurValues}
+                  formatValue={(v) => formatCurrency(v, userCurrency)}
+                  centerLabel={formatCurrency(paymentMethodsBreakdown.totalExpenses, userCurrency)}
+                  centerSub={t('expenses')}
+                  data={paymentMethodsBreakdown.breakdown.map((e) => ({
+                    name: e.name,
+                    value: e.value,
+                    color: e.method === 'Card' && e.color ? e.color : ({ Cash: '#10B981', Transfer: '#A78BFA', Paybox: '#F59E0B', PayPal: '#06B6D4', Bit: '#EAB308' }[e.method] || '#9CA3AF'),
+                  }))}
+                />
               </div>
 
               {/* Legend - Side by side on desktop, compact, hidden on mobile */}
@@ -486,8 +392,8 @@ function ExpenseMonthView({
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                        <span className={cn("text-[10px] sm:text-xs font-medium", colors.textTertiary)}>{percent}%</span>
-                        <span className={cn("text-xs sm:text-sm font-semibold min-w-[50px] sm:min-w-[60px] text-right", colors.textPrimary)}>
+                        <span className={cn("text-xs font-medium", colors.textTertiary)}>{percent}%</span>
+                        <span className={cn("text-xs sm:text-sm font-semibold min-w-[50px] sm:min-w-[60px] text-end", colors.textPrimary)}>
                           <BlurValue blur={user?.blurValues}>
                             {formatCurrency(entry.value, userCurrency)}
                           </BlurValue>
@@ -503,7 +409,7 @@ function ExpenseMonthView({
       )}
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="order-2 grid grid-cols-1 gap-4 md:order-3 md:grid-cols-2">
         {/* Budget Progress */}
         <BudgetProgress
           budgets={budgets}
@@ -514,99 +420,27 @@ function ExpenseMonthView({
         />
 
         {/* Expenses by Category */}
-        <Card className={cn(colors.cardBg, colors.cardBorder)}>
+        <Card className={cn(colors.cardBg, colors.cardBorder, !budgets?.length && 'md:col-span-2')}>
           <CardHeader className="pb-2 sm:pb-2">
             <CardTitle className={cn("text-sm sm:text-base", colors.accentText)}>{t('expensesByCategory')}</CardTitle>
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
             {categoryData.length > 0 ? (
-              <div className="flex flex-col gap-4">
+              <div className={cn("flex flex-col gap-4", !budgets?.length && "md:flex-row md:items-center")}>
                 {/* Chart */}
-                <div className="w-full">
-                  <ResponsiveContainer width="100%" height={180}>
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={(props) => {
-                          // Only show label line if label will be shown
-                          const { value } = props;
-                          const total = categoryData.reduce((sum, item) => sum + item.value, 0);
-                          if (total === 0) return false;
-                          const percent = (value / total) * 100;
-                          return percent >= 0.1;
-                        }}
-                        label={(props) => {
-                          const { name, value, x, y, cx } = props;
-                          const total = categoryData.reduce((sum, item) => sum + item.value, 0);
-                          if (total === 0) return null;
-                          const percent = (value / total) * 100;
-                          // Hide labels for slices smaller than 0.1% or 0 value
-                          if (percent < 0.1 || value === 0) return null;
-                          const percentStr = percent < 1 ? percent.toFixed(1) : percent.toFixed(0);
-                          const amountStr = user?.blurValues ? '••••' : formatCurrency(value, user?.currency);
-                          const categoryName = translateCategory(name, language);
-                          // Truncate long category names
-                          const displayName = categoryName.length > 12 ? categoryName.substring(0, 10) + '...' : categoryName;
-                          return (
-                            <g>
-                              <text
-                                x={x}
-                                y={y - 6}
-                                fill={theme === 'light' ? '#1e293b' : '#ffffff'}
-                                textAnchor={x > cx ? 'start' : 'end'}
-                                dominantBaseline="central"
-                                style={{ fontSize: '11px', fontWeight: '500' }}
-                              >
-                                {`${displayName} ${percentStr}%`}
-                              </text>
-                              <text
-                                x={x}
-                                y={y + 8}
-                                fill={theme === 'light' ? '#64748b' : '#9ca3af'}
-                                textAnchor={x > cx ? 'start' : 'end'}
-                                dominantBaseline="central"
-                                style={{ fontSize: '10px', fontWeight: '400' }}
-                              >
-                                {amountStr}
-                              </text>
-                            </g>
-                          );
-                        }}
-                        outerRadius={60}
-                        innerRadius={20}
-                        fill="#8884d8"
-                        dataKey="value"
-                        paddingAngle={2}
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                            stroke={theme === 'light' ? '#ffffff' : '#092635'}
-                            strokeWidth={2}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
-                          border: `1px solid ${theme === 'light' ? '#e2e8f0' : '#5C8374'}`,
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                        }}
-                        itemStyle={{ color: theme === 'light' ? '#1e293b' : '#ffffff' }}
-                        formatter={(value, name) => [
-                          user?.blurValues ? '••••••' : formatCurrency(value, user?.currency),
-                          translateCategory(name, language)
-                        ]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div className={cn("w-full", !budgets?.length && "md:w-1/2")}>
+                  <DonutChart
+                    height={190}
+                    ariaLabel={t('expensesByCategory')}
+                    blur={!!user?.blurValues}
+                    formatValue={(v) => formatCurrency(v, user?.currency)}
+                    centerLabel={formatCurrency(categoryData.reduce((sum, item) => sum + item.value, 0), user?.currency)}
+                    centerSub={t('expenses')}
+                    data={categoryData.map((e) => ({ name: translateCategory(e.name, language), value: e.value }))}
+                  />
                 </div>
                 {/* Category List - Hidden on mobile, visible on desktop */}
-                <div className="hidden sm:block space-y-2">
+                <div className={cn("hidden sm:block space-y-2", !budgets?.length && "md:w-1/2")}>
                   {categoryData.map((entry, index) => {
                     const total = categoryData.reduce((sum, item) => sum + item.value, 0);
                     const percent = ((entry.value / total) * 100).toFixed(0);
@@ -615,7 +449,7 @@ function ExpenseMonthView({
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            style={{ backgroundColor: palette[index % palette.length] || '#888' }}
                           />
                           <span className={cn("text-sm truncate", colors.textSecondary)}>
                             {translateCategory(entry.name, language)}
@@ -623,7 +457,7 @@ function ExpenseMonthView({
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={cn("text-xs font-medium", colors.textTertiary)}>{percent}%</span>
-                          <span className={cn("text-sm font-semibold min-w-[60px] text-right", colors.textPrimary)}>
+                          <span className={cn("text-sm font-semibold min-w-[60px] text-end", colors.textPrimary)}>
                             <BlurValue blur={user?.blurValues}>
                               {formatCurrency(entry.value, user?.currency)}
                             </BlurValue>
@@ -645,7 +479,7 @@ function ExpenseMonthView({
       </div>
 
       {/* Transaction List with Filters */}
-      <Card className={cn(colors.cardBg, colors.cardBorder)}>
+      <Card className={cn(colors.cardBg, colors.cardBorder, "order-3 md:order-4")}>
         <CardHeader className="pb-2 sm:pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -659,9 +493,9 @@ function ExpenseMonthView({
                 variant="ghost"
                 size="sm"
                 onClick={clearFilters}
-                className={cn("h-7 sm:h-8 text-xs sm:text-sm", colors.textTertiary, "hover:bg-[#5C8374]/20")}
+                className={cn("h-7 sm:h-8 text-xs sm:text-sm", colors.textTertiary, "hover:bg-primary/20")}
               >
-                <X className="w-3 h-3 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
+                <X className="w-3 h-3 sm:w-4 sm:h-4 me-0.5 sm:me-1" />
                 {t('clear')}
               </Button>
             )}
@@ -673,12 +507,13 @@ function ExpenseMonthView({
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className={cn(
-                "absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#5C8374]",
-                isRTL ? "right-2 sm:right-3" : "left-2 sm:left-3"
+                "absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary",
+                "start-2 sm:start-3"
               )} />
               <Input
                 type="text"
                 placeholder={t('searchTransactions') || 'Search...'}
+                aria-label={t('searchTransactions')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={cn(
@@ -686,15 +521,15 @@ function ExpenseMonthView({
                   colors.bgTertiary,
                   colors.border,
                   colors.textPrimary,
-                  isRTL ? "pr-9 text-right" : "pl-9"
+                  "ps-9"
                 )}
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
                   className={cn(
-                    "absolute top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[#5C8374]/20 transition-colors",
-                    isRTL ? "left-2" : "right-2"
+                    "absolute top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-primary/20 transition-colors",
+                    "end-2"
                   )}
                 >
                   <X className={cn("w-3 h-3", colors.textTertiary)} />
@@ -708,14 +543,14 @@ function ExpenseMonthView({
                 <SelectValue placeholder={t('allCategories')} />
               </SelectTrigger>
               <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                <SelectItem value="all" className={cn(colors.textPrimary, "hover:bg-[#5C8374]/20 focus:bg-[#5C8374]/20")}>
+                <SelectItem value="all" className={cn(colors.textPrimary, "hover:bg-primary/20 focus:bg-primary/20")}>
                   {t('allCategories')}
                 </SelectItem>
                 {categories.map((category) => (
                   <SelectItem
                     key={category.id || category.name}
                     value={category.nameKey || category.name}
-                    className={cn(colors.textPrimary, "hover:bg-[#5C8374]/20 focus:bg-[#5C8374]/20")}
+                    className={cn(colors.textPrimary, "hover:bg-primary/20 focus:bg-primary/20")}
                   >
                     {category.icon ? `${category.icon} ` : ''}{translateCategory(category.nameKey || category.name, language)}
                   </SelectItem>
@@ -723,6 +558,34 @@ function ExpenseMonthView({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Who added it: only meaningful when the workspace is shared */}
+          {isShared && (
+            <div role="group" aria-label={t('filterByPerson')} className="flex flex-wrap gap-2">
+              {[{ email: 'all', label: t('everyone') }, ...members.map((m) => ({ email: m.email, label: m.isMe ? t('me') : m.name, member: m }))].map((opt) => {
+                const active = personFilter === opt.email;
+                return (
+                  <button
+                    key={opt.email}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setPersonFilter(opt.email)}
+                    className={cn(
+                      "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors sm:min-h-9 sm:px-3",
+                      active ? "border-primary bg-primary/15 text-primary" : cn(colors.border, colors.textSecondary, "hover:bg-primary/10")
+                    )}
+                  >
+                    {opt.member && (
+                      <span aria-hidden className="grid h-5 w-5 place-items-center rounded-full text-xs font-semibold leading-none text-background" style={{ backgroundColor: opt.member.color }}>
+                        {opt.member.initials.slice(0, 1)}
+                      </span>
+                    )}
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Transaction List */}
           <TransactionList
@@ -746,7 +609,7 @@ function ExpenseMonthView({
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className={cn("h-8 w-8 p-0 bg-transparent hover:bg-[#5C8374]/20 disabled:opacity-50", colors.border, colors.textPrimary)}
+                  className={cn("h-8 w-8 p-0 bg-transparent hover:bg-primary/20 disabled:opacity-50", colors.border, colors.textPrimary)}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -758,7 +621,7 @@ function ExpenseMonthView({
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className={cn("h-8 w-8 p-0 bg-transparent hover:bg-[#5C8374]/20 disabled:opacity-50", colors.border, colors.textPrimary)}
+                  className={cn("h-8 w-8 p-0 bg-transparent hover:bg-primary/20 disabled:opacity-50", colors.border, colors.textPrimary)}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>

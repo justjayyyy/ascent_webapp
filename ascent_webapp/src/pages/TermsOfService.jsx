@@ -5,13 +5,13 @@ import { FileText } from 'lucide-react';
 export default function TermsOfService() {
   // Use default dark theme colors for public page
   const colors = {
-    bgPrimary: 'bg-[#092635]',
-    cardBg: 'bg-[#1B4242]',
-    cardBorder: 'border-[#5C8374]/20',
-    textPrimary: 'text-white',
-    textSecondary: 'text-[#9EC8B9]',
-    textTertiary: 'text-[#5C8374]',
-    accentText: 'text-[#9EC8B9]',
+    bgPrimary: 'bg-background',
+    cardBg: 'bg-card',
+    cardBorder: 'border-primary/20',
+    textPrimary: 'text-foreground',
+    textSecondary: 'text-muted-foreground',
+    textTertiary: 'text-primary',
+    accentText: 'text-muted-foreground',
   };
 
   // Simple translation function (fallback to English)
@@ -63,7 +63,7 @@ export default function TermsOfService() {
       <div className="max-w-4xl mx-auto py-8">
         <div className={`rounded-xl border p-6 md:p-8 ${colors.cardBg} ${colors.cardBorder}`}>
           <div className="flex items-center gap-3 mb-6">
-            <FileText className="w-6 h-6 text-[#5C8374]" />
+            <FileText className="w-6 h-6 text-primary" />
             <h1 className={`text-3xl font-bold ${colors.textPrimary}`}>
               {t('termsOfService')}
             </h1>
@@ -108,7 +108,7 @@ export default function TermsOfService() {
               <p className={`mb-2 ${colors.textSecondary}`}>
                 {t('accountRegistrationText')}
               </p>
-              <ul className={`list-disc list-inside space-y-2 mb-4 ml-4 ${colors.textSecondary}`}>
+              <ul className={`list-disc list-inside space-y-2 mb-4 ms-4 ${colors.textSecondary}`}>
                 <li>{t('provideAccurateInfo')}</li>
                 <li>{t('maintainAccountSecurity')}</li>
                 <li>{t('protectCredentials')}</li>
@@ -123,7 +123,7 @@ export default function TermsOfService() {
               <p className={`mb-2 ${colors.textSecondary}`}>
                 {t('useOfServiceText')}
               </p>
-              <ul className={`list-disc list-inside space-y-2 mb-4 ml-4 ${colors.textSecondary}`}>
+              <ul className={`list-disc list-inside space-y-2 mb-4 ms-4 ${colors.textSecondary}`}>
                 <li>{t('violateLaws')}</li>
                 <li>{t('infringeRights')}</li>
                 <li>{t('transmitHarmful')}</li>

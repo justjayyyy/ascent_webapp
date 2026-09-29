@@ -144,7 +144,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       <CardHeader className="drag-handle cursor-move">
         <div className="flex items-center justify-between">
           <CardTitle className={colors.accentText}>{t('budgetTracking')}</CardTitle>
-          <TrendingUp className="w-5 h-5 text-[#5C8374]" />
+          <TrendingUp className="w-5 h-5 text-primary" />
         </div>
       </CardHeader>
       <CardContent>
@@ -157,13 +157,13 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                     {translateCategory(budget.category, language)}
                   </span>
                   {budget.isOverBudget && (
-                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    <AlertCircle className="w-4 h-4 text-danger" />
                   )}
                   {budget.isAtLimit && (
-                    <CheckCircle className="w-4 h-4 text-orange-400" />
+                    <CheckCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                   )}
                   {budget.isNearLimit && (
-                    <AlertCircle className="w-4 h-4 text-yellow-400" />
+                    <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                   )}
                 </div>
                 <span className={cn("text-sm", colors.textTertiary)}>
@@ -178,12 +178,12 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                 className={cn("h-2", colors.bgTertiary)}
                 indicatorClassName={
                   budget.isOverBudget
-                    ? "bg-red-500"
+                    ? "bg-danger"
                     : budget.isAtLimit
                       ? "bg-orange-500"
                       : budget.isNearLimit
                         ? "bg-yellow-500"
-                        : "bg-green-500"
+                        : "bg-success"
                 }
               />
 
@@ -199,7 +199,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                 </span>
                 <span className={cn(
                   "font-medium",
-                  budget.isOverBudget ? "text-red-400" : "text-green-400"
+                  budget.isOverBudget ? "text-danger" : "text-success"
                 )}>
                   <BlurValue blur={user?.blurValues}>
                     {budget.remaining >= 0 ? '+' : ''}{formatCurrency(budget.remaining, userCurrency)}
@@ -208,19 +208,19 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
               </div>
 
               {budget.isOverBudget && (
-                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">
+                <div className="flex items-center gap-2 text-xs text-danger bg-danger/10 rounded-md px-2 py-1">
                   <AlertCircle className="w-3 h-3" />
                   {t('overBudgetBy')} {formatCurrency(Math.abs(budget.remaining), userCurrency)}
                 </div>
               )}
               {budget.isAtLimit && (
-                <div className="flex items-center gap-2 text-xs text-orange-400 bg-orange-500/10 rounded-md px-2 py-1">
+                <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-500/10 rounded-md px-2 py-1">
                   <CheckCircle className="w-3 h-3" />
                   {t('reachedLimit')}
                 </div>
               )}
               {budget.isNearLimit && (
-                <div className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-500/10 rounded-md px-2 py-1">
+                <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 rounded-md px-2 py-1">
                   <AlertCircle className="w-3 h-3" />
                   {t('approachingLimit')} ({budget.displayPercentage.toFixed(0)}%)
                 </div>

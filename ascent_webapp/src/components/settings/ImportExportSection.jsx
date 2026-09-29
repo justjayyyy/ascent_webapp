@@ -1,3 +1,4 @@
+import { PORTFOLIO_ENABLED } from '@/lib/features';
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,7 +90,7 @@ export default function ImportExportSection({ accounts, positions, transactions,
     <Card className={cn(colors.cardBg, colors.cardBorder)}>
       <CardHeader>
         <div className="flex items-center gap-3">
-          <FileText className="w-5 h-5 text-[#5C8374]" />
+          <FileText className="w-5 h-5 text-primary" />
           <CardTitle className={colors.accentText}>{t('exportData')}</CardTitle>
         </div>
       </CardHeader>
@@ -98,31 +99,33 @@ export default function ImportExportSection({ accounts, positions, transactions,
           {t('downloadDataCsv')}
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className={cn("grid grid-cols-2 gap-3", PORTFOLIO_ENABLED && "md:grid-cols-3")}>
+          {PORTFOLIO_ENABLED && (
           <Button
             onClick={() => handleExport('portfolio')}
             disabled={exporting || (!accounts?.length && !positions?.length)}
             variant="outline"
-            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
           >
             {exporting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 me-2" />
             )}
             {t('portfolio')}
           </Button>
+          )}
 
           <Button
             onClick={() => handleExport('expenses')}
             disabled={exporting || (!transactions?.length && !budgets?.length && !categories?.length && !cards?.length)}
             variant="outline"
-            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
           >
             {exporting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 me-2" />
             )}
             {t('expenses')}
           </Button>
@@ -131,12 +134,12 @@ export default function ImportExportSection({ accounts, positions, transactions,
             onClick={() => handleExport('notes')}
             disabled={exporting || !notes?.length}
             variant="outline"
-            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+            className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
           >
             {exporting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 me-2" />
             )}
             {t('notes')}
           </Button>

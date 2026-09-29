@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import path from 'path'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,6 +10,34 @@ export default defineConfig({
     react({
       // Ensure React is properly handled
       jsxRuntime: 'automatic',
+    }),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      manifest: {
+        name: 'Ascent',
+        short_name: 'Ascent',
+        description: 'Ascent - Personal Finance Tracker',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#090a12',
+        theme_color: '#090a12',
+        icons: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        // Never serve the SPA shell for API calls
+        navigateFallbackDenylist: [/^\/api\//],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globIgnores: ['**/logo-dark.png', '**/logo-light.png'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+      },
     }),
   ],
   resolve: {
@@ -80,7 +109,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     // Pre-bundle React to ensure it's available and deduplicated
-    include: ['react', 'react-dom', 'react/jsx-runtime'],
+    include: [
+      'react', 'react-dom', 'react/jsx-runtime',
+      // Bundle ECharts' entry points together up front so they share one copy of core
+      'echarts/core', 'echarts/charts', 'echarts/components', 'echarts/features', 'echarts/renderers', 'zrender',
+    ],
   },
   server: {
     proxy: {

@@ -5,7 +5,7 @@ import { useTheme } from '../../ThemeProvider';
 import { cn } from '@/lib/utils';
 
 // High contrast bar colors
-const BAR_COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+const BAR_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--success))', 'hsl(var(--danger))'];
 
 // Format large numbers for Y-axis with currency symbol
 const formatYAxisValue = (value, currency = 'USD') => {
@@ -24,11 +24,11 @@ export default function AssetAllocationWidget({ data, formatCurrency }) {
   const { colors, theme, user, t } = useTheme();
   
   const chartColors = {
-    text: theme === 'light' ? '#1e293b' : '#ffffff',
-    grid: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltip: theme === 'light' ? '#ffffff' : '#1B4242',
-    tooltipBorder: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltipText: theme === 'light' ? '#1e293b' : '#ffffff',
+    text: 'hsl(var(--foreground))',
+    grid: 'hsl(var(--border))',
+    tooltip: 'hsl(var(--popover))',
+    tooltipBorder: 'hsl(var(--border))',
+    tooltipText: 'hsl(var(--foreground))',
   };
 
   // Custom tooltip with proper text color

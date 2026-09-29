@@ -119,9 +119,9 @@ export default function AddGoalDialog({ open, onClose, onSubmit, isLoading, edit
               placeholder={t('goalTitlePlaceholder')}
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.title && 'border-red-500')}
+              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.title && 'border-danger')}
             />
-            {errors.title && <p className="text-xs text-red-400">{errors.title}</p>}
+            {errors.title && <p className="text-xs text-danger">{errors.title}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -168,9 +168,9 @@ export default function AddGoalDialog({ open, onClose, onSubmit, isLoading, edit
                 placeholder="0.00"
                 value={formData.targetAmount}
                 onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.targetAmount && 'border-red-500')}
+                className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.targetAmount && 'border-danger')}
               />
-              {errors.targetAmount && <p className="text-xs text-red-400">{errors.targetAmount}</p>}
+              {errors.targetAmount && <p className="text-xs text-danger">{errors.targetAmount}</p>}
             </div>
 
             <div className="space-y-2">
@@ -196,9 +196,9 @@ export default function AddGoalDialog({ open, onClose, onSubmit, isLoading, edit
               value={formData.targetDate}
               onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })}
               min={format(new Date(), 'yyyy-MM-dd')}
-              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.targetDate && 'border-red-500')}
+              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.targetDate && 'border-danger')}
             />
-            {errors.targetDate && <p className="text-xs text-red-400">{errors.targetDate}</p>}
+            {errors.targetDate && <p className="text-xs text-danger">{errors.targetDate}</p>}
           </div>
 
           <div className="space-y-2">
@@ -227,7 +227,7 @@ export default function AddGoalDialog({ open, onClose, onSubmit, isLoading, edit
                       id={`account-${account.id}`}
                       checked={formData.linkedAccountIds.includes(account.id)}
                       onCheckedChange={() => toggleAccount(account.id)}
-                      className="border-[#5C8374]/50"
+                      className="border-primary/50"
                     />
                     <label
                       htmlFor={`account-${account.id}`}
@@ -259,18 +259,18 @@ export default function AddGoalDialog({ open, onClose, onSubmit, isLoading, edit
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+              className={cn("flex-1 bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
             >
               {t('cancel')}
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="flex-1 bg-primary hover:bg-primary/80 text-primary-foreground"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   {editGoal ? t('updating') : t('adding')}
                 </>
               ) : (

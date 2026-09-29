@@ -21,7 +21,7 @@ import BlurValue from '../components/BlurValue';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import { useAuth } from '@/lib/AuthContext';
 
-const COLORS = ['#5C8374', '#9EC8B9', '#1B4242', '#60A5FA', '#A78BFA', '#F59E0B', '#EF4444'];
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--primary))', 'hsl(var(--destructive))'];
 
 export default function AccountDetail() {
   const { colors, theme, t, user: themeUser } = useTheme();
@@ -996,7 +996,7 @@ export default function AccountDetail() {
         <div className="text-center">
           <p className={cn("mb-4", colors.textPrimary)}>{t('accountNotFound')}</p>
           <Link to={createPageUrl('Portfolio')}>
-            <Button className="bg-[#5C8374] hover:bg-[#5C8374]/80">
+            <Button className="bg-primary hover:bg-primary/80">
               {t('backToPortfolio')}
             </Button>
           </Link>
@@ -1019,8 +1019,8 @@ export default function AccountDetail() {
         {/* Header */}
         <div className="mb-3 sm:mb-6 flex-shrink-0">
           <Link to={createPageUrl('Portfolio')}>
-            <Button variant="ghost" className={cn("mb-4 hover:bg-[#5C8374]/20", colors.textSecondary)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+            <Button variant="ghost" className={cn("mb-4 hover:bg-primary/20", colors.textSecondary)}>
+              <ArrowLeft className="w-4 h-4 me-2" />
               {t('backToPortfolio')}
             </Button>
           </Link>
@@ -1036,9 +1036,9 @@ export default function AccountDetail() {
                   <Button
                     onClick={() => setEditAccountOpen(true)}
                     variant="outline"
-                    className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                    className={cn("bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
                   >
-                    <Settings className="w-4 h-4 mr-2" />
+                    <Settings className="w-4 h-4 me-2" />
                     <span className="hidden sm:inline">Edit Account</span>
                   </Button>
                 </>
@@ -1047,9 +1047,9 @@ export default function AccountDetail() {
                 onClick={handleRefreshPrices}
                 disabled={refreshingPrices || positions.length === 0}
                 variant="outline"
-                className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                className={cn("bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${refreshingPrices ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 me-2 ${refreshingPrices ? 'animate-spin' : ''}`} />
                 {t('refreshPrices')}
               </Button>
               {hasPermission('editPortfolio') && (
@@ -1059,9 +1059,9 @@ export default function AccountDetail() {
                     setEditingDayTrade(null);
                     setAddPositionOpen(true);
                   }}
-                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                  className="bg-primary hover:bg-primary/80 text-primary-foreground"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="w-4 h-4 me-2" />
                   {t('addPosition')}
                 </Button>
               )}
@@ -1073,7 +1073,7 @@ export default function AccountDetail() {
         <div className="flex-shrink-0 mb-3 md:mb-6">
           <div className="flex flex-row flex-nowrap gap-2 md:gap-4 overflow-x-auto">
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalValue')}</p>
+              <p className={cn("text-xs md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalValue')}</p>
               {account?.baseCurrency && account.baseCurrency !== 'USD' && account.baseCurrency !== undefined ? (
                 <>
                   <p className={cn("text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words", colors.textPrimary)}>
@@ -1082,7 +1082,7 @@ export default function AccountDetail() {
                     </BlurValue>
                   </p>
                   {account.baseCurrency !== userCurrency && metrics.totalValue !== undefined && (
-                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                    <p className={cn("text-xs md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
                       {formatCurrency(metrics.totalValue, userCurrency)}
                     </p>
                   )}
@@ -1095,7 +1095,7 @@ export default function AccountDetail() {
                     </BlurValue>
                   </p>
                   {account.baseCurrency && account.baseCurrency !== userCurrency && metrics.originalTotalValue !== undefined && (
-                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                    <p className={cn("text-xs md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
                       {formatCurrency(metrics.originalTotalValue, account.baseCurrency)}
                     </p>
                   )}
@@ -1104,29 +1104,29 @@ export default function AccountDetail() {
             </div>
 
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
+              <p className={cn("text-xs md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
               {account?.baseCurrency && account.baseCurrency !== 'USD' && account.baseCurrency !== undefined ? (
                 <>
-                  <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.originalTotalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.originalTotalPnL >= 0 ? 'text-success' : 'text-danger'}`}>
                     <BlurValue blur={user?.blurValues} className="truncate">
                       {metrics.originalTotalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.originalTotalPnL, account.baseCurrency)}
                     </BlurValue>
                   </p>
                   {account.baseCurrency !== userCurrency && metrics.totalPnL !== undefined && (
-                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                    <p className={cn("text-xs md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
                       {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, userCurrency)}
                     </p>
                   )}
                 </>
               ) : (
                 <>
-                  <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.totalPnL >= 0 ? 'text-success' : 'text-danger'}`}>
                     <BlurValue blur={user?.blurValues} className="truncate">
                       {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL, userCurrency)}
                     </BlurValue>
                   </p>
                   {account.baseCurrency && account.baseCurrency !== userCurrency && metrics.originalTotalPnL !== undefined && (
-                    <p className={cn("text-[10px] md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
+                    <p className={cn("text-xs md:text-xs mt-1 w-full flex justify-center md:justify-start opacity-60", colors.textTertiary)}>
                       {metrics.originalTotalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.originalTotalPnL, account.baseCurrency)}
                     </p>
                   )}
@@ -1135,8 +1135,8 @@ export default function AccountDetail() {
             </div>
 
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
-              <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.totalPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={cn("text-xs md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
+              <p className={`text-xs sm:text-sm md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start min-w-0 break-words ${metrics.totalPnLPercent >= 0 ? 'text-success' : 'text-danger'}`}>
                 <BlurValue blur={user?.blurValues} className="truncate">
                   {metrics.totalPnLPercent >= 0 ? '+' : ''}{metrics.totalPnLPercent.toFixed(2)}%
                 </BlurValue>
@@ -1171,14 +1171,14 @@ export default function AccountDetail() {
                       <AreaChart data={getPerformanceData()}>
                         <defs>
                           <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#5C8374" stopOpacity={0.8} />
-                            <stop offset="95%" stopColor="#5C8374" stopOpacity={0.1} />
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.1} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e2e8f0' : '#5C8374'} opacity={0.2} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={'hsl(var(--border))'} opacity={0.2} />
                         <XAxis
                           dataKey="date"
-                          stroke={theme === 'light' ? '#64748b' : '#9EC8B9'}
+                          stroke={'hsl(var(--muted-foreground))'}
                           tick={{ fontSize: 12 }}
                           tickFormatter={(date) => {
                             const d = new Date(date);
@@ -1191,7 +1191,7 @@ export default function AccountDetail() {
                           minTickGap={40}
                         />
                         <YAxis
-                          stroke={theme === 'light' ? '#64748b' : '#9EC8B9'}
+                          stroke={'hsl(var(--muted-foreground))'}
                           tick={{ fontSize: 12 }}
                           tickFormatter={(value) => {
                             const symbols = { USD: '$', EUR: '€', GBP: '£', ILS: '₪', RUB: '₽' };
@@ -1207,11 +1207,11 @@ export default function AccountDetail() {
                             const data = payload[0].payload;
                             return (
                               <div style={{
-                                backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
-                                border: theme === 'light' ? '1px solid #cbd5e1' : '1px solid #5C8374',
+                                backgroundColor: 'hsl(var(--popover))',
+                                border: '1px solid hsl(var(--border))',
                                 borderRadius: '8px',
                                 padding: '8px 12px',
-                                color: theme === 'light' ? '#475569' : '#ffffff',
+                                color: 'hsl(var(--popover-foreground))',
                               }}>
                                 <p style={{ margin: '0 0 4px 0', fontWeight: '500' }}>{data.date}</p>
                                 <p style={{ margin: '0', fontSize: '14px', fontWeight: '600' }}>
@@ -1234,7 +1234,7 @@ export default function AccountDetail() {
                         <Area
                           type="monotone"
                           dataKey="value"
-                          stroke="#5C8374"
+                          stroke="hsl(var(--primary))"
                           strokeWidth={2}
                           fill="url(#colorValue)"
                           fillOpacity={1}
@@ -1275,7 +1275,7 @@ export default function AccountDetail() {
                               <text
                                 x={x}
                                 y={y}
-                                fill={theme === 'light' ? '#1e293b' : '#9EC8B9'}
+                                fill={'hsl(var(--foreground))'}
                                 textAnchor={x > cx ? 'start' : 'end'}
                                 dominantBaseline="central"
                                 style={{ fontSize, fontWeight: '500' }}
@@ -1285,7 +1285,7 @@ export default function AccountDetail() {
                             );
                           }}
                           outerRadius={80}
-                          fill="#8884d8"
+                          fill="hsl(var(--chart-1))"
                           dataKey="displayValue"
                           nameKey="name"
                         >
@@ -1295,16 +1295,16 @@ export default function AccountDetail() {
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
-                            border: theme === 'light' ? '1px solid #cbd5e1' : '1px solid #5C8374',
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
                             borderRadius: '8px',
-                            color: theme === 'light' ? '#475569' : '#ffffff',
+                            color: 'hsl(var(--popover-foreground))',
                           }}
                           itemStyle={{
-                            color: theme === 'light' ? '#475569' : '#ffffff',
+                            color: 'hsl(var(--popover-foreground))',
                           }}
                           labelStyle={{
-                            color: theme === 'light' ? '#475569' : '#ffffff',
+                            color: 'hsl(var(--popover-foreground))',
                           }}
                           formatter={(value, name, props) => {
                             // Use the converted value (already in display currency)
@@ -1328,7 +1328,7 @@ export default function AccountDetail() {
                   <CardContent className="p-2 md:p-6">
                     <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                       {chartData.slice(0, 6).map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded-lg" style={{ backgroundColor: 'rgba(92, 131, 116, 0.1)' }}>
+                        <div key={index} className="flex items-center justify-between p-2 md:p-3 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
                           <div className="flex items-center gap-1.5 md:gap-3 min-w-0 flex-1">
                             <div
                               className="w-2 h-2 md:w-3 md:h-3 rounded-full flex-shrink-0"
@@ -1336,7 +1336,7 @@ export default function AccountDetail() {
                             />
                             <span className={cn("font-medium text-xs md:text-base truncate", colors.textPrimary)}>{item.name}</span>
                           </div>
-                          <div className="text-right flex-shrink-0 ml-1">
+                          <div className="text-end flex-shrink-0 ms-1">
                             <p className={cn("font-semibold text-xs md:text-base", colors.textPrimary)}>
                               <BlurValue blur={user?.blurValues}>
                                 {formatCurrency(item.value, displayCurrency)}
@@ -1347,14 +1347,14 @@ export default function AccountDetail() {
                                 ? convertCurrency(item.value, displayCurrency, 'USD', rates)
                                 : null;
                               return usdValue !== null ? (
-                                <p className={cn("text-[10px] md:text-xs", colors.textTertiary)}>
+                                <p className={cn("text-xs md:text-xs", colors.textTertiary)}>
                                   <BlurValue blur={user?.blurValues}>
                                     {formatCurrency(usdValue, 'USD')}
                                   </BlurValue>
                                 </p>
                               ) : null;
                             })()}
-                            <p className={cn("text-[10px] md:text-sm", colors.textTertiary)}>
+                            <p className={cn("text-xs md:text-sm", colors.textTertiary)}>
                               <BlurValue blur={user?.blurValues}>
                                 {item.percentage}%
                               </BlurValue>
@@ -1432,10 +1432,10 @@ export default function AccountDetail() {
                       {selectedPositionSymbol ? (
                         <ResponsiveContainer width="100%" height={250}>
                           <LineChart data={getPositionPerformanceData(selectedPositionSymbol)}>
-                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e2e8f0' : '#5C8374'} opacity={0.2} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={'hsl(var(--border))'} opacity={0.2} />
                             <XAxis
                               dataKey="date"
-                              stroke={theme === 'light' ? '#64748b' : '#9EC8B9'}
+                              stroke={'hsl(var(--muted-foreground))'}
                               tick={{ fontSize: 12 }}
                               tickFormatter={(date) => {
                                 const d = new Date(date);
@@ -1458,7 +1458,7 @@ export default function AccountDetail() {
                               minTickGap={50}
                             />
                             <YAxis
-                              stroke={theme === 'light' ? '#64748b' : '#9EC8B9'}
+                              stroke={'hsl(var(--muted-foreground))'}
                               tick={{ fontSize: 12 }}
                               tickFormatter={(value) => {
                                 const symbols = { USD: '$', EUR: '€', GBP: '£', ILS: '₪', RUB: '₽' };
@@ -1470,30 +1470,30 @@ export default function AccountDetail() {
                             />
                             <Tooltip
                               contentStyle={{
-                                backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
-                                border: theme === 'light' ? '1px solid #cbd5e1' : '1px solid #5C8374',
+                                backgroundColor: 'hsl(var(--popover))',
+                                border: '1px solid hsl(var(--border))',
                                 borderRadius: '8px',
-                                color: theme === 'light' ? '#475569' : '#ffffff',
+                                color: 'hsl(var(--popover-foreground))',
                               }}
                               itemStyle={{
-                                color: theme === 'light' ? '#475569' : '#ffffff',
+                                color: 'hsl(var(--popover-foreground))',
                               }}
                               labelStyle={{
-                                color: theme === 'light' ? '#475569' : '#ffffff',
+                                color: 'hsl(var(--popover-foreground))',
                               }}
                               content={({ active, payload }) => {
                                 if (!active || !payload || !payload.length) return null;
                                 const data = payload[0].payload;
                                 return (
                                   <div style={{
-                                    backgroundColor: theme === 'light' ? '#ffffff' : '#1B4242',
-                                    border: theme === 'light' ? '1px solid #cbd5e1' : '1px solid #5C8374',
+                                    backgroundColor: 'hsl(var(--popover))',
+                                    border: '1px solid hsl(var(--border))',
                                     borderRadius: '8px',
                                     padding: '8px 12px',
-                                    color: theme === 'light' ? '#475569' : '#ffffff',
+                                    color: 'hsl(var(--popover-foreground))',
                                   }}>
                                     <p style={{ margin: '0 0 4px 0', fontWeight: '500' }}>{data.date}</p>
-                                    <p style={{ margin: '2px 0', color: '#5C8374' }}>
+                                    <p style={{ margin: '2px 0', color: 'hsl(var(--primary))' }}>
                                       {t('currentValue') || 'Value'}: {formatCurrency(data.value, displayCurrency)}
                                       {displayCurrency !== 'USD' && (() => {
                                         const usdValue = rates && Object.keys(rates).length > 0
@@ -1506,7 +1506,7 @@ export default function AccountDetail() {
                                         ) : null;
                                       })()}
                                     </p>
-                                    <p style={{ margin: '2px 0', color: '#9EC8B9' }}>
+                                    <p style={{ margin: '2px 0', color: 'hsl(var(--chart-2))' }}>
                                       {t('costBasis') || 'Cost'}: {formatCurrency(data.costBasis, displayCurrency)}
                                       {displayCurrency !== 'USD' && (() => {
                                         const usdValue = rates && Object.keys(rates).length > 0
@@ -1521,7 +1521,7 @@ export default function AccountDetail() {
                                     </p>
                                     <p style={{
                                       margin: '2px 0',
-                                      color: data.pnl >= 0 ? '#10b981' : '#ef4444',
+                                      color: data.pnl >= 0 ? 'hsl(var(--success))' : 'hsl(var(--danger))',
                                       fontWeight: '500'
                                     }}>
                                       P/L: {formatCurrency(data.pnl, displayCurrency)} ({data.pnlPercent >= 0 ? '+' : ''}{data.pnlPercent.toFixed(2)}%)
@@ -1543,7 +1543,7 @@ export default function AccountDetail() {
                             <Line
                               type="monotone"
                               dataKey="value"
-                              stroke="#5C8374"
+                              stroke="hsl(var(--primary))"
                               strokeWidth={2}
                               dot={false}
                               name="value"
@@ -1551,7 +1551,7 @@ export default function AccountDetail() {
                             <Line
                               type="monotone"
                               dataKey="costBasis"
-                              stroke="#9EC8B9"
+                              stroke="hsl(var(--chart-2))"
                               strokeWidth={2}
                               strokeDasharray="5 5"
                               dot={false}

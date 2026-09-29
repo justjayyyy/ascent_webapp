@@ -1,3 +1,4 @@
+import { PORTFOLIO_ENABLED } from '@/lib/features';
 import React, { useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -137,7 +138,7 @@ const SharedUserItem = memo(function SharedUserItem({
     <div className={cn("p-4 rounded-lg border", colors.bgTertiary, colors.border)}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className={cn("w-10 h-10 rounded-full bg-[#5C8374]/20 flex items-center justify-center font-semibold", colors.accentText)}>
+          <div className={cn("w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-semibold", colors.accentText)}>
             {user.displayName?.[0]?.toUpperCase() || user.invitedEmail[0].toUpperCase()}
           </div>
           <div>
@@ -156,9 +157,10 @@ const SharedUserItem = memo(function SharedUserItem({
             <Button
               type="button"
               size="icon"
+              aria-label={t('toggleDetails')}
               variant="ghost"
               onClick={toggleExpanded}
-              className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+              className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
             >
               {isExpanded ? (
                 <EyeOff className="w-4 h-4" />
@@ -169,9 +171,10 @@ const SharedUserItem = memo(function SharedUserItem({
             <Button
               type="button"
               size="icon"
+              aria-label={t('delete')}
               variant="ghost"
               onClick={handleDelete}
-              className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+              className="h-11 w-11 sm:h-8 sm:w-8 text-danger hover:text-danger hover:bg-danger/20"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -181,11 +184,11 @@ const SharedUserItem = memo(function SharedUserItem({
 
       {isExpanded && canManageUsers && (
         <div className={cn("mt-4 pt-4 border-t space-y-4", colors.borderLight)}>
-          {permissionsList.map((perm) => (
+          {permissionsList.filter((perm) => PORTFOLIO_ENABLED || !/Portfolio$/.test(perm.key)).map((perm) => (
             <div key={perm.key} className="space-y-2">
               <div className="flex items-center justify-between py-1">
                 <Label className={cn("text-sm", colors.textPrimary)}>{t(perm.label)}</Label>
-                <Switch
+                <Switch aria-label={t(perm.label)}
                   checked={user.permissions?.[perm.key] || false}
                   onCheckedChange={() => togglePermission(perm.key)}
                 />
@@ -195,7 +198,7 @@ const SharedUserItem = memo(function SharedUserItem({
               {perm.subResource && (
                 <Collapsible open={!!user.permissions?.[perm.key]}>
                   <CollapsibleContent>
-                    <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
+                    <div className={cn("ms-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
                       <div className="flex items-center justify-between mb-2">
                         <span className={cn("text-xs font-semibold uppercase", colors.textTertiary)}>
                           {t(perm.selectLabel) || 'Select Items'}
@@ -221,7 +224,7 @@ const SharedUserItem = memo(function SharedUserItem({
                       ) : perm.items.length === 0 ? (
                         <p className={cn("text-xs italic", colors.textTertiary)}>{t(perm.emptyLabel) || 'No items found'}</p>
                       ) : (
-                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="space-y-2 max-h-40 overflow-y-auto pe-2 custom-scrollbar">
                           {perm.items.map(item => (
                             <div key={item.id} className="flex items-center gap-2">
                               <Checkbox

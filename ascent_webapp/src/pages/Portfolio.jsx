@@ -309,20 +309,20 @@ export default function Portfolio() {
                     onClick={() => setEditMode(!editMode)}
                     variant="outline"
                     className={cn(
-                      "bg-transparent hover:bg-[#5C8374]/20",
+                      "bg-transparent hover:bg-primary/20",
                       colors.border,
                       colors.textSecondary,
-                      editMode && "bg-[#5C8374]/20"
+                      editMode && "bg-primary/20"
                     )}
                   >
-                    <Edit2 className="w-5 h-5 mr-2" />
+                    <Edit2 className="w-5 h-5 me-2" />
                     <span className="hidden sm:inline">{editMode ? t('done') : t('edit')}</span>
                   </Button>
                   <Button
                     onClick={() => setAddDialogOpen(true)}
-                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white shadow-lg"
+                    className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-lg"
                   >
-                    <Plus className="w-5 h-5 mr-2" />
+                    <Plus className="w-5 h-5 me-2" />
                     <span className="hidden sm:inline">{t('addAccount')}</span>
                     <span className="sm:hidden">{t('add')}</span>
                   </Button>
@@ -334,7 +334,7 @@ export default function Portfolio() {
           {/* Overall Summary */}
           <div className="flex flex-row flex-nowrap gap-2 md:gap-4 mb-3 md:mb-6 overflow-x-auto">
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPortfolioValue')}</p>
+              <p className={cn("text-xs md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPortfolioValue')}</p>
               <p className={cn("text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>
                   {formatCurrency(overallMetrics.totalValue, user?.currency)}
@@ -342,16 +342,16 @@ export default function Portfolio() {
               </p>
             </div>
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
-              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${overallMetrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={cn("text-xs md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalPnL')}</p>
+              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${overallMetrics.totalPnL >= 0 ? 'text-success' : 'text-danger'}`}>
                 <BlurValue blur={user?.blurValues}>
                   {overallMetrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(overallMetrics.totalPnL, user?.currency)}
                 </BlurValue>
               </p>
             </div>
             <div className={cn("flex-shrink-0 flex-1 rounded-lg md:rounded-xl p-3 md:p-6 border min-w-0 flex flex-col justify-center", colors.cardBg, colors.cardBorder)}>
-              <p className={cn("text-[10px] md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
-              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${overallPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={cn("text-xs md:text-sm mb-2 md:mb-2 w-full flex justify-center md:justify-start opacity-80", colors.textTertiary)}>{t('totalReturn')}</p>
+              <p className={`text-sm md:text-3xl font-bold leading-tight w-full flex justify-center md:justify-start ${overallPnLPercent >= 0 ? 'text-success' : 'text-danger'}`}>
                 {overallPnLPercent >= 0 ? '+' : ''}{overallPnLPercent.toFixed(2)}%
               </p>
             </div>
@@ -366,7 +366,7 @@ export default function Portfolio() {
         ) : accounts.length === 0 ? (
           <div className={cn("text-center py-16 rounded-xl border", colors.cardBg, colors.cardBorder)}>
             <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-[#5C8374]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Plus className={cn("w-8 h-8", colors.accentText)} />
               </div>
               <h3 className={cn("text-xl font-semibold mb-2", colors.textPrimary)}>{t('noAccountsYetTitle')}</h3>
@@ -376,9 +376,9 @@ export default function Portfolio() {
               {hasPermission('editPortfolio') && (
                 <Button
                   onClick={() => setAddDialogOpen(true)}
-                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                  className="bg-primary hover:bg-primary/80 text-primary-foreground"
                 >
-                  <Plus className="w-5 h-5 mr-2" />
+                  <Plus className="w-5 h-5 me-2" />
                   {t('createYourFirstAccount')}
                 </Button>
               )}

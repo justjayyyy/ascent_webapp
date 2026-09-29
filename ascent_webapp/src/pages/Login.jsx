@@ -26,9 +26,9 @@ export default function Login() {
   const { t } = useTheme();
 
   // Get redirect URL, but exclude public pages (terms-of-service, privacy-policy, login)
-  const rawRedirectUrl = searchParams.get('redirect') || '/Portfolio';
+  const rawRedirectUrl = searchParams.get('redirect') || '/Dashboard';
   const publicPages = ['/terms-of-service', '/privacy-policy', '/login'];
-  const redirectUrl = publicPages.includes(rawRedirectUrl) ? '/Portfolio' : rawRedirectUrl;
+  const redirectUrl = publicPages.includes(rawRedirectUrl) ? '/Dashboard' : rawRedirectUrl;
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -260,24 +260,24 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-[#092635] flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div className="bg-background flex items-center justify-center p-2 sm:p-4 overflow-hidden" style={{ height: '100dvh', minHeight: '100vh', maxHeight: '100dvh', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
       <div className="w-full max-w-md flex flex-col items-center justify-center max-h-full overflow-hidden pt-2 sm:pt-0 pb-2">
         {/* Logo */}
         <div className="text-center mb-2 sm:mb-8 flex-shrink-0">
           <img
             src="/logo-dark.png"
-            alt="Ascend Logo"
+            alt="Ascent logo"
             className="object-contain mx-auto mb-1 sm:mb-3 h-[70px] sm:h-[120px] w-auto"
             style={{ filter: 'brightness(1.1) saturate(1.2)' }}
           />
-          <h1 className="text-2xl sm:text-4xl font-bold text-[#9EC8B9] mb-1 sm:mb-2">{t('ascend')}</h1>
-          <p className="text-xs sm:text-base text-[#5C8374]">{t('ascendTagline')}</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-muted-foreground mb-1 sm:mb-2">{t('ascend')}</h1>
+          <p className="text-xs sm:text-base text-primary">{t('ascendTagline')}</p>
         </div>
 
-        <Card className="bg-[#1B4242] border-[#5C8374]/30 mb-2 sm:mb-0 flex-shrink-0 w-full">
+        <Card className="bg-card border-primary/30 mb-2 sm:mb-0 flex-shrink-0 w-full">
           <CardHeader className="text-center pb-2 sm:pb-6">
-            <CardTitle className="text-base sm:text-xl text-[#9EC8B9]">{t('welcome')}</CardTitle>
-            <CardDescription className="text-xs sm:text-sm text-[#5C8374]">
+            <CardTitle className="text-base sm:text-xl text-muted-foreground">{t('welcome')}</CardTitle>
+            <CardDescription className="text-xs sm:text-sm text-primary">
               {t('signInToAccount')}
             </CardDescription>
           </CardHeader>
@@ -330,26 +330,26 @@ export default function Login() {
                 {/* Divider */}
                 <div className="relative my-2 sm:my-6">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[#5C8374]/30"></div>
+                    <div className="w-full border-t border-primary/30"></div>
                   </div>
                   <div className="relative flex justify-center text-xs sm:text-sm">
-                    <span className="px-2 bg-[#1B4242] text-[#5C8374]">{t('orContinueWithEmail')}</span>
+                    <span className="px-2 bg-card text-primary">{t('orContinueWithEmail')}</span>
                   </div>
                 </div>
               </div>
             )}
 
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-[#092635] h-9 sm:h-10">
+              <TabsList className="grid w-full grid-cols-2 bg-background h-9 sm:h-10">
                 <TabsTrigger
                   value="login"
-                  className="text-xs sm:text-sm data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
+                  className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   {t('login')}
                 </TabsTrigger>
                 <TabsTrigger
                   value="register"
-                  className="text-xs sm:text-sm data-[state=active]:bg-[#5C8374] data-[state=active]:text-white"
+                  className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   {t('register')}
                 </TabsTrigger>
@@ -358,7 +358,7 @@ export default function Login() {
               <TabsContent value="login" className="mt-2 sm:mt-6">
                 <form onSubmit={handleLogin} className="space-y-2 sm:space-y-4">
                   <div className="space-y-1 sm:space-y-2">
-                    <Label htmlFor="login-email" className="text-xs sm:text-sm text-[#9EC8B9]">{t('email')}</Label>
+                    <Label htmlFor="login-email" className="text-xs sm:text-sm text-muted-foreground">{t('email')}</Label>
                     <Input
                       id="login-email"
                       type="email"
@@ -366,11 +366,11 @@ export default function Login() {
                       value={loginData.email}
                       onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                       required
-                      className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                      className="h-9 sm:h-10 text-sm bg-background border-primary/50 text-foreground placeholder:text-primary/50"
                     />
                   </div>
                   <div className="space-y-1 sm:space-y-2">
-                    <Label htmlFor="login-password" className="text-xs sm:text-sm text-[#9EC8B9]">{t('password')}</Label>
+                    <Label htmlFor="login-password" className="text-xs sm:text-sm text-muted-foreground">{t('password')}</Label>
                     <div className="relative">
                       <Input
                         id="login-password"
@@ -379,12 +379,12 @@ export default function Login() {
                         value={loginData.password}
                         onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                         required
-                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-9 sm:pr-10"
+                        className="h-9 sm:h-10 text-sm bg-background border-primary/50 text-foreground placeholder:text-primary/50 pe-9 sm:pe-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[#5C8374] hover:text-[#9EC8B9]"
+                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-primary hover:text-muted-foreground"
                       >
                         {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                       </button>
@@ -392,12 +392,12 @@ export default function Login() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                    className="w-full h-9 sm:h-10 text-sm sm:text-base bg-primary hover:bg-primary/80 text-primary-foreground"
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="w-4 h-4 me-2 animate-spin" />
                         {t('signingIn')}
                       </>
                     ) : (
@@ -411,18 +411,18 @@ export default function Login() {
                 <form onSubmit={handleRegister} className="space-y-2 sm:space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                     <div className="space-y-1 sm:space-y-2">
-                      <Label htmlFor="register-name" className="text-xs sm:text-sm text-[#9EC8B9]">{t('fullName')}</Label>
+                      <Label htmlFor="register-name" className="text-xs sm:text-sm text-muted-foreground">{t('fullName')}</Label>
                       <Input
                         id="register-name"
                         type="text"
                         placeholder="John Doe"
                         value={registerData.full_name}
                         onChange={(e) => setRegisterData({ ...registerData, full_name: e.target.value })}
-                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                        className="h-9 sm:h-10 text-sm bg-background border-primary/50 text-foreground placeholder:text-primary/50"
                       />
                     </div>
                     <div className="space-y-1 sm:space-y-2">
-                      <Label htmlFor="register-email" className="text-xs sm:text-sm text-[#9EC8B9]">{t('email')}</Label>
+                      <Label htmlFor="register-email" className="text-xs sm:text-sm text-muted-foreground">{t('email')}</Label>
                       <Input
                         id="register-email"
                         type="email"
@@ -430,13 +430,13 @@ export default function Login() {
                         value={registerData.email}
                         onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
                         required
-                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                        className="h-9 sm:h-10 text-sm bg-background border-primary/50 text-foreground placeholder:text-primary/50"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                     <div className="space-y-1 sm:space-y-2">
-                      <Label htmlFor="register-password" className="text-xs sm:text-sm text-[#9EC8B9]">{t('password')}</Label>
+                      <Label htmlFor="register-password" className="text-xs sm:text-sm text-muted-foreground">{t('password')}</Label>
                       <div className="relative">
                         <Input
                           id="register-password"
@@ -446,19 +446,19 @@ export default function Login() {
                           onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                           required
                           minLength={6}
-                          className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50 pr-9 sm:pr-10"
+                          className="h-9 sm:h-10 text-sm bg-background border-primary/50 text-foreground placeholder:text-primary/50 pe-9 sm:pe-10"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[#5C8374] hover:text-[#9EC8B9]"
+                          className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-primary hover:text-muted-foreground"
                         >
                           {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                         </button>
                       </div>
                     </div>
                     <div className="space-y-1 sm:space-y-2">
-                      <Label htmlFor="register-confirm" className="text-xs sm:text-sm text-[#9EC8B9]">{t('confirmPassword')}</Label>
+                      <Label htmlFor="register-confirm" className="text-xs sm:text-sm text-muted-foreground">{t('confirmPassword')}</Label>
                       <Input
                         id="register-confirm"
                         type="password"
@@ -466,18 +466,18 @@ export default function Login() {
                         value={registerData.confirmPassword}
                         onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
                         required
-                        className="h-9 sm:h-10 text-sm bg-[#092635] border-[#5C8374]/50 text-white placeholder:text-[#5C8374]/50"
+                        className="h-9 sm:h-10 text-sm bg-background border-primary/50 text-foreground placeholder:text-primary/50"
                       />
                     </div>
                   </div>
                   <Button
                     type="submit"
-                    className="w-full h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                    className="w-full h-9 sm:h-10 text-sm sm:text-base bg-primary hover:bg-primary/80 text-primary-foreground"
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="w-4 h-4 me-2 animate-spin" />
                         {t('creatingAccount')}
                       </>
                     ) : (
@@ -492,20 +492,20 @@ export default function Login() {
 
         {/* Footer with legal links */}
         <div className="mt-2 sm:mt-4 text-center flex-shrink-0">
-          <p className="text-xs sm:text-sm text-[#5C8374] mb-1 sm:mb-2">
+          <p className="text-xs sm:text-sm text-primary mb-1 sm:mb-2">
             By signing in, you agree to our
           </p>
           <div className="flex items-center justify-center gap-2 sm:gap-4 flex-wrap">
             <Link
               to="/privacy-policy"
-              className="text-xs sm:text-sm text-[#9EC8B9] hover:text-[#5C8374] underline transition-colors"
+              className="text-xs sm:text-sm text-muted-foreground hover:text-primary underline transition-colors"
             >
               {t('privacyPolicy') || 'Privacy Policy'}
             </Link>
-            <span className="text-[#5C8374]">•</span>
+            <span className="text-primary">•</span>
             <Link
               to="/terms-of-service"
-              className="text-xs sm:text-sm text-[#9EC8B9] hover:text-[#5C8374] underline transition-colors"
+              className="text-xs sm:text-sm text-muted-foreground hover:text-primary underline transition-colors"
             >
               {t('termsOfService') || 'Terms of Service'}
             </Link>

@@ -157,18 +157,18 @@ export default function AddAccountDialog({ open, onClose, onSubmit, isLoading, e
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+              className={cn("flex-1 bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
             >
               {t('cancel')}
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="flex-1 bg-primary hover:bg-primary/80 text-primary-foreground"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   {editAccount ? 'Updating...' : t('creating')}
                 </>
               ) : (

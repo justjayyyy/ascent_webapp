@@ -52,7 +52,7 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#5C8374]" />
+            <Filter className="w-4 h-4 text-primary" />
             <h3 className={cn("font-semibold", colors.accentText)}>{t('filters')}</h3>
           </div>
           {hasActiveFilters && (
@@ -60,9 +60,9 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
               variant="ghost"
               size="sm"
               onClick={onClearFilters}
-              className={cn(colors.textTertiary, "hover:bg-[#5C8374]/20")}
+              className={cn(colors.textTertiary, "hover:bg-primary/20")}
             >
-              <X className="w-4 h-4 mr-1" />
+              <X className="w-4 h-4 me-1" />
               {t('clear')}
             </Button>
           )}
@@ -72,8 +72,8 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
           {/* Search Input */}
           <div className="relative">
             <Search className={cn(
-              "absolute top-1/2 -translate-y-1/2 w-4 h-4 text-[#5C8374]",
-              isRTL ? "right-3" : "left-3"
+              "absolute top-1/2 -translate-y-1/2 w-4 h-4 text-primary",
+              "start-3"
             )} />
             <Input
               type="text"
@@ -84,15 +84,15 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
                 colors.bgTertiary,
                 colors.border,
                 colors.textPrimary,
-                isRTL ? "pr-10 text-right" : "pl-10"
+                "ps-10"
               )}
             />
             {searchQuery && (
               <button
                 onClick={() => onSearchChange?.('')}
                 className={cn(
-                  "absolute top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[#5C8374]/20 transition-colors",
-                  isRTL ? "left-2" : "right-2"
+                  "absolute top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-primary/20 transition-colors",
+                  "end-2"
                 )}
               >
                 <X className={cn("w-4 h-4", colors.textTertiary)} />
@@ -106,7 +106,7 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
               variant="outline"
               size="sm"
               onClick={() => handleQuickFilter('today')}
-              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
             >
               {t('today')}
             </Button>
@@ -114,7 +114,7 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
               variant="outline"
               size="sm"
               onClick={() => handleQuickFilter('week')}
-              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
             >
               {t('last7Days')}
             </Button>
@@ -122,7 +122,7 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
               variant="outline"
               size="sm"
               onClick={() => handleQuickFilter('month')}
-              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
             >
               {t('thisMonth')}
             </Button>
@@ -130,7 +130,7 @@ export default function TransactionFilters({ filters, onFilterChange, onClearFil
               variant="outline"
               size="sm"
               onClick={() => handleQuickFilter('all')}
-              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-[#5C8374]/20")}
+              className={cn(colors.bgTertiary, colors.border, colors.textSecondary, "hover:bg-primary/20")}
             >
               {t('allTime')}
             </Button>

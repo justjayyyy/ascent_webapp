@@ -111,7 +111,7 @@ export default function CategoryManager({
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-red-400 bg-red-500/10 rounded-md px-2 sm:px-3 py-1.5 sm:py-2">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-danger bg-danger/10 rounded-md px-2 sm:px-3 py-1.5 sm:py-2">
               <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
               {error}
             </div>
@@ -120,12 +120,12 @@ export default function CategoryManager({
           <Button
             type="submit"
             disabled={isLoading || !formData.name.trim()}
-            className="w-full h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+            className="w-full h-9 sm:h-10 text-sm sm:text-base bg-primary hover:bg-primary/80 text-primary-foreground"
           >
             {isLoading ? (
-              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 me-1.5 sm:me-2 animate-spin" />
             ) : (
-              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 me-1.5 sm:me-2" />
             )}
             {t('addCategory') || 'Add Category'}
           </Button>
@@ -153,18 +153,19 @@ export default function CategoryManager({
                         </span>
                         <span 
                           className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: category.color || '#5C8374' }}
+                          style={{ backgroundColor: category.color || 'hsl(var(--primary))' }}
                         />
-                        <span className={cn("text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded flex-shrink-0", colors.textTertiary, colors.bgTertiary)}>
+                        <span className={cn("text-xs px-1.5 sm:px-2 py-0.5 rounded flex-shrink-0", colors.textTertiary, colors.bgTertiary)}>
                           {category.type === 'Expense' ? t('expense') : category.type === 'Income' ? t('income') : category.type}
                         </span>
                       </div>
                       {canEdit && (
                         <Button
                           size="icon"
+                          aria-label={t('delete')}
                           variant="ghost"
                           onClick={() => onDelete(category.id)}
-                          className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20 flex-shrink-0"
+                          className="h-7 w-7 sm:h-8 sm:w-8 text-danger hover:text-danger hover:bg-danger/20 flex-shrink-0"
                         >
                           <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </Button>

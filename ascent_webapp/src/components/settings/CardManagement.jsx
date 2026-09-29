@@ -96,16 +96,16 @@ export default function CardManagement({ user: propUser }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <CreditCard className="w-5 h-5 text-[#5C8374]" />
+            <CreditCard className="w-5 h-5 text-primary" />
             <CardTitle className={colors.accentText}>{t('paymentCards')}</CardTitle>
           </div>
           {!isAdding && (
             <Button
               onClick={() => setIsAdding(true)}
               size="sm"
-              className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="bg-primary hover:bg-primary/80 text-primary-foreground"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 me-2" />
               {t('addCard')}
             </Button>
           )}
@@ -152,9 +152,9 @@ export default function CardManagement({ user: propUser }) {
               <div className="flex gap-2">
                 <Button
                   onClick={handleSubmit}
-                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white flex-1"
+                  className="bg-primary hover:bg-primary/80 text-primary-foreground flex-1"
                 >
-                  <Check className="w-4 h-4 mr-2" />
+                  <Check className="w-4 h-4 me-2" />
                   {editingCard ? 'Update' : 'Add'}
                 </Button>
                 <Button
@@ -162,7 +162,7 @@ export default function CardManagement({ user: propUser }) {
                   variant="outline"
                   className={cn("flex-1", colors.border, colors.textSecondary)}
                 >
-                  <X className="w-4 h-4 mr-2" />
+                  <X className="w-4 h-4 me-2" />
                   Cancel
                 </Button>
               </div>
@@ -203,7 +203,7 @@ export default function CardManagement({ user: propUser }) {
                     onClick={() => deleteCardMutation.mutate(card.id)}
                     size="icon"
                     variant="ghost"
-                    className="text-red-400 hover:text-red-300"
+                    className="text-danger hover:text-danger"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

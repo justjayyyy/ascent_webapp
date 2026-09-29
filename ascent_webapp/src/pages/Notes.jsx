@@ -219,7 +219,7 @@ function Notes() {
               <h1 className={cn("text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-0.5 sm:mb-2", colors.textPrimary)}>
                 {t('notes') || 'Notes'}
               </h1>
-              <p className={cn("text-[10px] sm:text-base hidden sm:block", colors.textTertiary)}>
+              <p className={cn("text-xs sm:text-base hidden sm:block", colors.textTertiary)}>
                 {t('notesDescription') || 'Your personal notes and ideas'}
               </p>
             </div>
@@ -228,7 +228,7 @@ function Notes() {
                 onClick={openNewNote}
                 size="sm"
                 className={cn(
-                  "bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-6 sm:h-10 text-xs sm:text-base px-2.5 sm:px-4 py-1 sm:py-2",
+                  "bg-primary hover:bg-primary/80 text-primary-foreground h-6 sm:h-10 text-xs sm:text-base px-2.5 sm:px-4 py-1 sm:py-2",
                   "w-auto rounded-md shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 sm:gap-2"
                 )}
               >
@@ -243,16 +243,17 @@ function Notes() {
             <Search className={cn(
               "absolute top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4",
               colors.textTertiary,
-              isRTL ? "right-2 sm:right-3" : "left-2 sm:left-3"
+              "start-2 sm:start-3"
             )} />
             <Input
               type="text"
               placeholder={t('searchNotes') || 'Search notes...'}
+              aria-label={t('searchNotes')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={cn(
                 "h-7 sm:h-10 text-xs sm:text-sm", colors.bgSecondary, colors.border, colors.textPrimary,
-                isRTL ? "pr-7 sm:pr-10 text-right" : "pl-7 sm:pl-10"
+                "ps-7 sm:ps-10"
               )}
               dir={isRTL ? 'rtl' : 'ltr'}
             />
@@ -272,7 +273,7 @@ function Notes() {
             {pinnedNotes.length > 0 && (
               <div className="mb-3 sm:mb-8">
                 <h2 className={cn(
-                  "text-[10px] sm:text-sm font-medium mb-1.5 sm:mb-4 flex items-center gap-1 sm:gap-2",
+                  "text-xs sm:text-sm font-medium mb-1.5 sm:mb-4 flex items-center gap-1 sm:gap-2",
                   colors.textTertiary,
                   isRTL && "flex-row-reverse justify-end"
                 )}>
@@ -302,7 +303,7 @@ function Notes() {
             {unpinnedNotes.length > 0 && (
               <div>
                 {pinnedNotes.length > 0 && (
-                  <h2 className={cn("text-[10px] sm:text-sm font-medium mb-1.5 sm:mb-4", colors.textTertiary, isRTL && "text-right")}>
+                  <h2 className={cn("text-xs sm:text-sm font-medium mb-1.5 sm:mb-4", colors.textTertiary, isRTL && "text-right")}>
                     {t('others') || 'Others'}
                   </h2>
                 )}
@@ -359,7 +360,7 @@ function Notes() {
 
               {/* Color Picker */}
               <div>
-                <label className={cn("text-[10px] sm:text-sm font-medium mb-1 sm:mb-2 block", colors.textSecondary)}>
+                <label className={cn("text-xs sm:text-sm font-medium mb-1 sm:mb-2 block", colors.textSecondary)}>
                   {t('noteColor') || 'Color'}
                 </label>
                 <div className="flex gap-1.5 sm:gap-2 flex-wrap">
@@ -379,18 +380,18 @@ function Notes() {
 
               {/* Tags */}
               <div>
-                <label className={cn("text-[10px] sm:text-sm font-medium mb-1 sm:mb-2 block", colors.textSecondary)}>
+                <label className={cn("text-xs sm:text-sm font-medium mb-1 sm:mb-2 block", colors.textSecondary)}>
                   {t('tags') || 'Tags'}
                 </label>
                 <div className="flex gap-1 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
                   {noteForm.tags.map(tag => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs bg-[#5C8374]/20 text-[#5C8374]"
+                      className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs bg-primary/20 text-primary"
                     >
                       <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       {tag}
-                      <button onClick={() => removeTag(tag)} className="hover:text-red-400">
+                      <button onClick={() => removeTag(tag)} className="hover:text-danger">
                         <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                       </button>
                     </span>
@@ -427,7 +428,7 @@ function Notes() {
                     <Label htmlFor="isShared" className={cn("text-xs sm:text-sm cursor-pointer", colors.textSecondary)}>
                       {t('shareWithTeam') || 'Share'}
                     </Label>
-                    <Switch
+                    <Switch aria-label={t('shareWithTeam')}
                       id="isShared"
                       checked={noteForm.isShared}
                       onCheckedChange={(checked) => setNoteForm(prev => ({ ...prev, isShared: checked }))}
@@ -445,7 +446,7 @@ function Notes() {
                   <Button
                     onClick={handleSubmit}
                     disabled={createNoteMutation.isPending || updateNoteMutation.isPending}
-                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4"
+                    className="bg-primary hover:bg-primary/80 text-primary-foreground h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4"
                   >
                     {(createNoteMutation.isPending || updateNoteMutation.isPending) && (
                       <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin me-1 sm:me-2" />
@@ -505,7 +506,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
         </h3>
 
         {/* Content Preview */}
-        <p className={cn("text-[10px] sm:text-sm line-clamp-2 sm:line-clamp-4 whitespace-pre-wrap", colors.textSecondary)}>
+        <p className={cn("text-xs sm:text-sm line-clamp-2 sm:line-clamp-4 whitespace-pre-wrap", colors.textSecondary)}>
           {note.content || (t('noContent') || 'No content')}
         </p>
 
@@ -515,7 +516,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
             {note.tags.slice(0, 2).map(tag => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-0.5 px-1 sm:px-2 py-0 sm:py-0.5 rounded-full text-[9px] sm:text-xs"
+                className="inline-flex items-center gap-0.5 px-1 sm:px-2 py-0 sm:py-0.5 rounded-full text-xs"
                 style={{ backgroundColor: `${note.color}30`, color: note.color }}
               >
                 {tag}
@@ -525,7 +526,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className={cn("text-[9px] sm:text-xs cursor-help px-1 sm:px-2 py-0 sm:py-0.5 rounded-full", colors.textTertiary, "hover:bg-gray-500/20")}>
+                    <span className={cn("text-xs cursor-help px-1 sm:px-2 py-0 sm:py-0.5 rounded-full", colors.textTertiary, "hover:bg-muted")}>
                       +{note.tags.length - 2}
                     </span>
                   </TooltipTrigger>
@@ -539,7 +540,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
         )}
 
         {/* Dates */}
-        <div className={cn("text-[9px] sm:text-xs mt-1 sm:mt-3 space-y-0 hidden sm:block", colors.textTertiary)}>
+        <div className={cn("text-xs mt-1 sm:mt-3 space-y-0 hidden sm:block", colors.textTertiary)}>
           <p>{t('created') || 'Created'}: {createdDate}</p>
           {updatedDate && (
             <p>{t('updated') || 'Updated'}: {updatedDate}</p>
@@ -551,7 +552,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
           <div
             className={cn(
               "absolute top-0.5 sm:top-2 flex gap-0.5 sm:gap-1 transition-opacity",
-              isRTL ? "left-0.5 sm:left-2" : "right-0.5 sm:right-2",
+              "end-0.5 sm:end-2",
               showActions ? "opacity-100" : "opacity-0"
             )}
             onClick={(e) => e.stopPropagation()}
@@ -561,8 +562,8 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
               className={cn(
                 "p-0.5 sm:p-1.5 rounded-full transition-colors",
                 note.isPinned
-                  ? "bg-[#5C8374] text-white"
-                  : cn(colors.bgSecondary, colors.textSecondary, "hover:bg-[#5C8374]/20")
+                  ? "bg-primary text-primary-foreground"
+                  : cn(colors.bgSecondary, colors.textSecondary, "hover:bg-primary/20")
               )}
               title={note.isPinned ? (t('unpin') || 'Unpin') : (t('pin') || 'Pin')}
             >
@@ -572,7 +573,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
               onClick={handleDelete}
               className={cn(
                 "p-0.5 sm:p-1.5 rounded-full transition-colors",
-                colors.bgSecondary, "text-red-400 hover:bg-red-400/20"
+                colors.bgSecondary, "text-danger hover:bg-danger/20"
               )}
               title={t('delete') || 'Delete'}
             >
@@ -584,7 +585,7 @@ const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, c
         {/* Pin indicator */}
         {note.isPinned && (
           <Pin
-            className={cn("absolute top-0.5 sm:top-2 w-3.5 h-3.5 sm:w-5 sm:h-5", isRTL ? "left-0.5 sm:left-2" : "right-0.5 sm:right-2")}
+            className={cn("absolute top-0.5 sm:top-2 w-3.5 h-3.5 sm:w-5 sm:h-5", "end-0.5 sm:end-2")}
             style={{ color: note.color }}
           />
         )}

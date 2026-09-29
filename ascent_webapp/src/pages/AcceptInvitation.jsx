@@ -173,11 +173,11 @@ export default function AcceptInvitation() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#092635] flex items-center justify-center p-4">
-        <Card className="bg-[#1B4242] border-[#5C8374]/30 max-w-md w-full">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="bg-card border-primary/30 max-w-md w-full">
           <CardContent className="p-6 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#5C8374] mx-auto mb-4" />
-            <p className="text-[#9EC8B9]">Loading invitation...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading invitation...</p>
           </CardContent>
         </Card>
       </div>
@@ -203,45 +203,45 @@ export default function AcceptInvitation() {
   if (invitation?.permissions?.manageUsers) permissionsList.push('Manage Users');
 
   return (
-    <div className="min-h-screen bg-[#092635] flex items-center justify-center p-4">
-      <Card className="bg-[#1B4242] border-[#5C8374]/30 max-w-md w-full">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="bg-card border-primary/30 max-w-md w-full">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <Shield className="w-12 h-12 text-[#5C8374]" />
+            <Shield className="w-12 h-12 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold text-[#9EC8B9]">
+          <CardTitle className="text-2xl font-bold text-muted-foreground">
             You've Been Invited!
           </CardTitle>
-          <CardDescription className="text-[#5C8374] mt-2">
+          <CardDescription className="text-primary mt-2">
             Sign in with Google to accept this invitation
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-[#092635] rounded-lg">
-              <Mail className="w-5 h-5 text-[#5C8374]" />
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg">
+              <Mail className="w-5 h-5 text-primary" />
               <div>
-                <p className="text-xs text-[#5C8374]">Invited Email</p>
-                <p className="text-sm font-medium text-[#9EC8B9]">{invitation.invitedEmail || 'Not specified'}</p>
+                <p className="text-xs text-primary">Invited Email</p>
+                <p className="text-sm font-medium text-muted-foreground">{invitation.invitedEmail || 'Not specified'}</p>
               </div>
             </div>
             {invitation.displayName && (
-              <div className="flex items-center gap-3 p-3 bg-[#092635] rounded-lg">
-                <User className="w-5 h-5 text-[#5C8374]" />
+              <div className="flex items-center gap-3 p-3 bg-background rounded-lg">
+                <User className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs text-[#5C8374]">Display Name</p>
-                  <p className="text-sm font-medium text-[#9EC8B9]">{invitation.displayName}</p>
+                  <p className="text-xs text-primary">Display Name</p>
+                  <p className="text-sm font-medium text-muted-foreground">{invitation.displayName}</p>
                 </div>
               </div>
             )}
           </div>
 
           {permissionsList.length > 0 && (
-            <div className="p-4 bg-[#092635] rounded-lg">
-              <p className="text-sm font-medium text-[#9EC8B9] mb-2">Your Permissions:</p>
+            <div className="p-4 bg-background rounded-lg">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Your Permissions:</p>
               <ul className="space-y-1">
                 {permissionsList.map((perm, idx) => (
-                  <li key={idx} className="text-xs text-[#5C8374]">• {perm}</li>
+                  <li key={idx} className="text-xs text-primary">• {perm}</li>
                 ))}
               </ul>
             </div>
@@ -256,11 +256,11 @@ export default function AcceptInvitation() {
             />
             {isSigningIn && (
               <div className="mt-3 text-center">
-                <Loader2 className="w-4 h-4 animate-spin text-[#5C8374] mx-auto mb-2" />
-                <p className="text-xs text-[#5C8374]">Signing in...</p>
+                <Loader2 className="w-4 h-4 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-xs text-primary">Signing in...</p>
               </div>
             )}
-            <p className="text-xs text-[#5C8374] text-center mt-3">
+            <p className="text-xs text-primary text-center mt-3">
               You must sign in with <strong>{invitation.invitedEmail}</strong> to accept this invitation
             </p>
           </div>

@@ -28,9 +28,9 @@ const SharedUsersSection = memo(function SharedUsersSection({
   }, []);
 
   const statusColors = {
-    pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-    accepted: 'bg-green-500/10 text-green-400 border-green-500/30',
-    revoked: 'bg-red-500/10 text-red-400 border-red-500/30',
+    pending: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
+    accepted: 'bg-success/10 text-success border-success/30',
+    revoked: 'bg-danger/10 text-danger border-danger/30',
   };
 
   return (
@@ -38,16 +38,16 @@ const SharedUsersSection = memo(function SharedUsersSection({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <UserPlus className="w-5 h-5 text-[#5C8374]" />
+            <UserPlus className="w-5 h-5 text-primary" />
             <CardTitle className={colors.accentText}>{t('sharedAccess')}</CardTitle>
           </div>
           {canManageUsers && (
             <Button
               onClick={onInvite}
               size="sm"
-              className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="h-11 bg-primary hover:bg-primary/80 text-primary-foreground sm:h-8"
             >
-              <UserPlus className="w-4 h-4 mr-2" />
+              <UserPlus className="w-4 h-4 me-2" />
               {t('inviteUser')}
             </Button>
           )}
@@ -71,15 +71,15 @@ const SharedUsersSection = memo(function SharedUsersSection({
           </div>
         ) : (
           <div className="text-center py-8">
-            <Shield className="w-12 h-12 text-[#5C8374] mx-auto mb-3" />
+            <Shield className="w-12 h-12 text-primary mx-auto mb-3" />
             <p className={cn("mb-4", colors.textTertiary)}>{t('noSharedUsersYet')}</p>
             {canManageUsers && (
               <Button
                 onClick={onInvite}
                 variant="outline"
-                className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                className={cn("bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
               >
-                <UserPlus className="w-4 h-4 mr-2" />
+                <UserPlus className="w-4 h-4 me-2" />
                 {t('inviteFirstUser')}
               </Button>
             )}

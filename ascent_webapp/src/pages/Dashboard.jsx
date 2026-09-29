@@ -1,1018 +1,385 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
+import NumberFlow from '@number-flow/react';
+import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
 import { ascent } from '@/api/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cn } from '@/lib/utils';
-import BlurValue from '../components/BlurValue';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, TrendingDown, Wallet, PieChart as PieChartIcon, BarChart3, Target, Plus, Percent, Settings } from 'lucide-react';
-import { format, subDays, parseISO } from 'date-fns';
-import { Responsive as ResponsiveGridLayout } from 'react-grid-layout';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
-
-import AddGoalDialog from '../components/dashboard/AddGoalDialog';
-import GoalProgressCard from '../components/dashboard/GoalProgressCard';
-import DashboardCustomization from '../components/dashboard/DashboardCustomization';
-import PortfolioValueWidget from '../components/dashboard/widgets/PortfolioValueWidget';
-import NetWorthWidget from '../components/dashboard/widgets/NetWorthWidget';
-import AccountAllocationWidget from '../components/dashboard/widgets/AccountAllocationWidget';
-import AssetAllocationWidget from '../components/dashboard/widgets/AssetAllocationWidget';
-import { useTheme } from '../components/ThemeProvider';
+import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
+import BlurValue from '@/components/BlurValue';
+import { useTheme } from '@/components/ThemeProvider';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
-import { toast } from 'sonner';
+import { translateCategory } from '@/lib/translations';
+import { createPageUrl } from '@/utils';
+import { cn } from '@/lib/utils';
 
-// Default widget configuration - 2 columns layout with standard sizes
-const DEFAULT_WIDGETS = [
-  { widgetType: 'portfolio_value', x: 0, y: 0, w: 1, h: 3, enabled: true },
-  { widgetType: 'net_worth', x: 1, y: 0, w: 1, h: 3, enabled: true },
-  { widgetType: 'account_allocation', x: 0, y: 3, w: 1, h: 3, enabled: true },
-  { widgetType: 'asset_allocation', x: 1, y: 3, w: 1, h: 3, enabled: true },
-  { widgetType: 'savings_rate', x: 0, y: 6, w: 1, h: 2, enabled: true },
-  { widgetType: 'benchmark_comparison', x: 1, y: 6, w: 1, h: 3, enabled: true },
-  { widgetType: 'financial_goals', x: 0, y: 8, w: 1, h: 3, enabled: true },
-  { widgetType: 'account_summary', x: 1, y: 9, w: 1, h: 3, enabled: true },
-];
+const MAX_CATEGORY_SLICES = 6;
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-const COLORS = ['#5C8374', '#9EC8B9', '#60A5FA', '#A78BFA', '#F59E0B', '#EF4444', '#10B981'];
+// Glass card surface shared by all tiles
+const tile = 'relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 backdrop-blur-xl shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-12px_hsl(0_0%_0%/0.5)]';
+
+const rise = {
+  hidden: { opacity: 0, y: 16 },
+  show: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.45, ease: [0.22, 1, 0.36, 1] } }),
+};
+
+function Tile({ i = 0, className, children }) {
+  return (
+    <motion.section className={cn(tile, className)} variants={rise} initial="hidden" animate="show" custom={i}>
+      {children}
+    </motion.section>
+  );
+}
+
+function Money({ value, locale, currency, blur, className }) {
+  if (blur) return <BlurValue blur className={className} />;
+  return (
+    <NumberFlow
+      className={className}
+      value={value}
+      locales={locale}
+      format={{ style: 'currency', currency, maximumFractionDigits: 0 }}
+      trend={0}
+    />
+  );
+}
 
 export default function Dashboard() {
-  const { user, colors, t, theme } = useTheme();
+  const { user, t, language, isRTL } = useTheme();
+  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const tokens = useChartTokens();
   const userCurrency = user?.currency || 'USD';
-  const [addGoalOpen, setAddGoalOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState(null);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
-  const [timeRange, setTimeRange] = useState('30d');
-  const [gridWidth, setGridWidth] = useState(800);
-  const gridContainerRef = useRef(null);
-  const queryClient = useQueryClient();
-  const saveTimeoutRef = useRef(null);
-  const isInitialMount = useRef(true);
-  const { convertCurrency, fetchExchangeRates, isLoading: ratesLoading } = useCurrencyConversion();
+  const blur = !!user?.blurValues;
+  const userId = user?.id || user?._id;
+  const userEmail = user?.email;
 
-  // Fetch exchange rates on mount
-  useEffect(() => {
-    if (userCurrency) {
-      fetchExchangeRates('USD');
-    }
-  }, [userCurrency, fetchExchangeRates]);
-
-  // Measure the actual container width for the grid
-  useEffect(() => {
-    const measureWidth = () => {
-      if (gridContainerRef.current) {
-        // Get the actual computed width of the container
-        const rect = gridContainerRef.current.getBoundingClientRect();
-        const width = Math.floor(rect.width);
-        if (width > 0) {
-          setGridWidth(width);
-        }
-      }
-    };
-
-    // Measure after layout is complete
-    const timer1 = setTimeout(measureWidth, 50);
-    const timer2 = setTimeout(measureWidth, 200);
-    const timer3 = setTimeout(measureWidth, 500);
-
-    window.addEventListener('resize', measureWidth);
-
-    // Use ResizeObserver for more accurate measurements
-    const resizeObserver = new ResizeObserver(measureWidth);
-    if (gridContainerRef.current) {
-      resizeObserver.observe(gridContainerRef.current);
-    }
-
-    return () => {
-      window.removeEventListener('resize', measureWidth);
-      resizeObserver.disconnect();
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
-  }, []);
-
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', user?.id],
+  // Same query key as the Expenses page so the cache is shared
+  const { data: transactions = [], isLoading } = useQuery({
+    queryKey: ['transactions', userId],
     queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Account.list();
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  const { data: positions = [] } = useQuery({
-    queryKey: ['positions', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Position.list('-created_date', 1000);
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: snapshots = [] } = useQuery({
-    queryKey: ['snapshots', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.PortfolioSnapshot.list('-date', 30);
-    },
-    enabled: !!user,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['transactions', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
+      if (!userEmail) return [];
       return await ascent.entities.ExpenseTransaction.list('-date', 1000);
     },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!userEmail,
+    staleTime: 3 * 60 * 1000,
   });
 
-  const { data: goals = [] } = useQuery({
-    queryKey: ['goals', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.FinancialGoal.list('-created_date');
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+  useEffect(() => {
+    if (userCurrency) fetchExchangeRates(userCurrency);
+  }, [userCurrency, fetchExchangeRates]);
+
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  const createGoalMutation = useMutation({
-    mutationFn: (goalData) => ascent.entities.FinancialGoal.create(goalData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      setAddGoalOpen(false);
-      setEditingGoal(null);
-      toast.success(t('goalCreatedSuccessfully'));
-    },
-  });
-
-  const updateGoalMutation = useMutation({
-    mutationFn: ({ id, data }) => ascent.entities.FinancialGoal.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      setAddGoalOpen(false);
-      setEditingGoal(null);
-      toast.success(t('goalUpdatedSuccessfully'));
-    },
-  });
-
-  const deleteGoalMutation = useMutation({
-    mutationFn: (goalId) => ascent.entities.FinancialGoal.delete(goalId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goals'] });
-      toast.success(t('goalDeletedSuccessfully'));
-    },
-  });
-
-  // Local widget state for immediate UI updates
-  const [localWidgets, setLocalWidgets] = useState(null);
-
-  const { data: serverWidgets = [], isLoading: widgetsLoading } = useQuery({
-    queryKey: ['dashboardWidgets', user?.id],
-    queryFn: async () => {
-      if (!user) return DEFAULT_WIDGETS;
-      const widgets = await ascent.entities.DashboardWidget.list();
-      if (widgets.length === 0) {
-        return DEFAULT_WIDGETS;
-      }
-      return widgets.map(w => ({
-        ...w,
-        x: Math.max(0, Math.min(3, Number(w.x ?? 0))),
-        y: Math.max(0, Number(w.y ?? 0)),
-        w: Math.max(1, Math.min(4, Number(w.w ?? 2))),
-        h: Math.max(2, Math.min(8, Number(w.h ?? 3))),
-        enabled: w.enabled !== false,
-      }));
-    },
-    enabled: !!user,
-  });
-
-  // Use local state for immediate feedback, server state as fallback
-  const dashboardWidgets = localWidgets || serverWidgets;
-
-  const saveWidgetsMutation = useMutation({
-    mutationFn: async (widgets) => {
-      // Delete all existing widgets
-      const existing = await ascent.entities.DashboardWidget.list();
-      await Promise.all(existing.map(w => ascent.entities.DashboardWidget.delete(w.id)));
-
-      // Create new widgets without IDs
-      const widgetsToCreate = widgets.map(({ id, created_by, created_date, updated_date, ...widget }) => widget);
-      await ascent.entities.DashboardWidget.bulkCreate(widgetsToCreate);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboardWidgets'] });
-      setCustomizeOpen(false);
-      toast.success(t('dashboardLayoutSaved'));
-    },
-  });
-
-  const formatCurrency = React.useCallback((value, currency) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || user?.currency || 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value || 0);
-  }, [user?.currency]);
-
-  const calculateTotalMetrics = () => {
-    const accountsWithPositions = accounts.map(account => {
-      const accountPositions = positions.filter(p => p.accountId === account.id);
-
-      let totalValue = 0;
-      let totalCostBasis = 0;
-
-      accountPositions.forEach(position => {
-        const currentPrice = position.currentPrice || position.averageBuyPrice;
-
-        // Calculate values in original currency
-        const rawMarketValue = position.quantity * currentPrice;
-        const rawCostBasis = position.quantity * position.averageBuyPrice;
-
-        // Convert to user's currency
-        const marketValue = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
-        const costBasis = convertCurrency(rawCostBasis, position.currency || 'USD', userCurrency);
-
-        totalValue += marketValue;
-        totalCostBasis += costBasis;
-      });
-
-      return {
-        ...account,
-        totalValue,
-        totalCostBasis,
-        totalPnL: totalValue - totalCostBasis,
-      };
-    });
-
-    const totalPortfolioValue = accountsWithPositions.reduce((sum, acc) => sum + acc.totalValue, 0);
-    const totalCostBasis = accountsWithPositions.reduce((sum, acc) => sum + acc.totalCostBasis, 0);
-    const totalPnL = totalPortfolioValue - totalCostBasis;
-    const totalPnLPercent = totalCostBasis > 0 ? (totalPnL / totalCostBasis) * 100 : 0;
-
-    // Cash vs Invested
-    const cashPositions = positions.filter(p => p.assetType === 'Cash');
-    const totalCash = cashPositions.reduce((sum, p) => {
-      const price = p.currentPrice || p.averageBuyPrice;
-      const rawValue = p.quantity * price;
-      return sum + convertCurrency(rawValue, p.currency || 'USD', userCurrency);
-    }, 0);
-    const totalInvested = totalPortfolioValue - totalCash;
-
-    return {
-      accountsWithPositions,
-      totalPortfolioValue,
-      totalPnL,
-      totalPnLPercent,
-      totalCash,
-      totalInvested,
-    };
-  };
-
-  // Generate allocation by account type
-  const getAccountTypeAllocation = (accountsWithPositions) => {
-    const typeGroups = {};
-    accountsWithPositions.forEach(account => {
-      if (!typeGroups[account.type]) {
-        typeGroups[account.type] = 0;
-      }
-      typeGroups[account.type] += account.totalValue;
-    });
-
-    return Object.entries(typeGroups).map(([type, value]) => ({
-      name: type,
-      value,
-    }));
-  };
-
-  // Generate allocation by asset type
-  const getAssetTypeAllocation = () => {
-    const assetGroups = {};
-    positions.forEach(position => {
-      const currentPrice = position.currentPrice || position.averageBuyPrice;
-      const rawMarketValue = position.quantity * currentPrice;
-      const marketValue = convertCurrency(rawMarketValue, position.currency || 'USD', userCurrency);
-
-      if (!assetGroups[position.assetType]) {
-        assetGroups[position.assetType] = 0;
-      }
-      assetGroups[position.assetType] += marketValue;
-    });
-
-    return Object.entries(assetGroups).map(([type, value]) => ({
-      name: type,
-      value,
-    })).sort((a, b) => b.value - a.value);
-  };
-
-  // Calculate savings rate (using stored converted amounts)
-  const calculateSavingsRate = useCallback(() => {
-    const thisMonth = new Date();
-    const thisMonthTransactions = transactions.filter(t => {
-      const transDate = parseISO(t.date);
-      return transDate.getMonth() === thisMonth.getMonth() &&
-        transDate.getFullYear() === thisMonth.getFullYear();
-    });
-
-    const totalIncome = thisMonthTransactions
-      .filter(t => t.type === 'Income')
-      .reduce((sum, t) => {
-        // Use stored converted amount if available
-        if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
-          return sum + t.amountInGlobalCurrency;
-        }
-        // Fallback: convert currency if no stored amount
-        return sum + convertCurrency(t.amount, t.currency || 'USD', userCurrency);
-      }, 0);
-
-    const totalExpenses = thisMonthTransactions
-      .filter(t => t.type === 'Expense')
-      .reduce((sum, t) => {
-        // Use stored converted amount if available
-        if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
-          return sum + t.amountInGlobalCurrency;
-        }
-        // Fallback: convert currency if no stored amount
-        return sum + convertCurrency(t.amount, t.currency || 'USD', userCurrency);
-      }, 0);
-
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
-    return { savingsRate, totalIncome, totalExpenses };
-  }, [transactions, userCurrency]);
-
-  // Deterministic pseudo-random based on date (same date = same value)
-  const seededRandom = (seed) => {
-    const x = Math.sin(seed) * 10000;
-    return x - Math.floor(x);
-  };
-
-  // Net worth over time (Assets - Cumulative Expenses, using stored converted amounts)
-  const getNetWorthData = useCallback((range = '30d') => {
-    const metrics = calculateTotalMetrics();
-    const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 365;
-    const data = [];
-    const currentPortfolioValue = metrics.totalPortfolioValue;
-
-    // Find the earliest position/account creation date
-    const positionDates = positions
-      .filter(p => p.created_date)
-      .map(p => new Date(p.created_date));
-    const accountDates = accounts
-      .filter(a => a.created_date)
-      .map(a => new Date(a.created_date));
-    const transactionDates = transactions
-      .filter(t => t.date)
-      .map(t => parseISO(t.date));
-
-    const allDates = [...positionDates, ...accountDates, ...transactionDates];
-    const earliestDate = allDates.length > 0
-      ? new Date(Math.min(...allDates.map(d => d.getTime())))
-      : new Date();
-
-    // Calculate total invested from positions
-    const totalInvested = positions.reduce((sum, p) => {
-      const rawCost = p.quantity * p.averageBuyPrice;
-      return sum + convertCurrency(rawCost, p.currency || 'USD', userCurrency);
-    }, 0);
-    const totalPnL = currentPortfolioValue - totalInvested;
-    const daysSinceStart = Math.max(1, Math.floor((new Date() - earliestDate) / 86400000));
-
-    for (let i = days; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-
-      // Show 0 before any financial activity
-      if (date < earliestDate) {
-        data.push({
-          date: format(date, days <= 30 ? 'MMM dd' : 'MMM'),
-          netWorth: 0,
-          portfolio: 0,
-        });
-        continue;
-      }
-
-      // Calculate cumulative expenses up to this date (using stored converted amounts)
-      const cumulativeExpenses = transactions
-        .filter(t => t.type === 'Expense' && parseISO(t.date) <= date)
-        .reduce((sum, t) => {
-          const amountToUse = t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined
-            ? t.amountInGlobalCurrency
-            : (t.currency === userCurrency ? t.amount : t.amount);
-          return sum + amountToUse;
-        }, 0);
-
-      // Calculate cumulative income up to this date (using stored converted amounts)
-      const cumulativeIncome = transactions
-        .filter(t => t.type === 'Income' && parseISO(t.date) <= date)
-        .reduce((sum, t) => {
-          const amountToUse = t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined
-            ? t.amountInGlobalCurrency
-            : (t.currency === userCurrency ? t.amount : t.amount);
-          return sum + amountToUse;
-        }, 0);
-
-      // Calculate portfolio value based on position dates
-      const daysFromStart = Math.floor((date - earliestDate) / 86400000);
-      const progressRatio = daysSinceStart > 0 ? daysFromStart / daysSinceStart : 1;
-
-      const daysSeed = date.getTime() / 86400000;
-      const variation = (seededRandom(daysSeed) - 0.5) * 0.01;
-
-      const portfolioValue = totalInvested + (totalPnL * progressRatio) + (totalInvested * variation);
-      const netWorth = portfolioValue + (cumulativeIncome - cumulativeExpenses);
-
-      data.push({
-        date: format(date, days <= 30 ? 'MMM dd' : 'MMM'),
-        netWorth: Math.max(0, netWorth),
-        portfolio: Math.max(0, portfolioValue),
-      });
-    }
-
-    return data;
-  }, [accounts, positions, transactions, userCurrency]);
-
-  // Portfolio performance vs S&P 500 benchmark
-  const getBenchmarkComparison = () => {
-    const metrics = calculateTotalMetrics();
-    const portfolioReturn = metrics.totalPnLPercent;
-
-    // Use a fixed S&P 500 benchmark based on current year
-    // Average S&P 500 YTD return (deterministic based on current month)
-    const currentMonth = new Date().getMonth();
-    const sp500MonthlyReturns = [1.5, 2.8, 4.2, 5.5, 6.8, 7.2, 8.1, 8.5, 9.2, 10.1, 10.8, 11.5];
-    const sp500Return = sp500MonthlyReturns[currentMonth];
-
-    const difference = portfolioReturn - sp500Return;
-
-    return {
-      portfolioReturn,
-      sp500Return,
-      difference,
-      outperforming: difference > 0,
-    };
-  };
-
-  // Generate historical data for portfolio value over time
-  const getHistoricalData = (range = '30d') => {
-    const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 365;
-
-    // Use real snapshots if available
-    if (snapshots.length > 0) {
-      // Filter snapshots for the selected time range
-      const cutoffDate = subDays(new Date(), days);
-      const relevantSnapshots = snapshots
-        .filter(s => new Date(s.date) >= cutoffDate)
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-      if (relevantSnapshots.length > 0) {
-        return relevantSnapshots.map(snapshot => ({
-          date: format(new Date(snapshot.date), days <= 30 ? 'MMM dd' : 'MMM'),
-          value: snapshot.totalValue,
-        }));
-      }
-    }
-
-    // Find the earliest position creation date
-    const positionDates = positions
-      .filter(p => p.created_date)
-      .map(p => new Date(p.created_date));
-    const accountDates = accounts
-      .filter(a => a.created_date)
-      .map(a => new Date(a.created_date));
-
-    const allDates = [...positionDates, ...accountDates];
-    const earliestDate = allDates.length > 0
-      ? new Date(Math.min(...allDates.map(d => d.getTime())))
-      : new Date(); // If no dates, use today
-
-    // Generate deterministic historical data based on current positions
-    const metrics = calculateTotalMetrics();
-    const data = [];
-    const currentValue = metrics.totalPortfolioValue;
-    const totalCost = positions.reduce((sum, p) => {
-      const rawCost = p.quantity * p.averageBuyPrice;
-      return sum + convertCurrency(rawCost, p.currency || 'USD', userCurrency);
-    }, 0);
-
-    // Calculate average daily return from P&L
-    const totalPnL = currentValue - totalCost;
-    const daysSinceStart = Math.max(1, Math.floor((new Date() - earliestDate) / 86400000));
-    const avgDailyReturn = totalCost > 0 ? (totalPnL / totalCost) / daysSinceStart : 0;
-
-    for (let i = days; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-
-      // Show 0 before the first deposit/position
-      if (date < earliestDate) {
-        data.push({
-          date: format(date, days <= 30 ? 'MMM dd' : 'MMM'),
-          value: 0,
-        });
-        continue;
-      }
-
-      const daysSeed = date.getTime() / 86400000;
-
-      // Deterministic small daily variation
-      const dailyVariation = (seededRandom(daysSeed) - 0.5) * 0.01;
-
-      // Calculate days since start for this point
-      const daysFromStart = Math.floor((date - earliestDate) / 86400000);
-      const totalDaysFromStart = Math.floor((new Date() - earliestDate) / 86400000);
-
-      // Linear growth from cost basis to current value
-      const progressRatio = totalDaysFromStart > 0 ? daysFromStart / totalDaysFromStart : 1;
-      const value = totalCost + (totalPnL * progressRatio) + (totalCost * dailyVariation);
-
-      data.push({
-        date: format(date, days <= 30 ? 'MMM dd' : 'MMM'),
-        value: Math.max(0, value),
-      });
-    }
-
-    return data;
-  };
-
-  const handleAddGoal = React.useCallback(async (goalData) => {
-    if (editingGoal) {
-      await updateGoalMutation.mutateAsync({ id: editingGoal.id, data: goalData });
-    } else {
-      await createGoalMutation.mutateAsync(goalData);
-    }
-  }, [editingGoal, updateGoalMutation, createGoalMutation]);
-
-  // Debounced save to backend
-  const debouncedSave = useCallback((widgetsToSave) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      saveWidgetsMutation.mutate(widgetsToSave);
-    }, 1000);
-  }, [saveWidgetsMutation]);
-
-  // Handle layout changes from the grid
-  const handleLayoutChange = useCallback((currentLayout, allLayouts) => {
-    if (!currentLayout || currentLayout.length === 0) return;
-
-    // Skip saving on initial mount (first 2 layout changes are from initialization)
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    setLocalWidgets(prev => {
-      const current = prev || serverWidgets || DEFAULT_WIDGETS;
-      const updated = current.map(widget => {
-        const layoutItem = currentLayout.find(l => l.i === widget.widgetType);
-        if (layoutItem) {
-          return {
-            ...widget,
-            x: layoutItem.x,
-            y: layoutItem.y,
-            w: layoutItem.w,
-            h: layoutItem.h,
-          };
-        }
-        return widget;
-      });
-      debouncedSave(updated);
-      return updated;
-    });
-  }, [serverWidgets, debouncedSave]);
-
-  // Handle saving layout from customization dialog
-  const handleSaveLayout = useCallback(async (widgets) => {
-    await saveWidgetsMutation.mutateAsync(widgets);
-    setLocalWidgets(widgets);
-  }, [saveWidgetsMutation]);
-
-  const metrics = React.useMemo(() => calculateTotalMetrics(), [accounts, positions]);
-  const accountTypeData = React.useMemo(() => getAccountTypeAllocation(metrics.accountsWithPositions), [metrics.accountsWithPositions]);
-  const assetTypeData = React.useMemo(() => getAssetTypeAllocation(), [positions]);
-  const historicalData = React.useMemo(() => getHistoricalData(timeRange), [snapshots, metrics.totalPortfolioValue, timeRange]);
-  const savingsMetrics = React.useMemo(() => calculateSavingsRate(), [calculateSavingsRate]);
-  const netWorthData = React.useMemo(() => getNetWorthData(timeRange), [getNetWorthData, timeRange]);
-  const benchmarkData = React.useMemo(() => getBenchmarkComparison(), [metrics.totalPnLPercent]);
-
-  const enabledWidgets = (dashboardWidgets || []).filter(w =>
-    w &&
-    w.enabled &&
-    w.widgetType &&
-    typeof w.x !== 'undefined' &&
-    typeof w.y !== 'undefined' &&
-    typeof w.w !== 'undefined' &&
-    typeof w.h !== 'undefined'
+  const toUserCurrency = useCallback((tx) => {
+    if (tx.amountInGlobalCurrency !== null && tx.amountInGlobalCurrency !== undefined) return tx.amountInGlobalCurrency;
+    if (tx.currency === userCurrency) return tx.amount;
+    if (rates && Object.keys(rates).length > 0) return convertCurrency(tx.amount, tx.currency || 'USD', userCurrency, rates);
+    return 0;
+  }, [userCurrency, rates, convertCurrency]);
+
+  const locale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
+  const fmtMoney = useCallback((v) => new Intl.NumberFormat(locale, {
+    style: 'currency', currency: userCurrency, maximumFractionDigits: 0,
+  }).format(v || 0), [locale, userCurrency]);
+  const fmtCompact = useCallback((v) => new Intl.NumberFormat(locale, { notation: 'compact' }).format(v), [locale]);
+
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(selectedMonth),
+    [locale, selectedMonth]
   );
 
-  // Generate layout for ResponsiveGridLayout - 2 columns, widgets can be side by side
-  // MUST be before any early returns to maintain hook order
-  const layouts = React.useMemo(() => {
-    const lgLayout = enabledWidgets.map(widget => ({
-      i: widget.widgetType,
-      x: Math.max(0, Math.min(1, Number(widget.x) || 0)), // 0 or 1 for 2 columns
-      y: Math.max(0, Number(widget.y) || 0),
-      w: Math.max(1, Math.min(2, Number(widget.w) || 1)), // 1 = half width, 2 = full width
-      h: Math.max(2, Math.min(6, Number(widget.h) || 3)),
-      minW: 1,
-      maxW: 2,
-      minH: 2,
-      maxH: 6,
-    }));
+  const normalized = useMemo(() => transactions
+    .filter((tx) => tx?.date)
+    .map((tx) => ({
+      ...tx,
+      _month: String(tx.date).slice(0, 7),
+      _day: parseInt(String(tx.date).slice(8, 10), 10),
+      _amount: toUserCurrency(tx),
+    })), [transactions, toUserCurrency]);
 
+  const selectedKey = monthKey(selectedMonth);
+  const prevKey = monthKey(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1));
+  const monthTx = useMemo(() => normalized.filter((tx) => tx._month === selectedKey), [normalized, selectedKey]);
+
+  const sums = useCallback((list) => {
+    const income = list.filter((x) => x.type === 'Income').reduce((s, x) => s + x._amount, 0);
+    const expenses = list.filter((x) => x.type === 'Expense').reduce((s, x) => s + x._amount, 0);
+    return { income, expenses, net: income - expenses };
+  }, []);
+
+  const kpis = useMemo(() => {
+    const cur = sums(monthTx);
+    const prev = sums(normalized.filter((tx) => tx._month === prevKey));
+    const savingsRate = cur.income > 0 ? Math.max(-100, Math.min(100, (cur.net / cur.income) * 100)) : null;
+    const expenseDelta = prev.expenses > 0 ? ((cur.expenses - prev.expenses) / prev.expenses) * 100 : null;
+    return { ...cur, savingsRate, expenseDelta };
+  }, [monthTx, normalized, prevKey, sums]);
+
+  const categoryData = useMemo(() => {
+    const totals = {};
+    monthTx.filter((x) => x.type === 'Expense').forEach((x) => {
+      const key = x.category || 'other';
+      totals[key] = (totals[key] || 0) + x._amount;
+    });
+    const sorted = Object.entries(totals)
+      .map(([key, value]) => ({ key, name: translateCategory(key, language), value }))
+      .filter((c) => c.value > 0)
+      .sort((a, b) => b.value - a.value);
+    if (sorted.length <= MAX_CATEGORY_SLICES) return sorted;
+    const head = sorted.slice(0, MAX_CATEGORY_SLICES - 1);
+    const rest = sorted.slice(MAX_CATEGORY_SLICES - 1).reduce((s, c) => s + c.value, 0);
+    return [...head, { key: '__other', name: t('dashOtherCategories'), value: rest }];
+  }, [monthTx, language, t]);
+
+  const monthlyData = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - i, 1);
+      months.push({ key: monthKey(d), label: new Intl.DateTimeFormat(locale, { month: 'short' }).format(d), income: 0, expenses: 0 });
+    }
+    const byKey = Object.fromEntries(months.map((m) => [m.key, m]));
+    normalized.forEach((tx) => {
+      const m = byKey[tx._month];
+      if (!m) return;
+      if (tx.type === 'Income') m.income += tx._amount;
+      else if (tx.type === 'Expense') m.expenses += tx._amount;
+    });
+    return months;
+  }, [normalized, selectedMonth, locale]);
+
+  const dailyData = useMemo(() => {
+    const days = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
+    const perDay = Array.from({ length: days }, (_, i) => ({ day: i + 1, amount: 0 }));
+    monthTx.filter((x) => x.type === 'Expense').forEach((x) => {
+      if (x._day >= 1 && x._day <= days) perDay[x._day - 1].amount += x._amount;
+    });
+    let running = 0;
+    return perDay.map((d) => { running += d.amount; return { ...d, cumulative: running }; });
+  }, [monthTx, selectedMonth]);
+
+  const recent = useMemo(() => [...monthTx].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 6), [monthTx]);
+
+  const shiftMonth = (delta) => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
+  const hasData = monthTx.length > 0;
+
+  // ---------- ECharts options ----------
+  const baseTooltip = useMemo(() => tokens && ({
+    backgroundColor: tokens.popover,
+    borderColor: tokens.border,
+    borderWidth: 1,
+    padding: [8, 12],
+    textStyle: { color: tokens.text, fontFamily: tokens.fontFamily, fontSize: 12 },
+    extraCssText: 'border-radius:12px;backdrop-filter:blur(8px);box-shadow:0 12px 32px -8px rgba(0,0,0,.5);',
+  }), [tokens]);
+
+  const donutOption = useMemo(() => {
+    if (!tokens) return null;
+    const palette = [...tokens.series, tokens.muted, tokens.primary];
     return {
-      lg: lgLayout,
-      md: lgLayout,
-      sm: enabledWidgets.map((widget, idx) => ({
-        i: widget.widgetType,
-        x: 0,
-        y: idx * 3,
-        w: 1,
-        h: Number(widget.h) || 3,
-        minH: 2,
-        maxH: 6,
-      })),
+      animationDuration: 900,
+      animationEasing: 'cubicOut',
+      tooltip: blur ? { show: false } : { ...baseTooltip, trigger: 'item', formatter: (p) => `${p.marker} ${p.name}<br/><b>${fmtMoney(p.value)}</b> · ${p.percent}%` },
+      title: blur ? undefined : {
+        text: fmtMoney(kpis.expenses), subtext: t('expenses'), left: 'center', top: '38%',
+        textStyle: { color: tokens.text, fontSize: 20, fontWeight: 700, fontFamily: tokens.fontFamily },
+        subtextStyle: { color: tokens.muted, fontSize: 12, fontFamily: tokens.fontFamily },
+      },
+      series: [{
+        type: 'pie',
+        radius: ['62%', '88%'],
+        center: ['50%', '50%'],
+        padAngle: 3,
+        itemStyle: { borderRadius: 10, borderColor: 'transparent' },
+        label: { show: false },
+        emphasis: { scaleSize: 6, itemStyle: { shadowBlur: 24, shadowColor: 'rgba(0,0,0,.35)' } },
+        data: categoryData.map((c, i) => ({ name: c.name, value: c.value, itemStyle: { color: palette[i % palette.length] } })),
+      }],
     };
-  }, [enabledWidgets]);
+  }, [tokens, baseTooltip, categoryData, kpis.expenses, fmtMoney, blur, t]);
 
-  // Loading state - after all hooks
-  if (!user || widgetsLoading) {
-    return (
-      <div className={cn("flex items-center justify-center min-h-screen", colors.bgPrimary)}>
-        <Loader2 className={cn("w-8 h-8 animate-spin", colors.accentText)} />
+  const barOption = useMemo(() => {
+    if (!tokens) return null;
+    const grad = (c) => ({ type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: c }, { offset: 1, color: withAlpha(c, 0.35) }] });
+    return {
+      animationDuration: 900,
+      animationEasing: 'cubicOut',
+      grid: { left: 4, right: 4, top: 16, bottom: 4, containLabel: true },
+      tooltip: blur ? { show: false } : {
+        ...baseTooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: tokens.grid } },
+        formatter: (ps) => `${ps[0].axisValueLabel}<br/>${ps.map((p) => `${p.marker} ${p.seriesName}: <b>${fmtMoney(p.value)}</b>`).join('<br/>')}`,
+      },
+      xAxis: { type: 'category', data: monthlyData.map((m) => m.label), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: tokens.muted, fontFamily: tokens.fontFamily } },
+      yAxis: { type: 'value', show: !blur, axisLabel: { color: tokens.muted, formatter: fmtCompact, fontFamily: tokens.fontFamily }, splitLine: { lineStyle: { color: tokens.grid, type: 'dashed' } } },
+      series: [
+        { name: t('income'), type: 'bar', barMaxWidth: 18, itemStyle: { borderRadius: [8, 8, 2, 2], color: grad(tokens.success) }, data: monthlyData.map((m) => m.income) },
+        { name: t('expenses'), type: 'bar', barMaxWidth: 18, itemStyle: { borderRadius: [8, 8, 2, 2], color: grad(tokens.danger) }, data: monthlyData.map((m) => m.expenses) },
+      ],
+    };
+  }, [tokens, baseTooltip, monthlyData, fmtMoney, fmtCompact, blur, t]);
+
+  const areaOption = useMemo(() => {
+    if (!tokens) return null;
+    return {
+      animationDuration: 1100,
+      animationEasing: 'cubicOut',
+      grid: { left: 4, right: 8, top: 16, bottom: 4, containLabel: true },
+      tooltip: blur ? { show: false } : {
+        ...baseTooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: tokens.primary, type: 'dashed' } },
+        formatter: (ps) => `${ps[0].axisValue}<br/>${ps.map((p) => `${p.marker} ${p.seriesName}: <b>${fmtMoney(p.value)}</b>`).join('<br/>')}`,
+      },
+      xAxis: { type: 'category', boundaryGap: false, data: dailyData.map((d) => d.day), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: tokens.muted, fontFamily: tokens.fontFamily } },
+      yAxis: { type: 'value', show: !blur, axisLabel: { color: tokens.muted, formatter: fmtCompact, fontFamily: tokens.fontFamily }, splitLine: { lineStyle: { color: tokens.grid, type: 'dashed' } } },
+      series: [
+        {
+          name: t('dashCumulative'), type: 'line', smooth: 0.35, symbol: 'none', z: 3,
+          lineStyle: { width: 3, color: tokens.primary, shadowBlur: 14, shadowColor: tokens.primary },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: withAlpha(tokens.primary, 0.35) }, { offset: 1, color: withAlpha(tokens.primary, 0) }] } },
+          data: dailyData.map((d) => d.cumulative),
+        },
+        { name: t('dashDailySpending'), type: 'bar', barMaxWidth: 8, itemStyle: { borderRadius: [4, 4, 0, 0], color: withAlpha(tokens.series[1], 0.55) }, data: dailyData.map((d) => d.amount) },
+      ],
+    };
+  }, [tokens, baseTooltip, dailyData, fmtMoney, fmtCompact, blur, t]);
+
+  const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
+  const NextIcon = isRTL ? ChevronLeft : ChevronRight;
+  const muted = 'text-muted-foreground';
+  const empty = (
+    <div className={cn('flex h-full min-h-[200px] items-center justify-center text-sm', muted)}>{t('dashNoDataMonth')}</div>
+  );
+
+  const stat = (label, value, Icon, tone) => (
+    <Tile className="p-5" i={2}>
+      <div className="flex items-center justify-between">
+        <span className={cn('text-sm', muted)}>{label}</span>
+        <span className={cn('grid h-8 w-8 place-items-center rounded-xl bg-foreground/5', tone)}><Icon className="h-4 w-4" /></span>
       </div>
-    );
-  }
-
-  const renderWidget = (widget) => {
-    if (!widget || !widget.widgetType) return null;
-
-    const widgetContent = (() => {
-      switch (widget.widgetType) {
-        case 'portfolio_value':
-          return <PortfolioValueWidget data={historicalData} formatCurrency={formatCurrency} timeRange={timeRange} onTimeRangeChange={setTimeRange} />;
-        case 'net_worth':
-          return <NetWorthWidget data={netWorthData} formatCurrency={formatCurrency} timeRange={timeRange} onTimeRangeChange={setTimeRange} />;
-        case 'account_allocation':
-          return <AccountAllocationWidget data={accountTypeData} totalValue={metrics.totalPortfolioValue} formatCurrency={formatCurrency} />;
-        case 'asset_allocation':
-          return <AssetAllocationWidget data={assetTypeData} formatCurrency={formatCurrency} />;
-        case 'savings_rate':
-          return (
-            <Card className={cn("h-full", colors.cardBg, colors.cardBorder)}>
-              <CardHeader className="pb-3 widget-drag-handle cursor-move">
-                <div className="flex items-center justify-between">
-                  <CardTitle className={colors.accentText}>{t('savingsRate')}</CardTitle>
-                  <Percent className="w-5 h-5 text-[#5C8374]" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className={`text-2xl font-bold ${savingsMetrics.savingsRate >= 20 ? 'text-green-400' : savingsMetrics.savingsRate >= 10 ? 'text-yellow-400' : 'text-red-400'}`}>
-                  {savingsMetrics.savingsRate.toFixed(1)}%
-                </p>
-                <p className={cn("text-sm mt-1", colors.textTertiary)}>{t('thisMonth')}</p>
-              </CardContent>
-            </Card>
-          );
-        case 'benchmark_comparison':
-          return (
-            <Card className={cn("h-full", colors.cardBg, colors.cardBorder)}>
-              <CardHeader className="widget-drag-handle cursor-move">
-                <div className="flex items-center justify-between">
-                  <CardTitle className={colors.accentText}>{t('performanceVsSP500')}</CardTitle>
-                  <TrendingUp className={`w-5 h-5 ${benchmarkData.outperforming ? 'text-green-400' : 'text-red-400'}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <p className={cn("text-sm mb-2", colors.textTertiary)}>{t('yourPortfolio')}</p>
-                    <p className={`text-3xl font-bold ${benchmarkData.portfolioReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {benchmarkData.portfolioReturn >= 0 ? '+' : ''}{benchmarkData.portfolioReturn.toFixed(2)}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className={cn("text-sm mb-2", colors.textTertiary)}>{t('sp500Benchmark')}</p>
-                    <p className="text-3xl font-bold text-blue-400">
-                      +{benchmarkData.sp500Return.toFixed(2)}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className={cn("text-sm mb-2", colors.textTertiary)}>{t('difference')}</p>
-                    <div className="flex items-center gap-2">
-                      <p className={`text-3xl font-bold ${benchmarkData.outperforming ? 'text-green-400' : 'text-red-400'}`}>
-                        {benchmarkData.difference >= 0 ? '+' : ''}{benchmarkData.difference.toFixed(2)}%
-                      </p>
-                      {benchmarkData.outperforming ? (
-                        <span className="text-sm text-green-400">{t('outperforming')}</span>
-                      ) : (
-                        <span className="text-sm text-red-400">{t('underperforming')}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        case 'financial_goals':
-          return (
-            <Card className={cn("h-full", colors.cardBg, colors.cardBorder)}>
-              <CardHeader className="widget-drag-handle cursor-move">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-[#5C8374]" />
-                    <CardTitle className={colors.accentText}>{t('financialGoals')}</CardTitle>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setEditingGoal(null);
-                      setAddGoalOpen(true);
-                    }}
-                    size="sm"
-                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t('addGoal')}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {goals.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {goals.map((goal) => {
-                      const linkedAccounts = goal.linkedAccountIds?.length > 0
-                        ? metrics.accountsWithPositions.filter(acc => goal.linkedAccountIds.includes(acc.id))
-                        : [];
-
-                      return (
-                        <GoalProgressCard
-                          key={goal.id}
-                          goal={goal}
-                          linkedAccounts={linkedAccounts}
-                          onEdit={(goal) => {
-                            setEditingGoal(goal);
-                            setAddGoalOpen(true);
-                          }}
-                          onDelete={deleteGoalMutation.mutate}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Target className="w-12 h-12 text-[#5C8374] mx-auto mb-3" />
-                    <p className={cn("mb-4", colors.textTertiary)}>{t('noGoalsYet')}</p>
-                    <Button
-                      onClick={() => setAddGoalOpen(true)}
-                      variant="outline"
-                      className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      {t('setYourFirstGoal')}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        case 'account_summary':
-          return (
-            <Card className={cn("h-full", colors.cardBg, colors.cardBorder)}>
-              <CardHeader className="widget-drag-handle cursor-move">
-                <CardTitle className={colors.accentText}>{t('accountSummary')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {metrics.accountsWithPositions.length > 0 ? (
-                  <div className="space-y-4">
-                    {metrics.accountsWithPositions.map((account, idx) => {
-                      const percentage = metrics.totalPortfolioValue > 0
-                        ? (account.totalValue / metrics.totalPortfolioValue) * 100
-                        : 0;
-
-                      return (
-                        <div key={account.id} className={cn("flex items-center justify-between py-3 border-b last:border-0", colors.borderLight)}>
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-                            />
-                            <div>
-                              <p className={cn("font-semibold", colors.textPrimary)}>{account.name}</p>
-                              <p className={cn("text-sm", colors.textTertiary)}>{account.type}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className={cn("font-semibold", colors.textPrimary)}>
-                              <BlurValue blur={user?.blurValues}>
-                                {formatCurrency(account.totalValue, user?.currency)}
-                              </BlurValue>
-                            </p>
-                            <p className={cn("text-sm", colors.textTertiary)}>
-                              <BlurValue blur={user?.blurValues}>
-                                {percentage.toFixed(1)}%
-                              </BlurValue>
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={cn("text-center py-8", colors.textTertiary)}>
-                    No accounts yet. Create your first account to get started.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        default:
-          return null;
-      }
-    })();
-
-    return widgetContent;
-  };
+      <div className="mt-3 text-2xl font-semibold tracking-tight">{value}</div>
+    </Tile>
+  );
 
   return (
-    <div className={cn("min-h-screen p-4 md:p-6", colors.bgPrimary)}>
-      <div className="w-full">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className={cn("text-3xl md:text-4xl font-bold mb-2", colors.textPrimary)}>{t('dashboard')}</h1>
-              <p className={colors.textTertiary}>{t('yourCompleteFinancialOverview')}</p>
-            </div>
-            <Button
-              onClick={() => setCustomizeOpen(true)}
-              variant="outline"
-              className={cn("bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              {t('customize')}
-            </Button>
+    <div className="relative">
+      {/* ambient glow behind the page */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[460px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.20),transparent_70%)]" />
+
+      <div className="mx-auto max-w-7xl space-y-5 p-4 pb-28 md:p-8 md:pb-10">
+        <motion.header className="flex flex-wrap items-end justify-between gap-4" variants={rise} initial="hidden" animate="show">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('dashboard')}</h1>
+            <p className={cn('mt-1 text-sm', muted)}>{t('dashSubtitle')}</p>
           </div>
-        </div>
+          <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/70 p-1 backdrop-blur-xl">
+            <button type="button" aria-label={t('dashPrevMonth')} onClick={() => shiftMonth(-1)}
+              className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-foreground/10 active:scale-95 sm:h-9 sm:w-9">
+              <PrevIcon className="h-4 w-4" />
+            </button>
+            <span className="min-w-[8.5rem] text-center text-sm font-medium capitalize">{monthLabel}</span>
+            <button type="button" aria-label={t('dashNextMonth')} onClick={() => shiftMonth(1)}
+              className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-foreground/10 active:scale-95 sm:h-9 sm:w-9">
+              <NextIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </motion.header>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('totalPortfolio')}</CardTitle>
-                <Wallet className="w-5 h-5 text-[#5C8374]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={cn("text-2xl font-bold", colors.textPrimary)}>
-                <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(metrics.totalPortfolioValue)}
-                </BlurValue>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('totalPnL')}</CardTitle>
-                {metrics.totalPnL >= 0 ? (
-                  <TrendingUp className="w-5 h-5 text-green-400" />
-                ) : (
-                  <TrendingDown className="w-5 h-5 text-red-400" />
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold ${metrics.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                <BlurValue blur={user?.blurValues}>
-                  {metrics.totalPnL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPnL)}
-                </BlurValue>
-              </p>
-              <p className={`text-sm mt-1 ${metrics.totalPnL >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
-                <BlurValue blur={user?.blurValues}>
-                  {metrics.totalPnL >= 0 ? '+' : ''}{metrics.totalPnLPercent.toFixed(2)}%
-                </BlurValue>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('invested')}</CardTitle>
-                <BarChart3 className="w-5 h-5 text-[#5C8374]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={cn("text-2xl font-bold", colors.textPrimary)}>
-                <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(metrics.totalInvested)}
-                </BlurValue>
-              </p>
-              <p className={cn("text-sm mt-1", colors.textTertiary)}>
-                {metrics.totalPortfolioValue > 0
-                  ? ((metrics.totalInvested / metrics.totalPortfolioValue) * 100).toFixed(1)
-                  : 0}% {t('ofPortfolio')}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('cash')}</CardTitle>
-                <PieChartIcon className="w-5 h-5 text-[#5C8374]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={cn("text-2xl font-bold", colors.textPrimary)}>
-                <BlurValue blur={user?.blurValues}>
-                  {formatCurrency(metrics.totalCash)}
-                </BlurValue>
-              </p>
-              <p className={cn("text-sm mt-1", colors.textTertiary)}>
-                {metrics.totalPortfolioValue > 0
-                  ? ((metrics.totalCash / metrics.totalPortfolioValue) * 100).toFixed(1)
-                  : 0}% {t('ofPortfolio')}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(colors.cardBg, colors.cardBorder)}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className={cn("text-sm font-medium", colors.textTertiary)}>{t('savingsRate')}</CardTitle>
-                <Percent className="w-5 h-5 text-[#5C8374]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold ${savingsMetrics.savingsRate >= 20 ? 'text-green-400' : savingsMetrics.savingsRate >= 10 ? 'text-yellow-400' : 'text-red-400'}`}>
-                {savingsMetrics.savingsRate.toFixed(1)}%
-              </p>
-              <p className={cn("text-sm mt-1", colors.textTertiary)}>
-                {t('thisMonth')}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Draggable & Resizable Widgets */}
-        <div ref={gridContainerRef} className="w-full overflow-hidden" style={{ maxWidth: '100%' }}>
-          {enabledWidgets.length > 0 && gridWidth > 0 && (
-            <ResponsiveGridLayout
-              className="layout"
-              layouts={layouts}
-              breakpoints={{ lg: 1200, md: 768, sm: 480 }}
-              cols={{ lg: 2, md: 2, sm: 1 }}
-              rowHeight={120}
-              width={gridWidth}
-              onLayoutChange={handleLayoutChange}
-              draggableHandle=".widget-drag-handle"
-              containerPadding={[0, 0]}
-              margin={[16, 16]}
-              isDraggable={true}
-              isResizable={true}
-              useCSSTransforms={true}
-              resizeHandles={['se', 's', 'e']}
-              compactType="vertical"
-            >
-              {enabledWidgets.map((widget) => (
-                <div key={widget.widgetType} className="overflow-hidden rounded-lg" style={{ maxWidth: '100%' }}>
-                  {renderWidget(widget)}
+        {/* Bento grid */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-6 md:gap-5">
+          {/* Hero: net + cumulative curve */}
+          <Tile i={1} className="p-6 md:col-span-4 md:row-span-1">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className={cn('text-sm', muted)}>{t('netAmount')}</p>
+                <div className={cn('mt-2 text-4xl font-bold tracking-tight md:text-5xl', kpis.net < 0 && 'text-danger')}>
+                  {isLoading ? '…' : <Money value={kpis.net} locale={locale} currency={userCurrency} blur={blur} />}
                 </div>
-              ))}
-            </ResponsiveGridLayout>
-          )}
+              </div>
+              {kpis.expenseDelta !== null && (
+                <span className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
+                  kpis.expenseDelta <= 0 ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+                )}>
+                  {kpis.expenseDelta <= 0 ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                  {Math.abs(kpis.expenseDelta).toFixed(0)}% {t('expenses')}
+                </span>
+              )}
+            </div>
+            <div className="mt-4 h-52">
+              {hasData && areaOption ? <EChart option={areaOption} className="h-full w-full" ariaLabel={t('dashDailySpending')} /> : empty}
+            </div>
+          </Tile>
+
+          {/* Stat stack */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:col-span-2 md:grid-cols-1 md:gap-5">
+            {stat(t('income'), <Money value={kpis.income} locale={locale} currency={userCurrency} blur={blur} />, TrendingUp, 'text-success')}
+            {stat(t('expenses'), <Money value={kpis.expenses} locale={locale} currency={userCurrency} blur={blur} />, TrendingDown, 'text-danger')}
+            {stat(t('savingsRate'),
+              kpis.savingsRate === null ? '—' : <NumberFlow value={kpis.savingsRate / 100} locales={locale} format={{ style: 'percent', maximumFractionDigits: 0 }} trend={0} />,
+              PiggyBank, 'text-primary')}
+          </div>
+
+          {/* Categories */}
+          <Tile i={3} className="p-6 md:col-span-3">
+            <h2 className="text-base font-semibold">{t('dashSpendingByCategory')}</h2>
+            {categoryData.length === 0 ? <div className="h-64">{empty}</div> : (
+              <div className="mt-2 flex flex-col items-center gap-4 sm:flex-row">
+                <div className="h-56 w-56 shrink-0">
+                  {donutOption && <EChart option={donutOption} className="h-full w-full" ariaLabel={t('dashSpendingByCategory')} />}
+                </div>
+                <ul className="w-full space-y-2.5 text-sm">
+                  {categoryData.map((c, i) => (
+                    <li key={c.key} className="flex items-center justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: tokens ? [...tokens.series, tokens.muted, tokens.primary][i % 7] : undefined }} />
+                        <span className="truncate">{c.name}</span>
+                      </span>
+                      <span className="font-medium tabular-nums"><BlurValue blur={blur}>{fmtMoney(c.value)}</BlurValue></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Tile>
+
+          {/* Income vs expenses */}
+          <Tile i={4} className="p-6 md:col-span-3">
+            <h2 className="text-base font-semibold">{t('dashIncomeVsExpenses')}</h2>
+            <div className="mt-2 h-64" dir="ltr">
+              {barOption && <EChart option={barOption} className="h-full w-full" ariaLabel={t('dashIncomeVsExpenses')} />}
+            </div>
+          </Tile>
+
+          {/* Recent */}
+          <Tile i={5} className="p-6 md:col-span-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">{t('dashRecentTransactions')}</h2>
+              <Link to={createPageUrl('Expenses')} className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline sm:min-h-0">{t('dashViewAll')}</Link>
+            </div>
+            {recent.length === 0 ? <div className="h-40">{empty}</div> : (
+              <ul className="mt-3 divide-y divide-border/50">
+                {recent.map((tx) => (
+                  <li key={tx.id || tx._id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl', tx.type === 'Income' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger')}>
+                        {tx.type === 'Income' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{tx.description || translateCategory(tx.category, language)}</p>
+                        <p className={cn('text-xs', muted)}>{translateCategory(tx.category, language)} · {String(tx.date).slice(0, 10)}</p>
+                      </div>
+                    </div>
+                    <span className={cn('text-sm font-semibold tabular-nums', tx.type === 'Income' ? 'text-success' : 'text-foreground')}>
+                      <BlurValue blur={blur}>{tx.type === 'Income' ? '+' : '-'}{fmtMoney(tx._amount)}</BlurValue>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Tile>
         </div>
-
-        {/* Customization Dialog */}
-        <DashboardCustomization
-          open={customizeOpen}
-          onClose={() => setCustomizeOpen(false)}
-          widgets={dashboardWidgets}
-          onSave={handleSaveLayout}
-          isSaving={saveWidgetsMutation.isPending}
-        />
-
-        {/* Add/Edit Goal Dialog */}
-        <AddGoalDialog
-          open={addGoalOpen}
-          onClose={() => {
-            setAddGoalOpen(false);
-            setEditingGoal(null);
-          }}
-          onSubmit={handleAddGoal}
-          isLoading={createGoalMutation.isPending || updateGoalMutation.isPending}
-          editGoal={editingGoal}
-          accounts={accounts}
-        />
       </div>
     </div>
   );

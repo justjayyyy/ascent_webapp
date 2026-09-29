@@ -712,7 +712,7 @@ export default function CalendarModal({ open, onOpenChange }) {
       <div
         key={event.id || index}
         className={cn(
-          "absolute left-1 right-4 px-2 py-1 rounded overflow-hidden select-none",
+          "absolute start-1 end-4 px-2 py-1 rounded overflow-hidden select-none",
           "hover:opacity-90 transition-opacity",
           (isDragging || isResizing) && "shadow-lg",
           event.isHoliday ? "cursor-default" : "cursor-move"
@@ -727,7 +727,7 @@ export default function CalendarModal({ open, onOpenChange }) {
         title={`${event.summary} - Drag to move, drag bottom edge to resize`}
       >
         {/* Drag handle */}
-        <div className="absolute top-0 left-0 right-0 h-4 flex items-center justify-center cursor-move opacity-50 hover:opacity-100">
+        <div className="absolute top-0 start-0 end-0 h-4 flex items-center justify-center cursor-move opacity-50 hover:opacity-100">
           <Menu className="w-3 h-3 rotate-90" />
         </div>
         
@@ -745,7 +745,7 @@ export default function CalendarModal({ open, onOpenChange }) {
         
         {/* Resize handle */}
         <div 
-          className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/40 transition-colors"
+          className="absolute bottom-0 start-0 end-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/40 transition-colors"
           onMouseDown={(e) => { e.stopPropagation(); handleResizeStart(event, e); }}
           title="Drag to resize"
         />
@@ -796,7 +796,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                 <img 
                   src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
                   alt="Google" 
-                  className="w-5 h-5 mr-2"
+                  className="w-5 h-5 me-2"
                 />
                 {t('connectWithGoogle') || 'Connect with Google'}
               </Button>
@@ -862,7 +862,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     <MapPin className={cn(
                       "absolute top-1/2 -translate-y-1/2 w-4 h-4", 
                       colors.textTertiary,
-                      isRTL ? "right-3" : "left-3"
+                      "start-3"
                     )} />
                     <Input
                       value={eventForm.location}
@@ -870,7 +870,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                       placeholder={t('addLocation') || 'Add location'}
                       className={cn(
                         colors.bgPrimary, colors.border, colors.textPrimary,
-                        isRTL ? "pr-10 text-right" : "pl-10"
+                        "ps-10"
                       )}
                       dir={isRTL ? 'rtl' : 'ltr'}
                     />
@@ -894,9 +894,9 @@ export default function CalendarModal({ open, onOpenChange }) {
                     <Button
                       variant="outline"
                       onClick={() => deleteEvent(editingEvent.id)}
-                      className="text-red-500 border-red-500/50 hover:bg-red-500/10"
+                      className="text-danger border-danger/50 hover:bg-danger/10"
                     >
-                      <Trash2 className={cn("w-4 h-4", isRTL ? "ml-2" : "mr-2")} />
+                      <Trash2 className={cn("w-4 h-4", "me-2")} />
                       {t('delete') || 'Delete'}
                     </Button>
                   )}
@@ -910,9 +910,9 @@ export default function CalendarModal({ open, onOpenChange }) {
                   </Button>
                   <Button
                     onClick={editingEvent ? () => updateEvent() : createEvent}
-                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                    className="bg-primary hover:bg-primary/80 text-primary-foreground"
                   >
-                    <Check className={cn("w-4 h-4", isRTL ? "ml-2" : "mr-2")} />
+                    <Check className={cn("w-4 h-4", "me-2")} />
                     {editingEvent ? (t('save') || 'Save') : (t('create') || 'Create')}
                   </Button>
                 </div>
@@ -974,7 +974,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     onClick={createTask}
                     className="bg-yellow-500 hover:bg-yellow-600 text-white"
                   >
-                    <Check className={cn("w-4 h-4", isRTL ? "ml-2" : "mr-2")} />
+                    <Check className={cn("w-4 h-4", "me-2")} />
                     {t('create') || 'Create'}
                   </Button>
                 </div>
@@ -1009,7 +1009,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     variant="outline"
                     size="sm"
                     onClick={goToToday}
-                    className={cn("ml-2", colors.border, colors.textSecondary)}
+                    className={cn("ms-2", colors.border, colors.textSecondary)}
                   >
                     {t('today') || 'Today'}
                   </Button>
@@ -1023,8 +1023,8 @@ export default function CalendarModal({ open, onOpenChange }) {
                       className={cn(
                         "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 transition-colors",
                         view === 'day' 
-                          ? "bg-[#5C8374] text-white" 
-                          : cn(colors.textSecondary, "hover:bg-[#5C8374]/20")
+                          ? "bg-primary text-primary-foreground" 
+                          : cn(colors.textSecondary, "hover:bg-primary/20")
                       )}
                     >
                       <CalendarIcon className="w-4 h-4" />
@@ -1036,8 +1036,8 @@ export default function CalendarModal({ open, onOpenChange }) {
                         "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 transition-colors border-x",
                         colors.border,
                         view === 'week' 
-                          ? "bg-[#5C8374] text-white" 
-                          : cn(colors.textSecondary, "hover:bg-[#5C8374]/20")
+                          ? "bg-primary text-primary-foreground" 
+                          : cn(colors.textSecondary, "hover:bg-primary/20")
                       )}
                     >
                       <List className="w-4 h-4" />
@@ -1048,8 +1048,8 @@ export default function CalendarModal({ open, onOpenChange }) {
                       className={cn(
                         "px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 transition-colors",
                         view === 'month' 
-                          ? "bg-[#5C8374] text-white" 
-                          : cn(colors.textSecondary, "hover:bg-[#5C8374]/20")
+                          ? "bg-primary text-primary-foreground" 
+                          : cn(colors.textSecondary, "hover:bg-primary/20")
                       )}
                     >
                       <Grid className="w-4 h-4" />
@@ -1060,6 +1060,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                   <Button
                     variant="outline"
                     size="icon"
+                    aria-label={t('refresh')}
                     onClick={fetchEvents}
                     disabled={isRefreshing}
                     className={cn(colors.border, colors.textSecondary)}
@@ -1072,7 +1073,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     variant="outline"
                     size="sm"
                     onClick={disconnectCalendar}
-                    className={cn(colors.border, "text-red-500 hover:bg-red-500/10")}
+                    className={cn(colors.border, "text-danger hover:bg-danger/10")}
                     title={t('disconnect') || 'Disconnect Calendar'}
                   >
                     {t('reconnect') || 'Reconnect'}
@@ -1080,9 +1081,9 @@ export default function CalendarModal({ open, onOpenChange }) {
 
                   <Button
                     onClick={() => openNewEvent()}
-                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                    className="bg-primary hover:bg-primary/80 text-primary-foreground"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="w-4 h-4 me-2" />
                     {t('newEvent') || 'New Event'}
                   </Button>
 
@@ -1094,7 +1095,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     variant="outline"
                     className={cn(colors.border, "text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20")}
                   >
-                    <Check className="w-4 h-4 mr-2" />
+                    <Check className="w-4 h-4 me-2" />
                     {t('newTask') || 'New Task'}
                   </Button>
                 </div>
@@ -1132,15 +1133,15 @@ export default function CalendarModal({ open, onOpenChange }) {
                             className={cn(
                               "min-h-[100px] p-1 rounded-lg cursor-pointer transition-all border",
                               isCurrentMonth ? colors.bgPrimary : 'opacity-40',
-                              isToday && "ring-2 ring-[#5C8374]",
-                              isSelected && "bg-[#5C8374]/20",
-                              theme === 'light' ? 'border-gray-200' : 'border-gray-700',
-                              "hover:bg-[#5C8374]/10 hover:scale-[1.02]"
+                              isToday && "ring-2 ring-primary",
+                              isSelected && "bg-primary/20",
+                              'border-border',
+                              "hover:bg-primary/10 hover:scale-[1.02]"
                             )}
                           >
                             <div className={cn(
                               "text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full",
-                              isToday ? "bg-[#5C8374] text-white" : colors.textPrimary
+                              isToday ? "bg-primary text-primary-foreground" : colors.textPrimary
                             )}>
                               {format(day, 'd')}
                             </div>
@@ -1158,7 +1159,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                                   title={`${event.isHoliday ? '✡️ ' : event.isTask ? '✓ ' : ''}${event.summary}`}
                                 >
                                   {event.start?.dateTime && (
-                                    <span className="opacity-75 mr-1">
+                                    <span className="opacity-75 me-1">
                                       {format(parseISO(event.start.dateTime), 'h:mm')}
                                     </span>
                                   )}
@@ -1189,8 +1190,8 @@ export default function CalendarModal({ open, onOpenChange }) {
                           key={i}
                           onClick={() => { setCurrentDate(day); setView('day'); }}
                           className={cn(
-                            "text-center py-2 cursor-pointer hover:bg-[#5C8374]/10 transition-colors",
-                            isSameDay(day, new Date()) && "bg-[#5C8374]/20"
+                            "text-center py-2 cursor-pointer hover:bg-primary/10 transition-colors",
+                            isSameDay(day, new Date()) && "bg-primary/20"
                           )}
                         >
                           <div className={cn("text-xs", colors.textTertiary)}>
@@ -1198,7 +1199,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                           </div>
                           <div className={cn(
                             "text-lg font-semibold w-8 h-8 mx-auto flex items-center justify-center rounded-full",
-                            isSameDay(day, new Date()) ? "bg-[#5C8374] text-white" : colors.textPrimary
+                            isSameDay(day, new Date()) ? "bg-primary text-primary-foreground" : colors.textPrimary
                           )}>
                             {format(day, 'd')}
                           </div>
@@ -1211,7 +1212,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                       <div className="relative">
                         {HOURS.map(hour => (
                           <div key={hour} className={cn("grid grid-cols-8 border-b", colors.border)} style={{ height: `${HOUR_HEIGHT}px` }}>
-                            <div className={cn("w-16 text-xs text-right pr-2 pt-1", colors.textTertiary)}>
+                            <div className={cn("w-16 text-xs text-end pe-2 pt-1", colors.textTertiary)}>
                               {format(setHours(new Date(), hour), 'h a')}
                             </div>
                             {weekDays.map((day, dayIndex) => {
@@ -1221,9 +1222,9 @@ export default function CalendarModal({ open, onOpenChange }) {
                                   key={dayIndex}
                                   onClick={() => openNewEvent(day, hour)}
                                   className={cn(
-                                    "border-l relative cursor-pointer hover:bg-[#5C8374]/5",
+                                    "border-l relative cursor-pointer hover:bg-primary/5",
                                     colors.border,
-                                    isSameDay(day, new Date()) && "bg-[#5C8374]/5"
+                                    isSameDay(day, new Date()) && "bg-primary/5"
                                   )}
                                 >
                                   {hourEvents.map((event, i) => (
@@ -1231,7 +1232,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                                       key={event.id || i}
                                       onClick={(e) => !event.isHoliday && openEditEvent(event, e)}
                                       className={cn(
-                                        "absolute left-0 right-1 text-xs px-1 py-0.5 rounded overflow-hidden z-10",
+                                        "absolute start-0 end-1 text-xs px-1 py-0.5 rounded overflow-hidden z-10",
                                         event.isHoliday ? "cursor-default" : "cursor-pointer"
                                       )}
                                       style={{ 
@@ -1263,7 +1264,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     {/* Time column */}
                     <div className="w-16 flex-shrink-0">
                       {HOURS.map(hour => (
-                        <div key={hour} className={cn("text-xs text-right pr-2 pt-1", colors.textTertiary)} style={{ height: `${HOUR_HEIGHT}px` }}>
+                        <div key={hour} className={cn("text-xs text-end pe-2 pt-1", colors.textTertiary)} style={{ height: `${HOUR_HEIGHT}px` }}>
                           {format(setHours(new Date(), hour), 'h a')}
                         </div>
                       ))}
@@ -1273,7 +1274,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                     <div 
                       ref={dayColumnRef}
                       className="flex-1 relative border-l" 
-                      style={{ borderColor: theme === 'light' ? '#e2e8f0' : '#5C8374' }}
+                      style={{ borderColor: 'hsl(var(--border))' }}
                     >
                       {/* Hour lines */}
                       {HOURS.map(hour => (
@@ -1281,7 +1282,7 @@ export default function CalendarModal({ open, onOpenChange }) {
                           key={hour}
                           onClick={() => openNewEvent(currentDate, hour)}
                           className={cn(
-                            "border-b cursor-pointer hover:bg-[#5C8374]/5",
+                            "border-b cursor-pointer hover:bg-primary/5",
                             colors.border
                           )}
                           style={{ height: `${HOUR_HEIGHT}px` }}
@@ -1301,7 +1302,7 @@ export default function CalendarModal({ open, onOpenChange }) {
 
                       {/* All-day events */}
                       {getEventsForDate(currentDate).filter(e => e.start?.date).length > 0 && (
-                        <div className={cn("absolute top-0 left-0 right-0 p-2 border-b z-20", colors.bgSecondary, colors.border)}>
+                        <div className={cn("absolute top-0 start-0 end-0 p-2 border-b z-20", colors.bgSecondary, colors.border)}>
                           <div className={cn("text-xs font-medium mb-1", colors.textTertiary)}>All-day</div>
                           {getEventsForDate(currentDate)
                             .filter(e => e.start?.date)

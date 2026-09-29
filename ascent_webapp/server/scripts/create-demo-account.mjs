@@ -104,64 +104,6 @@ async function createDemoAccount() {
   const workspaceId = workspaceResult.insertedId;
   console.log(`✅ Created workspace: Demo Workspace\n`);
 
-  // Create accounts
-  console.log('🏦 Creating accounts...');
-  const accounts = [
-    { name: 'Fidelity 401k', type: 'Retirement', institution: 'Fidelity', baseCurrency: 'USD', initialInvestment: 50000 },
-    { name: 'Robinhood Trading', type: 'Investment', institution: 'Robinhood', baseCurrency: 'USD', initialInvestment: 25000 },
-    { name: 'Chase Savings', type: 'Savings', institution: 'Chase', baseCurrency: 'USD', initialInvestment: 25000 },
-    { name: 'Schwab IRA', type: 'IRA', institution: 'Charles Schwab', baseCurrency: 'USD', initialInvestment: 40000 },
-  ];
-
-  const accountIds = [];
-  for (const acc of accounts) {
-    const result = await db.collection('accounts').insertOne({
-      ...acc,
-      workspaceId: workspaceId,
-      createdBy: userId,
-      created_date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // 90 days ago
-      updated_date: new Date(),
-    });
-    accountIds.push({ id: result.insertedId, name: acc.name, type: acc.type });
-    console.log(`  ✅ ${acc.name}`);
-  }
-  console.log('');
-
-  // Create positions
-  console.log('📈 Creating positions...');
-  const positions = [
-    // Fidelity 401k
-    { accountId: accountIds[0].id, symbol: 'VTI', name: 'Vanguard Total Stock Market ETF', assetType: 'ETF', quantity: 150, averageBuyPrice: 180, currentPrice: 245 },
-    { accountId: accountIds[0].id, symbol: 'BND', name: 'Vanguard Total Bond Market ETF', assetType: 'ETF', quantity: 200, averageBuyPrice: 75, currentPrice: 72 },
-    { accountId: accountIds[0].id, symbol: 'VXUS', name: 'Vanguard Total International Stock ETF', assetType: 'ETF', quantity: 100, averageBuyPrice: 52, currentPrice: 58 },
-    
-    // Robinhood Trading
-    { accountId: accountIds[1].id, symbol: 'AAPL', name: 'Apple Inc.', assetType: 'Stock', quantity: 50, averageBuyPrice: 150, currentPrice: 195 },
-    { accountId: accountIds[1].id, symbol: 'GOOGL', name: 'Alphabet Inc.', assetType: 'Stock', quantity: 25, averageBuyPrice: 120, currentPrice: 175 },
-    { accountId: accountIds[1].id, symbol: 'MSFT', name: 'Microsoft Corporation', assetType: 'Stock', quantity: 30, averageBuyPrice: 280, currentPrice: 430 },
-    { accountId: accountIds[1].id, symbol: 'NVDA', name: 'NVIDIA Corporation', assetType: 'Stock', quantity: 20, averageBuyPrice: 250, currentPrice: 495 },
-    { accountId: accountIds[1].id, symbol: 'TSLA', name: 'Tesla Inc.', assetType: 'Stock', quantity: 15, averageBuyPrice: 200, currentPrice: 250 },
-    
-    // Chase Savings (Cash)
-    { accountId: accountIds[2].id, symbol: 'USD', name: 'US Dollar Cash', assetType: 'Cash', quantity: 25000, averageBuyPrice: 1, currentPrice: 1 },
-    
-    // Schwab IRA
-    { accountId: accountIds[3].id, symbol: 'SPY', name: 'SPDR S&P 500 ETF', assetType: 'ETF', quantity: 80, averageBuyPrice: 380, currentPrice: 475 },
-    { accountId: accountIds[3].id, symbol: 'QQQ', name: 'Invesco QQQ Trust', assetType: 'ETF', quantity: 40, averageBuyPrice: 320, currentPrice: 435 },
-  ];
-
-  for (const pos of positions) {
-    await db.collection('positions').insertOne({
-      ...pos,
-      workspaceId: workspaceId,
-      createdBy: userId,
-      created_date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), // 60 days ago
-      updated_date: new Date(),
-    });
-    console.log(`  ✅ ${pos.symbol} - ${pos.quantity} shares @ $${pos.currentPrice}`);
-  }
-  console.log('');
-
   // Create categories
   console.log('🏷️ Creating categories...');
   const categories = [
@@ -214,97 +156,69 @@ async function createDemoAccount() {
   }
   console.log('');
 
-  // Create transactions (last 90 days)
+  // Create transactions (last 6 months)
   console.log('💸 Creating transactions...');
-  const transactionTemplates = [
-    { description: 'Whole Foods', category: 'groceries', type: 'Expense', minAmount: 50, maxAmount: 200, frequency: 0.3 },
-    { description: 'Netflix Subscription', category: 'entertainment', type: 'Expense', minAmount: 15, maxAmount: 20, frequency: 0.05 },
-    { description: 'Uber Ride', category: 'transportation', type: 'Expense', minAmount: 15, maxAmount: 45, frequency: 0.2 },
-    { description: 'Electric Bill', category: 'utilities', type: 'Expense', minAmount: 80, maxAmount: 150, frequency: 0.03 },
-    { description: 'Rent Payment', category: 'rent_housing', type: 'Expense', minAmount: 2000, maxAmount: 2000, frequency: 0.03 },
-    { description: 'Restaurant Dinner', category: 'food_dining', type: 'Expense', minAmount: 30, maxAmount: 100, frequency: 0.2 },
-    { description: 'Amazon Purchase', category: 'shopping', type: 'Expense', minAmount: 20, maxAmount: 150, frequency: 0.15 },
-    { description: 'Doctor Visit', category: 'healthcare', type: 'Expense', minAmount: 50, maxAmount: 200, frequency: 0.05 },
-    { description: 'Gas Station', category: 'transportation', type: 'Expense', minAmount: 40, maxAmount: 70, frequency: 0.2 },
-    { description: 'Coffee Shop', category: 'food_dining', type: 'Expense', minAmount: 5, maxAmount: 15, frequency: 0.3 },
-    { description: 'Monthly Salary', category: 'salary', type: 'Income', minAmount: 8000, maxAmount: 8000, frequency: 0.03 },
-    { description: 'Freelance Project', category: 'freelance', type: 'Income', minAmount: 500, maxAmount: 2000, frequency: 0.1 },
-    { description: 'Dividend Payment', category: 'investments', type: 'Income', minAmount: 100, maxAmount: 500, frequency: 0.05 },
+  const dailyTemplates = [
+    { description: 'Whole Foods', category: 'groceries', minAmount: 50, maxAmount: 200, frequency: 0.15 },
+    { description: 'Uber Ride', category: 'transportation', minAmount: 15, maxAmount: 45, frequency: 0.1 },
+    { description: 'Restaurant Dinner', category: 'food_dining', minAmount: 30, maxAmount: 100, frequency: 0.12 },
+    { description: 'Amazon Purchase', category: 'shopping', minAmount: 20, maxAmount: 150, frequency: 0.08 },
+    { description: 'Gas Station', category: 'transportation', minAmount: 40, maxAmount: 70, frequency: 0.1 },
+    { description: 'Coffee Shop', category: 'food_dining', minAmount: 5, maxAmount: 15, frequency: 0.25 },
+    { description: 'Doctor Visit', category: 'healthcare', minAmount: 50, maxAmount: 200, frequency: 0.02 },
+    { description: 'Freelance Project', category: 'freelance', type: 'Income', minAmount: 500, maxAmount: 2000, frequency: 0.03 },
+  ];
+  // Fixed monthly items: [day of month, template]
+  const monthlyItems = [
+    { day: 1, description: 'Monthly Salary', category: 'salary', type: 'Income', amount: 8000 },
+    { day: 1, description: 'Rent Payment', category: 'rent_housing', type: 'Expense', amount: 2000 },
+    { day: 5, description: 'Netflix Subscription', category: 'entertainment', type: 'Expense', amount: 18 },
+    { day: 12, description: 'Electric Bill', category: 'utilities', type: 'Expense', amount: 110 },
+    { day: 20, description: 'Dividend Payment', category: 'investments', type: 'Income', amount: 250 },
   ];
 
-  let transactionCount = 0;
-  for (let daysAgo = 90; daysAgo >= 0; daysAgo--) {
-    const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
-    
-    // Generate transactions based on frequency
-    for (const template of transactionTemplates) {
-      if (Math.random() < template.frequency) {
-        const amount = Math.floor(Math.random() * (template.maxAmount - template.minAmount + 1)) + template.minAmount;
-        const paymentMethods = ['Card', 'Cash', 'Transfer'];
-        const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
-        
-        await db.collection('expensetransactions').insertOne({
-          description: template.description,
-          amount: amount,
-          currency: 'USD',
-          amountInGlobalCurrency: amount,
-          exchangeRate: 1,
-          type: template.type,
-          category: template.category,
-          date: date.toISOString().split('T')[0],
-          paymentMethod: paymentMethod,
-          cardId: paymentMethod === 'Card' ? cardIds[Math.floor(Math.random() * cardIds.length)] : null,
-          workspaceId: workspaceId,
-          createdBy: userId,
-          created_date: date,
-          updated_date: date,
-        });
-        transactionCount++;
+  const paymentMethods = ['Card', 'Cash', 'Transfer'];
+  const toDateStr = (d) => d.toISOString().split('T')[0];
+  const today = new Date();
+  const transactions = [];
+  const pushTx = (t, date) => {
+    const paymentMethod = t.fixedPayment || paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+    transactions.push({
+      description: t.description,
+      amount: t.amount,
+      currency: 'USD',
+      amountInGlobalCurrency: t.amount,
+      exchangeRate: 1,
+      type: t.type || 'Expense',
+      category: t.category,
+      date: toDateStr(date),
+      paymentMethod,
+      cardId: paymentMethod === 'Card' ? cardIds[Math.floor(Math.random() * cardIds.length)].toString() : null,
+      workspaceId,
+      createdBy: userId,
+      created_date: date,
+      updated_date: date,
+    });
+  };
+
+  for (let daysAgo = 180; daysAgo >= 0; daysAgo--) {
+    const date = new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    for (const tpl of dailyTemplates) {
+      if (Math.random() < tpl.frequency) {
+        const amount = Math.floor(Math.random() * (tpl.maxAmount - tpl.minAmount + 1)) + tpl.minAmount;
+        pushTx({ ...tpl, amount }, date);
+      }
+    }
+    for (const item of monthlyItems) {
+      if (date.getDate() === item.day) {
+        pushTx({ ...item, fixedPayment: item.type === 'Income' || item.category === 'rent_housing' ? 'Transfer' : 'Card' }, date);
       }
     }
   }
-  console.log(`  ✅ Created ${transactionCount} transactions\n`);
-
-  // Create financial goals
-  console.log('🎯 Creating financial goals...');
-  const goals = [
-    { 
-      title: 'Emergency Fund', 
-      targetAmount: 30000, 
-      currentAmount: 25000, 
-      targetDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      expectedAnnualReturn: 3,
-      linkedAccountIds: [accountIds[2].id.toString()]
-    },
-    { 
-      title: 'Vacation to Japan', 
-      targetAmount: 5000, 
-      currentAmount: 2500, 
-      targetDate: new Date(Date.now() + 240 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      expectedAnnualReturn: 2,
-      linkedAccountIds: []
-    },
-    { 
-      title: 'New Car Down Payment', 
-      targetAmount: 15000, 
-      currentAmount: 8000, 
-      targetDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      expectedAnnualReturn: 4,
-      linkedAccountIds: [accountIds[2].id.toString()]
-    },
-  ];
-
-  for (const goal of goals) {
-    await db.collection('financialgoals').insertOne({
-      ...goal,
-      workspaceId: workspaceId,
-      createdBy: userId,
-      created_date: new Date(),
-      updated_date: new Date(),
-    });
-    console.log(`  ✅ ${goal.title}: $${goal.currentAmount.toLocaleString()} / $${goal.targetAmount.toLocaleString()}`);
-  }
-  console.log('');
+  await db.collection('expensetransactions').insertMany(transactions);
+  const transactionCount = transactions.length;
+  console.log(`  ✅ Created ${transactionCount} transactions
+`);
 
   // Create budgets for current month
   console.log('📊 Creating budgets...');
@@ -388,12 +302,9 @@ async function createDemoAccount() {
   console.log('\nData created:');
   console.log(`  • 1 user`);
   console.log(`  • 1 workspace`);
-  console.log(`  • ${accounts.length} accounts`);
-  console.log(`  • ${positions.length} positions`);
   console.log(`  • ${categories.length} categories`);
   console.log(`  • ${cards.length} cards`);
   console.log(`  • ${transactionCount} transactions`);
-  console.log(`  • ${goals.length} financial goals`);
   console.log(`  • ${budgets.length} budgets`);
   console.log(`  • ${notes.length} notes`);
   console.log('\n');

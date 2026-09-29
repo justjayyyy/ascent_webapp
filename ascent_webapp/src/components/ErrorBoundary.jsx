@@ -40,27 +40,27 @@ class ErrorBoundary extends React.Component {
       }
 
       return (
-        <div className="min-h-screen bg-[#092635] flex items-center justify-center p-4">
-          <Card className="max-w-lg w-full bg-[#1B4242] border-[#5C8374]/30">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="max-w-lg w-full bg-card border-primary/30">
             <CardHeader className="text-center pb-2">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-red-400" />
+              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-danger/20 flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-danger" />
               </div>
-              <CardTitle className="text-[#9EC8B9] text-xl">
+              <CardTitle className="text-muted-foreground text-xl">
                 Something went wrong
               </CardTitle>
             </CardHeader>
             <CardContent className="text-center space-y-4">
-              <p className="text-[#5C8374]">
+              <p className="text-primary">
                 We encountered an unexpected error. Please try again or return to the home page.
               </p>
               
               {process.env.NODE_ENV === 'development' && this.state.error && (
-                <details className="text-left bg-[#092635] rounded-lg p-3 text-sm">
-                  <summary className="text-red-400 cursor-pointer mb-2">
+                <details className="text-start bg-background rounded-lg p-3 text-sm">
+                  <summary className="text-danger cursor-pointer mb-2">
                     Error Details
                   </summary>
-                  <pre className="text-[#9EC8B9] whitespace-pre-wrap overflow-auto max-h-40">
+                  <pre className="text-muted-foreground whitespace-pre-wrap overflow-auto max-h-40">
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}
                   </pre>
@@ -70,17 +70,17 @@ class ErrorBoundary extends React.Component {
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <Button
                   onClick={this.handleRetry}
-                  className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+                  className="bg-primary hover:bg-primary/80 text-primary-foreground"
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <RefreshCw className="w-4 h-4 me-2" />
                   Try Again
                 </Button>
                 <Button
                   onClick={this.handleGoHome}
                   variant="outline"
-                  className="border-[#5C8374] text-[#9EC8B9] hover:bg-[#5C8374]/20"
+                  className="border-primary text-muted-foreground hover:bg-primary/20"
                 >
-                  <Home className="w-4 h-4 mr-2" />
+                  <Home className="w-4 h-4 me-2" />
                   Go Home
                 </Button>
               </div>
@@ -98,15 +98,15 @@ class ErrorBoundary extends React.Component {
 export function InlineError({ message, onRetry }) {
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center">
-      <AlertTriangle className="w-12 h-12 text-red-400 mb-4" />
-      <p className="text-[#9EC8B9] mb-4">{message || 'Failed to load data'}</p>
+      <AlertTriangle className="w-12 h-12 text-danger mb-4" />
+      <p className="text-muted-foreground mb-4">{message || 'Failed to load data'}</p>
       {onRetry && (
         <Button
           onClick={onRetry}
           size="sm"
-          className="bg-[#5C8374] hover:bg-[#5C8374]/80"
+          className="bg-primary hover:bg-primary/80"
         >
-          <RefreshCw className="w-4 h-4 mr-2" />
+          <RefreshCw className="w-4 h-4 me-2" />
           Retry
         </Button>
       )}

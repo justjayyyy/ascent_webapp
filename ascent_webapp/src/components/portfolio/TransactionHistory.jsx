@@ -15,28 +15,28 @@ const typeConfig = {
     label: 'Buy',
     labelHe: 'קנייה',
     labelRu: 'Покупка',
-    color: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+    color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
     icon: ShoppingCart,
   },
   sell: {
     label: 'Sell',
     labelHe: 'מכירה',
     labelRu: 'Продажа',
-    color: 'bg-green-500/10 text-green-400 border-green-500/30',
+    color: 'bg-success/10 text-success border-success/30',
     icon: TrendingUp,
   },
   deposit: {
     label: 'Deposit',
     labelHe: 'הפקדה',
     labelRu: 'Депозит',
-    color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    color: 'bg-success/10 text-success border-success/30',
     icon: DollarSign,
   },
   withdrawal: {
     label: 'Withdrawal',
     labelHe: 'משיכה',
     labelRu: 'Снятие',
-    color: 'bg-red-500/10 text-red-400 border-red-500/30',
+    color: 'bg-danger/10 text-danger border-danger/30',
     icon: TrendingDown,
   },
 };
@@ -170,13 +170,13 @@ export default function TransactionHistory({ transactions = [], isLoading, accou
                     <TableHead className={cn("font-semibold", colors.textSecondary)}>
                       {t('symbol') || 'Symbol'}
                     </TableHead>
-                    <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>
+                    <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>
                       {t('quantity') || 'Qty'}
                     </TableHead>
-                    <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>
+                    <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>
                       {t('price') || 'Price'}
                     </TableHead>
-                    <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>
+                    <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>
                       {t('total') || 'Total'}
                     </TableHead>
                     <TableHead className={cn("font-semibold", colors.textSecondary)}>
@@ -207,12 +207,12 @@ export default function TransactionHistory({ transactions = [], isLoading, accou
                         <TableCell className={cn("font-medium", colors.textPrimary)}>
                           {tx.symbol || '-'}
                         </TableCell>
-                        <TableCell className={cn("text-right", colors.textSecondary)}>
+                        <TableCell className={cn("text-end", colors.textSecondary)}>
                           <BlurValue blur={user?.blurValues}>
                             {tx.quantity?.toLocaleString() || '-'}
                           </BlurValue>
                         </TableCell>
-                        <TableCell className={cn("text-right", colors.textSecondary)}>
+                        <TableCell className={cn("text-end", colors.textSecondary)}>
                           {tx.pricePerUnit ? (
                             <div className="flex flex-col items-end">
                               <BlurValue blur={user?.blurValues}>
@@ -220,7 +220,7 @@ export default function TransactionHistory({ transactions = [], isLoading, accou
                               </BlurValue>
                               {tx.currency !== userCurrency && rates && Object.keys(rates).length > 0 && (
                                 <BlurValue blur={user?.blurValues}>
-                                  <span className={cn("text-xs text-gray-500 dark:text-gray-400")}>
+                                  <span className={cn("text-xs text-muted-foreground dark:text-muted-foreground")}>
                                     {formatCurrency(
                                       convertCurrency(tx.pricePerUnit, tx.currency, userCurrency, rates),
                                       userCurrency
@@ -233,14 +233,14 @@ export default function TransactionHistory({ transactions = [], isLoading, accou
                             <span>-</span>
                           )}
                         </TableCell>
-                        <TableCell className={cn("text-right font-semibold", isInflow ? 'text-green-400' : 'text-red-400')}>
+                        <TableCell className={cn("text-end font-semibold", isInflow ? 'text-success' : 'text-danger')}>
                           <div className="flex flex-col items-end">
                             <BlurValue blur={user?.blurValues}>
                               {isInflow ? '+' : '-'}{formatCurrency(Math.abs(tx.totalAmount), tx.currency)}
                             </BlurValue>
                             {tx.currency !== userCurrency && rates && Object.keys(rates).length > 0 && (
                               <BlurValue blur={user?.blurValues}>
-                                <span className={cn("text-xs text-gray-500 dark:text-gray-400")}>
+                                <span className={cn("text-xs text-muted-foreground dark:text-muted-foreground")}>
                                   {isInflow ? '+' : '-'}
                                   {formatCurrency(
                                     Math.abs(convertCurrency(tx.totalAmount, tx.currency, userCurrency, rates)),

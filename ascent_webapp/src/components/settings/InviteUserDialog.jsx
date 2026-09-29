@@ -1,3 +1,4 @@
+import { PORTFOLIO_ENABLED } from '@/lib/features';
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -177,9 +178,9 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
               placeholder="user@example.com"
               value={formData.invitedEmail}
               onChange={(e) => setFormData({ ...formData, invitedEmail: e.target.value })}
-              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.invitedEmail && 'border-red-500')}
+              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.invitedEmail && 'border-danger')}
             />
-            {errors.invitedEmail && <p className="text-xs text-red-400">{errors.invitedEmail}</p>}
+            {errors.invitedEmail && <p className="text-xs text-danger">{errors.invitedEmail}</p>}
           </div>
 
           <div className="space-y-2">
@@ -189,15 +190,17 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
               placeholder="John Doe"
               value={formData.displayName}
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.displayName && 'border-red-500')}
+              className={cn(colors.bgTertiary, colors.border, colors.textPrimary, errors.displayName && 'border-danger')}
             />
-            {errors.displayName && <p className="text-xs text-red-400">{errors.displayName}</p>}
+            {errors.displayName && <p className="text-xs text-danger">{errors.displayName}</p>}
           </div>
 
           <div className={cn("space-y-3 pt-4 border-t", colors.borderLight)}>
             <Label className={colors.textSecondary}>{t('permissions')}</Label>
 
             <div className="space-y-3">
+              {PORTFOLIO_ENABLED && (
+              <>
               {/* Portfolio */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between py-2">
@@ -205,7 +208,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                     <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewPortfolio')}</p>
                     <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeAccountsPositions')}</p>
                   </div>
-                  <Switch
+                  <Switch aria-label={t('canSeeAccountsPositions')}
                     checked={formData.permissions.viewPortfolio}
                     onCheckedChange={() => togglePermission('viewPortfolio')}
                   />
@@ -213,7 +216,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
                 <Collapsible open={formData.permissions.viewPortfolio}>
                   <CollapsibleContent>
-                    <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
+                    <div className={cn("ms-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold uppercase opacity-70">{t('selectAccounts')}</span>
                         <Button
@@ -226,7 +229,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                           {accounts.length > 0 && accounts.every(i => (formData.permissions.allowedAccountIds || []).includes(i.id)) ? t('deselectAll') : t('selectAll')}
                         </Button>
                       </div>
-                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-32 overflow-y-auto pe-1">
                         {isLoadingAccounts ? (
                           <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> {t('loadingAccounts')}</div>
                         ) : accounts.length === 0 ? (
@@ -255,11 +258,13 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editPortfolio')}</p>
                   <p className={cn("text-xs", colors.textTertiary)}>{t('canAddEditAccountsPositions')}</p>
                 </div>
-                <Switch
+                <Switch aria-label={t('canAddEditAccountsPositions')}
                   checked={formData.permissions.editPortfolio}
                   onCheckedChange={() => togglePermission('editPortfolio')}
                 />
               </div>
+              </>
+              )}
 
               {/* Notes */}
               <div className="space-y-2">
@@ -268,7 +273,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                     <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewNotes')}</p>
                     <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeNotes')}</p>
                   </div>
-                  <Switch
+                  <Switch aria-label={t('canSeeNotes')}
                     checked={formData.permissions.viewNotes}
                     onCheckedChange={() => togglePermission('viewNotes')}
                   />
@@ -276,7 +281,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
 
                 <Collapsible open={formData.permissions.viewNotes}>
                   <CollapsibleContent>
-                    <div className={cn("ml-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
+                    <div className={cn("ms-4 p-3 rounded-md border text-sm space-y-2 animate-in slide-in-from-top-2 duration-300", colors.bgSecondary, colors.border)}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold uppercase opacity-70">{t('selectNotes')}</span>
                         <Button
@@ -289,7 +294,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                           {notes.length > 0 && notes.every(i => (formData.permissions.allowedNoteIds || []).includes(i.id)) ? t('deselectAll') : t('selectAll')}
                         </Button>
                       </div>
-                      <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-32 overflow-y-auto pe-1">
                         {isLoadingNotes ? (
                           <div className="flex items-center gap-2 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> {t('loadingNotes')}</div>
                         ) : notes.length === 0 ? (
@@ -318,7 +323,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editNotes')}</p>
                   <p className={cn("text-xs", colors.textTertiary)}>{t('canAddEditNotes')}</p>
                 </div>
-                <Switch
+                <Switch aria-label={t('canAddEditNotes')}
                   checked={formData.permissions.editNotes}
                   onCheckedChange={() => togglePermission('editNotes')}
                 />
@@ -329,7 +334,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewExpenses')}</p>
                   <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeExpenseTransactions')}</p>
                 </div>
-                <Switch
+                <Switch aria-label={t('canSeeExpenseTransactions')}
                   checked={formData.permissions.viewExpenses}
                   onCheckedChange={() => togglePermission('viewExpenses')}
                 />
@@ -340,7 +345,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editExpenses')}</p>
                   <p className={cn("text-xs", colors.textTertiary)}>{t('canAddEditExpenseTransactions')}</p>
                 </div>
-                <Switch
+                <Switch aria-label={t('canAddEditExpenseTransactions')}
                   checked={formData.permissions.editExpenses}
                   onCheckedChange={() => togglePermission('editExpenses')}
                 />
@@ -351,7 +356,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('viewBudgets')}</p>
                   <p className={cn("text-xs", colors.textTertiary)}>{t('canSeeBudgets')}</p>
                 </div>
-                <Switch
+                <Switch aria-label={t('canSeeBudgets')}
                   checked={formData.permissions.viewBudgets}
                   onCheckedChange={() => togglePermission('viewBudgets')}
                 />
@@ -362,7 +367,7 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
                   <p className={cn("text-sm font-medium", colors.textPrimary)}>{t('editBudgets')}</p>
                   <p className={cn("text-xs", colors.textTertiary)}>{t('canAddEditBudgets')}</p>
                 </div>
-                <Switch
+                <Switch aria-label={t('canAddEditBudgets')}
                   checked={formData.permissions.editBudgets}
                   onCheckedChange={() => togglePermission('editBudgets')}
                 />
@@ -376,18 +381,18 @@ export default function InviteUserDialog({ open, onClose, onSubmit, isLoading })
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+              className={cn("flex-1 bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
             >
               {t('cancel')}
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="flex-1 bg-primary hover:bg-primary/80 text-primary-foreground"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   {t('sending')}
                 </>
               ) : (

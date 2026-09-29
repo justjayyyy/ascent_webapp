@@ -371,13 +371,14 @@ function Expenses() {
   }
 
   return (
-    <div className={cn("flex flex-col h-[calc(100vh-10rem)] md:h-auto md:min-h-screen p-2 sm:p-4 md:p-8", colors.bgPrimary)}>
+    <div className="relative flex flex-col h-[calc(100dvh-10rem)] md:h-auto md:min-h-dvh p-2 sm:p-4 md:p-8">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.16),transparent_70%)]" />
       <div className="max-w-7xl mx-auto flex flex-col flex-1 md:flex-none md:block min-h-0 w-full">
         {/* Header */}
         <div className="mb-3 sm:mb-6 flex-shrink-0">
           <div className="flex items-center justify-between mb-2 sm:mb-4">
             <div>
-              <h1 className={cn("text-xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2", colors.textPrimary)}>{t('expenses')}</h1>
+              <h1 className={cn("text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-1 sm:mb-2", colors.textPrimary)}>{t('expenses')}</h1>
               <p className={cn("text-xs sm:text-base", colors.textTertiary)}>{t('trackYourIncomeExpenses')}</p>
             </div>
             <div className="flex gap-1 sm:gap-2">
@@ -387,10 +388,11 @@ function Expenses() {
                     onClick={() => setCategoryDialogOpen(true)}
                     variant="outline"
                     size="sm"
-                    className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
+                    aria-label={t('categories')}
+                    className={cn("bg-transparent hover:bg-primary/20 h-11 w-11 p-0 sm:h-10 sm:w-auto sm:px-3", colors.border, colors.textSecondary)}
                   >
-                    <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                    <span className="hidden md:inline">Categories</span>
+                    <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:me-2" />
+                    <span className="hidden md:inline">{t('categories')}</span>
                   </Button>
                 </>
               )}
@@ -399,10 +401,11 @@ function Expenses() {
                   onClick={() => setBudgetDialogOpen(true)}
                   variant="outline"
                   size="sm"
-                  className={cn("bg-transparent hover:bg-[#5C8374]/20 h-8 sm:h-10", colors.border, colors.textSecondary)}
+                  aria-label={t('budgets')}
+                  className={cn("bg-transparent hover:bg-primary/20 h-11 w-11 p-0 sm:h-10 sm:w-auto sm:px-3", colors.border, colors.textSecondary)}
                 >
-                  <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                  <span className="hidden md:inline">Budgets</span>
+                  <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:me-2" />
+                  <span className="hidden md:inline">{t('budgets')}</span>
                 </Button>
               )}
               {canEdit && (
@@ -413,9 +416,9 @@ function Expenses() {
                       setAddDialogOpen(true);
                     }}
                     size="sm"
-                    className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white h-8 sm:h-10 text-xs sm:text-base"
+                    className="hidden bg-primary hover:bg-primary/80 text-primary-foreground sm:inline-flex sm:h-10 sm:text-base"
                   >
-                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:me-2" />
                     <span className="hidden sm:inline">{t('addTransaction')}</span>
                     <span className="sm:hidden">{t('add')}</span>
                   </Button>
@@ -453,6 +456,17 @@ function Expenses() {
             canEdit={canEdit}
           />
         </div>
+
+        {/* Thumb-reach quick add (phones) */}
+        {canEdit && (
+          <Button
+            onClick={() => { setEditingTransaction(null); setAddDialogOpen(true); }}
+            aria-label={t('addTransaction')}
+            className="fixed end-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-lg sm:hidden"
+          >
+            <Plus className="!size-6" />
+          </Button>
+        )}
 
         {/* Add/Edit Transaction Dialog */}
         <AddTransactionDialog
@@ -517,7 +531,7 @@ function Expenses() {
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDeleteTransaction}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               >
                 {t('delete')}
               </AlertDialogAction>

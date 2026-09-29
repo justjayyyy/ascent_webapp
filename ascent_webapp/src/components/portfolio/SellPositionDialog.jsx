@@ -103,11 +103,11 @@ export default function SellPositionDialog({
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className={colors.textTertiary}>{t('currentHolding') || 'Current Holding'}:</span>
-                <span className={cn("ml-2 font-medium", colors.textPrimary)}>{position.quantity}</span>
+                <span className={cn("ms-2 font-medium", colors.textPrimary)}>{position.quantity}</span>
               </div>
               <div>
                 <span className={colors.textTertiary}>{t('avgPrice') || 'Avg Price'}:</span>
-                <span className={cn("ml-2 font-medium", colors.textPrimary)}>
+                <span className={cn("ms-2 font-medium", colors.textPrimary)}>
                   {formatCurrency(position.averageBuyPrice)}
                 </span>
               </div>
@@ -125,7 +125,7 @@ export default function SellPositionDialog({
                 variant="ghost"
                 size="sm"
                 onClick={handleSellAll}
-                className="text-xs text-[#5C8374] hover:text-[#5C8374]/80"
+                className="text-xs text-primary hover:text-primary/80"
               >
                 {t('sellAll') || 'Sell All'}
               </Button>
@@ -144,11 +144,11 @@ export default function SellPositionDialog({
                 colors.bgTertiary, 
                 colors.border, 
                 colors.textPrimary,
-                !isValidQuantity && formData.quantity && "border-red-500"
+                !isValidQuantity && formData.quantity && "border-danger"
               )}
             />
             {formData.quantity && !isValidQuantity && (
-              <p className="text-red-400 text-sm">
+              <p className="text-danger text-sm">
                 {t('invalidQuantity') || `Max quantity: ${position.quantity}`}
               </p>
             )}
@@ -181,7 +181,7 @@ export default function SellPositionDialog({
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className={colors.textTertiary}>{t('totalProceeds') || 'Total Proceeds'}:</span>
-                  <span className="font-medium text-green-400">{formatCurrency(totalProceeds)}</span>
+                  <span className="font-medium text-success">{formatCurrency(totalProceeds)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className={colors.textTertiary}>{t('costBasis') || 'Cost Basis'}:</span>
@@ -191,11 +191,11 @@ export default function SellPositionDialog({
                   <span className={colors.textTertiary}>{t('profitLoss') || 'Profit/Loss'}:</span>
                   <div className="flex items-center gap-1">
                     {profitLoss >= 0 ? (
-                      <TrendingUp className="w-3 h-3 text-green-400" />
+                      <TrendingUp className="w-3 h-3 text-success" />
                     ) : (
-                      <TrendingDown className="w-3 h-3 text-red-400" />
+                      <TrendingDown className="w-3 h-3 text-danger" />
                     )}
-                    <span className={cn("font-medium", profitLoss >= 0 ? 'text-green-400' : 'text-red-400')}>
+                    <span className={cn("font-medium", profitLoss >= 0 ? 'text-success' : 'text-danger')}>
                       {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss)} ({profitLossPercent >= 0 ? '+' : ''}{profitLossPercent.toFixed(2)}%)
                     </span>
                   </div>
@@ -222,7 +222,7 @@ export default function SellPositionDialog({
               />
               <Label htmlFor="returnToCash" className={cn("cursor-pointer", colors.textSecondary)}>
                 <div className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4 text-green-400" />
+                  <DollarSign className="w-4 h-4 text-success" />
                   {t('addProceedsToCash') || 'Add proceeds to cash balance'}
                 </div>
               </Label>
@@ -248,23 +248,23 @@ export default function SellPositionDialog({
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+              className={cn("flex-1 bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
             >
               {t('cancel')}
             </Button>
             <Button
               type="submit"
               disabled={isLoading || !isValidQuantity || sellPrice <= 0}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              className="flex-1 bg-success hover:bg-success/90 text-white"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   {t('selling') || 'Selling...'}
                 </>
               ) : (
                 <>
-                  <TrendingUp className="w-4 h-4 mr-2" />
+                  <TrendingUp className="w-4 h-4 me-2" />
                   {isPartialSell 
                     ? (t('sellPartial') || `Sell ${quantityToSell}`) 
                     : (t('sellAll') || 'Sell All')

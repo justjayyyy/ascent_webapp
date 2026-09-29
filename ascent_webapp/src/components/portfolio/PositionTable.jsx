@@ -9,12 +9,12 @@ import BlurValue from '../BlurValue';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 
 const assetTypeColors = {
-  Stock: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  ETF: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-  Option: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
-  Cash: 'bg-green-500/10 text-green-400 border-green-500/30',
-  Crypto: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  Other: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
+  Stock: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  ETF: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+  Option: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
+  Cash: 'bg-success/10 text-success border-success/30',
+  Crypto: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
+  Other: 'bg-muted text-muted-foreground border-border',
 };
 
 function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, onEditDayTrade, onDeleteDayTrade, totalAccountValue, userCurrency = 'USD', accountCurrency = 'USD', exchangeRates = null, convertCurrency = null }) {
@@ -270,17 +270,17 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
       return (
         <div className={cn("p-2 rounded-lg border", colors.cardBg, colors.cardBorder)}>
           <div className="flex items-center justify-between mb-2">
-            <Badge className={cn('text-[9px] border px-1 py-0', 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30')}>
+            <Badge className={cn('text-xs border px-1 py-0', 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30')}>
               {dayTradeLabel}
             </Badge>
-            <span className={cn("text-[9px]", colors.textTertiary)}>{formatDate(item.date)}</span>
+            <span className={cn("text-xs", colors.textTertiary)}>{formatDate(item.date)}</span>
           </div>
           <div className="flex items-center justify-between mb-2">
-            <span className={cn("text-[10px]", colors.textSecondary)}>{t('totalPnL') !== 'totalPnL' ? t('totalPnL') : 'P&L'}</span>
+            <span className={cn("text-xs", colors.textSecondary)}>{t('totalPnL') !== 'totalPnL' ? t('totalPnL') : 'P&L'}</span>
             <div className="flex flex-col items-end gap-0.5">
               <div className="flex items-center gap-0.5">
-                {isPositive ? <TrendingUp className="w-3 h-3 text-green-400" /> : <TrendingDown className="w-3 h-3 text-red-400" />}
-                <span className={cn("font-semibold text-xs", isPositive ? 'text-green-400' : 'text-red-400')}>
+                {isPositive ? <TrendingUp className="w-3 h-3 text-success" /> : <TrendingDown className="w-3 h-3 text-danger" />}
+                <span className={cn("font-semibold text-xs", isPositive ? 'text-success' : 'text-danger')}>
                   <BlurValue blur={user?.blurValues}>
                     {isPositive ? '+' : ''}{formatCurrency(convertedProfitLoss, userCurrency)}
                   </BlurValue>
@@ -289,7 +289,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               {userCurrency !== 'USD' && (() => {
                 const usdValue = convertToUSD(convertedProfitLoss);
                 return usdValue !== null ? (
-                  <span className={cn("text-[9px]", isPositive ? 'text-green-400/70' : 'text-red-400/70')}>
+                  <span className={cn("text-xs", isPositive ? 'text-success/70' : 'text-danger/70')}>
                     <BlurValue blur={user?.blurValues}>
                       {isPositive && usdValue >= 0 ? '+' : ''}{formatCurrency(usdValue, 'USD')}
                     </BlurValue>
@@ -298,7 +298,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               })()}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-1 pt-1.5 border-t border-[#5C8374]/10">
+          <div className="flex items-center justify-end gap-1 pt-1.5 border-t border-primary/10">
             {item.notes && (
               <Button size="sm" variant="ghost" onClick={() => setNotesDialog({ open: true, notes: item.notes, title: dayTradeNotesTitle })} className={cn("h-6 px-1.5", colors.textSecondary)}>
                 <FileText className="w-3 h-3" />
@@ -310,7 +310,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               </Button>
             )}
             {onDeleteDayTrade && (
-              <Button size="sm" variant="ghost" onClick={() => setDeleteConfirmDialog({ open: true, item: item, isDayTrade: true, isAggregated: false })} className="h-6 px-1.5 text-red-400">
+              <Button size="sm" variant="ghost" onClick={() => setDeleteConfirmDialog({ open: true, item: item, isDayTrade: true, isAggregated: false })} className="h-6 px-1.5 text-danger">
                 <Trash2 className="w-3 h-3" />
               </Button>
             )}
@@ -355,49 +355,49 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               <span className={cn("font-bold text-sm truncate", colors.textPrimary)}>
                 {item.symbol}
                 {item.assetType === 'Cash' && item.currency && (
-                  <span className={cn("text-xs font-normal ml-1", colors.textTertiary)}>
+                  <span className={cn("text-xs font-normal ms-1", colors.textTertiary)}>
                     ({item.currency})
                   </span>
                 )}
               </span>
               {isAggregated && (
-                <span className="text-[9px] px-1 py-0 rounded bg-[#5C8374]/20 text-[#9EC8B9] flex-shrink-0">×{item.positionCount}</span>
+                <span className="text-xs px-1 py-0 rounded bg-primary/20 text-muted-foreground flex-shrink-0">×{item.positionCount}</span>
               )}
             </div>
             {item.assetType === 'Option' && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={cn("text-[8px] px-1 py-0 rounded",
-                  item.optionType === 'Call' ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+                <span className={cn("text-xs px-1 py-0 rounded",
+                  item.optionType === 'Call' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-danger/20 text-danger'
                 )}>
                   {item.optionType || 'Call'}
                 </span>
-                <span className={cn("text-[8px] px-1 py-0 rounded",
-                  item.optionAction === 'Buy' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'
+                <span className={cn("text-xs px-1 py-0 rounded",
+                  item.optionAction === 'Buy' ? 'bg-success/20 text-success' : 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
                 )}>
                   {item.optionAction || 'Buy'}
                 </span>
                 {item.strikePrice && (
-                  <span className={cn("text-[8px]", colors.textTertiary)}>
+                  <span className={cn("text-xs", colors.textTertiary)}>
                     Strike: {formatCurrency(item.strikePrice, item.currency || accountCurrency)}
                   </span>
                 )}
               </div>
             )}
           </div>
-          <Badge className={cn('text-[9px] border px-1 py-0 flex-shrink-0', assetTypeColors[item.assetType])}>{item.assetType}</Badge>
+          <Badge className={cn('text-xs border px-1 py-0 flex-shrink-0', assetTypeColors[item.assetType])}>{item.assetType}</Badge>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-2">
           {item.assetType !== 'Cash' && (
             <div>
-              <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{quantityLabel}</p>
+              <p className={cn("text-xs mb-0.5", colors.textTertiary)}>{quantityLabel}</p>
               <p className={cn("font-medium text-xs", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>{item.quantity.toLocaleString()}</BlurValue>
               </p>
             </div>
           )}
           <div>
-            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>
+            <p className={cn("text-xs mb-0.5", colors.textTertiary)}>
               {item.assetType === 'Option' ? 'Premium' : avgPriceLabel}
             </p>
             <div className="flex flex-col items-end">
@@ -411,7 +411,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                   {userCurrency !== 'USD' && (() => {
                     const usdValue = convertToUSD(item.premiumPrice);
                     return usdValue !== null ? (
-                      <p className={cn("text-[8px] font-normal", colors.textTertiary)}>
+                      <p className={cn("text-xs font-normal", colors.textTertiary)}>
                         <BlurValue blur={user?.blurValues}>{formatCurrency(usdValue, 'USD')}</BlurValue>
                       </p>
                     ) : null;
@@ -425,7 +425,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                   {userCurrency !== 'USD' && (() => {
                     const usdValue = convertToUSD(metrics.averageBuyPrice);
                     return usdValue !== null ? (
-                      <p className={cn("text-[8px] font-normal", colors.textTertiary)}>
+                      <p className={cn("text-xs font-normal", colors.textTertiary)}>
                         <BlurValue blur={user?.blurValues}>{formatCurrency(usdValue, 'USD')}</BlurValue>
                       </p>
                     ) : null;
@@ -435,7 +435,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
             </div>
           </div>
           <div>
-            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{currentAmountLabel}</p>
+            <p className={cn("text-xs mb-0.5", colors.textTertiary)}>{currentAmountLabel}</p>
             <div className="flex flex-col items-end">
               <p className={cn("font-medium text-xs", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>{formatCurrency(metrics.currentPrice, userCurrency)}</BlurValue>
@@ -443,7 +443,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               {userCurrency !== 'USD' && (() => {
                 const usdValue = convertToUSD(metrics.currentPrice);
                 return usdValue !== null ? (
-                  <p className={cn("text-[8px] font-normal", colors.textTertiary)}>
+                  <p className={cn("text-xs font-normal", colors.textTertiary)}>
                     <BlurValue blur={user?.blurValues}>{formatCurrency(usdValue, 'USD')}</BlurValue>
                   </p>
                 ) : null;
@@ -451,7 +451,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
             </div>
           </div>
           <div>
-            <p className={cn("text-[9px] mb-0.5", colors.textTertiary)}>{totalValueLabel}</p>
+            <p className={cn("text-xs mb-0.5", colors.textTertiary)}>{totalValueLabel}</p>
             <div className="flex flex-col items-end">
               <p className={cn("font-semibold text-xs", colors.textPrimary)}>
                 <BlurValue blur={user?.blurValues}>{formatCurrency(metrics.marketValue, userCurrency)}</BlurValue>
@@ -459,7 +459,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               {userCurrency !== 'USD' && (() => {
                 const usdValue = convertToUSD(metrics.marketValue);
                 return usdValue !== null ? (
-                  <p className={cn("text-[8px] font-normal", colors.textTertiary)}>
+                  <p className={cn("text-xs font-normal", colors.textTertiary)}>
                     <BlurValue blur={user?.blurValues}>{formatCurrency(usdValue, 'USD')}</BlurValue>
                   </p>
                 ) : null;
@@ -468,46 +468,46 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
           </div>
         </div>
 
-        <div className="flex items-center justify-between py-1.5 border-t border-[#5C8374]/10 mb-1.5">
+        <div className="flex items-center justify-between py-1.5 border-t border-primary/10 mb-1.5">
           {item.assetType === 'Cash' ? (
             <>
               <span className={cn("text-xs", colors.textTertiary)}>-</span>
-              <span className={cn("text-[9px] flex-shrink-0", colors.textTertiary)}>{metrics.weight.toFixed(1)}% {weightLabel}</span>
+              <span className={cn("text-xs flex-shrink-0", colors.textTertiary)}>{metrics.weight.toFixed(1)}% {weightLabel}</span>
             </>
           ) : (
             <>
               <div className="flex items-center gap-1 min-w-0 flex-1">
-                {isPositive ? <TrendingUp className="w-3 h-3 text-green-400 flex-shrink-0" /> : <TrendingDown className="w-3 h-3 text-red-400 flex-shrink-0" />}
+                {isPositive ? <TrendingUp className="w-3 h-3 text-success flex-shrink-0" /> : <TrendingDown className="w-3 h-3 text-danger flex-shrink-0" />}
                 <div className="min-w-0">
-                  <span className={cn("font-semibold text-xs", isPositive ? 'text-green-400' : 'text-red-400')}>
+                  <span className={cn("font-semibold text-xs", isPositive ? 'text-success' : 'text-danger')}>
                     <BlurValue blur={user?.blurValues}>{isPositive ? '+' : ''}{formatCurrency(metrics.pnl, userCurrency)}</BlurValue>
                   </span>
                   {userCurrency !== 'USD' && (() => {
                     const usdValue = convertToUSD(metrics.pnl);
                     return usdValue !== null ? (
-                      <span className={cn("text-[8px] ml-0.5 block", isPositive ? 'text-green-400/70' : 'text-red-400/70')}>
+                      <span className={cn("text-xs ms-0.5 block", isPositive ? 'text-success/70' : 'text-danger/70')}>
                         <BlurValue blur={user?.blurValues}>{isPositive && usdValue >= 0 ? '+' : ''}{formatCurrency(usdValue, 'USD')}</BlurValue>
                       </span>
                     ) : null;
                   })()}
-                  <span className={cn("text-[9px] ml-0.5", isPositive ? 'text-green-400/70' : 'text-red-400/70')}>
+                  <span className={cn("text-xs ms-0.5", isPositive ? 'text-success/70' : 'text-danger/70')}>
                     ({isPositive ? '+' : ''}{metrics.pnlPercent.toFixed(2)}%)
                   </span>
                 </div>
               </div>
-              <span className={cn("text-[9px] flex-shrink-0", colors.textTertiary)}>{metrics.weight.toFixed(1)}% {weightLabel}</span>
+              <span className={cn("text-xs flex-shrink-0", colors.textTertiary)}>{metrics.weight.toFixed(1)}% {weightLabel}</span>
             </>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-1 pt-1.5 border-t border-[#5C8374]/10">
+        <div className="flex items-center justify-end gap-1 pt-1.5 border-t border-primary/10">
           {item.notes && (
             <Button size="sm" variant="ghost" onClick={() => setNotesDialog({ open: true, notes: item.notes, title: notesTitle })} className={cn("h-6 px-1.5", colors.textSecondary)}>
               <FileText className="w-3 h-3" />
             </Button>
           )}
           {item.assetType !== 'Cash' && onSell && (
-            <Button size="sm" variant="ghost" onClick={() => onSell(item)} className="h-6 px-1.5 text-green-400">
+            <Button size="sm" variant="ghost" onClick={() => onSell(item)} className="h-6 px-1.5 text-success">
               <DollarSign className="w-3 h-3" />
             </Button>
           )}
@@ -517,7 +517,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
             </Button>
           )}
           {onDelete && (
-            <Button size="sm" variant="ghost" onClick={handleDelete} className="h-6 px-1.5 text-red-400">
+            <Button size="sm" variant="ghost" onClick={handleDelete} className="h-6 px-1.5 text-danger">
               <Trash2 className="w-3 h-3" />
             </Button>
           )}
@@ -566,7 +566,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
             <Button
               variant="destructive"
               onClick={confirmDelete}
-              className={cn("bg-red-500 hover:bg-red-600 text-white border-red-500")}
+              className={cn("bg-danger hover:bg-danger/90 text-white border-danger")}
             >
               {t('delete') || 'Delete'}
             </Button>
@@ -589,13 +589,13 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
               <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('date') !== 'date' ? t('date') : 'Date'}</TableHead>
               <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('symbol') !== 'symbol' ? t('symbol') : 'Symbol'}</TableHead>
               <TableHead className={cn("font-semibold", colors.textSecondary)}>{t('type') !== 'type' ? t('type') : 'Type'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('quantity') !== 'quantity' ? t('quantity') : 'Quantity'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('avgPrice') !== 'avgPrice' ? t('avgPrice') : 'Avg Price'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('currentAmount') !== 'currentAmount' ? t('currentAmount') : 'Current Price'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('totalValue') !== 'totalValue' ? t('totalValue') : 'Total Value'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('totalPnL') !== 'totalPnL' ? t('totalPnL') : 'Total P&L'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('weight') !== 'weight' ? t('weight') : 'Weight'}</TableHead>
-              <TableHead className={cn("font-semibold text-right", colors.textSecondary)}>{t('edit') !== 'edit' ? t('edit') : 'Edit'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('quantity') !== 'quantity' ? t('quantity') : 'Quantity'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('avgPrice') !== 'avgPrice' ? t('avgPrice') : 'Avg Price'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('currentAmount') !== 'currentAmount' ? t('currentAmount') : 'Current Price'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('totalValue') !== 'totalValue' ? t('totalValue') : 'Total Value'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('totalPnL') !== 'totalPnL' ? t('totalPnL') : 'Total P&L'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('weight') !== 'weight' ? t('weight') : 'Weight'}</TableHead>
+              <TableHead className={cn("font-semibold text-end", colors.textSecondary)}>{t('edit') !== 'edit' ? t('edit') : 'Edit'}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -616,33 +616,33 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                       -
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn('text-xs border', 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30')}>
+                      <Badge className={cn('text-xs border', 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30')}>
                         {t('dayTrade') !== 'dayTrade' ? t('dayTrade') : 'Day Trade'}
                       </Badge>
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       -
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       -
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       -
                     </TableCell>
-                    <TableCell className={cn("text-right font-semibold", colors.textPrimary)}>
+                    <TableCell className={cn("text-end font-semibold", colors.textPrimary)}>
                       -
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <div className="flex items-center justify-end gap-1">
                         {isPositive ? (
-                          <TrendingUp className="w-3 h-3 text-green-400" />
+                          <TrendingUp className="w-3 h-3 text-success" />
                         ) : (
-                          <TrendingDown className="w-3 h-3 text-red-400" />
+                          <TrendingDown className="w-3 h-3 text-danger" />
                         )}
                         <div>
                           <div className={cn(
                             'font-semibold text-sm',
-                            isPositive ? 'text-green-400' : 'text-red-400'
+                            isPositive ? 'text-success' : 'text-danger'
                           )}>
                             <BlurValue blur={user?.blurValues}>
                               {isPositive ? '+' : ''}{formatCurrency(convertedProfitLoss, userCurrency)}
@@ -653,7 +653,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                             return usdValue !== null ? (
                               <div className={cn(
                                 'text-xs',
-                                isPositive ? 'text-green-400/70' : 'text-red-400/70'
+                                isPositive ? 'text-success/70' : 'text-danger/70'
                               )}>
                                 <BlurValue blur={user?.blurValues}>
                                   {isPositive && usdValue >= 0 ? '+' : ''}{formatCurrency(usdValue, 'USD')}
@@ -664,17 +664,18 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       -
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <div className="flex items-center justify-end gap-2">
                         {item.notes && (
                           <Button
                             size="icon"
+                            aria-label={t('viewNotes')}
                             variant="ghost"
                             onClick={() => setNotesDialog({ open: true, notes: item.notes, title: (t('dayTradeNotes') !== 'dayTradeNotes' ? t('dayTradeNotes') : 'Day Trade Notes') })}
-                            className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                            className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                           >
                             <FileText className="w-4 h-4" />
                           </Button>
@@ -682,9 +683,10 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {onEditDayTrade && (
                           <Button
                             size="icon"
+                            aria-label={t('edit')}
                             variant="ghost"
                             onClick={() => onEditDayTrade(item)}
-                            className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                            className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -692,9 +694,10 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {onDeleteDayTrade && (
                           <Button
                             size="icon"
+                            aria-label={t('delete')}
                             variant="ghost"
                             onClick={() => setDeleteConfirmDialog({ open: true, item: item, isDayTrade: true, isAggregated: false })}
-                            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            className="h-11 w-11 sm:h-8 sm:w-8 text-danger hover:text-danger hover:bg-danger/20"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -745,7 +748,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                             </span>
                           )}
                           {isAggregated && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-[#5C8374]/20 text-[#9EC8B9]">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-muted-foreground">
                               ×{item.positionCount}
                             </span>
                           )}
@@ -753,12 +756,12 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {item.assetType === 'Option' && (
                           <div className="flex items-center gap-2 text-xs opacity-75">
                             <span className={cn("px-1.5 py-0.5 rounded",
-                              item.optionType === 'Call' ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+                              item.optionType === 'Call' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-danger/20 text-danger'
                             )}>
                               {item.optionType || 'Call'}
                             </span>
                             <span className={cn("px-1.5 py-0.5 rounded",
-                              item.optionAction === 'Buy' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'
+                              item.optionAction === 'Buy' ? 'bg-success/20 text-success' : 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
                             )}>
                               {item.optionAction || 'Buy'}
                             </span>
@@ -781,7 +784,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {item.assetType}
                       </Badge>
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       {item.assetType === 'Cash' ? (
                         <span className={cn("text-xs", colors.textTertiary)}>-</span>
                       ) : (
@@ -790,7 +793,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         </BlurValue>
                       )}
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       {item.assetType === 'Cash' ? (
                         <span className={cn("text-xs", colors.textTertiary)}>-</span>
                       ) : (
@@ -811,7 +814,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       {item.assetType === 'Cash' ? (
                         <span className={cn("text-xs", colors.textTertiary)}>-</span>
                       ) : (
@@ -832,7 +835,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className={cn("text-right font-semibold", colors.textPrimary)}>
+                    <TableCell className={cn("text-end font-semibold", colors.textPrimary)}>
                       <div className="flex flex-col items-end">
                         {item.assetType === 'Cash' ? (
                           <BlurValue blur={user?.blurValues}>
@@ -857,20 +860,20 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       {item.assetType === 'Cash' ? (
                         <span className={cn("text-xs", colors.textTertiary)}>-</span>
                       ) : (
                         <div className="flex items-center justify-end gap-1">
                           {isPositive ? (
-                            <TrendingUp className="w-3 h-3 text-green-400" />
+                            <TrendingUp className="w-3 h-3 text-success" />
                           ) : (
-                            <TrendingDown className="w-3 h-3 text-red-400" />
+                            <TrendingDown className="w-3 h-3 text-danger" />
                           )}
                           <div>
                             <div className={cn(
                               'font-semibold text-sm',
-                              isPositive ? 'text-green-400' : 'text-red-400'
+                              isPositive ? 'text-success' : 'text-danger'
                             )}>
                               <BlurValue blur={user?.blurValues}>
                                 {isPositive ? '+' : ''}{formatCurrency(metrics.pnl, userCurrency)}
@@ -881,7 +884,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                               return usdValue !== null ? (
                                 <div className={cn(
                                   'text-xs',
-                                  isPositive ? 'text-green-400/70' : 'text-red-400/70'
+                                  isPositive ? 'text-success/70' : 'text-danger/70'
                                 )}>
                                   <BlurValue blur={user?.blurValues}>
                                     {isPositive && usdValue >= 0 ? '+' : ''}{formatCurrency(usdValue, 'USD')}
@@ -891,7 +894,7 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                             })()}
                             <div className={cn(
                               'text-xs',
-                              isPositive ? 'text-green-400/70' : 'text-red-400/70'
+                              isPositive ? 'text-success/70' : 'text-danger/70'
                             )}>
                               <BlurValue blur={user?.blurValues}>
                                 {isPositive ? '+' : ''}{metrics.pnlPercent.toFixed(2)}%
@@ -901,19 +904,20 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className={cn("text-right", colors.textSecondary)}>
+                    <TableCell className={cn("text-end", colors.textSecondary)}>
                       <BlurValue blur={user?.blurValues}>
                         {metrics.weight.toFixed(1)}%
                       </BlurValue>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <div className="flex items-center justify-end gap-1">
                         {item.notes && (
                           <Button
                             size="icon"
+                            aria-label={t('viewNotes')}
                             variant="ghost"
                             onClick={() => setNotesDialog({ open: true, notes: item.notes, title: (t('notes') !== 'notes' ? `${item.symbol} ${t('notes')}` : `${item.symbol} Notes`) })}
-                            className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                            className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                             title={t('viewNotes') !== 'viewNotes' ? t('viewNotes') : 'View Notes'}
                           >
                             <FileText className="w-4 h-4" />
@@ -923,9 +927,10 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {item.assetType !== 'Cash' && onSell && (
                           <Button
                             size="icon"
+                            aria-label={t('sell')}
                             variant="ghost"
                             onClick={() => onSell(item)}
-                            className="h-8 w-8 text-green-400 hover:text-green-300 hover:bg-green-500/20"
+                            className="h-11 w-11 sm:h-8 sm:w-8 text-success hover:text-success hover:bg-success/20"
                             title={t('sell') || 'Sell'}
                           >
                             <DollarSign className="w-4 h-4" />
@@ -934,9 +939,10 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {onEdit && (
                           <Button
                             size="icon"
+                            aria-label={t('edit')}
                             variant="ghost"
                             onClick={handleEdit}
-                            className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                            className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                             title={isAggregated ? (t('editFirst') || 'Edit first entry') : (t('edit') || 'Edit')}
                           >
                             <Edit className="w-4 h-4" />
@@ -945,9 +951,10 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
                         {onDelete && (
                           <Button
                             size="icon"
+                            aria-label={t('delete')}
                             variant="ghost"
                             onClick={handleDelete}
-                            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            className="h-11 w-11 sm:h-8 sm:w-8 text-danger hover:text-danger hover:bg-danger/20"
                             title={isAggregated ? (t('deleteAll') || 'Delete all') : (t('delete') || 'Delete')}
                           >
                             <Trash2 className="w-4 h-4" />

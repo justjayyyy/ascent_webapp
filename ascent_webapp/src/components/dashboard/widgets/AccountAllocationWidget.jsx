@@ -6,17 +6,17 @@ import { cn } from '@/lib/utils';
 import BlurValue from '../../BlurValue';
 
 // High contrast colors for better visibility
-const COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--success))', 'hsl(var(--danger))'];
 
 export default function AccountAllocationWidget({ data, totalValue, formatCurrency }) {
   const { colors, theme, user, t } = useTheme();
   
   const chartColors = {
-    tooltip: theme === 'light' ? '#ffffff' : '#1B4242',
-    tooltipBorder: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltipText: theme === 'light' ? '#1e293b' : '#ffffff',
-    labelText: theme === 'light' ? '#1e293b' : '#ffffff',
-    legendText: theme === 'light' ? '#475569' : '#9EC8B9',
+    tooltip: 'hsl(var(--popover))',
+    tooltipBorder: 'hsl(var(--border))',
+    tooltipText: 'hsl(var(--foreground))',
+    labelText: 'hsl(var(--foreground))',
+    legendText: 'hsl(var(--muted-foreground))',
   };
 
   // Custom label that renders outside the pie with good contrast
@@ -93,7 +93,7 @@ export default function AccountAllocationWidget({ data, totalValue, formatCurren
                   label={renderCustomLabel}
                   outerRadius={70}
                   innerRadius={30}
-                  fill="#8884d8"
+                  fill="hsl(var(--chart-1))"
                   dataKey="value"
                   paddingAngle={2}
                 >
@@ -101,7 +101,7 @@ export default function AccountAllocationWidget({ data, totalValue, formatCurren
                     <Cell 
                       key={`cell-${index}`} 
                       fill={COLORS[index % COLORS.length]}
-                      stroke={theme === 'light' ? '#ffffff' : '#092635'}
+                      stroke={'hsl(var(--popover))'}
                       strokeWidth={2}
                     />
                   ))}

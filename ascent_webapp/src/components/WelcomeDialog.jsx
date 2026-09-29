@@ -13,8 +13,8 @@ export default function WelcomeDialog({ open, onClose }) {
       <DialogContent className={cn(colors.cardBg, colors.cardBorder, "max-w-lg")}>
         <DialogHeader>
           <div className="flex items-center justify-center mb-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-[#5C8374] to-[#1B4242] rounded-full flex items-center justify-center">
-              <Sparkles className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 bg-gradient-to-br from-primary to-card rounded-full flex items-center justify-center">
+              <Sparkles className="w-10 h-10 text-foreground" />
             </div>
           </div>
           <DialogTitle className={cn("text-2xl font-bold text-center", colors.textPrimary)}>
@@ -51,7 +51,7 @@ export default function WelcomeDialog({ open, onClose }) {
         <div className="flex justify-center mt-6">
           <Button
             onClick={onClose}
-            className="bg-[#5C8374] hover:bg-[#5C8374]/80 text-white px-8"
+            className="bg-primary hover:bg-primary/80 text-primary-foreground px-8"
           >
             {t('letsGetStarted') || "Let's Get Started!"}
           </Button>

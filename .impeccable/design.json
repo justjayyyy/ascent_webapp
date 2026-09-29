@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T00:00:00Z",
+  "title": "Design System: Ascent",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Luminous Violet", "canonical": "hsl(252 92% 70%)", "tonalRamp": ["hsl(252 60% 15%)", "hsl(252 70% 25%)", "hsl(252 80% 35%)", "hsl(252 85% 45%)", "hsl(252 90% 56%)", "hsl(252 92% 70%)", "hsl(252 92% 82%)", "hsl(252 92% 94%)"] },
+      "gold-primary": { "role": "primary", "displayName": "Gold (OLED palette)", "canonical": "hsl(43 95% 58%)", "tonalRamp": ["hsl(43 80% 15%)", "hsl(43 85% 25%)", "hsl(43 90% 35%)", "hsl(43 92% 45%)", "hsl(43 95% 52%)", "hsl(43 95% 58%)", "hsl(43 95% 76%)", "hsl(43 95% 93%)"] },
+      "midnight-canvas": { "role": "neutral", "displayName": "Midnight Canvas", "canonical": "hsl(234 34% 5.5%)", "tonalRamp": ["hsl(234 34% 5.5%)", "hsl(234 28% 9%)", "hsl(234 26% 12%)", "hsl(234 22% 15%)", "hsl(234 20% 19%)", "hsl(234 20% 24%)", "hsl(230 14% 68%)", "hsl(228 30% 96%)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "hsl(228 30% 96%)", "tonalRamp": ["hsl(228 30% 15%)", "hsl(228 25% 28%)", "hsl(228 20% 42%)", "hsl(228 16% 56%)", "hsl(230 14% 68%)", "hsl(228 20% 80%)", "hsl(228 26% 90%)", "hsl(228 30% 96%)"] },
+      "light-canvas": { "role": "neutral", "displayName": "Cool Paper (light theme)", "canonical": "hsl(230 30% 97%)", "tonalRamp": ["hsl(232 40% 10%)", "hsl(232 12% 40%)", "hsl(230 20% 65%)", "hsl(230 20% 85%)", "hsl(230 20% 89%)", "hsl(230 25% 94%)", "hsl(230 30% 97%)", "hsl(0 0% 100%)"] },
+      "success": { "role": "semantic", "displayName": "Gain Green", "canonical": "hsl(156 72% 52%)", "tonalRamp": ["hsl(156 72% 12%)", "hsl(156 72% 20%)", "hsl(156 72% 28%)", "hsl(156 72% 38%)", "hsl(156 72% 46%)", "hsl(156 72% 52%)", "hsl(156 72% 72%)", "hsl(156 72% 92%)"] },
+      "danger": { "role": "semantic", "displayName": "Loss Rose", "canonical": "hsl(350 90% 68%)", "tonalRamp": ["hsl(350 70% 15%)", "hsl(350 75% 27%)", "hsl(350 80% 40%)", "hsl(350 85% 52%)", "hsl(350 88% 60%)", "hsl(350 90% 68%)", "hsl(350 90% 82%)", "hsl(350 90% 94%)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero money figure (net amount) only." },
+      "headline": { "displayName": "Headline", "purpose": "Page H1." },
+      "title": { "displayName": "Title", "purpose": "Tile and card headings." },
+      "body": { "displayName": "Body", "purpose": "Default UI text and muted descriptions." },
+      "label": { "displayName": "Label", "purpose": "Chips, badges, tab labels; 12px floor." }
+    },
+    "shadows": [
+      { "name": "tile", "value": "inset 0 1px 0 0 hsl(var(--foreground)/0.05), 0 8px 30px -14px hsl(0 0% 0%/0.45)", "purpose": "Every Card." },
+      { "name": "primary-glow", "value": "0 6px 20px -6px hsl(var(--glow)/0.55)", "purpose": "Default button only." },
+      { "name": "drag-lift", "value": "0 10px 40px -10px rgba(0,0,0,0.3)", "purpose": "Dashboard widget while dragging." },
+      { "name": "page-wash", "value": "radial-gradient(60% 60% at 50% 0%, hsl(var(--glow)/0.20), transparent 70%)", "purpose": "Ambient accent light behind Dashboard top." }
+    ],
+    "motion": [
+      { "name": "press", "value": "active:scale(0.97), transition-all", "purpose": "Button press; removed under prefers-reduced-motion." },
+      { "name": "grid-settle", "value": "transform 150ms ease", "purpose": "Dashboard widget reposition when not dragging." },
+      { "name": "accordion", "value": "0.2s ease-out", "purpose": "Accordion open/close." },
+      { "name": "sidebar", "value": "300ms transition-all", "purpose": "Sidebar collapse and content offset." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default action; violet fill with soft glow.",
+      "html": "<button class=\"ds-btn-primary\">Save</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:8px 16px;border:0;border-radius:12px;background:hsl(252 92% 70%);color:hsl(234 40% 8%);font-size:14px;font-weight:500;box-shadow:0 6px 20px -6px hsl(252 92% 70% / .55);cursor:pointer;transition:all .15s}.ds-btn-primary:hover{background:hsl(252 92% 70% / .9)}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:2px solid hsl(252 95% 76%);outline-offset:0}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action with input stroke on translucent canvas.",
+      "html": "<button class=\"ds-btn-outline\">Cancel</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:8px 16px;border:1px solid hsl(234 20% 24%);border-radius:12px;background:hsl(234 34% 5.5% / .6);color:hsl(228 30% 96%);font-size:14px;font-weight:500;cursor:pointer;transition:all .15s}.ds-btn-outline:hover{background:hsl(240 30% 19%);color:hsl(228 30% 98%)}.ds-btn-outline:active{transform:scale(.97)}.ds-btn-outline:focus-visible{outline:2px solid hsl(252 95% 76%)}"
+    },
+    {
+      "name": "Tile Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Frosted 24px tile holding a KPI or chart.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">Net amount</p><div class=\"ds-card-value\">$4,280</div></div>",
+      "css": ".ds-card{padding:24px;border:1px solid hsl(234 20% 19% / .6);border-radius:24px;background:hsl(234 28% 9% / .75);color:hsl(228 30% 96%);backdrop-filter:blur(24px);box-shadow:inset 0 1px 0 0 hsl(228 30% 96% / .05),0 8px 30px -14px hsl(0 0% 0% / .45)}.ds-card-label{margin:0;font-size:14px;color:hsl(230 14% 68%)}.ds-card-value{margin-top:8px;font-size:36px;font-weight:700;letter-spacing:-.025em}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Transparent field with input stroke and ring focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Amount\" />",
+      "css": ".ds-input{box-sizing:border-box;width:100%;height:36px;padding:4px 12px;border:1px solid hsl(234 20% 24%);border-radius:14px;background:transparent;color:hsl(228 30% 96%);font-size:14px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:color .15s}.ds-input::placeholder{color:hsl(230 14% 68%)}.ds-input:focus-visible{outline:none;box-shadow:0 0 0 1px hsl(252 95% 76%)}"
+    },
+    {
+      "name": "Delta Pill",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Full-round status pill, 15% tint with full-strength text.",
+      "html": "<span class=\"ds-pill\">12% expenses</span>",
+      "css": ".ds-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:9999px;background:hsl(156 72% 52% / .15);color:hsl(156 72% 52%);font-size:12px;font-weight:500}"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Desktop sidebar link; active is solid primary.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-active\">Dashboard</a><a class=\"ds-nav-item\">Expenses</a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:4px;padding:12px;background:hsl(234 28% 9%);width:220px}.ds-nav-item{display:flex;align-items:center;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:500;color:hsl(228 30% 96% / .8);cursor:pointer;transition:all .2s}.ds-nav-item:hover{background:hsl(240 30% 19%);color:hsl(228 30% 96%)}.ds-nav-item.ds-active{background:hsl(252 92% 70%);color:hsl(234 40% 8%)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Ledger",
+    "overview": "A dark, quiet surface where money figures are the brightest thing on the screen. The default is Midnight Indigo: a near-black blue canvas with slightly lighter frosted cards, one luminous violet accent, and green and rose reserved for gain and loss. The light theme mirrors it on a cool off-white; the optional OLED palette swaps violet for gold on true black. All three are intentional brand commitments and every component reads colour from the same semantic variables.",
+    "keyCharacteristics": [
+      "Semantic HSL variables only; three palettes share one variable set.",
+      "Frosted, softly lit tiles on a dark canvas with a single ambient accent glow.",
+      "One accent per palette; success and danger are separate tokens.",
+      "Inter Variable with Heebo Variable fallback for Hebrew; tabular numerals in tables.",
+      "RTL is first-class: logical utilities only.",
+      "12px minimum text size; 44px touch targets on coarse pointers."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Only primary is a brand colour. Never add a second accent; use success/danger for meaning and chart-* for data series only.", "section": "colors" },
+      { "name": "The Semantic Variable Rule", "body": "Colour comes from a variable (bg-card, text-muted-foreground, border-border). Raw hex or hsl literals in components are not part of the system.", "section": "colors" },
+      { "name": "The Three Palettes Rule", "body": "Any new surface must be checked in light, Midnight Indigo and OLED gold.", "section": "colors" },
+      { "name": "The 12px Floor Rule", "body": "No text below 12px (text-xs).", "section": "typography" },
+      { "name": "The Steady Figures Rule", "body": "Tables and columns of figures use tabular numerals; money values are set large, semibold or bold, and tightly tracked.", "section": "typography" },
+      { "name": "The Logical Edge Rule", "body": "Use ms-, me-, ps-, pe-, start-, end-, text-start; not left/right.", "section": "layout" },
+      { "name": "The Thumb Reach Rule", "body": "Primary navigation lives at the bottom on phones; controls on coarse pointers get a hit area of at least 44px.", "section": "layout" },
+      { "name": "The Quiet Glow Rule", "body": "Depth is soft and low-contrast; the accent glow is reserved for the single primary action and the page wash.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do take every colour from a semantic variable so light, Midnight Indigo and gold all work.",
+      "Do use logical utilities for all horizontal spacing, position and alignment.",
+      "Do set money figures large, semibold or bold, tightly tracked, and tabular in columns; honour the blur-values setting.",
+      "Do use success and danger for direction of money, tinted at 15% for pills, and keep warnings calm.",
+      "Do keep touch targets at 44px on coarse pointers and text at 12px or larger.",
+      "Do pass chart colours through useChartTokens."
+    ],
+    "donts": [
+      "Don't introduce a second brand accent or hard-coded palette values.",
+      "Don't use physical left/right/ml/mr/pl/pr on surfaces that must flip in Hebrew.",
+      "Don't add movement that is not neutralised by the reduced-motion block (entrance translate and scale variables, press scale).",
+      "Don't use card with blur on top of another blurred tile; nest with flat tints (foreground/5) instead."
+    ]
+  }
+}

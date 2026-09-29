@@ -73,22 +73,22 @@ function PeriodSelector({
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
           "w-full p-2 sm:p-4 flex items-center justify-between",
-          "hover:bg-[#5C8374]/5 transition-colors rounded-t-lg",
+          "hover:bg-primary/5 transition-colors rounded-t-lg",
           !isExpanded && "rounded-b-lg"
         )}
       >
         <div className="flex items-center gap-2 sm:gap-3">
           <div className={cn(
             "p-1.5 sm:p-2 rounded-lg",
-            isViewingCurrentMonth ? "bg-[#5C8374]/20" : colors.bgTertiary
+            isViewingCurrentMonth ? "bg-primary/20" : colors.bgTertiary
           )}>
-            <Calendar className={cn("w-4 h-4 sm:w-5 sm:h-5", isViewingCurrentMonth ? "text-[#5C8374]" : colors.textSecondary)} />
+            <Calendar className={cn("w-4 h-4 sm:w-5 sm:h-5", isViewingCurrentMonth ? "text-primary" : colors.textSecondary)} />
           </div>
-          <div className="text-left">
+          <div className="text-start">
             <p className={cn("text-base sm:text-lg font-semibold", colors.textPrimary)}>
               {getSelectedMonthsDisplay}
             </p>
-            <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
+            <p className={cn("text-xs", colors.textTertiary)}>
               {isViewingCurrentMonth 
                 ? t('currentMonth')
                 : hasSelectedMonths
@@ -115,7 +115,7 @@ function PeriodSelector({
         <CardContent className="p-2 sm:p-4 pt-0 space-y-3 sm:space-y-4">
           {/* Years Row */}
           <div>
-            <p className={cn("text-[10px] sm:text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
+            <p className={cn("text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
               {t('year')}
             </p>
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
@@ -132,18 +132,18 @@ function PeriodSelector({
                         onMonthChange([]);
                       }}
                       className={cn(
-                        "px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200",
-                        "border-2 min-w-[60px] sm:min-w-[70px]",
+                        "min-h-11 px-3 sm:min-h-0 sm:px-4 py-1.5 sm:py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                        "border min-w-[60px] sm:min-w-[70px]",
                         isSelected
-                          ? "bg-[#5C8374] text-white border-[#5C8374] shadow-md"
+                          ? "bg-primary text-primary-foreground border-primary shadow-[0_6px_18px_-6px_hsl(var(--glow)/0.6)]"
                           : isCurrent
-                          ? cn("border-[#5C8374]/50 hover:border-[#5C8374]", colors.textPrimary, colors.bgTertiary)
-                          : cn("border-transparent hover:border-[#5C8374]/30", colors.textSecondary, colors.bgTertiary)
+                          ? cn("border-primary/50 hover:border-primary", colors.textPrimary, colors.bgTertiary)
+                          : cn("border-transparent hover:border-primary/30", colors.textSecondary, colors.bgTertiary)
                       )}
                     >
                       {year}
                       {isCurrent && !isSelected && (
-                        <span className="ml-0.5 sm:ml-1 text-[8px] sm:text-[10px] text-[#5C8374]">●</span>
+                        <span className="ms-0.5 sm:ms-1 text-[8px] sm:text-[10px] text-primary">●</span>
                       )}
                     </button>
                   );
@@ -153,7 +153,7 @@ function PeriodSelector({
 
           {/* Months Row */}
           <div>
-            <p className={cn("text-[10px] sm:text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
+            <p className={cn("text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
               {t('month')}
             </p>
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
@@ -180,13 +180,13 @@ function PeriodSelector({
                     }}
                     title={t(month.fullLabelKey)}
                     className={cn(
-                      "px-1.5 sm:px-2 py-1.5 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all duration-200",
-                      "border-2 relative",
+                      "min-h-11 px-2 sm:min-h-0 py-1.5 sm:py-2.5 rounded-xl text-xs font-medium transition-all duration-200",
+                      "border relative",
                       isSelected
-                        ? "bg-[#5C8374] text-white border-[#5C8374] shadow-md"
+                        ? "bg-primary text-primary-foreground border-primary shadow-[0_6px_18px_-6px_hsl(var(--glow)/0.6)]"
                         : isCurrent
-                        ? cn("border-[#5C8374] bg-[#5C8374]/10", colors.textPrimary)
-                        : cn("border-transparent hover:border-[#5C8374]/30", colors.textSecondary, colors.bgTertiary)
+                        ? cn("border-primary bg-primary/10", colors.textPrimary)
+                        : cn("border-transparent hover:border-primary/30", colors.textSecondary, colors.bgTertiary)
                     )}
                   >
                     {t(month.labelKey)}

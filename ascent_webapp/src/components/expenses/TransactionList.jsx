@@ -9,25 +9,26 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useHousehold } from '@/hooks/useHousehold';
 
 const categoryColors = {
-  'Food & Dining': 'bg-orange-500/10 text-orange-400 border-orange-500/30',
-  'Groceries': 'bg-green-500/10 text-green-400 border-green-500/30',
-  'Rent & Housing': 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  'Transportation': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-  'Healthcare': 'bg-red-500/10 text-red-400 border-red-500/30',
-  'Entertainment': 'bg-pink-500/10 text-pink-400 border-pink-500/30',
-  'Shopping': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  'Utilities': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
-  'Insurance': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-  'Investment Fees': 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-  'Taxes': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-  'Salary': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-  'Investment Income': 'bg-teal-500/10 text-teal-400 border-teal-500/30',
-  'Other': 'bg-gray-500/10 text-gray-400 border-gray-500/30',
+  'Food & Dining': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
+  'Groceries': 'bg-success/10 text-success border-success/30',
+  'Rent & Housing': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  'Transportation': 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+  'Healthcare': 'bg-danger/10 text-danger border-danger/30',
+  'Entertainment': 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/30',
+  'Shopping': 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
+  'Utilities': 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+  'Insurance': 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+  'Investment Fees': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
+  'Taxes': 'bg-danger/10 text-danger border-danger/30',
+  'Salary': 'bg-success/10 text-success border-success/30',
+  'Investment Income': 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30',
+  'Other': 'bg-muted text-muted-foreground border-border',
 };
 
-const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true }) => {
+const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true, author = null }) => {
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'USD';
 
@@ -99,16 +100,17 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
   const Icon = getPaymentMethodIcon(transaction.paymentMethod);
 
   return (
-    <Card key={transaction.id} className={cn(colors.cardBg, colors.cardBorder, "hover:border-[#5C8374]/40 transition-all")}>
-      <CardContent className="p-3">
+    <div key={transaction.id} className="group rounded-2xl border border-border/50 bg-muted/40 transition-all hover:border-primary/40 hover:bg-muted/70">
+      <div className="p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0 flex items-center gap-3">
             {/* Type Icon */}
-            {transaction.type === 'Income' ? (
-              <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-red-400 flex-shrink-0" />
-            )}
+            <span className={cn(
+              "grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl",
+              transaction.type === 'Income' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+            )}>
+              {transaction.type === 'Income' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            </span>
 
             {/* Main Content */}
             <div className="flex-1 min-w-0">
@@ -119,7 +121,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                   </Badge>
                 )}
                 {transaction.isRecurring && (
-                  <Badge className="text-[10px] px-1.5 py-0.5 bg-[#5C8374]/20 text-[#5C8374] border-[#5C8374]/30 flex items-center gap-1">
+                  <Badge className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary border-primary/30 flex items-center gap-1">
                     <Repeat className="w-2.5 h-2.5" />
                     {transaction.recurringFrequency === 'monthly' ? 'Monthly' : transaction.recurringFrequency}
                   </Badge>
@@ -134,11 +136,26 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                   <Calendar className="w-3 h-3" />
                   {format(new Date(transaction.date), 'MMM dd, yyyy')}
                 </div>
-                <span className="text-[#5C8374]">•</span>
+                <span className="text-primary">•</span>
                 <span className="uppercase">{transaction.currency}</span>
+                {author && (
+                  <>
+                    <span className="text-primary">•</span>
+                    <span className="flex items-center gap-1" title={`${t('addedBy')} ${author.name}`}>
+                      <span
+                        aria-hidden
+                        className="grid h-5 w-5 place-items-center rounded-full text-xs font-semibold leading-none text-background"
+                        style={{ backgroundColor: author.color }}
+                      >
+                        {author.initials.slice(0, 1)}
+                      </span>
+                      <span className="truncate max-w-[6rem]">{author.isMe ? t('me') : author.name}</span>
+                    </span>
+                  </>
+                )}
                 {transaction.paymentMethod && (
                   <>
-                    <span className="text-[#5C8374]">•</span>
+                    <span className="text-primary">•</span>
                     <div className="flex items-center gap-1">
                       {Icon && <Icon className="w-3 h-3" />}
                       <span>
@@ -157,14 +174,14 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="flex flex-col items-end">
               <span className={cn(
-                'text-base font-bold whitespace-nowrap',
-                transaction.type === 'Income' ? 'text-green-400' : 'text-red-400'
+                'text-base font-bold tabular-nums whitespace-nowrap',
+                transaction.type === 'Income' ? 'text-success' : 'text-danger'
               )}>
                 {transaction.type === 'Income' ? '+' : '-'}
                 {formatCurrency(transaction.amount, transaction.currency)}
               </span>
               {convertedAmount !== null && convertedAmount !== undefined && (
-                <span className={cn("text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap")}>
+                <span className={cn("text-xs text-muted-foreground dark:text-muted-foreground whitespace-nowrap")}>
                   {formatCurrency(convertedAmount, userCurrency)}
                 </span>
               )}
@@ -176,8 +193,9 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="icon"
+                    aria-label={t('moreActions')}
                     variant="ghost"
-                    className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                    className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>
@@ -188,23 +206,23 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                 >
                   <DropdownMenuItem
                     onClick={handleEdit}
-                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-[#5C8374]/20")}
+                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-primary/20")}
                   >
-                    <Edit className="w-4 h-4 mr-2" />
+                    <Edit className="w-4 h-4 me-2" />
                     <span>{t('edit')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleDuplicate}
-                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-[#5C8374]/20")}
+                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-primary/20")}
                   >
-                    <Copy className="w-4 h-4 mr-2" />
+                    <Copy className="w-4 h-4 me-2" />
                     <span>{t('duplicate')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleDelete}
-                    className={cn("cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/20")}
+                    className={cn("cursor-pointer text-danger hover:text-danger hover:bg-danger/20")}
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
+                    <Trash2 className="w-4 h-4 me-2" />
                     <span>{t('delete')}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -212,8 +230,8 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 });
 
@@ -241,6 +259,7 @@ function TransactionList({
   canEdit = true
 }) {
   const { t, language, colors, user } = useTheme();
+  const { byEmail, isShared } = useHousehold();
 
   const handleEdit = useCallback((transaction) => {
     onEdit(transaction);
@@ -259,7 +278,7 @@ function TransactionList({
       <Card className={cn(colors.cardBg, colors.cardBorder)}>
         <CardContent className="p-12">
           <div className="text-center">
-            <div className="w-16 h-16 bg-[#5C8374]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <DollarSign className={cn("w-8 h-8", colors.accentText)} />
             </div>
             <h3 className={cn("text-xl font-semibold mb-2", colors.textPrimary)}>{t('noTransactionsFound')}</h3>
@@ -287,6 +306,7 @@ function TransactionList({
           user={user}
           t={t}
           canEdit={canEdit}
+          author={isShared ? byEmail[transaction.created_by] || null : null}
         />
       ))}
     </div>

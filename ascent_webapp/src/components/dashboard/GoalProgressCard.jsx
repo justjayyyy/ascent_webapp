@@ -9,18 +9,18 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 
 const categoryColors = {
-  Retirement: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  'Emergency Fund': 'bg-green-500/10 text-green-400 border-green-500/30',
-  Investment: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-  Savings: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  'Debt Payoff': 'bg-red-500/10 text-red-400 border-red-500/30',
-  Other: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
+  Retirement: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  'Emergency Fund': 'bg-success/10 text-success border-success/30',
+  Investment: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+  Savings: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
+  'Debt Payoff': 'bg-danger/10 text-danger border-danger/30',
+  Other: 'bg-muted text-muted-foreground border-border',
 };
 
 const statusColors = {
-  Active: 'bg-green-500/10 text-green-400 border-green-500/30',
-  Completed: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  Paused: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
+  Active: 'bg-success/10 text-success border-success/30',
+  Completed: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  Paused: 'bg-muted text-muted-foreground border-border',
 };
 
 import BlurValue from '../BlurValue';
@@ -67,7 +67,7 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, linkedAccount
   const onTrack = projectedDate ? projectedDate <= new Date(goal.targetDate) : null;
 
   return (
-    <Card className={cn(colors.cardBg, colors.cardBorder, "hover:border-[#5C8374]/40 transition-all")}>
+    <Card className={cn(colors.cardBg, colors.cardBorder, "hover:border-primary/40 transition-all")}>
       <CardContent className="p-5">
         <div className="space-y-4">
           {/* Header */}
@@ -86,17 +86,19 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, linkedAccount
             <div className="flex gap-2">
               <Button
                 size="icon"
+                aria-label={t('edit')}
                 variant="ghost"
                 onClick={() => onEdit(goal)}
-                className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
               >
                 <Edit className="w-4 h-4" />
               </Button>
               <Button
                 size="icon"
+                aria-label={t('delete')}
                 variant="ghost"
                 onClick={() => onDelete(goal.id)}
-                className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                className="h-11 w-11 sm:h-8 sm:w-8 text-danger hover:text-danger hover:bg-danger/20"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -125,7 +127,7 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, linkedAccount
                 </BlurValue>
               </p>
               {linkedAccounts.length > 0 && (
-                <div className="flex items-center gap-1 text-xs text-[#5C8374]">
+                <div className="flex items-center gap-1 text-xs text-primary">
                   <Link2 className="w-3 h-3" />
                   <span>Auto-tracked from {linkedAccounts.length} account{linkedAccounts.length > 1 ? 's' : ''}</span>
                 </div>
@@ -151,13 +153,13 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, linkedAccount
                 <div className="flex items-center justify-between">
                   <span className={cn("text-xs", colors.textTertiary)}>Projected Achievement</span>
                   {onTrack ? (
-                    <Badge className="text-xs bg-green-500/10 text-green-400 border-green-500/30">
-                      <TrendingUp className="w-3 h-3 mr-1" />
+                    <Badge className="text-xs bg-success/10 text-success border-success/30">
+                      <TrendingUp className="w-3 h-3 me-1" />
                       On Track
                     </Badge>
                   ) : (
-                    <Badge className="text-xs bg-red-500/10 text-red-400 border-red-500/30">
-                      <TrendingDown className="w-3 h-3 mr-1" />
+                    <Badge className="text-xs bg-danger/10 text-danger border-danger/30">
+                      <TrendingDown className="w-3 h-3 me-1" />
                       Behind
                     </Badge>
                   )}
@@ -185,7 +187,7 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, linkedAccount
             </div>
             <span className={cn(
               'text-xs font-medium',
-              daysLeft < 30 ? 'text-red-400' : daysLeft < 90 ? 'text-yellow-400' : 'text-green-400'
+              daysLeft < 30 ? 'text-danger' : daysLeft < 90 ? 'text-yellow-600 dark:text-yellow-400' : 'text-success'
             )}>
               {daysLeft > 0 ? `${daysLeft} days left` : 'Overdue'}
             </span>

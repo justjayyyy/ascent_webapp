@@ -288,7 +288,7 @@ export default function BudgetManager({
                   }}
                   className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                 />
-                <p className={cn("text-[10px] sm:text-xs", colors.textTertiary)}>
+                <p className={cn("text-xs", colors.textTertiary)}>
                   {t('alertThresholdHelp')}
                 </p>
               </div>
@@ -305,7 +305,7 @@ export default function BudgetManager({
                       {t('shareWithTeam') || 'Share with team'}
                     </Label>
                   </div>
-                  <Switch
+                  <Switch aria-label={t('shareWithTeam')}
                     id="isShared"
                     checked={formData.isShared}
                     onCheckedChange={(checked) => setFormData({ ...formData, isShared: checked })}
@@ -319,7 +319,7 @@ export default function BudgetManager({
                     type="button"
                     variant="outline"
                     onClick={handleCancel}
-                    className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+                    className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
                   >
                     {t('cancel')}
                   </Button>
@@ -327,14 +327,14 @@ export default function BudgetManager({
                 <Button
                   type="submit"
                   disabled={isLoading || !formData.monthlyLimit || !formData.category || !formData.year || !formData.month}
-                  className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-[#5C8374] hover:bg-[#5C8374]/80 text-white", editingBudget && "flex-1")}
+                  className={cn("flex-1 h-9 sm:h-10 text-sm sm:text-base bg-primary hover:bg-primary/80 text-primary-foreground", editingBudget && "flex-1")}
                 >
                   {isLoading ? (
-                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 me-1.5 sm:me-2 animate-spin" />
                   ) : editingBudget ? (
-                    <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 me-1.5 sm:me-2" />
                   ) : (
-                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 me-1.5 sm:me-2" />
                   )}
                   {editingBudget ? t('updateBudget') : t('addBudget')}
                 </Button>
@@ -377,17 +377,19 @@ export default function BudgetManager({
                         <>
                           <Button
                             size="icon"
+                            aria-label={t('edit')}
                             variant="ghost"
                             onClick={() => handleEdit(budget)}
-                            className={cn("h-7 w-7 sm:h-8 sm:w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                            className={cn("h-7 w-7 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                           >
                             <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </Button>
                           <Button
                             size="icon"
+                            aria-label={t('delete')}
                             variant="ghost"
                             onClick={() => onDelete(budget.id)}
-                            className="h-7 w-7 sm:h-8 sm:w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            className="h-7 w-7 sm:h-8 sm:w-8 text-danger hover:text-danger hover:bg-danger/20"
                           >
                             <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </Button>

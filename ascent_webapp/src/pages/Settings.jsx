@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, User, Mail, Shield, Bell, Globe, Edit2, Check, X, Users } from 'lucide-react';
+import { PORTFOLIO_ENABLED } from '@/lib/features';
 import ImportExportSection from '../components/settings/ImportExportSection';
 import SharedUsersSection from '../components/settings/SharedUsersSection';
 import InviteUserDialog from '../components/settings/InviteUserDialog';
@@ -18,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function Settings() {
-  const { user: themeUser, theme, colors, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
+  const { user: themeUser, theme, colors, palette, setPalette, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
   const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission, refreshWorkspaces } = useAuth();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -427,7 +428,7 @@ export default function Settings() {
             <Card className={cn(colors.cardBg, colors.cardBorder)}>
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-[#5C8374]" />
+                  <User className="w-5 h-5 text-primary" />
                   <CardTitle className={colors.accentText}>{t('profileInformation')}</CardTitle>
                 </div>
               </CardHeader>
@@ -447,33 +448,36 @@ export default function Settings() {
                           handleCancelEditFullName();
                         }
                       }}
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingFullName && "ring-2 ring-[#5C8374]")}
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingFullName && "ring-2 ring-primary")}
                     />
                     {editingFullName ? (
                       <div className="flex items-center gap-1">
                         <Button
                           size="icon"
+                          aria-label={t('save')}
                           variant="ghost"
                           onClick={handleSaveFullName}
-                          className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
+                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-success/20", colors.textSecondary)}
                         >
-                          <Check className="w-4 h-4 text-green-400" />
+                          <Check className="w-4 h-4 text-success" />
                         </Button>
                         <Button
                           size="icon"
+                          aria-label={t('cancel')}
                           variant="ghost"
                           onClick={handleCancelEditFullName}
-                          className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
+                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-danger/20", colors.textSecondary)}
                         >
-                          <X className="w-4 h-4 text-red-400" />
+                          <X className="w-4 h-4 text-danger" />
                         </Button>
                       </div>
                     ) : (
                       <Button
                         size="icon"
+                        aria-label={t('edit')}
                         variant="ghost"
                         onClick={() => setEditingFullName(true)}
-                        className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                        className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
@@ -496,9 +500,9 @@ export default function Settings() {
                   <div className="flex items-center gap-2">
                     <Shield className={cn("w-4 h-4", colors.textTertiary)} />
                     <Input
-                      value={user?.role || 'user'}
+                      value={permissions ? t('sharedUser') : t('owner')}
                       disabled
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, "capitalize")}
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary)}
                     />
                   </div>
                 </div>
@@ -509,7 +513,7 @@ export default function Settings() {
             <Card className={cn(colors.cardBg, colors.cardBorder)}>
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-[#5C8374]" />
+                  <Globe className="w-5 h-5 text-primary" />
                   <CardTitle className={colors.accentText}>{t('preferences')}</CardTitle>
                 </div>
               </CardHeader>
@@ -571,6 +575,34 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="py-3">
+                  <p className={cn("font-medium", colors.textPrimary)}>{t('colorPalette')}</p>
+                  <p className={cn("text-sm mb-3", colors.textTertiary)}>{t('colorPaletteDesc')}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: 'indigo', label: t('paletteIndigo'), swatch: ['#0c0d1a', '#8b7cf8', '#22d3ee'] },
+                      { id: 'gold', label: t('paletteGold'), swatch: ['#000000', '#f5b91f', '#e07a3a'] },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPalette(p.id)}
+                        aria-pressed={palette === p.id}
+                        className={cn(
+                          "rounded-2xl border p-3 text-start transition hover:bg-foreground/5",
+                          palette === p.id ? "border-primary ring-2 ring-primary/40" : "border-border"
+                        )}
+                      >
+                        <div className="mb-2 flex h-10 overflow-hidden rounded-xl border border-border/60">
+                          {p.swatch.map((c, i) => (
+                            <span key={c} className={i === 0 ? "flex-[2]" : "flex-1"} style={{ background: c }} />
+                          ))}
+                        </div>
+                        <p className={cn("text-sm font-medium", colors.textPrimary)}>{p.label}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -579,29 +611,31 @@ export default function Settings() {
             <Card className={cn(colors.cardBg, colors.cardBorder)}>
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-[#5C8374]" />
+                  <Bell className="w-5 h-5 text-primary" />
                   <CardTitle className={colors.accentText}>{t('notifications')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {PORTFOLIO_ENABLED && (
                   <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
                     <div>
                       <p className={cn("font-medium", colors.textPrimary)}>{t('priceAlerts')}</p>
                       <p className={cn("text-sm", colors.textTertiary)}>{t('getNotifiedPriceChanges')}</p>
                     </div>
-                    <Switch
+                    <Switch aria-label={t('priceAlerts')}
                       checked={user?.priceAlerts || false}
                       onCheckedChange={(checked) => updateUserMutation.mutate({ priceAlerts: checked })}
                       onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
                     />
                   </div>
+                  )}
                   <div className={cn("flex items-center justify-between py-3 border-b", colors.borderLight)}>
                     <div>
                       <p className={cn("font-medium", colors.textPrimary)}>{t('dailySummary')}</p>
                       <p className={cn("text-sm", colors.textTertiary)}>{t('receiveDailyReports')}</p>
                     </div>
-                    <Switch
+                    <Switch aria-label={t('dailySummary')}
                       checked={user?.dailySummary !== false}
                       onCheckedChange={(checked) => updateUserMutation.mutate({ dailySummary: checked })}
                       onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -612,7 +646,7 @@ export default function Settings() {
                       <p className={cn("font-medium", colors.textPrimary)}>{t('weeklySummary')}</p>
                       <p className={cn("text-sm", colors.textTertiary)}>{t('receiveWeeklyReports')}</p>
                     </div>
-                    <Switch
+                    <Switch aria-label={t('weeklySummary')}
                       checked={user?.weeklyReports !== false}
                       onCheckedChange={(checked) => updateUserMutation.mutate({ weeklyReports: checked })}
                       onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -623,7 +657,7 @@ export default function Settings() {
                       <p className={cn("font-medium", colors.textPrimary)}>{t('emailNotifications')}</p>
                       <p className={cn("text-sm", colors.textTertiary)}>{t('receiveImportantUpdates')}</p>
                     </div>
-                    <Switch
+                    <Switch aria-label={t('emailNotifications')}
                       checked={user?.emailNotifications !== false}
                       onCheckedChange={(checked) => updateUserMutation.mutate({ emailNotifications: checked })}
                       onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -642,7 +676,7 @@ export default function Settings() {
             <Card className={cn(colors.cardBg, colors.cardBorder)}>
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-[#5C8374]" />
+                  <Users className="w-5 h-5 text-primary" />
                   <CardTitle className={colors.accentText}>{t('workspaceSettings') || 'Workspace Settings'}</CardTitle>
                 </div>
               </CardHeader>
@@ -654,37 +688,40 @@ export default function Settings() {
                       value={workspaceNameValue}
                       onChange={(e) => setWorkspaceNameValue(e.target.value)}
                       disabled={!editingWorkspaceName}
-                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingWorkspaceName && "ring-2 ring-[#5C8374]")}
+                      className={cn(colors.bgTertiary, colors.border, colors.textPrimary, editingWorkspaceName && "ring-2 ring-primary")}
                     />
                     {editingWorkspaceName ? (
                       <div className="flex items-center gap-1">
                         <Button
                           size="icon"
+                          aria-label={t('save')}
                           variant="ghost"
                           onClick={handleSaveWorkspaceName}
-                          className={cn("h-8 w-8 hover:bg-green-500/20", colors.textSecondary)}
+                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-success/20", colors.textSecondary)}
                         >
-                          <Check className="w-4 h-4 text-green-400" />
+                          <Check className="w-4 h-4 text-success" />
                         </Button>
                         <Button
                           size="icon"
+                          aria-label={t('cancel')}
                           variant="ghost"
                           onClick={() => {
                             setWorkspaceNameValue(currentWorkspace?.name || '');
                             setEditingWorkspaceName(false);
                           }}
-                          className={cn("h-8 w-8 hover:bg-red-500/20", colors.textSecondary)}
+                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-danger/20", colors.textSecondary)}
                         >
-                          <X className="w-4 h-4 text-red-400" />
+                          <X className="w-4 h-4 text-danger" />
                         </Button>
                       </div>
                     ) : (
                       isOwner && (
                         <Button
                           size="icon"
+                          aria-label={t('edit')}
                           variant="ghost"
                           onClick={() => setEditingWorkspaceName(true)}
-                          className={cn("h-8 w-8 hover:bg-[#5C8374]/20", colors.textSecondary)}
+                          className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
@@ -736,7 +773,7 @@ export default function Settings() {
                       ? "/logo-dark.png"
                       : "/logo-light.png"
                     }
-                    alt="Ascend Logo"
+                    alt="Ascent logo"
                     className="w-24 h-24 object-contain"
                     style={{ filter: 'brightness(1.1) saturate(1.2)' }}
                   />

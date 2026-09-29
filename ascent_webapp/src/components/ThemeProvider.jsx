@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 import { translations, translateCategory } from '../lib/translations';
@@ -35,37 +35,56 @@ export function ThemeProvider({ children }) {
   const language = user?.language || getBrowserLanguage();
   const isRTL = language === 'he';
 
+  // Keep <html lang/dir> in sync with the selected language
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+  }, [language, isRTL]);
+
+  // Color palette (indigo | gold), stored per device. Legacy ?palette=... URL param still works.
+  const [palette, setPaletteState] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('palette');
+      if (q === 'gold' || q === 'indigo') localStorage.setItem('ascent_palette', q);
+      return localStorage.getItem('ascent_palette') === 'gold' ? 'gold' : 'indigo';
+    } catch { return 'indigo'; }
+  });
+
+  const setPalette = useCallback((next) => {
+    setPaletteState(next);
+    try { localStorage.setItem('ascent_palette', next); } catch { /* storage unavailable */ }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (palette === 'gold') document.documentElement.dataset.palette = 'gold';
+    else delete document.documentElement.dataset.palette;
+  }, [palette]);
+
   const t = useCallback((key) => translations[language]?.[key] || translations.en[key] || key, [language]);
 
-  const colors = React.useMemo(() => theme === 'light' ? {
-    bgPrimary: 'bg-slate-50',
-    bgSecondary: 'bg-white',
-    bgTertiary: 'bg-slate-100',
-    textPrimary: 'text-slate-900',
-    textSecondary: 'text-slate-700',
-    textTertiary: 'text-slate-500',
-    border: 'border-slate-200',
-    borderLight: 'border-slate-100',
-    accent: 'bg-[#5C8374]',
-    accentHover: 'hover:bg-[#4a6b5e]',
-    accentText: 'text-[#5C8374]',
-    cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-  } : {
-    bgPrimary: 'bg-[#092635]',
-    bgSecondary: 'bg-[#1B4242]',
-    bgTertiary: 'bg-[#092635]',
-    textPrimary: 'text-white',
-    textSecondary: 'text-[#9EC8B9]',
-    textTertiary: 'text-[#9EC8B9]/70',
-    border: 'border-[#5C8374]/20',
-    borderLight: 'border-[#5C8374]/10',
-    accent: 'bg-[#5C8374]',
-    accentHover: 'hover:bg-[#5C8374]/80',
-    accentText: 'text-[#9EC8B9]',
-    cardBg: 'bg-[#1B4242]',
-    cardBorder: 'border-[#5C8374]/20',
+  // Apply theme to <html> so shadcn CSS variable tokens switch
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme !== 'light');
+    root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
   }, [theme]);
+
+  // Token-based classes; values switch automatically via CSS variables (.dark)
+  const colors = React.useMemo(() => ({
+    bgPrimary: 'bg-background',
+    bgSecondary: 'bg-card',
+    bgTertiary: 'bg-muted',
+    textPrimary: 'text-foreground',
+    textSecondary: 'text-foreground/80',
+    textTertiary: 'text-muted-foreground',
+    border: 'border-border',
+    borderLight: 'border-border/50',
+    accent: 'bg-primary',
+    accentHover: 'hover:bg-primary/85',
+    accentText: 'text-primary',
+    cardBg: 'bg-card',
+    cardBorder: 'border-border',
+  }), []);
 
   const value = React.useMemo(() => ({
     user,
@@ -74,11 +93,13 @@ export function ThemeProvider({ children }) {
     language,
     isRTL,
     colors,
+    palette,
+    setPalette,
     t,
     loading,
     refreshUser,
     updateUserLocal,
-  }), [user, setUser, theme, language, isRTL, colors, t, loading, refreshUser, updateUserLocal]);
+  }), [user, setUser, theme, language, isRTL, colors, palette, setPalette, t, loading, refreshUser, updateUserLocal]);
 
   return (
     <ThemeContext.Provider value={value}>

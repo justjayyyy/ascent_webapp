@@ -5,13 +5,13 @@ import { Shield } from 'lucide-react';
 export default function PrivacyPolicy() {
   // Use default dark theme colors for public page
   const colors = {
-    bgPrimary: 'bg-[#092635]',
-    cardBg: 'bg-[#1B4242]',
-    cardBorder: 'border-[#5C8374]/20',
-    textPrimary: 'text-white',
-    textSecondary: 'text-[#9EC8B9]',
-    textTertiary: 'text-[#5C8374]',
-    accentText: 'text-[#9EC8B9]',
+    bgPrimary: 'bg-background',
+    cardBg: 'bg-card',
+    cardBorder: 'border-primary/20',
+    textPrimary: 'text-foreground',
+    textSecondary: 'text-muted-foreground',
+    textTertiary: 'text-primary',
+    accentText: 'text-muted-foreground',
   };
 
   // Simple translation function (fallback to English)
@@ -65,7 +65,7 @@ export default function PrivacyPolicy() {
       <div className="max-w-4xl mx-auto py-8">
         <div className={`rounded-xl border p-6 md:p-8 ${colors.cardBg} ${colors.cardBorder}`}>
           <div className="flex items-center gap-3 mb-6">
-            <Shield className="w-6 h-6 text-[#5C8374]" />
+            <Shield className="w-6 h-6 text-primary" />
             <h1 className={`text-3xl font-bold ${colors.textPrimary}`}>
               {t('privacyPolicy')}
             </h1>
@@ -92,7 +92,7 @@ export default function PrivacyPolicy() {
               <p className={`mb-2 ${colors.textSecondary}`}>
                 {t('informationWeCollectText')}
               </p>
-              <ul className={`list-disc list-inside space-y-2 mb-4 ml-4 ${colors.textSecondary}`}>
+              <ul className={`list-disc list-inside space-y-2 mb-4 ms-4 ${colors.textSecondary}`}>
                 <li>{t('personalInfoCollection')}</li>
                 <li>{t('financialDataCollection')}</li>
                 <li>{t('preferencesCollection')}</li>
@@ -107,7 +107,7 @@ export default function PrivacyPolicy() {
               <p className={`mb-2 ${colors.textSecondary}`}>
                 {t('howWeUseInformationText')}
               </p>
-              <ul className={`list-disc list-inside space-y-2 mb-4 ml-4 ${colors.textSecondary}`}>
+              <ul className={`list-disc list-inside space-y-2 mb-4 ms-4 ${colors.textSecondary}`}>
                 <li>{t('provideServices')}</li>
                 <li>{t('processTransactions')}</li>
                 <li>{t('sendNotifications')}</li>
@@ -132,7 +132,7 @@ export default function PrivacyPolicy() {
               <p className={`mb-4 ${colors.textSecondary}`}>
                 {t('dataSharingText')}
               </p>
-              <ul className={`list-disc list-inside space-y-2 mb-4 ml-4 ${colors.textSecondary}`}>
+              <ul className={`list-disc list-inside space-y-2 mb-4 ms-4 ${colors.textSecondary}`}>
                 <li>{t('withConsent')}</li>
                 <li>{t('sharedUsers')}</li>
                 <li>{t('legalRequirements')}</li>
@@ -147,7 +147,7 @@ export default function PrivacyPolicy() {
               <p className={`mb-2 ${colors.textSecondary}`}>
                 {t('yourRightsText')}
               </p>
-              <ul className={`list-disc list-inside space-y-2 mb-4 ml-4 ${colors.textSecondary}`}>
+              <ul className={`list-disc list-inside space-y-2 mb-4 ms-4 ${colors.textSecondary}`}>
                 <li>{t('accessData')}</li>
                 <li>{t('updateData')}</li>
                 <li>{t('deleteData')}</li>

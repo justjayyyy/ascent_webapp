@@ -11,6 +11,7 @@ import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import WelcomeDialog from './components/WelcomeDialog';
+import InstallHint from './components/InstallHint';
 
 function LayoutContent({ children, currentPageName }) {
   const { user, theme, language, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
@@ -76,8 +77,9 @@ function LayoutContent({ children, currentPageName }) {
   // }, [permissions]);
 
   const navigation = useMemo(() => [
-    { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },
-    // { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewDashboard' },
+    // Portfolio is hidden for now:
+    // { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },
+    { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewExpenses' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('notes'), page: 'Notes', icon: StickyNote, permission: 'viewNotes' },
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
@@ -85,52 +87,10 @@ function LayoutContent({ children, currentPageName }) {
 
   return (
     <div className={cn(
-      "min-h-screen transition-colors",
-      theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-[#092635] text-white'
+      "min-h-dvh transition-colors bg-background text-foreground"
     )} dir={isRTL ? 'rtl' : 'ltr'}>
       <style>{`
-        :root {
-          --primary-dark: ${theme === 'light' ? '#f8fafc' : '#092635'};
-          --secondary-dark: ${theme === 'light' ? '#f1f5f9' : '#1B4242'};
-          --accent: #5C8374;
-          --light-accent: #9EC8B9;
-        }
-
-        /* Switch styles */
-        [role="switch"][data-state="checked"] {
-          background-color: #5C8374 !important;
-        }
-
-        [role="switch"][data-state="unchecked"] {
-          background-color: ${theme === 'light' ? '#cbd5e1' : 'rgba(92, 131, 116, 0.3)'} !important;
-        }
-
-        [role="switch"] span {
-          background-color: white !important;
-        }
-
-        * {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(92, 131, 116, 0.5);
-          border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(92, 131, 116, 0.7);
-        }
+        * { -webkit-tap-highlight-color: transparent; }
       `}</style>
 
 
@@ -139,7 +99,7 @@ function LayoutContent({ children, currentPageName }) {
       <aside className={cn(
         "hidden md:fixed md:inset-y-0 md:flex md:flex-col transition-all duration-300",
         sidebarCollapsed ? "md:w-20" : "md:w-64",
-        isRTL ? "right-0" : "left-0"
+        "start-0"
       )}>
         <div className={cn(
           "flex flex-col flex-grow overflow-y-auto relative",
@@ -151,25 +111,26 @@ function LayoutContent({ children, currentPageName }) {
             {sidebarCollapsed ? (
               <button
                 onClick={() => setSidebarCollapsed(false)}
-                className="p-1.5 rounded-full bg-[#5C8374] hover:bg-[#5C8374]/80 transition-all"
+                aria-label={t('toggleSidebar')}
+                className="p-1.5 rounded-full bg-primary hover:bg-primary/85 transition-all"
               >
-                {isRTL ? <ChevronLeft className="w-4 h-4 text-white" /> : <ChevronRight className="w-4 h-4 text-white" />}
+                {isRTL ? <ChevronLeft className="w-4 h-4 text-foreground" /> : <ChevronRight className="w-4 h-4 text-foreground" />}
               </button>
             ) : (
               <DropdownMenu open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[#5C8374]/10 transition-colors w-full">
+                  <button className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-accent transition-colors w-full">
                     <img
                       src={theme === 'dark' ? "/logo-dark.png" : "/logo-light.png"}
-                      alt="Ascend Logo"
+                      alt="Ascent logo"
                       className="w-12 h-12 object-contain"
                       style={{ filter: 'brightness(1.1) saturate(1.2)' }}
                     />
-                    <div className="flex-1 text-left min-w-0">
+                    <div className="flex-1 text-start min-w-0">
                       <p className={cn("text-sm font-bold truncate", colors.textPrimary)}>
                         {currentWorkspace?.name || 'Ascent'}
                       </p>
-                      <p className={cn("text-[10px] truncate", colors.textTertiary)}>
+                      <p className={cn("text-xs truncate", colors.textTertiary)}>
                         {workspaces.length > 1 ? t('switchWorkspace') : t('workspace')}
                       </p>
                     </div>
@@ -184,7 +145,7 @@ function LayoutContent({ children, currentPageName }) {
                         onClick={() => switchWorkspace(ws.id || ws._id)}
                         className={cn(
                           "cursor-pointer",
-                          (currentWorkspace?.id === ws.id || currentWorkspace?._id === ws._id) && "bg-[#5C8374]/10"
+                          (currentWorkspace?.id === ws.id || currentWorkspace?._id === ws._id) && "bg-accent"
                         )}
                       >
                         <span className={cn(colors.textPrimary)}>{ws.name}</span>
@@ -200,12 +161,13 @@ function LayoutContent({ children, currentPageName }) {
           {!sidebarCollapsed && (
             <button
               onClick={() => setSidebarCollapsed(true)}
+              aria-label={t('toggleSidebar')}
               className={cn(
-                "fixed top-6 p-1.5 rounded-full bg-[#5C8374] hover:bg-[#5C8374]/80 transition-all shadow-lg z-[9999]",
+                "fixed top-6 p-1.5 rounded-full bg-primary hover:bg-primary/85 transition-all shadow-lg z-[9999]",
                 isRTL ? (sidebarCollapsed ? "right-[4.5rem]" : "right-64 -translate-x-1/2") : (sidebarCollapsed ? "left-[4.5rem]" : "left-64 -translate-x-1/2")
               )}
             >
-              {isRTL ? <ChevronRight className="w-4 h-4 text-white" /> : <ChevronLeft className="w-4 h-4 text-white" />}
+              {isRTL ? <ChevronRight className="w-4 h-4 text-foreground" /> : <ChevronLeft className="w-4 h-4 text-foreground" />}
             </button>
           )}
 
@@ -219,22 +181,22 @@ function LayoutContent({ children, currentPageName }) {
                   key={item.page}
                   to={createPageUrl(item.page)}
                   className={cn(
-                    "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200",
+                    "flex items-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200",
                     isActive
-                      ? "bg-[#5C8374] text-white shadow-lg"
-                      : cn(colors.textSecondary, "hover:bg-[#5C8374]/20"),
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : cn(colors.textSecondary, "hover:bg-accent hover:text-foreground"),
                     sidebarCollapsed && "justify-center"
                   )}
                   title={sidebarCollapsed ? item.name : undefined}
                 >
-                  <Icon className={cn("w-5 h-5", !sidebarCollapsed && (isRTL ? "ml-3" : "mr-3"))} />
+                  <Icon className={cn("w-5 h-5", !sidebarCollapsed && ("me-3"))} />
                   {!sidebarCollapsed && item.name}
                 </Link>
               );
             })}
 
             {/* OPTION 1: Calendar in Sidebar - ENABLED */}
-            <div className="pt-2 border-t border-[#5C8374]/20 mt-2">
+            <div className="pt-2 border-t border-border mt-2">
               {SidebarCalendarButton && <SidebarCalendarButton className={sidebarCollapsed ? "justify-center" : ""} />}
             </div>
           </nav>
@@ -244,12 +206,12 @@ function LayoutContent({ children, currentPageName }) {
               {!sidebarCollapsed ? (
                 <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                   <DropdownMenuTrigger asChild>
-                    <button className="w-full flex items-center justify-between px-5 py-2 rounded-xl hover:bg-[#5C8374]/10 transition-colors cursor-pointer">
+                    <button className="w-full flex items-center justify-between px-5 py-2 rounded-xl hover:bg-accent transition-colors cursor-pointer">
                       <div className="flex items-center min-w-0">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#5C8374] flex items-center justify-center text-white font-semibold">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
                           {user.full_name?.[0] || user.email[0].toUpperCase()}
                         </div>
-                        <div className={cn("flex-1 min-w-0", isRTL ? "mr-3" : "ml-3")}>
+                        <div className={cn("flex-1 min-w-0", "ms-3")}>
                           <p className={cn("text-sm font-medium truncate", colors.textPrimary)}>
                             {user.full_name || t('user')}
                           </p>
@@ -276,7 +238,7 @@ function LayoutContent({ children, currentPageName }) {
 
                     {/* Custom Separator - 93% width */}
                     <div className="flex justify-center py-1">
-                      <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
+                      <div className={cn("w-[93%] h-px opacity-30", 'bg-border')} />
                     </div>
 
                     {/* Theme Toggle */}
@@ -285,13 +247,13 @@ function LayoutContent({ children, currentPageName }) {
                         e.preventDefault();
                         handleThemeChange(theme !== 'dark');
                       }}
-                      className={cn("px-3 py-[5px] flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
+                      className={cn("px-3 py-[5px] flex items-center justify-between rounded-lg hover:bg-accent transition-colors cursor-pointer", colors.textPrimary)}
                     >
                       <div className="flex items-center gap-2">
                         {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                         <span className="text-sm">{t('darkMode')}</span>
                       </div>
-                      <Switch
+                      <Switch aria-label={t('darkMode')}
                         checked={theme === 'dark'}
                         onCheckedChange={handleThemeChange}
                         onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -305,13 +267,13 @@ function LayoutContent({ children, currentPageName }) {
                         e.preventDefault();
                         handleBlurValuesChange(!user?.blurValues);
                       }}
-                      className={cn("px-3 py-[5px] flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
+                      className={cn("px-3 py-[5px] flex items-center justify-between rounded-lg hover:bg-accent transition-colors cursor-pointer", colors.textPrimary)}
                     >
                       <div className="flex items-center gap-2">
                         {user?.blurValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         <span className="text-sm">{t('blurValues')}</span>
                       </div>
-                      <Switch
+                      <Switch aria-label={t('blurValues')}
                         checked={user?.blurValues || false}
                         onCheckedChange={handleBlurValuesChange}
                         onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -321,7 +283,7 @@ function LayoutContent({ children, currentPageName }) {
 
                     {/* Custom Separator - 93% width */}
                     <div className="flex justify-center py-1">
-                      <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
+                      <div className={cn("w-[93%] h-px opacity-30", 'bg-border')} />
                     </div>
 
                     {/* Settings */}
@@ -329,7 +291,7 @@ function LayoutContent({ children, currentPageName }) {
                       <DropdownMenuItem asChild>
                         <Link
                           to={createPageUrl('Settings')}
-                          className={cn("flex items-center gap-2 px-3 py-[5px] cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
+                          className={cn("flex items-center gap-2 px-3 py-[5px] cursor-pointer rounded-lg hover:bg-accent transition-colors", colors.textPrimary)}
                           onClick={() => setUserMenuOpen(false)}
                         >
                           <SettingsIcon className="w-4 h-4" />
@@ -339,14 +301,14 @@ function LayoutContent({ children, currentPageName }) {
 
                       {/* Custom Separator - 93% width */}
                       <div className="flex justify-center py-1">
-                        <div className={cn("w-[93%] h-px opacity-30", theme === 'light' ? 'bg-slate-300' : 'bg-[#5C8374]')} />
+                        <div className={cn("w-[93%] h-px opacity-30", 'bg-border')} />
                       </div>
                     </>
 
                     {/* Logout */}
                     <DropdownMenuItem
                       onClick={handleLogout}
-                      className={cn("flex items-center justify-center gap-2 px-3 py-[5px] cursor-pointer text-red-500 hover:text-red-600 focus:text-red-500 rounded-lg transition-colors")}
+                      className={cn("flex items-center justify-center gap-2 px-3 py-[5px] cursor-pointer text-danger hover:text-danger/80 focus:text-danger rounded-lg transition-colors")}
                     >
                       <LogOut className="w-4 h-4" />
                       <span className="text-sm">{t('logout')}</span>
@@ -355,7 +317,7 @@ function LayoutContent({ children, currentPageName }) {
                 </DropdownMenu>
               ) : (
                 <div className="flex flex-col items-center space-y-3">
-                  <div className="w-10 h-10 rounded-full bg-[#5C8374] flex items-center justify-center text-white font-semibold">
+                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
                     {user.full_name?.[0] || user.email[0].toUpperCase()}
                   </div>
                   <button
@@ -363,7 +325,7 @@ function LayoutContent({ children, currentPageName }) {
                     className={cn(
                       "p-2 rounded-lg transition-colors",
                       colors.textSecondary,
-                      "hover:bg-[#5C8374]/20"
+                      "hover:bg-accent"
                     )}
                     title={t('logout')}
                   >
@@ -378,8 +340,8 @@ function LayoutContent({ children, currentPageName }) {
 
       {/* Mobile Header */}
       <div className={cn(
-        "md:hidden fixed top-0 left-0 right-0 z-50 border-b",
-        colors.bgSecondary,
+        "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top",
+        "bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70",
         colors.border
       )}>
         <div className="flex items-center justify-center h-16 px-4">
@@ -388,7 +350,7 @@ function LayoutContent({ children, currentPageName }) {
               ? "/logo-dark.png"
               : "/logo-light.png"
             }
-            alt="Ascend Logo"
+            alt="Ascent logo"
             className="w-16 h-16 object-contain"
             style={{ filter: 'brightness(1.1) saturate(1.2)' }}
           />
@@ -403,7 +365,7 @@ function LayoutContent({ children, currentPageName }) {
             "md:hidden fixed inset-0 z-40 bg-black/50 transition-opacity duration-300",
             mobileMenuOpen ? "opacity-100" : "opacity-0"
           )}
-          style={{ top: '64px', bottom: '64px' }}
+          style={{ top: 'calc(4rem + env(safe-area-inset-top))', bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
         />
       )}
 
@@ -411,7 +373,7 @@ function LayoutContent({ children, currentPageName }) {
       <div
         className={cn(
           "md:hidden fixed top-16 bottom-16 z-50 w-1/2 overflow-y-auto transition-transform duration-300 ease-out",
-          isRTL ? "left-0" : "right-0",
+          "end-0",
           mobileMenuOpen
             ? (isRTL ? "translate-x-0" : "translate-x-0")
             : (isRTL ? "-translate-x-full" : "translate-x-full"),
@@ -423,11 +385,11 @@ function LayoutContent({ children, currentPageName }) {
         {user && (
           <div className={cn("p-4", colors.bgSecondary)}>
             {/* User Info */}
-            <div className="flex items-center justify-center mb-3 pb-3 border-b border-[#5C8374]/20">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#5C8374] flex items-center justify-center text-white font-semibold">
+            <div className="flex items-center justify-center mb-3 pb-3 border-b border-border">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
                 {user.full_name?.[0] || user.email[0].toUpperCase()}
               </div>
-              <div className="ml-3 flex-1 min-w-0">
+              <div className="ms-3 flex-1 min-w-0">
                 <p className={cn("text-sm font-medium truncate", colors.textPrimary)}>{user.full_name || t('user')}</p>
                 <p className={cn("text-xs truncate", colors.textTertiary)}>
                   {permissions ? t('sharedUser') : t('owner')}
@@ -441,13 +403,13 @@ function LayoutContent({ children, currentPageName }) {
                 e.preventDefault();
                 handleThemeChange(theme !== 'dark');
               }}
-              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
+              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-accent transition-colors cursor-pointer", colors.textPrimary)}
             >
               <div className="flex items-center gap-2">
                 {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 <span className="text-sm">{t('darkMode')}</span>
               </div>
-              <Switch
+              <Switch aria-label={t('darkMode')}
                 checked={theme === 'dark'}
                 onCheckedChange={handleThemeChange}
                 onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -461,13 +423,13 @@ function LayoutContent({ children, currentPageName }) {
                 e.preventDefault();
                 handleBlurValuesChange(!user?.blurValues);
               }}
-              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-[#5C8374]/10 transition-colors cursor-pointer", colors.textPrimary)}
+              className={cn("px-3 py-2 mb-2 flex items-center justify-between rounded-lg hover:bg-accent transition-colors cursor-pointer", colors.textPrimary)}
             >
               <div className="flex items-center gap-2">
                 {user?.blurValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 <span className="text-sm">{t('blurValues')}</span>
               </div>
-              <Switch
+              <Switch aria-label={t('blurValues')}
                 checked={user?.blurValues || false}
                 onCheckedChange={handleBlurValuesChange}
                 onFocus={(e) => e.target.scrollIntoView({ block: 'nearest' })}
@@ -479,7 +441,7 @@ function LayoutContent({ children, currentPageName }) {
             <Link
               to={createPageUrl('Settings')}
               onClick={() => setMobileMenuOpen(false)}
-              className={cn("flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-[#5C8374]/10 transition-colors", colors.textPrimary)}
+              className={cn("flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-lg hover:bg-accent transition-colors", colors.textPrimary)}
             >
               <SettingsIcon className="w-4 h-4" />
               <span className="text-sm">{t('settings')}</span>
@@ -489,7 +451,7 @@ function LayoutContent({ children, currentPageName }) {
             <button
               onClick={handleLogout}
               className={cn(
-                "w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-red-500 hover:text-red-600"
+                "w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-danger hover:text-danger/80"
               )}
             >
               <LogOut className="w-4 h-4" />
@@ -503,10 +465,10 @@ function LayoutContent({ children, currentPageName }) {
 
       {/* Main Content */}
       <main className={cn(
-        "min-h-screen pt-16 md:pt-0 transition-all duration-300",
+        "min-h-dvh pt-16 md:pt-0 transition-all duration-300",
         isRTL
-          ? (sidebarCollapsed ? "md:pr-20" : "md:pr-64")
-          : (sidebarCollapsed ? "md:pl-20" : "md:pl-64")
+          ? (sidebarCollapsed ? "md:pe-20" : "md:pe-64")
+          : (sidebarCollapsed ? "md:ps-20" : "md:ps-64")
       )}>
         <div className="pb-20 md:pb-0">
           {children}
@@ -520,8 +482,8 @@ function LayoutContent({ children, currentPageName }) {
       {/* <div className={cn(
         "fixed top-4 z-50",
         isRTL 
-          ? (sidebarCollapsed ? "right-24" : "right-[17rem]")
-          : (sidebarCollapsed ? "left-24" : "left-[17rem]"),
+          ? (sidebarCollapsed ? "end-24" : "right-[17rem]")
+          : (sidebarCollapsed ? "start-24" : "left-[17rem]"),
         "hidden md:block"
       )}>
         <HeaderCalendarButton />
@@ -529,8 +491,8 @@ function LayoutContent({ children, currentPageName }) {
 
       {/* Mobile Bottom Navigation */}
       <div className={cn(
-        "md:hidden fixed bottom-0 left-0 right-0 border-t safe-area-inset-bottom z-50",
-        colors.bgSecondary,
+        "md:hidden fixed bottom-0 start-0 end-0 border-t safe-area-inset-bottom z-50",
+        "bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70",
         colors.border
       )}>
         <div className="flex items-center h-16">
@@ -544,11 +506,17 @@ function LayoutContent({ children, currentPageName }) {
                   key={item.page}
                   to={createPageUrl(item.page)}
                   className={cn(
-                    "flex flex-col items-center justify-center flex-1 py-2 transition-colors",
-                    isActive ? "text-[#9EC8B9]" : "text-[#5C8374]"
+                    "flex flex-col items-center justify-center flex-1 py-1.5 transition-colors",
+                    isActive ? "text-primary" : "text-muted-foreground"
                   )}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  <Icon className="w-6 h-6 mb-1" />
+                  <span className={cn(
+                    "flex items-center justify-center w-14 h-8 rounded-full mb-0.5 transition-colors",
+                    isActive ? "bg-primary/15" : "bg-transparent"
+                  )}>
+                    <Icon className="w-5 h-5" />
+                  </span>
                   <span className="text-xs font-medium">{item.name}</span>
                 </Link>
               );
@@ -556,12 +524,12 @@ function LayoutContent({ children, currentPageName }) {
           </nav>
 
           {/* Menu Button */}
-          <div className={cn("border-l px-2", colors.border)}>
+          <div className={cn("border-s px-2", colors.border)}>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={cn(
                 "flex flex-col items-center justify-center h-full px-3 py-2 transition-colors",
-                mobileMenuOpen ? "text-[#9EC8B9]" : "text-[#5C8374]"
+                mobileMenuOpen ? "text-primary" : "text-muted-foreground"
               )}
             >
               {mobileMenuOpen ? (
@@ -576,6 +544,7 @@ function LayoutContent({ children, currentPageName }) {
       </div>
 
       {/* Welcome Dialog for First Login */}
+      <InstallHint />
       {WelcomeDialog && <WelcomeDialog
         open={showWelcomeDialog}
         onClose={() => setShowWelcomeDialog(false)}

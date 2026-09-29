@@ -22,11 +22,11 @@ export default function PortfolioValueWidget({ data, formatCurrency, timeRange, 
   const { colors, theme, user, t } = useTheme();
   
   const chartColors = {
-    text: theme === 'light' ? '#1e293b' : '#ffffff',
-    grid: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltip: theme === 'light' ? '#ffffff' : '#1B4242',
-    tooltipBorder: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltipText: theme === 'light' ? '#1e293b' : '#ffffff',
+    text: 'hsl(var(--foreground))',
+    grid: 'hsl(var(--border))',
+    tooltip: 'hsl(var(--popover))',
+    tooltipBorder: 'hsl(var(--border))',
+    tooltipText: 'hsl(var(--foreground))',
   };
   
   return (
@@ -73,10 +73,10 @@ export default function PortfolioValueWidget({ data, formatCurrency, timeRange, 
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#5C8374"
+              stroke="hsl(var(--primary))"
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 5, fill: '#9EC8B9', stroke: '#5C8374', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: 'hsl(var(--chart-2))', stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>

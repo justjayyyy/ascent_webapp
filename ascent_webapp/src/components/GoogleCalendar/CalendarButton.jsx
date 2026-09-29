@@ -24,11 +24,11 @@ export default function CalendarButton({ variant = 'icon', className }) {
             className={cn(
               "flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200",
               colors.textSecondary,
-              "hover:bg-[#5C8374]/20",
+              "hover:bg-primary/20",
               className
             )}
           >
-            <Calendar className={cn("w-5 h-5", !className?.includes('justify-center') && (isRTL ? "ml-3" : "mr-3"))} />
+            <Calendar className={cn("w-5 h-5", !className?.includes('justify-center') && ("me-3"))} />
             {!className?.includes('justify-center') && (t('calendar') || 'Calendar')}
           </button>
         );
@@ -43,7 +43,7 @@ export default function CalendarButton({ variant = 'icon', className }) {
             className={cn(
               "flex items-center gap-2",
               colors.textSecondary,
-              "hover:bg-[#5C8374]/20",
+              "hover:bg-primary/20",
               className
             )}
           >
@@ -59,9 +59,9 @@ export default function CalendarButton({ variant = 'icon', className }) {
             onClick={() => setIsOpen(true)}
             className={cn(
               "fixed z-50 p-4 rounded-full shadow-lg transition-all duration-200",
-              "bg-[#5C8374] text-white hover:bg-[#5C8374]/90 hover:scale-110",
+              "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-110",
               "bottom-6",
-              isRTL ? "left-6" : "right-6",
+              "end-6",
               className
             )}
             title={t('calendar') || 'Calendar'}
@@ -79,7 +79,7 @@ export default function CalendarButton({ variant = 'icon', className }) {
             className={cn(
               "p-2 rounded-lg transition-colors",
               colors.textSecondary,
-              "hover:bg-[#5C8374]/20",
+              "hover:bg-primary/20",
               className
             )}
             title={t('calendar') || 'Calendar'}

@@ -157,7 +157,7 @@ export default function DashboardCustomization({ open, onClose, widgets, onSave,
                     <div className="flex items-center gap-3 flex-1">
                       <div className={cn(
                         "p-2 rounded-lg",
-                        enabled ? 'bg-[#5C8374]/20' : 'bg-[#5C8374]/10'
+                        enabled ? 'bg-primary/20' : 'bg-primary/10'
                       )}>
                         <Icon className={cn(
                           "w-5 h-5",
@@ -176,10 +176,10 @@ export default function DashboardCustomization({ open, onClose, widgets, onSave,
                         </p>
                       </div>
                     </div>
-                    <Switch
+                    <Switch aria-label={widget.name}
                       checked={enabled}
                       onCheckedChange={() => toggleWidget(widget.type)}
-                      className="data-[state=checked]:bg-[#5C8374]"
+                      className="data-[state=checked]:bg-primary"
                     />
                   </div>
                 </Card>
@@ -192,18 +192,18 @@ export default function DashboardCustomization({ open, onClose, widgets, onSave,
               onClick={handleResetToDefault}
               variant="outline"
               disabled={isSaving}
-              className={cn("flex-1 bg-transparent hover:bg-[#5C8374]/20", colors.border, colors.textSecondary)}
+              className={cn("flex-1 bg-transparent hover:bg-primary/20", colors.border, colors.textSecondary)}
             >
               {t('resetToDefault')}
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 bg-[#5C8374] hover:bg-[#5C8374]/80 text-white"
+              className="flex-1 bg-primary hover:bg-primary/80 text-primary-foreground"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   {t('saving')}
                 </>
               ) : (

@@ -25,8 +25,8 @@ export default function TimeRangeSelector({ value, onChange, options = ['7d', '3
           className={cn(
             "h-7 px-2 text-xs",
             value === range
-              ? "bg-[#5C8374] text-white hover:bg-[#5C8374]/80"
-              : cn(colors.textTertiary, "hover:bg-[#5C8374]/20")
+              ? "bg-primary text-primary-foreground hover:bg-primary/80"
+              : cn(colors.textTertiary, "hover:bg-primary/20")
           )}
         >
           {rangeLabels[range] || range}

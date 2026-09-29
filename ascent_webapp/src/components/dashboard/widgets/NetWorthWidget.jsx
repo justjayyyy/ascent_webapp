@@ -22,11 +22,11 @@ export default function NetWorthWidget({ data, formatCurrency, timeRange, onTime
   const { t, colors, theme, user } = useTheme();
   
   const chartColors = {
-    text: theme === 'light' ? '#1e293b' : '#ffffff',
-    grid: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltip: theme === 'light' ? '#ffffff' : '#1B4242',
-    tooltipBorder: theme === 'light' ? '#e2e8f0' : '#5C8374',
-    tooltipText: theme === 'light' ? '#1e293b' : '#ffffff',
+    text: 'hsl(var(--foreground))',
+    grid: 'hsl(var(--border))',
+    tooltip: 'hsl(var(--popover))',
+    tooltipBorder: 'hsl(var(--border))',
+    tooltipText: 'hsl(var(--foreground))',
   };
   
   return (
@@ -77,16 +77,16 @@ export default function NetWorthWidget({ data, formatCurrency, timeRange, onTime
             <Line
               type="monotone"
               dataKey="netWorth"
-              stroke="#10B981"
+              stroke="hsl(var(--success))"
               strokeWidth={2}
               dot={false}
               name={t('netWorth')}
-              activeDot={{ r: 5, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: 'hsl(var(--success))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
             />
             <Line
               type="monotone"
               dataKey="portfolio"
-              stroke="#5C8374"
+              stroke="hsl(var(--primary))"
               strokeWidth={2}
               dot={false}
               name={t('portfolio')}
