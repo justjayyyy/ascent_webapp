@@ -43,7 +43,7 @@ export default function InstallHint() {
       role="status"
       className={cn(
         'fixed inset-x-3 z-50 flex items-start gap-3 rounded-xl border p-3 shadow-lg backdrop-blur',
-        'bottom-[calc(5rem+env(safe-area-inset-bottom))] md:hidden',
+        'bottom-[calc(1rem+env(safe-area-inset-bottom))] md:hidden',
         colors.cardBg, colors.cardBorder
       )}
     >
