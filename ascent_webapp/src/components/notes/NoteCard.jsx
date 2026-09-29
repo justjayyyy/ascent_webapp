@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
-  Archive, ArchiveRestore, Copy, LogOut, MoreVertical, Pin, PinOff, Share2, Trash2, Undo2, Users, XCircle,
+  Archive, ArchiveRestore, BellRing, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Share2, Trash2, Undo2, Users, XCircle,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -9,11 +9,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { PeopleStack } from './NoteParts';
-import { fmt, highlight, resolveColor } from './noteUtils';
+import { PersonDot } from './NoteParts';
+import { fmt, formatReminder, highlight, isOverdue, resolveColor, timeAgo } from './noteUtils';
 
 const PREVIEW_ITEMS = 6;
 
-function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
+function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language }) {
   const color = resolveColor(note.color);
   const isOwner = note.myAccess === 'owner';
   const canEdit = isOwner || note.myAccess === 'edit';
@@ -26,6 +27,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
     return [...ids].map(id => people.byId[id]).filter(p => p && !p.isMe);
   }, [note.createdBy, note.collaborators, people]);
 
+  const editorPerson = note.updatedByEmail ? people.list.find(p => p.email === note.updatedByEmail) : null;
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
 
   const openItems = (note.items || []).filter(i => !i.done);
@@ -61,7 +63,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
 
       <div className="pointer-events-none relative z-[1] space-y-2">
         {(note.title || !hasBody) && (
-          <h3 className={cn('pe-8 text-[15px] font-semibold leading-snug tracking-tight break-words line-clamp-3', !note.title && 'text-muted-foreground')}>
+          <h3 className={cn('pe-8 text-[15px] [@media(pointer:coarse)]:pe-11 font-semibold leading-snug tracking-tight break-words line-clamp-3', !note.title && 'text-muted-foreground')}>
             {note.title ? highlight(note.title, query) : (hasBody ? '' : t('ntEmptyNote'))}
           </h3>
         )}
@@ -108,6 +110,21 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
           </div>
         )}
 
+        {(note.reminder || note.attachments?.length > 0) && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+            {note.reminder && (
+              <span className={cn('inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium', isOverdue(note.reminder) ? 'text-danger' : 'text-foreground/80')}>
+                <BellRing className="h-3 w-3" /> {formatReminder(note.reminder, language)}
+              </span>
+            )}
+            {note.attachments?.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium text-foreground/80">
+                <Paperclip className="h-3 w-3" /> {note.attachments.length}
+              </span>
+            )}
+          </div>
+        )}
+
         {(isShared || involved.length > 0) && (
           <div className="flex items-center gap-2 pt-1 text-muted-foreground">
             {involved.length > 0 ? <PeopleStack people={involved} max={3} size={24} /> : <Users className="h-3.5 w-3.5" />}
@@ -119,10 +136,23 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
             {note.myAccess === 'view' && <span className="text-xs">· {t('ntViewOnly')}</span>}
           </div>
         )}
+        {isShared && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {editorPerson && !editorPerson.isMe && <PersonDot person={editorPerson} size={16} />}
+            <span className="min-w-0 break-words">
+              {editorPerson && !editorPerson.isMe
+                ? fmt(t('ntEditedBy'), { name: editorPerson.name, time: timeAgo(note.updated_date, language) })
+                : fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })}
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Pin + menu: on hover / focus with a mouse, always visible on touch */}
       <div className="pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5">
+        {!trashed && note.isPinned && (
+          <Pin aria-hidden="true" className="hidden h-4 w-4 fill-current text-foreground/80 [@media(pointer:coarse)]:block" />
+        )}
         {!trashed && (
           <button
             type="button"
@@ -130,7 +160,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
             aria-label={note.isPinned ? t('ntUnpin') : t('ntPin')}
             aria-pressed={note.isPinned}
             className={cn(
-              'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full transition-opacity [@media(pointer:coarse)]:hidden hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               note.isPinned ? 'text-foreground opacity-100' : 'text-muted-foreground opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-70'
             )}
           >
@@ -142,7 +172,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate }) {
             <button
               type="button"
               aria-label={t('ntMore')}
-              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-70"
+              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground opacity-0 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-70"
             >
               <MoreVertical className="h-4 w-4" />
             </button>

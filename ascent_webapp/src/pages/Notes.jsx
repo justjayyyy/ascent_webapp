@@ -2,7 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from 'motion/react';
 import {
-  Archive, CloudOff, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, Trash2, Users, X,
+  Archive, Bell, CloudOff, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, Trash2, Users, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -20,13 +20,14 @@ import NoteComposer from '@/components/notes/NoteComposer';
 import NoteEditor from '@/components/notes/NoteEditor';
 import NotesNav from '@/components/notes/NotesNav';
 import ShareNoteDialog from '@/components/notes/ShareNoteDialog';
+import { useReminders } from '@/components/notes/useReminders';
 import { buildPeople } from '@/components/notes/NoteParts';
 import {
   distribute, fmt, newItemId, noteToText, searchableText, useColumnCount,
 } from '@/components/notes/noteUtils';
 
 const VIEW_KEY = 'ascent_notes_view';
-const VIEWS = ['notes', 'shared', 'archive', 'trash'];
+const VIEWS = ['notes', 'shared', 'reminders', 'archive', 'trash'];
 
 function readLayoutPref() {
   try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
@@ -38,7 +39,7 @@ function Notes() {
   const [params, setParams] = useSearchParams();
   const {
     notes, isLoading, isFetching, online, pending, userId,
-    createNote, patchNote, deleteNote, emptyTrash, refetch,
+    createNote, patchNote, deleteNote, emptyTrash, refetch, addFiles, removeFile, uploading,
   } = useNotes();
 
   const canCreate = hasPermission('editNotes');
@@ -60,6 +61,14 @@ function Notes() {
 
   // ---- entry points: install shortcut (?new=1) and text shared to the app (?share=1) ----
   useEffect(() => {
+    const openParam = params.get('open');
+    if (openParam) {
+      setOpenId(openParam);
+      const next = new URLSearchParams(params);
+      next.delete('open');
+      setParams(next, { replace: true });
+      return;
+    }
     const isNew = params.get('new') === '1' || params.get('share') === '1';
     if (!isNew) return;
     if (canCreate) {
@@ -116,6 +125,7 @@ function Notes() {
     return {
       notes: active.length,
       shared: active.filter(isSharedNote).length,
+      reminders: visible.filter(n => !n.trashedAt && n.reminder).length,
       archive: visible.filter(n => !n.trashedAt && n.isArchived).length,
       trash: visible.filter(n => n.trashedAt).length,
     };
@@ -146,10 +156,15 @@ function Notes() {
       list = visible.filter(n => n.trashedAt);
     } else if (view === 'archive') {
       list = visible.filter(n => !n.trashedAt && n.isArchived);
+    } else if (view === 'reminders') {
+      list = visible.filter(n => !n.trashedAt && n.reminder);
     } else if (view === 'shared') {
       list = visible.filter(n => !n.trashedAt && !n.isArchived && isSharedNote(n));
     } else {
       list = visible.filter(n => !n.trashedAt && !n.isArchived);
+    }
+    if (view === 'reminders' && !searching && !label) {
+      return [...list].sort((a, b) => new Date(a.reminder) - new Date(b.reminder));
     }
     return [...list].sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -157,7 +172,7 @@ function Notes() {
     });
   }, [visible, view, label, query, searching]);
 
-  const splitPins = !searching && view !== 'trash' && view !== 'archive';
+  const splitPins = !searching && view !== 'trash' && view !== 'archive' && view !== 'reminders';
   const pinned = splitPins ? shown.filter(n => n.isPinned) : [];
   const others = splitPins ? shown.filter(n => !n.isPinned) : shown;
 
@@ -182,6 +197,8 @@ function Notes() {
         else { deleteNote(id); toast.success(t('ntLeft')); }
       },
       share: (id) => setShareId(id),
+      addFiles,
+      removeFile,
       copy: async (n) => {
         try { await navigator.clipboard.writeText(noteToText(n)); toast.success(t('ntCopied')); }
         catch { toast.error(t('ntCopyFailed')); }
@@ -195,7 +212,13 @@ function Notes() {
         toast.success(t('noteCreated'));
       },
     };
-  }, [patchNote, deleteNote, createNote, notes, t, userId]);
+  }, [patchNote, deleteNote, createNote, addFiles, removeFile, notes, t, userId]);
+
+  useReminders(notes, {
+    t,
+    onOpen: setOpenId,
+    onDismiss: (id) => patchNote(id, { reminder: null }),
+  });
 
   const onCreate = useCallback((data) => {
     createNote(data);
@@ -211,12 +234,13 @@ function Notes() {
   }, [openId, openNote, isLoading]);
 
   const heading = label ? label : view === 'notes' ? t('notes')
-    : view === 'shared' ? t('ntShared') : view === 'archive' ? t('ntArchiveNav') : t('ntTrashNav');
+    : view === 'shared' ? t('ntShared') : view === 'reminders' ? t('ntReminders') : view === 'archive' ? t('ntArchiveNav') : t('ntTrashNav');
 
   const emptyCopy = (() => {
     if (searching) return { icon: Search, title: t('ntNoResults'), hint: t('ntNoResultsHint') };
     if (label) return { icon: Lightbulb, title: t('ntEmptyLabel'), hint: '' };
     if (view === 'shared') return { icon: Users, title: t('ntEmptyShared'), hint: t('ntEmptySharedHint') };
+    if (view === 'reminders') return { icon: Bell, title: t('ntEmptyReminders'), hint: t('ntEmptyRemindersHint') };
     if (view === 'archive') return { icon: Archive, title: t('ntEmptyArchive'), hint: t('ntEmptyArchiveHint') };
     if (view === 'trash') return { icon: Trash2, title: t('ntTrashEmpty'), hint: t('ntTrashHint') };
     return { icon: Lightbulb, title: t('ntEmptyNotes'), hint: canCreate ? t('ntEmptyNotesHint') : t('ntEmptyNotesReadOnly') };
@@ -237,6 +261,7 @@ function Notes() {
                 onOpen={setOpenId}
                 actions={actions}
                 t={t}
+                language={language}
                 canCreate={canCreate}
               />
             ))}
@@ -422,6 +447,7 @@ function Notes() {
               language={language}
               online={online}
               pending={pending}
+              uploading={uploading}
               canCreate={canCreate}
             />
           )}

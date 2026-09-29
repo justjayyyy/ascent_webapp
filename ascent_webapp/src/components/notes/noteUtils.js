@@ -180,3 +180,101 @@ export function useLatest(value) {
 
 export const fmt = (template, vars = {}) =>
   String(template).replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
+
+// ---- attachments ----
+
+export const MAX_FILE_BYTES = 3 * 1024 * 1024;
+export const MAX_FILES = 10;
+const PREVIEWABLE = /^image\/(png|jpe?g|gif|webp|avif)$/;
+
+export const isPreviewable = (type) => PREVIEWABLE.test(type || '');
+
+export function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+const toBase64 = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+  reader.onerror = reject;
+  reader.readAsDataURL(blob);
+});
+
+/** Shrink big photos so a phone snapshot fits under the upload limit. */
+async function downscale(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+}
+
+/** File -> { name, type, size, data } ready for the API, or throws 'too-large'. */
+export async function prepareUpload(file) {
+  let blob = file;
+  let name = file.name || 'file';
+  let type = file.type || 'application/octet-stream';
+  if (/^image\/(png|jpe?g|webp|heic|heif)$/i.test(type) && (file.size > 900 * 1024 || /heic|heif/i.test(type))) {
+    try {
+      const shrunk = await downscale(file);
+      if (shrunk && shrunk.size < file.size) {
+        blob = shrunk;
+        type = 'image/jpeg';
+        name = name.replace(/\.[^.]+$/, '') + '.jpg';
+      }
+    } catch { /* keep the original */ }
+  }
+  if (blob.size > MAX_FILE_BYTES) throw new Error('too-large');
+  return { name, type, size: blob.size, data: await toBase64(blob) };
+}
+
+export function base64ToBlob(b64, type) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: type || 'application/octet-stream' });
+}
+
+// ---- reminders ----
+
+/** Quick reminder times, always in the future. */
+export function reminderPresets(now = new Date()) {
+  const at = (d, h) => { const x = new Date(d); x.setHours(h, 0, 0, 0); return x; };
+  const list = [];
+  const laterToday = at(now, 18);
+  if (laterToday.getTime() - now.getTime() > 30 * 60 * 1000) list.push({ key: 'later', date: laterToday });
+  const tomorrow = at(new Date(now.getTime() + 86400000), 8);
+  list.push({ key: 'tomorrow', date: tomorrow });
+  const nextWeek = new Date(now);
+  nextWeek.setDate(now.getDate() + ((8 - now.getDay()) % 7 || 7));
+  list.push({ key: 'nextWeek', date: at(nextWeek, 8) });
+  return list;
+}
+
+/** <input type="datetime-local"> value for a Date, in local time. */
+export function toLocalInput(date) {
+  const d = new Date(date);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function formatReminder(iso, language) {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
+  const time = d.toLocaleTimeString(language || 'en', { hour: 'numeric', minute: '2-digit' });
+  if (sameDay) return time;
+  if (tomorrow) {
+    const word = new Intl.RelativeTimeFormat(language || 'en', { numeric: 'auto' }).format(1, 'day');
+    return `${word.charAt(0).toUpperCase()}${word.slice(1)}, ${time}`;
+  }
+  return `${d.toLocaleDateString(language || 'en', { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+export const isOverdue = (iso) => !!iso && new Date(iso).getTime() <= Date.now();

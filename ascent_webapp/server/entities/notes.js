@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import Note from '../models/Note.js';
-import Workspace from '../models/Workspace.js';
+import NoteFile from '../models/NoteFile.js';
 import connectDB from '../lib/mongodb.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, notFound, serverError } from '../lib/response.js';
@@ -10,6 +10,8 @@ const TRASH_DAYS = 7;
 const MAX_ITEMS = 500;
 const MAX_TAGS = 30;
 const MAX_TEXT = 100_000;
+const MAX_FILES = 10;
+const MAX_FILE_BYTES = 3 * 1024 * 1024; // base64 in JSON stays under Vercel's 4.5 MB body limit
 
 const sameId = (a, b) => a && b && a.toString() === b.toString();
 
@@ -36,17 +38,20 @@ function present(note, user, member) {
   const access = accessFor(note, user, member);
   const pinned = (note.pinnedBy || []).some(id => sameId(id, uid)) ||
     (sameId(note.createdBy, uid) && !!note.isPinned);
-  const { pinnedBy, archivedBy, isPinned, ...rest } = note;
+  const { pinnedBy, archivedBy, isPinned, reminders, ...rest } = note;
+  const mine = (reminders || []).find(r => sameId(r.userId, uid));
   return {
     ...rest,
     id: note._id.toString(),
     isPinned: pinned,
     isArchived: (archivedBy || []).some(id => sameId(id, uid)),
+    reminder: mine ? new Date(mine.at).toISOString() : null,
     myAccess: access,
     collaborators: (note.collaborators || []).map(c => ({
       userId: c.userId.toString(), email: c.email, role: c.role
     })),
-    items: (note.items || []).map(({ id, text, done }) => ({ id, text, done: !!done }))
+    items: (note.items || []).map(({ id, text, done }) => ({ id, text, done: !!done })),
+    attachments: (note.attachments || []).map(({ id, name, type, size }) => ({ id, name, type, size }))
   };
 }
 
@@ -100,7 +105,7 @@ function buildCollaborators(requested, workspace, user) {
   const seen = new Set();
   for (const entry of requested) {
     const member = (workspace.members || []).find(m =>
-      m.userId && sameId(m.userId, entry?.userId) && m.status === 'accepted');
+      m.userId && sameId(m.userId, entry?.userId) && m.status !== 'rejected');
     if (!member || sameId(member.userId, user._id) || seen.has(member.userId.toString())) continue;
     seen.add(member.userId.toString());
     out.push({
@@ -127,19 +132,84 @@ export default async function handler(req, res) {
 
     const workspace = req.workspace;
     if (!workspace) return error(res, 'Workspace context required', 400);
-    // Someone who has been invited but has not accepted yet gets no notes access
-    const member = req.member?.status === 'accepted' ? req.member : null;
+    // Invited people who already have an account are linked to the workspace straight away
+    // (the rest of the app lets them in), so only declined invitations are shut out.
+    const member = req.member && req.member.status !== 'rejected' ? req.member : null;
     const isAdmin = member && (member.role === 'owner' || member.role === 'admin');
     const canCreate = isAdmin || !!member?.permissions?.editNotes;
 
     const { id, action, _single } = req.query;
     const uid = user._id;
 
+    // ---- file attachments: ?action=file&id=<noteId>[&fileId=<fileId>] ----
+    if (action === 'file') {
+      if (!id || !mongoose.isValidObjectId(id)) return error(res, 'A valid note id is required', 400);
+      const note = await Note.findOne({ _id: id, workspaceId: workspace._id }).lean();
+      const access = note && accessFor(note, user, member);
+      if (!access) return notFound(res, 'Note not found');
+      const canEditNote = (access === 'owner' || access === 'edit') && !note.trashedAt;
+      const { fileId } = req.query;
+
+      if (req.method === 'GET') {
+        if (!fileId || !mongoose.isValidObjectId(fileId)) return error(res, 'A valid file id is required', 400);
+        const file = await NoteFile.findOne({ _id: fileId, noteId: id }).lean();
+        if (!file) return notFound(res, 'File not found');
+        return success(res, {
+          id: file._id.toString(), name: file.name, type: file.type, size: file.size,
+          data: Buffer.from(file.data.buffer ?? file.data).toString('base64')
+        });
+      }
+
+      if (!canEditNote) return error(res, 'You can only view this note', 403);
+
+      if (req.method === 'POST') {
+        const { name, type, data } = req.body || {};
+        if (typeof data !== 'string' || !data) return error(res, 'File data is required', 400);
+        if ((note.attachments || []).length >= MAX_FILES) return error(res, `Up to ${MAX_FILES} files per note`, 400);
+        const bytes = Buffer.from(data, 'base64');
+        if (!bytes.length) return error(res, 'File is empty', 400);
+        if (bytes.length > MAX_FILE_BYTES) return error(res, 'File is too large (max 3 MB)', 413);
+        const file = await NoteFile.create({
+          noteId: id, workspaceId: workspace._id,
+          name: String(name || 'file').slice(0, 200),
+          type: String(type || 'application/octet-stream').slice(0, 100),
+          size: bytes.length, data: bytes, uploadedBy: uid
+        });
+        const updated = await Note.findOneAndUpdate(
+          { _id: id },
+          {
+            $push: { attachments: { id: file._id.toString(), name: file.name, type: file.type, size: file.size } },
+            $set: { updatedByEmail: user.email }
+          },
+          { new: true }
+        ).lean();
+        return success(res, present(updated, user, member), 201);
+      }
+
+      if (req.method === 'DELETE') {
+        if (!fileId || !mongoose.isValidObjectId(fileId)) return error(res, 'A valid file id is required', 400);
+        await NoteFile.deleteOne({ _id: fileId, noteId: id });
+        const updated = await Note.findOneAndUpdate(
+          { _id: id },
+          { $pull: { attachments: { id: fileId } }, $set: { updatedByEmail: user.email } },
+          { new: true }
+        ).lean();
+        return success(res, present(updated, user, member));
+      }
+
+      return error(res, 'Method not allowed', 405);
+    }
+
     switch (req.method) {
       case 'GET': {
         // Purge notes that have been in the trash past the grace period
         const cutoff = new Date(Date.now() - TRASH_DAYS * 86400000);
-        await Note.deleteMany({ workspaceId: workspace._id, trashedAt: { $ne: null, $lt: cutoff } });
+        const expired = await Note.find({ workspaceId: workspace._id, trashedAt: { $ne: null, $lt: cutoff } }).select('_id').lean();
+        if (expired.length) {
+          const ids = expired.map(n => n._id);
+          await NoteFile.deleteMany({ noteId: { $in: ids } });
+          await Note.deleteMany({ _id: { $in: ids } });
+        }
 
         if (_single === 'true' && id) {
           if (!mongoose.isValidObjectId(id)) return notFound(res, 'Note not found');
@@ -232,6 +302,19 @@ export default async function handler(req, res) {
           update[op] = { ...(update[op] || {}), archivedBy: uid };
         }
 
+        // Reminders are personal too. $pull and $push can't share one update on the same
+        // field, so the old reminder is cleared first.
+        if (body.reminder !== undefined) {
+          const at = body.reminder ? new Date(body.reminder) : null;
+          if (at && Number.isNaN(at.getTime())) return error(res, 'Invalid reminder time', 400);
+          await Note.updateOne({ _id: id }, { $pull: { reminders: { userId: uid } } });
+          if (at) update.$push = { ...(update.$push || {}), reminders: { userId: uid, at } };
+          else if (!Object.keys(set).length && !Object.keys(update).length) {
+            const cleared = await Note.findById(id).lean();
+            return success(res, present(cleared, user, member));
+          }
+        }
+
         // Sharing and trash belong to the creator
         if (body.isShared !== undefined || body.collaborators !== undefined || body.trashed !== undefined) {
           if (!isOwner) return error(res, 'Only the note owner can do that', 403);
@@ -260,9 +343,10 @@ export default async function handler(req, res) {
       case 'DELETE': {
         // Empty the caller's trash
         if (action === 'empty-trash') {
-          const result = await Note.deleteMany({
-            workspaceId: workspace._id, createdBy: uid, trashedAt: { $ne: null }
-          });
+          const mine = await Note.find({ workspaceId: workspace._id, createdBy: uid, trashedAt: { $ne: null } }).select('_id').lean();
+          const ids = mine.map(n => n._id);
+          await NoteFile.deleteMany({ noteId: { $in: ids } });
+          const result = await Note.deleteMany({ _id: { $in: ids } });
           return success(res, { deleted: true, count: result.deletedCount });
         }
 
@@ -280,6 +364,7 @@ export default async function handler(req, res) {
           return success(res, { left: true, id });
         }
 
+        await NoteFile.deleteMany({ noteId: id });
         await Note.deleteOne({ _id: id });
         return success(res, { deleted: true, id });
       }

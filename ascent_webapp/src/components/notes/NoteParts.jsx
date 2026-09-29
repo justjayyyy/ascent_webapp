@@ -1,8 +1,8 @@
 import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, Plus, Tag, X } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { NOTE_COLORS, resolveColor } from './noteUtils';
+import { NOTE_COLORS, highlight, resolveColor } from './noteUtils';
 
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
@@ -26,7 +26,8 @@ export function buildPeople(workspace, me) {
       email: m.email,
       name,
       initials: initialsOf(name),
-      pending: m.status !== 'accepted' || !id,
+      // linked accounts count as members straight away, just as the rest of the app treats them
+      pending: !id,
       isMe: !!id && (id === me?.id || id === me?._id),
       color: `hsl(${SERIES[i % SERIES.length]})`,
     };
@@ -119,85 +120,94 @@ export function ColorPicker({ value, onChange, t, disabled }) {
   );
 }
 
-/** Labels on a note: chips plus an input that suggests labels already used elsewhere. */
+/**
+ * Multi-select for labels: every label already in use is listed with a checkbox and
+ * narrows as you type; Enter toggles the top match, or creates the label if none match.
+ */
 export function LabelEditor({ labels, suggestions, onChange, t, disabled }) {
   const [text, setText] = useState('');
-  const norm = (s) => s.trim();
-  const has = (s) => labels.some(l => l.toLowerCase() === s.toLowerCase());
+  const q = text.trim();
+  const lower = (s) => s.toLowerCase();
+  const isOn = (s) => labels.some(l => lower(l) === lower(s));
 
-  const matches = useMemo(() => {
-    const q = text.trim().toLowerCase();
-    return suggestions
-      .filter(s => !has(s) && (!q || s.toLowerCase().includes(q)))
-      .slice(0, 6);
-  }, [text, suggestions, labels]);
+  // Everything already used, plus anything on this note that no other note uses
+  const all = useMemo(() => {
+    const seen = new Set();
+    return [...labels, ...suggestions].filter(s => {
+      const k = lower(s);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }, [labels, suggestions]);
 
-  const add = (raw) => {
-    const label = norm(raw);
-    if (!label || has(label)) { setText(''); return; }
-    onChange([...labels, label.slice(0, 40)]);
-    setText('');
+  const matches = useMemo(
+    () => all.filter(s => !q || lower(s).includes(lower(q))),
+    [all, q]
+  );
+  const canCreate = q && !all.some(s => lower(s) === lower(q));
+
+  const toggle = (name) => {
+    onChange(isOn(name) ? labels.filter(l => lower(l) !== lower(name)) : [...labels, name.slice(0, 40)]);
   };
-  const exact = suggestions.some(s => s.toLowerCase() === text.trim().toLowerCase());
+  const create = () => { toggle(q); setText(''); };
+
+  if (disabled) {
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {labels.map(l => <span key={l} className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">{l}</span>)}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
-      {labels.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {labels.map(l => (
-            <span key={l} className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
-              <Tag className="h-3 w-3" />
-              {l}
-              {!disabled && (
-                <button
-                  type="button"
-                  aria-label={`${t('ntRemoveLabel')} ${l}`}
-                  onClick={() => onChange(labels.filter(x => x !== l))}
-                  className="-me-1 rounded-full p-0.5 hover:bg-primary/20"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+      <Input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          if (!q) return;
+          if (matches.length) { toggle(matches[0]); setText(''); } else create();
+        }}
+        placeholder={t('ntSearchLabels')}
+        aria-label={t('ntSearchLabels')}
+        autoComplete="off"
+        autoCapitalize="none"
+        maxLength={40}
+        className="h-10"
+      />
+      <ul role="listbox" aria-multiselectable="true" aria-label={t('ntLabels')} className="max-h-52 space-y-0.5 overflow-y-auto overscroll-contain">
+        {matches.map((name, i) => (
+          <li key={name} role="option" aria-selected={isOn(name)}>
+            <button
+              type="button"
+              onClick={() => toggle(name)}
+              className={cn(
+                'flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-start text-sm hover:bg-accent',
+                q && i === 0 && 'bg-accent/60'
               )}
-            </span>
-          ))}
-        </div>
-      )}
-      {!disabled && (
-        <>
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); add(text); }
-            }}
-            placeholder={t('ntEnterLabel')}
-            aria-label={t('ntAddLabel')}
-            maxLength={40}
-            className="h-9"
-          />
-          <div className="max-h-40 space-y-0.5 overflow-y-auto">
-            {matches.map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => add(s)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-sm hover:bg-accent"
-              >
-                <Tag className="h-3.5 w-3.5 text-muted-foreground" /> {s}
-              </button>
-            ))}
-            {text.trim() && !exact && !has(text.trim()) && (
-              <button
-                type="button"
-                onClick={() => add(text)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-sm text-primary hover:bg-accent"
-              >
-                <Plus className="h-3.5 w-3.5" /> {t('ntCreateLabel').replace('{label}', text.trim())}
-              </button>
-            )}
-          </div>
-        </>
-      )}
+            >
+              <span className={cn(
+                'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border',
+                isOn(name) ? 'border-primary bg-primary text-primary-foreground' : 'border-input'
+              )}>
+                {isOn(name) && <Check className="h-3 w-3" strokeWidth={3} />}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{highlight(name, q)}</span>
+            </button>
+          </li>
+        ))}
+        {canCreate && (
+          <li>
+            <button type="button" onClick={create} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-start text-sm text-primary hover:bg-accent">
+              <Plus className="h-4 w-4" /> {t('ntCreateLabel').replace('{label}', q)}
+            </button>
+          </li>
+        )}
+        {!matches.length && !canCreate && <li className="px-2 py-2 text-sm text-muted-foreground">{t('ntNoLabels')}</li>}
+      </ul>
     </div>
   );
 }
