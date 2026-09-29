@@ -206,7 +206,7 @@ function LayoutContent({ children, currentPageName }) {
       <main
         onClick={mobileMenuOpen ? () => setMobileMenuOpen(false) : undefined}
         className={cn(
-          "min-h-dvh min-w-0 pt-[calc(4rem+env(safe-area-inset-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          "min-h-dvh min-w-0 pt-[calc(4rem+var(--safe-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           // On phones the menu sheet pushes the page aside instead of covering it
           mobileMenuOpen && (isRTL ? "-translate-x-[17rem]" : "translate-x-[17rem]")
         )}

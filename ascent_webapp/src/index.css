@@ -197,6 +197,13 @@ button:focus-visible {
     --accent-foreground: 36 80% 24%;
     --glow: 36 92% 40%;
   }
+  /* Logo colours for this palette (same in light and dark) */
+  :root[data-palette="gold"] {
+    --logo-mtn-hi: #e0a91f;
+    --logo-mtn: #6b4d0e;
+    --logo-tint: #fff1c4;
+    --logo-accent: #f7cb52;
+  }
 
   /* ---- Dark: graphite (Settings > Appearance) ---- */
   .dark[data-palette="graphite"] {
@@ -455,7 +462,9 @@ button:focus-visible {
 
 @layer utilities {
   .safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  .safe-area-inset-top { padding-top: env(safe-area-inset-top); }
+  .safe-area-inset-top { padding-top: var(--safe-top); }
+  /* Landscape: keep content clear of the notch / Dynamic Island side cut-outs */
+  .safe-area-inset-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
   .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: hsl(var(--muted)); border-radius: 3px; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.5); border-radius: 3px; }
@@ -615,6 +624,30 @@ button:focus-visible {
 /* Figures line up in columns and don't jitter as values update */
 table, .tabular { font-variant-numeric: tabular-nums; }
 
+/* Phones: dialogs hang from just below the fixed app header (64px + the status-bar /
+   notch inset) instead of floating in the middle of the screen, so nothing sits under
+   the header, the Dynamic Island or the home indicator, and the keyboard never pushes
+   the top of a form off-screen. Zero extra offsets on desktop and in a browser tab. */
+@media (max-width: 767px) {
+  [role="dialog"].fixed.top-\[50\%\],
+  [role="alertdialog"].fixed.top-\[50\%\] {
+    top: calc(4rem + var(--safe-top) + 0.5rem);
+    max-height: calc(100dvh - 4rem - var(--safe-top) - env(safe-area-inset-bottom) - 1rem);
+    transform: translateX(-50%);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    animation-name: none;
+  }
+}
+
+/* Stop iOS from inflating text in landscape and from flashing a grey tap box */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (display-mode: standalone) {
+  /* Long-press callouts and rubber-banding feel wrong in an app shell */
+  body { -webkit-touch-callout: none; }
+  html, body { overscroll-behavior: none; }
+}
+
 /* ---- Notes: theme-aware note colours ----
    A note stores a colour key; the surface is derived from a hue so every key reads
    correctly in light, Midnight Indigo and the OLED palettes without hard-coded hex. */
@@ -652,3 +685,12 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 
 
 .note-mark { background: hsl(var(--primary) / 0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* One source of truth for the top inset. Installed on an iPhone the page runs edge to
+   edge under the notch / Dynamic Island, so everything that clears it reads --safe-top.
+   In standalone we add breathing room below the cut-out so the header content is fully
+   inside the tappable, un-blurred area. */
+:root { --safe-top: env(safe-area-inset-top); }
+@media (display-mode: standalone) {
+  :root { --safe-top: calc(env(safe-area-inset-top) + 0.5rem); }
+}

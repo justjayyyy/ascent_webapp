@@ -60,7 +60,7 @@ export default function CalendarButton({ variant = 'icon', className }) {
             className={cn(
               "fixed z-50 p-4 rounded-full shadow-lg transition-all duration-200",
               "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-110",
-              "bottom-6",
+              "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]",
               "end-6",
               className
             )}

@@ -169,8 +169,8 @@ function App() {
           <SonnerToaster
             position="top-right"
             richColors
-            offset={{ top: 'calc(env(safe-area-inset-top) + 16px)', right: 16 }}
-            mobileOffset={{ top: 'calc(env(safe-area-inset-top) + 8px)', left: 12, right: 12 }}
+            offset={{ top: 'calc(var(--safe-top) + 16px)', right: 16 }}
+            mobileOffset={{ top: 'calc(var(--safe-top) + 8px)', left: 12, right: 12 }}
           />
           <Analytics />
           <SpeedInsights />
