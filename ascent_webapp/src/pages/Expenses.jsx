@@ -462,7 +462,7 @@ function Expenses() {
           <Button
             onClick={() => { setEditingTransaction(null); setAddDialogOpen(true); }}
             aria-label={t('addTransaction')}
-            className="fixed end-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-lg sm:hidden"
+            className="fixed end-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-lg sm:hidden"
           >
             <Plus className="!size-6" />
           </Button>

@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Link } from 'react-router-dom';
-import { createPageUrl } from './utils';
-import { PieChart, Receipt, Menu, X, StickyNote } from 'lucide-react';
+import { PieChart, Receipt, StickyNote } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -28,6 +26,29 @@ function LayoutContent({ children, currentPageName }) {
   const [calendarMounted, setCalendarMounted] = useState(false);
 
   useEffect(() => { if (calendarOpen) setCalendarMounted(true); }, [calendarOpen]);
+
+  // Phones: swipe in from the leading screen edge to open the menu, swipe back to close it
+  useEffect(() => {
+    let start = null;
+    const onStart = (e) => {
+      if (window.innerWidth >= 768 || e.touches.length !== 1) { start = null; return; }
+      const x = e.touches[0].clientX;
+      const fromEdge = isRTL ? window.innerWidth - x : x;
+      start = { x, y: e.touches[0].clientY, fromEdge };
+    };
+    const onEnd = (e) => {
+      if (!start) return;
+      const t0 = e.changedTouches[0];
+      const dx = (t0.clientX - start.x) * (isRTL ? -1 : 1); // positive = toward the page
+      const dy = Math.abs(t0.clientY - start.y);
+      if (dy < 40 && dx > 60 && start.fromEdge < 24) setMobileMenuOpen(true);
+      else if (dy < 40 && dx < -60) setMobileMenuOpen(false);
+      start = null;
+    };
+    window.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchend', onEnd, { passive: true });
+    return () => { window.removeEventListener('touchstart', onStart); window.removeEventListener('touchend', onEnd); };
+  }, [isRTL]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
@@ -141,11 +162,28 @@ function LayoutContent({ children, currentPageName }) {
 
       {/* Mobile Header */}
       <div className={cn(
-        "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top",
+        "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top safe-area-inset-x",
         "bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70",
         colors.border
       )}>
-        <div className="flex items-center justify-center h-16 px-4">
+        <div className="relative flex items-center justify-center h-16 px-4">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            aria-label={t('menu')}
+            aria-expanded={mobileMenuOpen}
+            className={cn(
+              "absolute start-2 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-xl transition-colors",
+              "hover:bg-foreground/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              mobileMenuOpen ? "text-primary" : "text-foreground"
+            )}
+          >
+            <span className="relative block h-3.5 w-[18px]" aria-hidden="true">
+              <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 rotate-45" : "top-0")} />
+              <span className={cn("absolute inset-x-0 top-1.5 h-0.5 rounded-full bg-current transition-opacity duration-200", mobileMenuOpen && "opacity-0")} />
+              <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 -rotate-45" : "top-3")} />
+            </span>
+          </button>
           <AscentLogo motion="full" alt="Ascent logo" className="w-14" />
         </div>
       </div>
@@ -173,7 +211,7 @@ function LayoutContent({ children, currentPageName }) {
           mobileMenuOpen && (isRTL ? "-translate-x-[17rem]" : "translate-x-[17rem]")
         )}
       >
-        <div className="pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+        <div className="pb-[calc(1rem+env(safe-area-inset-bottom))] safe-area-inset-x md:pb-0 md:px-0">
           {children}
         </div>
       </main>
@@ -184,61 +222,6 @@ function LayoutContent({ children, currentPageName }) {
         </Suspense>
       )}
 
-      {/* Mobile Bottom Navigation */}
-      <div className={cn(
-        "md:hidden fixed bottom-0 start-0 end-0 border-t safe-area-inset-bottom z-50",
-        "bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70",
-        colors.border
-      )}>
-        <div className="flex items-center h-16">
-          {/* Pages Navigation */}
-          <nav className="flex items-center justify-around flex-1 px-2">
-            {navigation.slice(0, 4).map((item) => {
-              const isActive = currentPageName === item.page;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.page}
-                  to={createPageUrl(item.page)}
-                  className={cn(
-                    "flex flex-col items-center justify-center flex-1 py-1.5 transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <span className={cn(
-                    "flex items-center justify-center w-14 h-8 rounded-full mb-0.5 transition-colors",
-                    isActive ? "bg-primary/15" : "bg-transparent"
-                  )}>
-                    <Icon className="w-5 h-5" />
-                  </span>
-                  <span className="text-xs font-medium">{item.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Menu Button */}
-          <div className={cn("border-s px-2 rtl:order-first rtl:border-s-0 rtl:border-e", colors.border)}>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={cn(
-                "flex flex-col items-center justify-center h-full px-3 py-2 transition-colors",
-                mobileMenuOpen ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              {mobileMenuOpen ? (
-                <X className="w-6 h-6 mb-1" />
-              ) : (
-                <Menu className="w-6 h-6 mb-1" />
-              )}
-              <span className="text-xs font-medium">{t('menu')}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Welcome Dialog for First Login */}
       <InstallHint />
       {WelcomeDialog && <WelcomeDialog
         open={showWelcomeDialog}
