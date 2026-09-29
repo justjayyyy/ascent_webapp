@@ -218,7 +218,7 @@ function LayoutContent({ children, currentPageName }) {
           </nav>
 
           {/* Menu Button */}
-          <div className={cn("border-s px-2", colors.border)}>
+          <div className={cn("border-s px-2 rtl:order-first rtl:border-s-0 rtl:border-e", colors.border)}>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={cn(
