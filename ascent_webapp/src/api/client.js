@@ -220,11 +220,18 @@ const auth = {
   
   logout(redirectUrl) {
     removeToken();
-    if (redirectUrl) {
-      window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
-    } else {
-      window.location.href = '/login';
-    }
+    const go = () => {
+      if (redirectUrl) {
+        window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
+      } else {
+        window.location.href = '/login';
+      }
+    };
+    // Forget the notes kept on this device for offline use (bounded, so sign-out never hangs)
+    Promise.race([
+      import('@/components/notes/notesSync').then(m => m.clearNotesStorage()),
+      new Promise(resolve => setTimeout(resolve, 800)),
+    ]).catch(() => {}).finally(go);
   },
   
   redirectToLogin(redirectUrl) {
@@ -305,7 +312,13 @@ const entities = {
   PageLayout: createEntity('page-layouts'),
   SharedUser: createEntity('shared-users'),
   PortfolioSnapshot: createEntity('snapshots'),
-  Note: createEntity('notes'),
+  Note: {
+    ...createEntity('notes'),
+    // Permanently delete everything the caller has in the trash
+    async emptyTrash() {
+      return request('/entities/notes?action=empty-trash', { method: 'DELETE' });
+    }
+  },
   PortfolioTransaction: createEntity('portfolio-transactions')
 };
 

@@ -614,3 +614,41 @@ button:focus-visible {
 
 /* Figures line up in columns and don't jitter as values update */
 table, .tabular { font-variant-numeric: tabular-nums; }
+
+/* ---- Notes: theme-aware note colours ----
+   A note stores a colour key; the surface is derived from a hue so every key reads
+   correctly in light, Midnight Indigo and the OLED palettes without hard-coded hex. */
+[data-note-color] {
+  --n-s: 85%;
+  --n-bg: hsl(var(--n-h) var(--n-s) 93%);
+  --n-border: hsl(var(--n-h) 55% 80%);
+  --n-chip: hsl(var(--n-h) 60% 84%);
+  --n-swatch: hsl(var(--n-h) 70% 62%);
+}
+.dark [data-note-color] {
+  --n-s: 34%;
+  --n-bg: hsl(var(--n-h) var(--n-s) 15%);
+  --n-border: hsl(var(--n-h) 32% 27%);
+  --n-chip: hsl(var(--n-h) 30% 24%);
+  --n-swatch: hsl(var(--n-h) 60% 52%);
+}
+[data-note-color="coral"]  { --n-h: 8; }
+[data-note-color="amber"]  { --n-h: 36; }
+[data-note-color="sun"]    { --n-h: 52; }
+[data-note-color="sage"]   { --n-h: 140; }
+[data-note-color="teal"]   { --n-h: 176; }
+[data-note-color="sky"]    { --n-h: 205; }
+[data-note-color="violet"] { --n-h: 262; }
+[data-note-color="rose"]   { --n-h: 332; }
+[data-note-color="stone"]  { --n-h: 220; }
+[data-note-color="stone"] { --n-s: 12%; }
+.dark [data-note-color="stone"] { --n-s: 8%; }
+.note-surface[data-note-color] {
+  background-color: var(--n-bg);
+  border-color: var(--n-border);
+}
+.note-chip[data-note-color] { background-color: var(--n-chip); }
+.note-swatch { background-color: var(--n-swatch); }
+
+
+.note-mark { background: hsl(var(--primary) / 0.28); color: inherit; border-radius: 3px; padding: 0 1px; }

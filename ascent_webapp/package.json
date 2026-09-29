@@ -68,6 +68,7 @@
     "framer-motion": "^11.16.4",
     "googleapis": "^168.0.0",
     "html2canvas": "^1.4.1",
+    "idb-keyval": "^6.3.0",
     "input-otp": "^1.4.2",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.2",

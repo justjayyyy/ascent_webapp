@@ -15,13 +15,43 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
+        id: '/',
         name: 'Ascent',
         short_name: 'Ascent',
         description: 'Ascent - Personal Finance Tracker',
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'any',
+        categories: ['finance', 'productivity'],
+        // Long-press the installed icon for quick actions
+        shortcuts: [
+          {
+            name: 'New note',
+            short_name: 'New note',
+            description: 'Jot something down',
+            url: '/Notes?new=1',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'New checklist',
+            short_name: 'Checklist',
+            url: '/Notes?new=1&type=checklist',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Notes',
+            short_name: 'Notes',
+            url: '/Notes',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
+        // Appear in the system share sheet: share text or a link into a new note
+        share_target: {
+          action: '/Notes',
+          method: 'GET',
+          params: { title: 'title', text: 'text', url: 'url' },
+        },
         background_color: '#000000',
         theme_color: '#000000',
         icons: [

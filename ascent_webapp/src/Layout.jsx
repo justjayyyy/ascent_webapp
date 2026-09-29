@@ -111,9 +111,10 @@ function LayoutContent({ children, currentPageName }) {
     // { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },
     { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewExpenses' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
-    { name: t('notes'), page: 'Notes', icon: StickyNote, permission: 'viewNotes' },
+    // Open to every member: notes shared with someone need no workspace-wide notes permission
+    { name: t('notes'), page: 'Notes', icon: StickyNote },
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
-  ].filter(item => hasPermission(item.permission)), [t, hasPermission]);
+  ].filter(item => !item.permission || hasPermission(item.permission)), [t, hasPermission]);
 
   return (
     <div className={cn(

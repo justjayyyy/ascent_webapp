@@ -1,596 +1,469 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
-import { ascent } from '@/api/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { AnimatePresence, LayoutGroup, MotionConfig } from 'motion/react';
 import {
-  Plus, Loader2, Pin, PinOff, Trash2, X, Search,
-  StickyNote, Edit2, Check, Tag, Eye, EyeOff
+  Archive, CloudOff, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, Trash2, Users, X,
 } from 'lucide-react';
-import { useTheme } from '../components/ThemeProvider';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { useNotes } from '@/components/notes/useNotes';
+import NoteCard from '@/components/notes/NoteCard';
+import NoteComposer from '@/components/notes/NoteComposer';
+import NoteEditor from '@/components/notes/NoteEditor';
+import NotesNav from '@/components/notes/NotesNav';
+import ShareNoteDialog from '@/components/notes/ShareNoteDialog';
+import { buildPeople } from '@/components/notes/NoteParts';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  distribute, fmt, newItemId, noteToText, searchableText, useColumnCount,
+} from '@/components/notes/noteUtils';
 
-const NOTE_COLORS = [
-  '#5C8374', // Default green
-  '#3B82F6', // Blue
-  '#F59E0B', // Yellow/Orange
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#14B8A6', // Teal
-  '#6B7280', // Gray
-];
+const VIEW_KEY = 'ascent_notes_view';
+const VIEWS = ['notes', 'shared', 'archive', 'trash'];
+
+function readLayoutPref() {
+  try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
+}
 
 function Notes() {
-  const { user, colors, t, theme, isRTL } = useTheme();
+  const { user, t, language, isRTL } = useTheme();
   const { currentWorkspace, hasPermission } = useAuth();
-  const isOwner = currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id;
-  const canEdit = hasPermission('editNotes');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [editingNote, setEditingNote] = useState(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [noteForm, setNoteForm] = useState({
-    title: '',
-    content: '',
-    color: '#5C8374',
-    tags: [],
-    isShared: true
-  });
-  const [newTag, setNewTag] = useState('');
-  const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const {
+    notes, isLoading, isFetching, online, pending, userId,
+    createNote, patchNote, deleteNote, emptyTrash, refetch,
+  } = useNotes();
 
-  // Memoize user identifiers
-  const userId = useMemo(() => user?.id || user?._id, [user?.id, user?._id]);
-  const userEmail = useMemo(() => user?.email, [user?.email]);
+  const canCreate = hasPermission('editNotes');
+  const view = VIEWS.includes(params.get('f')) ? params.get('f') : 'notes';
+  const label = params.get('label') || '';
 
-  const { data: notes = [], isLoading } = useQuery({
-    queryKey: ['notes', userId],
-    queryFn: async () => {
-      if (!userEmail) return [];
-      const result = await ascent.entities.Note.filter({ created_by: userEmail });
-      const allNotes = Array.isArray(result) ? result : [];
+  const [query, setQuery] = useState('');
+  const [layout, setLayout] = useState(readLayoutPref);
+  const [openId, setOpenId] = useState(null);
+  const [shareId, setShareId] = useState(null);
+  const [confirm, setConfirm] = useState(null); // { kind: 'delete' | 'empty', id? }
+  const [composerRequest, setComposerRequest] = useState(null);
+  const searchRef = useRef(null);
+  const gridRef = useRef(null);
 
-      // Filter based on granular permissions if they exist
-      if (user.permissions?.allowedNoteIds && Array.isArray(user.permissions.allowedNoteIds)) {
-        return allNotes.filter(n => user.permissions.allowedNoteIds.includes(n.id || n._id));
+  const people = useMemo(() => buildPeople(currentWorkspace, user), [currentWorkspace, user]);
+  const listView = layout === 'list';
+  const columnCount = useColumnCount(gridRef, listView);
+
+  // ---- entry points: install shortcut (?new=1) and text shared to the app (?share=1) ----
+  useEffect(() => {
+    const isNew = params.get('new') === '1' || params.get('share') === '1';
+    if (!isNew) return;
+    if (canCreate) {
+      const sharedText = [params.get('text'), params.get('url')].filter(Boolean).join('\n');
+      setComposerRequest({
+        title: params.get('title') || '',
+        content: sharedText,
+        type: params.get('type') === 'checklist' ? 'checklist' : 'text',
+      });
+    }
+    const next = new URLSearchParams(params);
+    ['new', 'share', 'title', 'text', 'url', 'type'].forEach(k => next.delete(k));
+    setParams(next, { replace: true });
+  }, [params, setParams, canCreate]);
+
+  // ---- keyboard: "/" to search ----
+  useEffect(() => {
+    const onKey = (e) => {
+      const el = document.activeElement;
+      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        searchRef.current?.focus();
       }
-
-      return allNotes;
-    },
-    enabled: !!userEmail,
-    staleTime: 3 * 60 * 1000,
-  });
-
-  const createNoteMutation = useMutation({
-    mutationFn: (newNote) => ascent.entities.Note.create(newNote),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      closeDialog();
-      toast.success(t('noteCreated') || 'Note created');
-    },
-  });
-
-  const updateNoteMutation = useMutation({
-    mutationFn: ({ id, data }) => ascent.entities.Note.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      closeDialog();
-      toast.success(t('noteUpdated') || 'Note updated');
-    },
-  });
-
-  const deleteNoteMutation = useMutation({
-    mutationFn: (noteId) => ascent.entities.Note.delete(noteId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      toast.success(t('noteDeleted') || 'Note deleted');
-    },
-  });
-
-  const togglePinMutation = useMutation({
-    mutationFn: ({ id, isPinned }) => ascent.entities.Note.update(id, { isPinned: !isPinned }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-    },
-  });
-
-  const openNewNote = useCallback(() => {
-    setEditingNote(null);
-    setNoteForm({ title: '', content: '', color: '#5C8374', tags: [], isShared: true });
-    setIsDialogOpen(true);
-  }, []);
-
-  const openEditNote = useCallback((note) => {
-    setEditingNote(note);
-    setNoteForm({
-      title: note.title,
-      content: note.content,
-      color: note.color || '#5C8374',
-      tags: note.tags || [],
-      isShared: note.isShared !== false
-    });
-    setIsDialogOpen(true);
-  }, []);
-
-  const closeDialog = useCallback(() => {
-    setIsDialogOpen(false);
-    setEditingNote(null);
-    setNoteForm({ title: '', content: '', color: '#5C8374', tags: [], isShared: true });
-    setNewTag('');
-  }, []);
-
-  const handleSubmit = useCallback(async () => {
-    if (!noteForm.title.trim() && !noteForm.content.trim()) {
-      toast.error(t('noteTitleOrContentRequired') || 'Please add a title or content');
-      return;
-    }
-
-    const noteData = {
-      title: noteForm.title.trim() || 'Untitled',
-      content: noteForm.content,
-      color: noteForm.color,
-      tags: noteForm.tags,
-      isShared: noteForm.isShared
     };
-
-    if (editingNote) {
-      await updateNoteMutation.mutateAsync({ id: editingNote.id, data: noteData });
-    } else {
-      await createNoteMutation.mutateAsync(noteData);
-    }
-  }, [noteForm, editingNote, updateNoteMutation, createNoteMutation, t]);
-
-  const addTag = useCallback(() => {
-    if (newTag.trim() && !noteForm.tags.includes(newTag.trim())) {
-      setNoteForm(prev => ({ ...prev, tags: [...prev.tags, newTag.trim()] }));
-      setNewTag('');
-    }
-  }, [newTag, noteForm.tags]);
-
-  const removeTag = useCallback((tagToRemove) => {
-    setNoteForm(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Filter notes by search query - memoized for performance
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes;
-    const query = searchQuery.toLowerCase();
-    return notes.filter(note => {
-      return (
-        note.title?.toLowerCase().includes(query) ||
-        note.content?.toLowerCase().includes(query) ||
-        note.tags?.some(tag => tag.toLowerCase().includes(query))
-      );
-    });
-  }, [notes, searchQuery]);
+  const setLayoutPref = (value) => {
+    setLayout(value);
+    try { localStorage.setItem(VIEW_KEY, value); } catch { /* private mode */ }
+  };
 
-  // Sort notes: pinned first, then by updated date - memoized
-  const sortedNotes = useMemo(() => {
-    return [...filteredNotes].sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
+  const select = useCallback((key, name) => {
+    const next = new URLSearchParams(params);
+    next.delete('f');
+    next.delete('label');
+    if (key === 'label') next.set('label', name);
+    else if (key !== 'notes') next.set('f', key);
+    setParams(next, { replace: false });
+  }, [params, setParams]);
+
+  // ---- derived lists ----
+  const visible = useMemo(
+    () => notes.filter(n => !n.trashedAt || n.myAccess === 'owner'),
+    [notes]
+  );
+
+  const isSharedNote = (n) => n.myAccess !== 'owner' || n.isShared || (n.collaborators || []).length > 0;
+
+  const counts = useMemo(() => {
+    const active = visible.filter(n => !n.trashedAt && !n.isArchived);
+    return {
+      notes: active.length,
+      shared: active.filter(isSharedNote).length,
+      archive: visible.filter(n => !n.trashedAt && n.isArchived).length,
+      trash: visible.filter(n => n.trashedAt).length,
+    };
+  }, [visible]);
+
+  const labelList = useMemo(() => {
+    const map = new Map();
+    visible.filter(n => !n.trashedAt).forEach(n => (n.tags || []).forEach(tag => {
+      const key = tag.toLowerCase();
+      const entry = map.get(key) || { name: tag, count: 0 };
+      entry.count += 1;
+      map.set(key, entry);
+    }));
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, language));
+  }, [visible, language]);
+  const labelNames = useMemo(() => labelList.map(l => l.name), [labelList]);
+
+  const searching = query.trim().length > 0;
+
+  const shown = useMemo(() => {
+    let list;
+    if (searching) {
+      const q = query.trim().toLowerCase();
+      list = visible.filter(n => !n.trashedAt && searchableText(n).includes(q));
+    } else if (label) {
+      list = visible.filter(n => !n.trashedAt && (n.tags || []).some(tag => tag.toLowerCase() === label.toLowerCase()));
+    } else if (view === 'trash') {
+      list = visible.filter(n => n.trashedAt);
+    } else if (view === 'archive') {
+      list = visible.filter(n => !n.trashedAt && n.isArchived);
+    } else if (view === 'shared') {
+      list = visible.filter(n => !n.trashedAt && !n.isArchived && isSharedNote(n));
+    } else {
+      list = visible.filter(n => !n.trashedAt && !n.isArchived);
+    }
+    return [...list].sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       return new Date(b.updated_date) - new Date(a.updated_date);
     });
-  }, [filteredNotes]);
+  }, [visible, view, label, query, searching]);
 
-  const pinnedNotes = useMemo(() => sortedNotes.filter(n => n.isPinned), [sortedNotes]);
-  const unpinnedNotes = useMemo(() => sortedNotes.filter(n => !n.isPinned), [sortedNotes]);
+  const splitPins = !searching && view !== 'trash' && view !== 'archive';
+  const pinned = splitPins ? shown.filter(n => n.isPinned) : [];
+  const others = splitPins ? shown.filter(n => !n.isPinned) : shown;
 
-  if (!user || isLoading) {
+  // ---- actions ----
+  const actions = useMemo(() => {
+    const archiveToast = (id, archived) => toast(archived ? t('ntArchived') : t('ntUnarchived'), {
+      action: { label: t('ntUndo'), onClick: () => patchNote(id, { isArchived: !archived }) },
+    });
+    return {
+      meId: userId,
+      patch: (id, changes) => {
+        patchNote(id, changes);
+        if (typeof changes.isArchived === 'boolean') archiveToast(id, changes.isArchived);
+      },
+      trash: (id) => {
+        patchNote(id, { trashed: true });
+        toast(t('ntTrashed'), { action: { label: t('ntUndo'), onClick: () => patchNote(id, { trashed: false }) } });
+      },
+      remove: (id) => {
+        const n = notes.find(x => x.id === id);
+        if (n && n.myAccess === 'owner') setConfirm({ kind: 'delete', id });
+        else { deleteNote(id); toast.success(t('ntLeft')); }
+      },
+      share: (id) => setShareId(id),
+      copy: async (n) => {
+        try { await navigator.clipboard.writeText(noteToText(n)); toast.success(t('ntCopied')); }
+        catch { toast.error(t('ntCopyFailed')); }
+      },
+      duplicate: (n) => {
+        createNote({
+          title: n.title ? `${n.title} (${t('ntCopySuffix')})` : '',
+          content: n.content, type: n.type, color: n.color, tags: n.tags || [],
+          items: (n.items || []).map(i => ({ ...i, id: newItemId() })),
+        });
+        toast.success(t('noteCreated'));
+      },
+    };
+  }, [patchNote, deleteNote, createNote, notes, t, userId]);
+
+  const onCreate = useCallback((data) => {
+    createNote(data);
+    toast.success(t('noteCreated'));
+  }, [createNote, t]);
+
+  const openNote = openId ? notes.find(n => n.id === openId) : null;
+  const shareNote = shareId ? notes.find(n => n.id === shareId) : null;
+
+  // The note was deleted or unshared while it was open
+  useEffect(() => {
+    if (openId && !isLoading && !openNote) setOpenId(null);
+  }, [openId, openNote, isLoading]);
+
+  const heading = label ? label : view === 'notes' ? t('notes')
+    : view === 'shared' ? t('ntShared') : view === 'archive' ? t('ntArchiveNav') : t('ntTrashNav');
+
+  const emptyCopy = (() => {
+    if (searching) return { icon: Search, title: t('ntNoResults'), hint: t('ntNoResultsHint') };
+    if (label) return { icon: Lightbulb, title: t('ntEmptyLabel'), hint: '' };
+    if (view === 'shared') return { icon: Users, title: t('ntEmptyShared'), hint: t('ntEmptySharedHint') };
+    if (view === 'archive') return { icon: Archive, title: t('ntEmptyArchive'), hint: t('ntEmptyArchiveHint') };
+    if (view === 'trash') return { icon: Trash2, title: t('ntTrashEmpty'), hint: t('ntTrashHint') };
+    return { icon: Lightbulb, title: t('ntEmptyNotes'), hint: canCreate ? t('ntEmptyNotesHint') : t('ntEmptyNotesReadOnly') };
+  })();
+
+  const renderGrid = (list) => {
+    const cols = distribute(list, columnCount);
     return (
-      <div className={cn("flex items-center justify-center min-h-screen", colors.bgPrimary)}>
-        <Loader2 className={cn("w-8 h-8 animate-spin", colors.accentText)} />
+      <div className={cn('flex items-start gap-3', listView && 'mx-auto max-w-2xl')}>
+        {cols.map((col, i) => (
+          <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">
+            {col.map(n => (
+              <NoteCard
+                key={n.id}
+                note={n}
+                people={people}
+                query={query}
+                onOpen={setOpenId}
+                actions={actions}
+                t={t}
+                canCreate={canCreate}
+              />
+            ))}
+          </div>
+        ))}
       </div>
     );
-  }
+  };
+
+  const statusPill = !online ? (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-medium">
+      <CloudOff className="h-3.5 w-3.5" />
+      {pending > 0 ? fmt(t('ntOfflinePending'), { n: pending }) : t('ntOffline')}
+    </span>
+  ) : pending > 0 ? (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-medium">
+      <Loader2 className="h-3.5 w-3.5 animate-spin" /> {fmt(t('ntSyncing'), { n: pending })}
+    </span>
+  ) : null;
+
+  const showComposer = canCreate && !searching && (view === 'notes' || view === 'shared' || !!label);
 
   return (
-    <div className={cn("p-2 sm:p-4 md:p-8", colors.bgPrimary)}>
-      <div className="max-w-6xl mx-auto">
+    <MotionConfig reducedMotion="user">
+      <div className="mx-auto max-w-7xl space-y-5 p-4 pb-28 md:p-8 md:pb-10" dir={isRTL ? 'rtl' : 'ltr'}>
         {/* Header */}
-        <div className="mb-3 sm:mb-8">
-          <div className={cn(
-            "flex items-start sm:items-center justify-between mb-2 sm:mb-6 gap-2 sm:gap-4",
-            "flex-col sm:flex-row",
-            isRTL && "flex-col-reverse sm:flex-row-reverse"
-          )}>
-            <div className={cn(isRTL && "text-right w-full sm:w-auto")}>
-              <h1 className={cn("text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-0.5 sm:mb-2", colors.textPrimary)}>
-                {t('notes') || 'Notes'}
-              </h1>
-              <p className={cn("text-xs sm:text-base hidden sm:block", colors.textTertiary)}>
-                {t('notesDescription') || 'Your personal notes and ideas'}
-              </p>
-            </div>
-            {canEdit && (
-              <Button
-                onClick={openNewNote}
-                size="sm"
-                className={cn(
-                  "bg-primary hover:bg-primary/80 text-primary-foreground h-6 sm:h-10 text-xs sm:text-base px-2.5 sm:px-4 py-1 sm:py-2",
-                  "w-auto rounded-md shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 sm:gap-2"
-                )}
-              >
-                <Plus className={cn("w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0")} />
-                <span className="whitespace-nowrap">{t('newNote') || 'New Note'}</span>
-              </Button>
-            )}
+        <header className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold tracking-tight text-balance md:text-4xl">{heading}</h1>
+            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">{t('notesDescription')}</p>
           </div>
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {statusPill}
+            <Button
+              variant="ghost" size="icon"
+              onClick={() => refetch()}
+              aria-label={t('ntRefresh')}
+              title={t('ntRefresh')}
+              disabled={!online}
+            >
+              <RefreshCw className={cn(isFetching && 'animate-spin')} />
+            </Button>
+            <div role="group" aria-label={t('ntLayout')} className="inline-flex rounded-xl border border-border/70 bg-card/60 p-0.5">
+              {[
+                { key: 'grid', icon: LayoutGrid, label: t('ntGridView') },
+                { key: 'list', icon: Rows3, label: t('ntListView') },
+              ].map(({ key, icon: Icon, label: text }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLayoutPref(key)}
+                  aria-pressed={layout === key}
+                  aria-label={text}
+                  title={text}
+                  className={cn(
+                    'flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11',
+                    layout === key ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
 
-          {/* Search */}
-          <div className={cn("relative max-w-md w-full", isRTL && "mr-auto ml-0")}>
-            <Search className={cn(
-              "absolute top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4",
-              colors.textTertiary,
-              "start-2 sm:start-3"
-            )} />
-            <Input
-              type="text"
-              placeholder={t('searchNotes') || 'Search notes...'}
-              aria-label={t('searchNotes')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn(
-                "h-7 sm:h-10 text-xs sm:text-sm", colors.bgSecondary, colors.border, colors.textPrimary,
-                "ps-7 sm:ps-10"
+        {/* Search */}
+        <div className="relative max-w-xl">
+          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
+            placeholder={t('searchNotes')}
+            aria-label={t('searchNotes')}
+            enterKeyHint="search"
+            className="h-11 rounded-2xl border-border/70 bg-card/60 ps-10 pe-10 [&::-webkit-search-cancel-button]:hidden"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); searchRef.current?.focus(); }}
+              aria-label={t('ntClearSearch')}
+              className="absolute end-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="lg:flex lg:items-start lg:gap-8">
+          {/* Side rail (large screens) */}
+          <aside className="sticky top-6 hidden w-56 shrink-0 lg:block">
+            <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} t={t} variant="rail" />
+          </aside>
+
+          <div className="min-w-0 flex-1 space-y-5">
+            <div className="lg:hidden">
+              <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} t={t} variant="chips" />
+            </div>
+
+            {showComposer && (
+              <NoteComposer
+                t={t}
+                labels={labelNames}
+                defaultTag={label}
+                onCreate={onCreate}
+                request={composerRequest}
+                onRequestHandled={() => setComposerRequest(null)}
+              />
+            )}
+
+            {view === 'trash' && !searching && !label && counts.trash > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/60 px-4 py-3">
+                <p className="text-sm text-muted-foreground">{t('ntTrashHint')}</p>
+                <Button variant="outline" size="sm" onClick={() => setConfirm({ kind: 'empty' })}>
+                  <Trash2 /> {t('ntEmptyTrash')}
+                </Button>
+              </div>
+            )}
+
+            <div ref={gridRef}>
+              {isLoading ? (
+                <div className="flex items-start gap-3" aria-busy="true" aria-label={t('loadingNotes')}>
+                  {Array.from({ length: Math.min(columnCount, 3) }).map((_, c) => (
+                    <div key={c} className="flex flex-1 flex-col gap-3">
+                      {[130, 190, 100].map((h, i) => (
+                        <div
+                          key={i}
+                          className="animate-pulse rounded-2xl border border-border/50 bg-card/50"
+                          style={{ height: h + ((c + i) % 2) * 34 }}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : shown.length === 0 ? (
+                <div className="mx-auto flex max-w-sm flex-col items-center px-4 py-16 text-center">
+                  <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10 text-primary">
+                    <emptyCopy.icon className="h-8 w-8" />
+                  </span>
+                  <p className="text-base font-semibold">{emptyCopy.title}</p>
+                  {emptyCopy.hint && <p className="mt-1 text-sm text-muted-foreground">{emptyCopy.hint}</p>}
+                </div>
+              ) : (
+                <LayoutGroup>
+                  {pinned.length > 0 && (
+                    <section className="mb-6" aria-label={t('pinned')}>
+                      <h2 className="mb-2.5 flex items-center gap-1.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        <Pin className="h-3.5 w-3.5" /> {t('pinned')}
+                      </h2>
+                      {renderGrid(pinned)}
+                    </section>
+                  )}
+                  {others.length > 0 && (
+                    <section aria-label={pinned.length > 0 ? t('others') : heading}>
+                      {pinned.length > 0 && (
+                        <h2 className="mb-2.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('others')}</h2>
+                      )}
+                      {renderGrid(others)}
+                    </section>
+                  )}
+                </LayoutGroup>
               )}
-              dir={isRTL ? 'rtl' : 'ltr'}
-            />
+            </div>
           </div>
         </div>
 
-        {/* Notes Grid */}
-        {sortedNotes.length === 0 ? (
-          <div className={cn("text-center py-8 sm:py-16", colors.textTertiary)}>
-            <StickyNote className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-2 sm:mb-4 opacity-50" />
-            <p className={cn("text-sm sm:text-lg mb-1 sm:mb-2", colors.textTertiary)}>{t('noNotesYet') || 'No notes yet'}</p>
-            <p className={cn("text-xs sm:text-sm", colors.textTertiary)}>{t('createFirstNote') || 'Create your first note to get started'}</p>
-          </div>
-        ) : (
-          <>
-            {/* Pinned Notes */}
-            {pinnedNotes.length > 0 && (
-              <div className="mb-3 sm:mb-8">
-                <h2 className={cn(
-                  "text-xs sm:text-sm font-medium mb-1.5 sm:mb-4 flex items-center gap-1 sm:gap-2",
-                  colors.textTertiary,
-                  isRTL && "flex-row-reverse justify-end"
-                )}>
-                  <Pin className="w-3 h-3 sm:w-4 sm:h-4" />
-                  {t('pinned') || 'Pinned'}
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-4">
-                  {pinnedNotes.map(note => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      onEdit={openEditNote}
-                      onDelete={deleteNoteMutation.mutate}
-                      onTogglePin={(id, isPinned) => togglePinMutation.mutate({ id, isPinned })}
-                      colors={colors}
-                      theme={theme}
-                      t={t}
-                      isRTL={isRTL}
-                      canEdit={canEdit}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* Editor */}
+        <AnimatePresence>
+          {openNote && (
+            <NoteEditor
+              key={openNote.id}
+              note={openNote}
+              people={people}
+              labels={labelNames}
+              actions={actions}
+              onClose={() => setOpenId(null)}
+              onShare={(id) => setShareId(id)}
+              t={t}
+              language={language}
+              online={online}
+              pending={pending}
+              canCreate={canCreate}
+            />
+          )}
+        </AnimatePresence>
 
-            {/* Other Notes */}
-            {unpinnedNotes.length > 0 && (
-              <div>
-                {pinnedNotes.length > 0 && (
-                  <h2 className={cn("text-xs sm:text-sm font-medium mb-1.5 sm:mb-4", colors.textTertiary, isRTL && "text-right")}>
-                    {t('others') || 'Others'}
-                  </h2>
-                )}
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-4">
-                  {unpinnedNotes.map(note => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      onEdit={openEditNote}
-                      onDelete={deleteNoteMutation.mutate}
-                      onTogglePin={(id, isPinned) => togglePinMutation.mutate({ id, isPinned })}
-                      colors={colors}
-                      theme={theme}
-                      t={t}
-                      isRTL={isRTL}
-                      canEdit={canEdit}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        <ShareNoteDialog
+          open={!!shareNote}
+          onOpenChange={(o) => { if (!o) setShareId(null); }}
+          note={shareNote}
+          people={people}
+          workspaceName={currentWorkspace?.name}
+          onChange={(changes) => shareNote && patchNote(shareNote.id, changes)}
+          t={t}
+        />
 
-        {/* Note Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent
-            className={cn("max-w-4xl w-[95vw] sm:w-full max-h-[80dvh] sm:max-h-[75vh] min-h-[50vh] sm:min-h-0 overflow-y-auto p-3 sm:p-6", colors.bgSecondary, colors.border)}
-            dir={isRTL ? 'rtl' : 'ltr'}
-          >
-            <DialogHeader className="pb-2 sm:pb-4">
-              <DialogTitle className={cn("text-base sm:text-xl", colors.textPrimary, isRTL && "text-right")}>
-                {editingNote ? (t('editNote') || 'Edit Note') : (t('newNote') || 'New Note')}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-2 sm:space-y-4">
-              {/* Title */}
-              <Input
-                placeholder={t('noteTitle') || 'Title'}
-                value={noteForm.title}
-                onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
-                className={cn("h-8 sm:h-auto text-sm sm:text-lg font-medium", colors.bgPrimary, colors.border, colors.textPrimary)}
-              />
-
-              {/* Content */}
-              <Textarea
-                placeholder={t('noteContent') || 'Write your note...'}
-                value={noteForm.content}
-                onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
-                rows={4}
-                className={cn(colors.bgPrimary, colors.border, colors.textPrimary, "resize-y min-h-[250px] sm:min-h-[200px] max-h-[600px] sm:max-h-[400px] text-xs sm:text-sm")}
-              />
-
-              {/* Color Picker */}
-              <div>
-                <label className={cn("text-xs sm:text-sm font-medium mb-1 sm:mb-2 block", colors.textSecondary)}>
-                  {t('noteColor') || 'Color'}
-                </label>
-                <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-                  {NOTE_COLORS.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => setNoteForm(prev => ({ ...prev, color }))}
-                      className={cn(
-                        "w-6 h-6 sm:w-8 sm:h-8 rounded-full transition-all",
-                        noteForm.color === color ? "ring-2 ring-offset-1 sm:ring-offset-2 ring-white scale-110" : "hover:scale-105"
-                      )}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className={cn("text-xs sm:text-sm font-medium mb-1 sm:mb-2 block", colors.textSecondary)}>
-                  {t('tags') || 'Tags'}
-                </label>
-                <div className="flex gap-1 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
-                  {noteForm.tags.map(tag => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs bg-primary/20 text-primary"
-                    >
-                      <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                      {tag}
-                      <button onClick={() => removeTag(tag)} className="hover:text-danger">
-                        <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-1.5 sm:gap-2">
-                  <Input
-                    placeholder={t('addTag') || 'Add tag...'}
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                    className={cn("flex-1 h-7 sm:h-10 text-xs sm:text-sm", colors.bgPrimary, colors.border, colors.textPrimary)}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addTag}
-                    className={cn("h-7 sm:h-10 px-2 sm:px-4", colors.border, colors.textSecondary)}
-                  >
-                    <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-1.5 sm:gap-2 pt-2 sm:pt-4 justify-between items-center">
-                {isOwner && (
-                  <div className="flex items-center gap-2">
-                    {noteForm.isShared ? (
-                      <Eye className={cn("w-4 h-4", colors.textSecondary)} />
-                    ) : (
-                      <EyeOff className={cn("w-4 h-4", colors.textTertiary)} />
-                    )}
-                    <Label htmlFor="isShared" className={cn("text-xs sm:text-sm cursor-pointer", colors.textSecondary)}>
-                      {t('shareWithTeam') || 'Share'}
-                    </Label>
-                    <Switch aria-label={t('shareWithTeam')}
-                      id="isShared"
-                      checked={noteForm.isShared}
-                      onCheckedChange={(checked) => setNoteForm(prev => ({ ...prev, isShared: checked }))}
-                    />
-                  </div>
-                )}
-                <div className="flex gap-1.5 sm:gap-2 flex-1 justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={closeDialog}
-                    className={cn("h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4", colors.border, colors.textSecondary)}
-                  >
-                    {t('cancel') || 'Cancel'}
-                  </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={createNoteMutation.isPending || updateNoteMutation.isPending}
-                    className="bg-primary hover:bg-primary/80 text-primary-foreground h-7 sm:h-10 text-xs sm:text-base px-3 sm:px-4"
-                  >
-                    {(createNoteMutation.isPending || updateNoteMutation.isPending) && (
-                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin me-1 sm:me-2" />
-                    )}
-                    {editingNote ? (t('save') || 'Save') : (t('create') || 'Create')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AlertDialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {confirm?.kind === 'empty' ? t('ntEmptyTrash') : t('ntDeleteForever')}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirm?.kind === 'empty' ? t('ntEmptyTrashConfirm') : t('ntDeleteForeverConfirm')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (confirm?.kind === 'empty') emptyTrash();
+                  else if (confirm?.id) { deleteNote(confirm.id); toast.success(t('ntDeleted')); }
+                  setConfirm(null);
+                }}
+              >
+                {t('delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-    </div>
+    </MotionConfig>
   );
 }
 
 export default memo(Notes);
-
-// Note Card Component - memoized for performance
-const NoteCard = memo(function NoteCard({ note, onEdit, onDelete, onTogglePin, colors, theme, t, isRTL, canEdit }) {
-  const [showActions, setShowActions] = useState(false);
-
-  const handleMouseEnter = useCallback(() => setShowActions(true), []);
-  const handleMouseLeave = useCallback(() => setShowActions(false), []);
-  const handleClick = useCallback(() => {
-    if (canEdit) onEdit(note);
-  }, [onEdit, note, canEdit]);
-  const handleTogglePin = useCallback(() => onTogglePin(note.id, note.isPinned), [onTogglePin, note.id, note.isPinned]);
-  const handleDelete = useCallback(() => onDelete(note.id), [onDelete, note.id]);
-
-  // Memoize formatted dates
-  const createdDate = useMemo(() => new Date(note.created_date).toLocaleDateString(), [note.created_date]);
-  const updatedDate = useMemo(() => note.updated_date !== note.created_date ? new Date(note.updated_date).toLocaleDateString() : null, [note.updated_date, note.created_date]);
-
-  // Memoize card style
-  const cardStyle = useMemo(() => ({
-    backgroundColor: theme === 'light' ? `${note.color}15` : `${note.color}25`,
-    [isRTL ? 'borderRightWidth' : 'borderLeftWidth']: '4px',
-    [isRTL ? 'borderRightColor' : 'borderLeftColor']: note.color
-  }), [note.color, theme, isRTL]);
-
-  return (
-    <Card
-      className={cn(
-        "group cursor-pointer transition-all hover:shadow-lg relative overflow-hidden",
-        colors.cardBorder
-      )}
-      style={cardStyle}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-    >
-      <CardContent className="p-2 sm:p-5">
-        {/* Title */}
-        <h3 className={cn("text-xs sm:text-base font-semibold mb-0.5 sm:mb-2 line-clamp-1", colors.textPrimary)}>
-          {note.title || 'Untitled'}
-        </h3>
-
-        {/* Content Preview */}
-        <p className={cn("text-xs sm:text-sm line-clamp-2 sm:line-clamp-4 whitespace-pre-wrap", colors.textSecondary)}>
-          {note.content || (t('noContent') || 'No content')}
-        </p>
-
-        {/* Tags */}
-        {note.tags?.length > 0 && (
-          <div className="flex gap-0.5 sm:gap-1 mt-1 sm:mt-3 flex-wrap items-center">
-            {note.tags.slice(0, 2).map(tag => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-0.5 px-1 sm:px-2 py-0 sm:py-0.5 rounded-full text-xs"
-                style={{ backgroundColor: `${note.color}30`, color: note.color }}
-              >
-                {tag}
-              </span>
-            ))}
-            {note.tags.length > 2 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={cn("text-xs cursor-help px-1 sm:px-2 py-0 sm:py-0.5 rounded-full", colors.textTertiary, "hover:bg-muted")}>
-                      +{note.tags.length - 2}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[200px]">
-                    <p className="text-xs">{note.tags.slice(2).join(', ')}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        )}
-
-        {/* Dates */}
-        <div className={cn("text-xs mt-1 sm:mt-3 space-y-0 hidden sm:block", colors.textTertiary)}>
-          <p>{t('created') || 'Created'}: {createdDate}</p>
-          {updatedDate && (
-            <p>{t('updated') || 'Updated'}: {updatedDate}</p>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        {canEdit && (
-          <div
-            className={cn(
-              "absolute top-0.5 sm:top-2 flex gap-0.5 sm:gap-1 transition-opacity",
-              "end-0.5 sm:end-2",
-              showActions ? "opacity-100" : "opacity-0"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={handleTogglePin}
-              className={cn(
-                "p-0.5 sm:p-1.5 rounded-full transition-colors",
-                note.isPinned
-                  ? "bg-primary text-primary-foreground"
-                  : cn(colors.bgSecondary, colors.textSecondary, "hover:bg-primary/20")
-              )}
-              title={note.isPinned ? (t('unpin') || 'Unpin') : (t('pin') || 'Pin')}
-            >
-              {note.isPinned ? <PinOff className="w-2.5 h-2.5 sm:w-4 sm:h-4" /> : <Pin className="w-2.5 h-2.5 sm:w-4 sm:h-4" />}
-            </button>
-            <button
-              onClick={handleDelete}
-              className={cn(
-                "p-0.5 sm:p-1.5 rounded-full transition-colors",
-                colors.bgSecondary, "text-danger hover:bg-danger/20"
-              )}
-              title={t('delete') || 'Delete'}
-            >
-              <Trash2 className="w-2.5 h-2.5 sm:w-4 sm:h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Pin indicator */}
-        {note.isPinned && (
-          <Pin
-            className={cn("absolute top-0.5 sm:top-2 w-3.5 h-3.5 sm:w-5 sm:h-5", "end-0.5 sm:end-2")}
-            style={{ color: note.color }}
-          />
-        )}
-      </CardContent>
-    </Card>
-  );
-});
-
