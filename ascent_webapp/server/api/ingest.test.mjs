@@ -172,13 +172,13 @@ test('only POST is accepted, and only known sources', async () => {
 });
 
 test('missing or malformed credentials are refused before the database is touched', async () => {
-  for (const headers of [{}, { authorization: TOKEN.token }, { authorization: 'Bearer nope' }, { authorization: `Basic ${TOKEN.token}` }]) {
+  for (const headers of [{}, { authorization: 'Bearer nope' }, { authorization: `Bearer ${TOKEN.token.slice(0, -1)}` }]) {
     const r = await call({ headers });
     assert.equal(r.code, 401);
     assert.deepEqual(r.body, { success: false, error: 'unauthorized' });
   }
   assert.equal(db.calls.tokenQuery, null);
-  assert.equal(limiter.calls, 4, 'each failed attempt counts toward the per-IP throttle');
+  assert.equal(limiter.calls, 3, 'each failed attempt counts toward the per-IP throttle');
 });
 
 test('repeated failures hit the throttle, which answers instead of the handler', async () => {

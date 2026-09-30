@@ -119,8 +119,13 @@ test('tokens: shape, hash and header parsing', () => {
   assert.equal(tokenHash.length, 64);
   assert.equal(prefix, token.slice(0, 8));
   assert.equal(tokenFromHeader({ authorization: `Bearer ${token}` }), token);
-  for (const h of [undefined, {}, { authorization: token }, { authorization: 'Bearer nope' }, { authorization: `Bearer ${token}x` }, { authorization: `Basic ${token}` }]) {
+  for (const h of [undefined, {}, { authorization: 'Bearer nope' }, { authorization: `Bearer ${token}x` }, { authorization: `Bearer ${token.slice(0, -1)}` }]) {
     assert.equal(tokenFromHeader(h), null);
+  }
+  // pasted on a phone: extra spaces, newline, direction marks, quotes, missing space, bare token
+  for (const h of [`Bearer  ${token} `, `Bearer ${token}
+`, `‏Bearer ${token}‎`, `"Bearer ${token}"`, `Bearer${token}`, token, `Bearer ‏${token}`]) {
+    assert.equal(tokenFromHeader({ authorization: h }), token, JSON.stringify(h));
   }
   assert.notEqual(newToken().token, newToken().token);
 });
