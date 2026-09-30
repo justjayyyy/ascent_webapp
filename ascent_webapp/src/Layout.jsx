@@ -19,6 +19,32 @@ function LayoutContent({ children, currentPageName }) {
   const { user, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
   const { hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
+
+  // Phones: the header bar slides away while scrolling down and returns on scroll up.
+  // The strip behind the status bar stays, so page content never runs under the clock.
+  useEffect(() => {
+    let lastY = Math.max(0, window.scrollY);
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = Math.max(0, window.scrollY);
+      const dy = y - lastY;
+      if (y <= 8) setHeaderHidden(false);
+      else if (dy > 6 && y > 72) setHeaderHidden(true);
+      else if (dy < -6) setHeaderHidden(false);
+      if (Math.abs(dy) > 6 || y <= 8) lastY = y;
+    };
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const hideHeader = headerHidden && !mobileMenuOpen;
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-header-hidden', hideHeader);
+    return () => document.documentElement.removeAttribute('data-header-hidden');
+  }, [hideHeader]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === '1'; } catch { return false; }
   });
@@ -163,6 +189,8 @@ function LayoutContent({ children, currentPageName }) {
       {/* Mobile Header */}
       <div className={cn(
         "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top safe-area-inset-x",
+        "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+        hideHeader && "-translate-y-16",
         colors.border
       )}
       // The strip behind the status bar is the page background, so the system's soft

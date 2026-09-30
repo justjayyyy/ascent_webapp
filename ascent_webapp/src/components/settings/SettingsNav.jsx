@@ -55,7 +55,7 @@ export default function SettingsNav({ items, active, onSelect, variant = 'rail' 
       <nav
         aria-label={t('setSections')}
         ref={railRef}
-        className="sticky top-[calc(4rem+var(--safe-top))] z-30 -mx-4 mb-6 flex gap-1.5 overflow-x-auto border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-md md:top-0 md:-mx-8 md:px-8 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="sticky top-[var(--sticky-top)] z-30 transition-[top] duration-300 -mx-4 mb-6 flex gap-1.5 overflow-x-auto border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-md md:top-0 md:-mx-8 md:px-8 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {items.map(({ id, label }) => (
           <a
