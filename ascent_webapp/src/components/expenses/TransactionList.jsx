@@ -1,330 +1,260 @@
-import React, { useMemo, useCallback, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCard, Banknote, ArrowLeftRight, MoreVertical, Copy, Repeat, Check, Nfc } from 'lucide-react';
-import { format } from 'date-fns';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
+import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import { useHousehold } from '@/hooks/useHousehold';
+import BlurValue from '../BlurValue';
 
-const categoryColors = {
-  'Food & Dining': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
-  'Groceries': 'bg-success/10 text-success border-success/30',
-  'Rent & Housing': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
-  'Transportation': 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
-  'Healthcare': 'bg-danger/10 text-danger border-danger/30',
-  'Entertainment': 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/30',
-  'Shopping': 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
-  'Utilities': 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
-  'Insurance': 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
-  'Investment Fees': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-  'Taxes': 'bg-danger/10 text-danger border-danger/30',
-  'Salary': 'bg-success/10 text-success border-success/30',
-  'Investment Income': 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30',
-  'Other': 'bg-muted text-muted-foreground border-border',
-};
+const PAGE = 30;
+const isObjectId = (s) => !!s && /^[0-9a-fA-F]{24}$/.test(s);
 
-const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true, author = null, onConfirm }) => {
+const localeOf = (language) => (language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US');
+
+function dayKey(date) {
+  return (date || '').slice(0, 10);
+}
+
+function useDayLabel(language, t) {
+  return useCallback((key) => {
+    const loc = localeOf(language);
+    const d = new Date(`${key}T12:00:00`);
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const diff = Math.round((d - today) / 86400000);
+    if (diff === 0) return t('today');
+    if (diff === -1) {
+      const s = new Intl.RelativeTimeFormat(loc, { numeric: 'auto' }).format(-1, 'day');
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    const sameYear = d.getFullYear() === today.getFullYear();
+    return new Intl.DateTimeFormat(loc, { weekday: 'short', day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) }).format(d);
+  }, [language, t]);
+}
+
+function Avatar({ transaction, icon, size = 'md' }) {
+  const income = transaction.type === 'Income';
+  const Fallback = income ? ArrowDownLeft : ArrowUpRight;
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "grid shrink-0 place-items-center rounded-2xl text-lg leading-none",
+        size === 'lg' ? 'h-14 w-14 text-2xl' : 'h-11 w-11',
+        income ? 'bg-success/15 text-success' : 'bg-foreground/[0.07] text-foreground/80'
+      )}
+    >
+      {icon ? icon : <Fallback className={size === 'lg' ? 'h-6 w-6' : 'h-5 w-5'} />}
+    </span>
+  );
+}
+
+function ActionRow({ icon: Icon, label, onClick, tone }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex min-h-12 w-full items-center gap-3 rounded-2xl px-4 text-start text-base font-medium transition-colors active:scale-[0.99]",
+        tone === 'danger' ? 'text-danger hover:bg-danger/10' : tone === 'primary' ? 'text-primary hover:bg-primary/10' : 'text-foreground hover:bg-foreground/[0.06]'
+      )}
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </button>
+  );
+}
+
+function TransactionList({ transactions, cards = [], categories = [], onEdit, onDelete, onDuplicate, onConfirm, canEdit = true }) {
+  const { t, language, user } = useTheme();
+  const { byEmail, isShared } = useHousehold();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
+  const loc = localeOf(language);
+  const dayLabel = useDayLabel(language, t);
+  const [visible, setVisible] = useState(PAGE);
+  const [active, setActive] = useState(null);
+  const sentinel = useRef(null);
 
   useEffect(() => {
-    if (userCurrency) {
-      fetchExchangeRates('USD');
-    }
+    if (userCurrency) fetchExchangeRates('USD');
   }, [userCurrency, fetchExchangeRates]);
 
-  const getPaymentMethodIcon = useCallback((method) => {
-    switch (method) {
-      case 'Card': return CreditCard;
-      case 'Cash': return Banknote;
-      case 'Transfer': return ArrowLeftRight;
-      default: return null;
-    }
-  }, []);
+  const iconByCategory = useMemo(() => {
+    const map = {};
+    categories.forEach((c) => { if (c.icon) map[c.nameKey || c.name] = c.icon; });
+    return map;
+  }, [categories]);
 
-  const getCardInfo = useCallback((cardId) => {
-    const card = cards.find(c => c.id === cardId);
-    return card ? `${card.name || card.cardName || ''} •••• ${card.lastFourDigits || ''}` : 'Card';
-  }, [cards]);
+  const money = useCallback((value, currency, decimals = 2) => new Intl.NumberFormat(loc, {
+    style: 'currency', currency: currency || userCurrency, minimumFractionDigits: 0, maximumFractionDigits: decimals,
+  }).format(value || 0), [loc, userCurrency]);
 
-  const isObjectId = useCallback((str) => {
-    return str && /^[0-9a-fA-F]{24}$/.test(str);
-  }, []);
-
-  const formatCurrency = useCallback((value, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || user?.currency || 'ILS',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value || 0);
-  }, [user?.currency]);
-
-  // Calculate converted amount (use stored value if available, otherwise calculate on the fly)
-  const convertedAmount = useMemo(() => {
-    if (transaction.currency === userCurrency) {
-      return null; // No conversion needed
-    }
-
-    // Use stored converted amount if available
-    if (transaction.amountInGlobalCurrency !== null && transaction.amountInGlobalCurrency !== undefined) {
-      return transaction.amountInGlobalCurrency;
-    }
-
-    // Fallback: calculate on the fly if rates are available
-    if (rates && Object.keys(rates).length > 0) {
-      return convertCurrency(transaction.amount, transaction.currency || 'USD', userCurrency, rates);
-    }
-
+  const converted = useCallback((tx) => {
+    if (tx.currency === userCurrency) return null;
+    if (tx.amountInGlobalCurrency !== null && tx.amountInGlobalCurrency !== undefined) return tx.amountInGlobalCurrency;
+    if (rates && Object.keys(rates).length > 0) return convertCurrency(tx.amount, tx.currency || 'USD', userCurrency, rates);
     return null;
-  }, [transaction.amount, transaction.currency, transaction.amountInGlobalCurrency, userCurrency, rates, convertCurrency]);
+  }, [userCurrency, rates, convertCurrency]);
 
-  const handleEdit = useCallback(() => {
-    onEdit(transaction);
-  }, [onEdit, transaction]);
+  const cardText = useCallback((tx) => {
+    if (tx.paymentMethod === 'Card' && tx.cardId) {
+      const c = cards.find((x) => x.id === tx.cardId);
+      return c ? `${c.name || c.cardName || ''} ••${c.lastFourDigits || ''}`.trim() : t('card');
+    }
+    return (tx.paymentMethod === 'Card' && tx.ingest?.sources?.[0]?.cardText) || tx.paymentMethod || '';
+  }, [cards, t]);
 
-  const handleDelete = useCallback(() => {
-    onDelete(transaction.id);
-  }, [onDelete, transaction.id]);
+  const shown = useMemo(() => transactions.slice(0, visible), [transactions, visible]);
+  const hasMore = visible < transactions.length;
 
-  const handleDuplicate = useCallback(() => {
-    onDuplicate(transaction);
-  }, [onDuplicate, transaction]);
+  useEffect(() => {
+    if (!hasMore || !sentinel.current) return undefined;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) setVisible((v) => v + PAGE);
+    }, { rootMargin: '400px' });
+    obs.observe(sentinel.current);
+    return () => obs.disconnect();
+  }, [hasMore, shown.length]);
 
-  const isObjId = isObjectId(transaction.category);
-  const Icon = getPaymentMethodIcon(transaction.paymentMethod);
+  const groups = useMemo(() => {
+    const out = [];
+    shown.forEach((tx) => {
+      const key = dayKey(tx.date);
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.items.push(tx);
+      else out.push({ key, items: [tx] });
+    });
+    return out;
+  }, [shown]);
 
-  return (
-    <div key={transaction.id} className="group rounded-2xl border border-border/50 bg-muted/40 transition-all hover:border-primary/40 hover:bg-muted/70">
-      <div className="p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0 flex items-center gap-3">
-            {/* Type Icon */}
-            <span className={cn(
-              "grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl",
-              transaction.type === 'Income' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-            )}>
-              {transaction.type === 'Income' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            </span>
-
-            {/* Main Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                {!isObjId && (
-                  <Badge className={cn('text-xs border', categoryColors[transaction.category] || categoryColors['Other'])}>
-                    {translateCategory(transaction.category, language)}
-                  </Badge>
-                )}
-                {transaction.status === 'pending' && (
-                  <Badge className="text-xs px-1.5 py-0.5 bg-primary/15 text-primary border-primary/30 flex items-center gap-1">
-                    <Nfc className="w-2.5 h-2.5" aria-hidden="true" />
-                    {transaction.ingest?.flags?.includes('possibleDuplicate') ? t('possibleDuplicate') : t('needsReview')}
-                  </Badge>
-                )}
-                {transaction.isRecurring && (
-                  <Badge className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary border-primary/30 flex items-center gap-1">
-                    <Repeat className="w-2.5 h-2.5" />
-                    {transaction.recurringFrequency === 'monthly' ? 'Monthly' : transaction.recurringFrequency}
-                  </Badge>
-                )}
-                <h3 className={cn("font-semibold truncate text-sm", colors.textPrimary)}>
-                  {transaction.description}
-                </h3>
-              </div>
-
-              <div className={cn("flex items-center gap-2 text-xs", colors.textTertiary)}>
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {format(new Date(transaction.date), 'MMM dd, yyyy')}{transaction.occurredAt && ` · ${format(new Date(transaction.occurredAt), 'HH:mm')}`}
-                </div>
-                <span className="text-primary">•</span>
-                <span className="uppercase">{transaction.currency}</span>
-                {author && (
-                  <>
-                    <span className="text-primary">•</span>
-                    <span className="flex items-center gap-1" title={`${t('addedBy')} ${author.name}`}>
-                      <span
-                        aria-hidden
-                        className="grid h-5 w-5 place-items-center rounded-full text-xs font-semibold leading-none text-background"
-                        style={{ backgroundColor: author.color }}
-                      >
-                        {author.initials.slice(0, 1)}
-                      </span>
-                      <span className="truncate max-w-[6rem]">{author.isMe ? t('me') : author.name}</span>
-                    </span>
-                  </>
-                )}
-                {transaction.paymentMethod && (
-                  <>
-                    <span className="text-primary">•</span>
-                    <div className="flex items-center gap-1">
-                      {Icon && <Icon className="w-3 h-3" />}
-                      <span>
-                        {transaction.paymentMethod === 'Card' && transaction.cardId
-                          ? getCardInfo(transaction.cardId)
-                          : (transaction.paymentMethod === 'Card' && transaction.ingest?.sources?.[0]?.cardText) || transaction.paymentMethod}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Amount and Actions */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="flex flex-col items-end">
-              <span className={cn(
-                'text-base font-bold tabular-nums whitespace-nowrap',
-                transaction.type === 'Income' ? 'text-success' : 'text-danger'
-              )}>
-                {transaction.type === 'Income' ? '+' : '-'}
-                {formatCurrency(transaction.amount, transaction.currency)}
-              </span>
-              {convertedAmount !== null && convertedAmount !== undefined && (
-                <span className={cn("text-xs text-muted-foreground dark:text-muted-foreground whitespace-nowrap")}>
-                  {formatCurrency(convertedAmount, userCurrency)}
-                </span>
-              )}
-            </div>
-
-            {canEdit && onConfirm && transaction.status === 'pending' && (
-              <Button size="icon" variant="ghost" aria-label={t('confirmTransaction')} title={t('confirmTransaction')}
-                onClick={() => onConfirm(transaction)} className="h-11 w-11 text-primary hover:bg-primary/20 sm:h-8 sm:w-8">
-                <Check className="w-4 h-4" />
-              </Button>
-            )}
-
-            {/* 3-dots Dropdown Menu */}
-            {canEdit && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="icon"
-                    aria-label={t('moreActions')}
-                    variant="ghost"
-                    className={cn("h-11 w-11 sm:h-8 sm:w-8 hover:bg-primary/20", colors.textSecondary)}
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className={cn(colors.cardBg, colors.cardBorder, "min-w-[160px]")}
-                >
-                  <DropdownMenuItem
-                    onClick={handleEdit}
-                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-primary/20")}
-                  >
-                    <Edit className="w-4 h-4 me-2" />
-                    <span>{t('edit')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleDuplicate}
-                    className={cn("cursor-pointer", colors.textPrimary, "hover:bg-primary/20")}
-                  >
-                    <Copy className="w-4 h-4 me-2" />
-                    <span>{t('duplicate')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleDelete}
-                    className={cn("cursor-pointer text-danger hover:text-danger hover:bg-danger/20")}
-                  >
-                    <Trash2 className="w-4 h-4 me-2" />
-                    <span>{t('delete')}</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-TransactionItem.displayName = 'TransactionItem';
-
-/**
- * @typedef {Object} TransactionListProps
- * @property {Array} transactions
- * @property {Array} cards
- * @property {Function} onEdit
- * @property {Function} onDelete
- * @property {Function} onDuplicate
- * @property {boolean} canEdit
- */
-
-/**
- * @param {TransactionListProps} props
- */
-function TransactionList({
-  transactions,
-  cards = [],
-  onEdit,
-  onDelete,
-  onDuplicate,
-  onConfirm,
-  canEdit = true
-}) {
-  const { t, language, colors, user } = useTheme();
-  const { byEmail, isShared } = useHousehold();
-
-  const handleEdit = useCallback((transaction) => {
-    onEdit(transaction);
-  }, [onEdit]);
-
-  const handleDelete = useCallback((id) => {
-    onDelete(id);
-  }, [onDelete]);
-
-  const handleDuplicate = useCallback((transaction) => {
-    onDuplicate(transaction);
-  }, [onDuplicate]);
+  const run = (fn) => () => { const tx = active; setActive(null); if (tx) setTimeout(() => fn(tx), 180); };
 
   if (transactions.length === 0) {
     return (
-      <Card className={cn(colors.cardBg, colors.cardBorder)}>
-        <CardContent className="p-12">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <DollarSign className={cn("w-8 h-8", colors.accentText)} />
-            </div>
-            <h3 className={cn("text-xl font-semibold mb-2", colors.textPrimary)}>{t('noTransactionsFound')}</h3>
-            <p className={colors.textTertiary}>
-              {t('addFirstTransactionOrAdjust')}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center px-6 py-14 text-center">
+        <span className="mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-primary/12 text-primary">
+          <Receipt className="h-8 w-8" />
+        </span>
+        <h3 className="text-lg font-semibold text-foreground">{t('noTransactionsFound')}</h3>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">{t('addFirstTransactionOrAdjust')}</p>
+      </div>
     );
   }
 
+  const activeAuthor = active && isShared ? byEmail[active.created_by] : null;
+  const activeConverted = active ? converted(active) : null;
+
   return (
-    <div className="space-y-2">
-      {transactions.map((transaction) => (
-        <TransactionItem
-          key={transaction.id}
-          transaction={transaction}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onDuplicate={handleDuplicate}
-          cards={cards}
-          colors={colors}
-          language={language}
-          user={user}
-          t={t}
-          canEdit={canEdit}
-          onConfirm={onConfirm}
-          author={isShared ? byEmail[transaction.created_by] || null : null}
-        />
-      ))}
-    </div>
+    <>
+      <div className="-mx-1">
+        {groups.map((group) => (
+          <section key={group.key} aria-label={dayLabel(group.key)}>
+            <h3 className="sticky top-0 z-10 bg-background/80 px-3 pb-1 pt-4 text-xs font-medium text-muted-foreground backdrop-blur-md">
+              {dayLabel(group.key)}
+            </h3>
+            <ul>
+              {group.items.map((tx, i) => {
+                const income = tx.type === 'Income';
+                const author = isShared ? byEmail[tx.created_by] : null;
+                const conv = converted(tx);
+                const pending = tx.status === 'pending';
+                const cat = isObjectId(tx.category) ? '' : translateCategory(tx.category, language);
+                const meta = [cat, cardText(tx)].filter(Boolean).join(' · ');
+                return (
+                  <motion.li
+                    key={tx.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.03, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setActive(tx)}
+                      className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl px-3 py-2 text-start transition-[background-color,transform] duration-150 hover:bg-foreground/[0.05] active:scale-[0.985] active:bg-foreground/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Avatar transaction={tx} icon={iconByCategory[tx.category]} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-[0.9375rem] font-medium text-foreground">{tx.description}</span>
+                          {tx.isRecurring && <Repeat aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {pending && (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-medium text-primary">
+                              <Nfc className="h-3 w-3" aria-hidden />
+                              {tx.ingest?.flags?.includes('possibleDuplicate') ? t('possibleDuplicate') : t('needsReview')}
+                            </span>
+                          )}
+                          <span className="truncate">{meta}</span>
+                          {author && (
+                            <span aria-label={author.name} className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[0.625rem] font-semibold leading-none text-background" style={{ backgroundColor: author.color }}>
+                              {author.initials.slice(0, 1)}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 flex-col items-end">
+                        <span className={cn("text-[0.9375rem] font-semibold tabular-nums", income ? 'text-success' : 'text-foreground')} dir="ltr">
+                          <BlurValue blur={user?.blurValues}>{income ? '+' : '−'}{money(tx.amount, tx.currency)}</BlurValue>
+                        </span>
+                        {conv !== null && (
+                          <span className="text-xs tabular-nums text-muted-foreground" dir="ltr">
+                            <BlurValue blur={user?.blurValues}>{money(conv, userCurrency, 0)}</BlurValue>
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </motion.li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+        {hasMore && (
+          <div ref={sentinel} className="grid place-items-center py-6" aria-hidden>
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
+
+      <Drawer open={!!active} onOpenChange={(o) => !o && setActive(null)} shouldScaleBackground={false}>
+        <DrawerContent className="rounded-t-3xl border-0 bg-popover">
+          {active && (
+            <>
+              <DrawerHeader className="items-center gap-3 pb-2 text-center">
+                <Avatar transaction={active} icon={iconByCategory[active.category]} size="lg" />
+                <DrawerTitle className="text-lg leading-tight">{active.description}</DrawerTitle>
+                <p className={cn("text-3xl font-bold tabular-nums tracking-tight", active.type === 'Income' ? 'text-success' : 'text-foreground')} dir="ltr">
+                  <BlurValue blur={user?.blurValues}>{active.type === 'Income' ? '+' : '−'}{money(active.amount, active.currency)}</BlurValue>
+                </p>
+                <DrawerDescription className="text-center">
+                  {[
+                    isObjectId(active.category) ? '' : translateCategory(active.category, language),
+                    new Intl.DateTimeFormat(loc, { dateStyle: 'medium' }).format(new Date(`${dayKey(active.date)}T12:00:00`)) + (active.occurredAt ? ` · ${new Intl.DateTimeFormat(loc, { timeStyle: 'short' }).format(new Date(active.occurredAt))}` : ''),
+                    cardText(active),
+                    activeAuthor ? (activeAuthor.isMe ? t('me') : activeAuthor.name) : '',
+                    activeConverted !== null ? money(activeConverted, userCurrency, 0) : '',
+                  ].filter(Boolean).join(' · ')}
+                </DrawerDescription>
+              </DrawerHeader>
+              {canEdit && (
+                <div className="space-y-1 px-3 pb-4 pt-2">
+                  {onConfirm && active.status === 'pending' && <ActionRow icon={Check} tone="primary" label={t('confirmTransaction')} onClick={run(onConfirm)} />}
+                  <ActionRow icon={Edit} label={t('edit')} onClick={run(onEdit)} />
+                  <ActionRow icon={Copy} label={t('duplicate')} onClick={run(onDuplicate)} />
+                  <ActionRow icon={Trash2} tone="danger" label={t('delete')} onClick={run((tx) => onDelete(tx.id))} />
+                </div>
+              )}
+              {!canEdit && <div className="pb-4" />}
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
+    </>
   );
 }
 

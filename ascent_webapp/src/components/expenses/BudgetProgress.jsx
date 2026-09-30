@@ -1,7 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle } from 'lucide-react';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
@@ -9,7 +8,7 @@ import BlurValue from '../BlurValue';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 
 function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [] }) {
-  const { colors, language, user, t } = useTheme();
+  const { language, user, t } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
 
@@ -140,96 +139,48 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
   }
 
   return (
-    <Card className={cn(colors.cardBg, colors.cardBorder, "h-full")}>
-      <CardHeader className="drag-handle cursor-move">
-        <div className="flex items-center justify-between">
-          <CardTitle className={colors.accentText}>{t('budgetTracking')}</CardTitle>
-          <TrendingUp className="w-5 h-5 text-primary" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {budgetData.map((budget) => (
-            <div key={budget.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={cn("font-medium", colors.textPrimary)}>
-                    {translateCategory(budget.category, language)}
-                  </span>
-                  {budget.isOverBudget && (
-                    <AlertCircle className="w-4 h-4 text-danger" />
-                  )}
-                  {budget.isAtLimit && (
-                    <CheckCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                  )}
-                  {budget.isNearLimit && (
-                    <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  )}
-                </div>
-                <span className={cn("text-sm", colors.textTertiary)}>
+    <section className="rounded-3xl bg-foreground/[0.04] p-4 sm:p-5">
+      <h2 className="text-sm font-semibold text-foreground">{t('budgetTracking')}</h2>
+      <ul className="mt-3 space-y-4">
+        {budgetData.map((budget) => {
+          const tone = budget.isOverBudget ? 'bg-danger' : budget.isAtLimit ? 'bg-orange-500' : budget.isNearLimit ? 'bg-yellow-500' : 'bg-success';
+          return (
+            <li key={budget.id}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
+                  <span className="truncate">{translateCategory(budget.category, language)}</span>
+                  {budget.isOverBudget && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-danger" />}
+                  {budget.isAtLimit && <CheckCircle aria-hidden className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />}
+                  {budget.isNearLimit && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400" />}
+                </span>
+                <span className={cn("shrink-0 text-sm font-semibold tabular-nums", budget.isOverBudget ? 'text-danger' : 'text-foreground')} dir="ltr">
+                  <BlurValue blur={user?.blurValues}>{formatCurrency(budget.remaining, userCurrency)}</BlurValue>
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(budget.displayPercentage)} aria-valuemin={0} aria-valuemax={100}>
+                <motion.div className={cn("h-full rounded-full", tone)} initial={{ width: 0 }} animate={{ width: `${budget.percentage}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                <span dir="ltr">
+                  <BlurValue blur={user?.blurValues}>{formatCurrency(budget.spent, userCurrency)} / {formatCurrency(budget.monthlyLimit, userCurrency)}</BlurValue>
+                </span>
+                <span className="tabular-nums">
                   <BlurValue blur={user?.blurValues}>
-                    {budget.displayPercentage.toFixed(0)}%
+                    {budget.isOverBudget
+                      ? `${t('overBudgetBy')} ${formatCurrency(Math.abs(budget.remaining), userCurrency)}`
+                      : budget.isAtLimit
+                        ? t('reachedLimit')
+                        : budget.isNearLimit
+                          ? t('approachingLimit')
+                          : `${budget.displayPercentage.toFixed(0)}%`}
                   </BlurValue>
                 </span>
               </div>
-
-              <Progress
-                value={budget.percentage}
-                className={cn("h-2", colors.bgTertiary)}
-                indicatorClassName={
-                  budget.isOverBudget
-                    ? "bg-danger"
-                    : budget.isAtLimit
-                      ? "bg-orange-500"
-                      : budget.isNearLimit
-                        ? "bg-yellow-500"
-                        : "bg-success"
-                }
-              />
-
-              <div className="flex items-center justify-between text-sm">
-                <span className={colors.textTertiary}>
-                  <BlurValue blur={user?.blurValues}>
-                    {formatCurrency(budget.spent, userCurrency)}
-                  </BlurValue>
-                  {' / '}
-                  <BlurValue blur={user?.blurValues}>
-                    {formatCurrency(budget.monthlyLimit, userCurrency)}
-                  </BlurValue>
-                </span>
-                <span className={cn(
-                  "font-medium",
-                  budget.isOverBudget ? "text-danger" : "text-success"
-                )}>
-                  <BlurValue blur={user?.blurValues}>
-                    {budget.remaining >= 0 ? '+' : ''}{formatCurrency(budget.remaining, userCurrency)}
-                  </BlurValue>
-                </span>
-              </div>
-
-              {budget.isOverBudget && (
-                <div className="flex items-center gap-2 text-xs text-danger bg-danger/10 rounded-md px-2 py-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {t('overBudgetBy')} {formatCurrency(Math.abs(budget.remaining), userCurrency)}
-                </div>
-              )}
-              {budget.isAtLimit && (
-                <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 bg-orange-500/10 rounded-md px-2 py-1">
-                  <CheckCircle className="w-3 h-3" />
-                  {t('reachedLimit')}
-                </div>
-              )}
-              {budget.isNearLimit && (
-                <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 rounded-md px-2 py-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {t('approachingLimit')} ({budget.displayPercentage.toFixed(0)}%)
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
