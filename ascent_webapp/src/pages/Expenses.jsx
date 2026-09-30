@@ -387,9 +387,9 @@ function Expenses() {
   }
 
   return (
-    <div className="relative flex flex-col h-[calc(100dvh-10rem)] md:h-auto md:min-h-dvh p-2 sm:p-4 md:p-8">
+    <div className="relative flex flex-col md:min-h-dvh p-2 pb-24 sm:p-4 sm:pb-24 md:p-8">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.16),transparent_70%)]" />
-      <div className="max-w-7xl mx-auto flex flex-col flex-1 md:flex-none md:block min-h-0 w-full">
+      <div className="max-w-7xl mx-auto flex flex-col md:block w-full">
         {/* Header */}
         <div className="mb-3 sm:mb-6 flex-shrink-0">
           <div className="flex items-center justify-between mb-2 sm:mb-4">
@@ -456,7 +456,7 @@ function Expenses() {
         </div>
 
         {/* Period View with integrated filters - Scrollable on mobile */}
-        <div className="mt-3 sm:mt-6 flex-1 overflow-y-auto min-h-0 md:flex-none md:overflow-visible custom-scrollbar">
+        <div className="mt-3 sm:mt-6">
           <ExpenseMonthView
             transactions={selectedPeriodTransactions}
             budgets={budgets}
