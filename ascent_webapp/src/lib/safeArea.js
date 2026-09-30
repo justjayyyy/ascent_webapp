@@ -58,7 +58,10 @@ export function ensureStandaloneTopInset() {
     } else {
       root.style.removeProperty('--safe-top');
     }
-    renderDebug({ standalone, iphone, portrait, envTop, inner: `${window.innerWidth}x${window.innerHeight}`, screen: `${screen.width}x${screen.height}`, fullScreen, applied: top });
+    const header = document.querySelector('.fixed.top-0.z-50');
+    const hr = header?.getBoundingClientRect();
+    const scripts = [...document.scripts].map((x) => x.src).find((u) => /assets\/index-/.test(u)) || '';
+    renderDebug({ build: scripts.split('index-')[1] || '?', bodyBg: getComputedStyle(document.body).backgroundColor, headerBg: header ? (header.style.background || '').slice(0, 40) : 'none', headerTop: hr ? Math.round(hr.top) : '-', headerH: hr ? Math.round(hr.height) : '-', cssSafeTop: getComputedStyle(root).getPropertyValue('--safe-top') || 'env', standalone, iphone, portrait, envTop, inner: `${window.innerWidth}x${window.innerHeight}`, screen: `${screen.width}x${screen.height}`, fullScreen, applied: top });
   };
   const run = () => { cached = undefined; apply(); };
   const start = () => { run(); requestAnimationFrame(run); setTimeout(run, 400); };
@@ -87,4 +90,24 @@ function renderDebug(info) {
     document.body.appendChild(el);
   }
   el.textContent = Object.entries(info).map(([k, v]) => `${k}: ${v}`).join('\n');
+}
+
+// Installed iPhone apps keep their own storage and always open at "/", so a URL flag can't
+// reach them. Tap five times quickly in the top strip of the screen to toggle the readout.
+if (typeof window !== 'undefined') {
+  let taps = [];
+  window.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    if (!t || t.clientY > 140) return;
+    const now = Date.now();
+    taps = [...taps.filter((x) => now - x < 2500), now];
+    if (taps.length >= 5) {
+      taps = [];
+      try {
+        if (localStorage.getItem('ascent_safedebug') === '1') localStorage.removeItem('ascent_safedebug');
+        else localStorage.setItem('ascent_safedebug', '1');
+      } catch { /* storage unavailable */ }
+      window.dispatchEvent(new Event('resize'));
+    }
+  }, { passive: true });
 }
