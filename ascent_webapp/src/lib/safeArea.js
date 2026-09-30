@@ -79,6 +79,7 @@ export function ensureStandaloneTopInset() {
 }
 
 // Open the app once with ?safedebug=1 to show what the device reports (stays on until ?safedebug=0)
+let lastTap = '';
 function renderDebug(info) {
   let on = false;
   try {
@@ -95,7 +96,9 @@ function renderDebug(info) {
     el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;margin:0;padding:6px 8px;font:10px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.85);border-radius:6px;pointer-events:none;white-space:pre-wrap;max-width:70vw';
     document.body.appendChild(el);
   }
-  el.textContent = Object.entries(info).map(([k, v]) => `${k}: ${v}`).join('\n');
+  const lines = Object.entries(info).map(([k, v]) => `${k}: ${v}`);
+  if (lastTap) lines.push(lastTap);
+  el.textContent = lines.join('\n');
 }
 
 // Installed iPhone apps keep their own storage and always open at "/", so a URL flag can't
@@ -104,6 +107,13 @@ if (typeof window !== 'undefined') {
   let taps = [];
   window.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
+    try {
+      if (t && localStorage.getItem('ascent_safedebug') === '1') {
+        const d = (n) => `${n.tagName.toLowerCase()}${n.id ? '#' + n.id : ''}.${String(n.className?.baseVal ?? n.className).split(' ').slice(0, 3).join('.')}`.slice(0, 48);
+        lastTap = `tap@${Math.round(t.clientX)},${Math.round(t.clientY)}: ` + document.elementsFromPoint(t.clientX, t.clientY).slice(0, 3).map(d).join(' > ');
+        window.dispatchEvent(new Event('ascent:safe-refresh'));
+      }
+    } catch { /* debug only */ }
     if (!t || t.clientY > 140) return;
     const now = Date.now();
     taps = [...taps.filter((x) => now - x < 2500), now];
