@@ -631,8 +631,8 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 @media (max-width: 767px) {
   [role="dialog"].fixed.top-\[50\%\],
   [role="alertdialog"].fixed.top-\[50\%\] {
-    top: calc(4rem + var(--safe-top) + 0.5rem);
-    max-height: calc(100dvh - 4rem - var(--safe-top) - env(safe-area-inset-bottom) - 1rem);
+    top: calc(var(--header-bar) + var(--safe-top) + 0.5rem);
+    max-height: calc(100dvh - var(--header-bar) - var(--safe-top) - env(safe-area-inset-bottom) - 1rem);
     transform: translateX(-50%);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -692,6 +692,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 :root { --safe-top: env(safe-area-inset-top); }
 
 /* Sticky page bars sit under the phone header, and follow it when it slides away */
-:root { --sticky-top: calc(4rem + var(--safe-top)); }
+:root { --header-bar: 3.25rem; --sticky-top: calc(var(--header-bar) + var(--safe-top)); }
 html[data-header-hidden] { --sticky-top: var(--safe-top); }
 @media (min-width: 768px) { :root, html[data-header-hidden] { --sticky-top: 0px; } }

@@ -186,18 +186,21 @@ function LayoutContent({ children, currentPageName }) {
         onBlurChange={handleBlurValuesChange}
       />
 
+      {/* Solid strip behind the status bar. It stays put while the header bar slides up
+          underneath it, so the logo never shows through behind the clock. */}
+      <div aria-hidden="true" className="md:hidden fixed top-0 start-0 end-0 z-[51] bg-background" style={{ height: 'var(--safe-top)' }} />
+
       {/* Mobile Header */}
       <div className={cn(
         "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top safe-area-inset-x",
         "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-        hideHeader && "-translate-y-16",
-        colors.border
+                colors.border
       )}
       // The strip behind the status bar is the page background, so the system's soft
       // edge under the clock/battery fades into black instead of showing as a grey blur
-      style={{ background: 'linear-gradient(to bottom, hsl(var(--background)) var(--safe-top), hsl(var(--card)) var(--safe-top))' }}
+      style={{ background: 'linear-gradient(to bottom, hsl(var(--background)) var(--safe-top), hsl(var(--card)) var(--safe-top))', transform: hideHeader ? 'translateY(calc(var(--header-bar) * -1))' : undefined }}
       >
-        <div className="relative flex items-center justify-center h-16 px-4">
+        <div className="relative flex items-center justify-center h-[var(--header-bar)] px-4">
           <button
             type="button"
             onClick={() => setMobileMenuOpen((o) => !o)}
@@ -215,7 +218,7 @@ function LayoutContent({ children, currentPageName }) {
               <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 -rotate-45" : "top-3")} />
             </span>
           </button>
-          <AscentLogo motion="full" alt="Ascent logo" className="w-14" />
+          <AscentLogo motion="full" alt="Ascent logo" className="w-[3.75rem]" />
         </div>
       </div>
 
@@ -237,7 +240,7 @@ function LayoutContent({ children, currentPageName }) {
       <main
         onClick={mobileMenuOpen ? () => setMobileMenuOpen(false) : undefined}
         className={cn(
-          "min-h-dvh min-w-0 pt-[calc(4rem+var(--safe-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          "min-h-dvh min-w-0 pt-[calc(var(--header-bar)+var(--safe-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           // On phones the menu sheet pushes the page aside instead of covering it
           mobileMenuOpen && (isRTL ? "-translate-x-[17rem]" : "translate-x-[17rem]")
         )}
