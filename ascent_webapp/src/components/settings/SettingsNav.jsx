@@ -34,10 +34,17 @@ export default function SettingsNav({ items, active, onSelect, variant = 'rail' 
   const { t } = useTheme();
   const railRef = useRef(null);
 
-  // Keep the active chip visible in the phone strip.
+  // Keep the active chip visible in the phone strip. This scrolls only the strip itself: calling
+  // scrollIntoView here would also drive the page scroller and, in WebKit, cancel the smooth
+  // scroll to the section that the same tap just started.
   useEffect(() => {
-    const el = railRef.current?.querySelector('[aria-current="true"]');
-    el?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    const nav = railRef.current;
+    const el = nav?.querySelector('[aria-current="true"]');
+    if (!nav || !el) return;
+    const n = nav.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const delta = r.left + r.width / 2 - (n.left + n.width / 2);
+    if (Math.abs(delta) > 1) nav.scrollBy({ left: delta, behavior: 'smooth' });
   }, [active]);
 
   const go = (e, id) => {
@@ -45,8 +52,12 @@ export default function SettingsNav({ items, active, onSelect, variant = 'rail' 
     onSelect(id);
     const el = document.getElementById(id);
     if (!el) return;
+    // Land the section just below the sticky strip (phones) or the top gap (desktop rail)
+    const strip = variant === 'strip' ? railRef.current : null;
+    const offset = strip ? (parseFloat(getComputedStyle(strip).top) || 0) + strip.offsetHeight + 12 : 32;
+    const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY - offset);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    window.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
     history.replaceState(null, '', `#${id}`);
   };
 

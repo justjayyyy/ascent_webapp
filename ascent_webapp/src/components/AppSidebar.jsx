@@ -324,7 +324,7 @@ export default function AppSidebar({
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to={createPageUrl('Settings')} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2">
+                  <Link to={createPageUrl('Settings')} onClick={onNavigate} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2">
                     <SettingsIcon className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">{t('settings')}</span>
                   </Link>
