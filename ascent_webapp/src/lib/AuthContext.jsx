@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
-import { ascent } from '@/api/client';
+import { ascent, systemPrefs } from '@/api/client';
 import { useQueryClient } from '@tanstack/react-query';
 
 const AuthContext = createContext();
@@ -211,6 +211,13 @@ export const AuthProvider = ({ children }) => {
       const currentUser = response.user || response;
       const isFirstLogin = response.isFirstLogin || false;
 
+      // First login: adopt the device's language/theme (also for accounts created before sign-up sent them)
+      if (isFirstLogin) {
+        const prefs = systemPrefs();
+        Object.assign(currentUser, prefs);
+        ascent.auth.updateMe(prefs).catch(() => {});
+      }
+
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
@@ -260,6 +267,13 @@ export const AuthProvider = ({ children }) => {
       const response = await ascent.auth.googleLogin(credential, clientId, userInfo);
       const currentUser = response.user || response;
       const isFirstLogin = response.isFirstLogin || false;
+
+      // First login: adopt the device's language/theme (also for accounts created before sign-up sent them)
+      if (isFirstLogin) {
+        const prefs = systemPrefs();
+        Object.assign(currentUser, prefs);
+        ascent.auth.updateMe(prefs).catch(() => {});
+      }
 
       setUser(currentUser);
       setIsAuthenticated(true);

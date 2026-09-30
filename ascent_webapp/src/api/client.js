@@ -514,7 +514,7 @@ export const api = ascent;
 export default ascent;
 
 // Device language/theme, sent on sign-up so new accounts start in the user's own settings
-function systemPrefs() {
+export function systemPrefs() {
   try {
     const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
     return {
