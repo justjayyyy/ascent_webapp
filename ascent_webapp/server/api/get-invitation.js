@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { connectDB } from '../lib/mongodb.js';
 import Workspace from '../models/Workspace.js';
+import User from '../models/User.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, notFound } from '../lib/response.js';
 
@@ -42,14 +43,18 @@ export default async function handler(req, res) {
     }
 
     // Return invitation details (without sensitive info)
+    const inviter = await User.findById(invitation.invitedBy || workspace.ownerId).select('full_name email').lean();
+
     const invitationData = {
       id: invitation._id.toString(),
       workspaceId: workspace._id.toString(),
       workspaceName: workspace.name,
       invitedEmail: invitation.email,
+      role: invitation.role,
       permissions: invitation.permissions,
-      created_by: workspace.ownerId, // For compatibility, or show workspace owner
-      created_date: workspace.createdAt
+      invitedByName: inviter?.full_name || inviter?.email || '',
+      hasAccount: !!invitation.userId,
+      created_date: invitation.invitedAt || workspace.created_date
     };
 
     return success(res, invitationData);

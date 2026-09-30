@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
+import { useWorkspaceSync } from './hooks/useWorkspaceSync';
+import InvitationsBanner from '@/components/workspace/InvitationsBanner';
 import WelcomeDialog from './components/WelcomeDialog';
 import InstallHint from './components/InstallHint';
 import MobileIsland from '@/components/MobileIsland';
@@ -101,6 +103,7 @@ function LayoutContent({ children, currentPageName }) {
 
   // Session timeout - auto logout after 5 minutes of inactivity
   useSessionTimeout(!!user, t);
+  useWorkspaceSync();
 
   // Check for first login welcome message
   useEffect(() => {
@@ -228,6 +231,7 @@ function LayoutContent({ children, currentPageName }) {
         )}
       >
         <div className="pb-[calc(1rem+env(safe-area-inset-bottom))] safe-area-inset-x md:pb-0 md:px-0">
+          <InvitationsBanner />
           {children}
         </div>
       </main>

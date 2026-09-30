@@ -453,6 +453,24 @@ const workspaces = {
     return request(`/workspaces?id=${workspaceId}&action=removeMember&memberId=${memberId}`, {
       method: 'DELETE'
     });
+  },
+  async resendInvite(workspaceId, memberId) {
+    return request(`/workspaces?id=${workspaceId}&action=resend&memberId=${memberId}`, { method: 'POST' });
+  },
+  async leave(workspaceId) {
+    return request(`/workspaces?id=${workspaceId}&action=leave`, { method: 'POST' });
+  },
+  async heartbeat(workspaceId) {
+    return request(`/workspaces?id=${workspaceId}&action=heartbeat`, { method: 'POST' });
+  },
+  async myInvitations() {
+    return request('/workspaces?action=invitations');
+  },
+  async acceptInvitation(token) {
+    return request(`/workspaces?action=accept&token=${token}`, { method: 'POST' });
+  },
+  async declineInvitation(token) {
+    return request(`/workspaces?action=decline&token=${token}`, { method: 'POST' });
   }
 };
 

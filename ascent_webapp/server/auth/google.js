@@ -166,6 +166,7 @@ export default async function handler(req, res) {
         if (memberIndex !== -1) {
           workspace.members[memberIndex].status = 'accepted';
           workspace.members[memberIndex].userId = user._id;
+          workspace.members[memberIndex].joinedAt = new Date();
           await workspace.save();
           console.log(`[Google Auth] Auto-accepted invitation for ${normalizedEmail} to workspace ${workspace.name}`);
         }

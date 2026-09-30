@@ -18,9 +18,13 @@ const memberSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['pending', 'accepted', 'rejected'], 
+    enum: ['pending', 'accepted', 'declined', 'rejected'], 
     default: 'pending' 
   },
+  invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  invitedAt: { type: Date, default: null },
+  joinedAt: { type: Date, default: null },
+  lastSeenAt: { type: Date, default: null },
   permissions: {
     viewPortfolio: { type: Boolean, default: true },
     editPortfolio: { type: Boolean, default: false },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import ImportExportSection from '../components/settings/ImportExportSection';
-import SharedUsersSection from '../components/settings/SharedUsersSection';
-import InviteUserDialog from '../components/settings/InviteUserDialog';
+import MembersSection from '../components/workspace/MembersSection';
+import { roleLabel as memberRoleLabel } from '../components/workspace/utils';
 import CardManagement from '../components/settings/CardManagement';
 import ApplePaySection from '../components/settings/ApplePaySection';
 import ThemePicker from '../components/settings/ThemePicker';
@@ -43,9 +43,8 @@ const listQuery = (key, userId, fn) => ({
 
 export default function Settings() {
   const { user: themeUser, theme, setPalette, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
-  const { currentWorkspace, setCurrentWorkspace, permissions, hasPermission, refreshWorkspaces, logout } = useAuth();
+  const { currentWorkspace, setCurrentWorkspace, currentMember, isWorkspaceOwner: isOwner, hasPermission, refreshWorkspaces, logout } = useAuth();
   const [user, setUser] = useState(null);
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchRef = useRef(null);
 
@@ -113,117 +112,6 @@ export default function Settings() {
     },
   });
 
-  const isOwner = useMemo(
-    () => currentWorkspace?.ownerId === user?.id || currentWorkspace?.ownerId === user?._id,
-    [currentWorkspace?.ownerId, user?.id, user?._id]
-  );
-
-  const inviteUserMutation = useMutation({
-    mutationFn: async (data) => {
-      if (!currentWorkspace) throw new Error('No active workspace');
-      return ascent.workspaces.invite(currentWorkspace.id || currentWorkspace._id, {
-        email: data.invitedEmail,
-        role: 'viewer',
-        permissions: data.permissions,
-        displayName: data.displayName,
-      });
-    },
-    onSuccess: async (data) => {
-      // Backend returns { message, workspace, emailSent, emailError }
-      if (data && data.emailSent === false) {
-        toast.warning(`Invitation created, but email failed: ${data.emailError || 'SMTP error'}`);
-      } else {
-        toast.success('Invitation sent successfully!');
-      }
-      setInviteDialogOpen(false);
-      await refreshWorkspaces();
-    },
-    onMutate: async (data) => {
-      const previousWorkspace = currentWorkspace;
-      if (currentWorkspace) {
-        setInviteDialogOpen(false);
-        const tempId = `temp-${Date.now()}`;
-        setCurrentWorkspace((prev) => ({
-          ...prev,
-          members: [
-            ...(prev.members || []),
-            { _id: tempId, userId: tempId, email: data.invitedEmail, status: 'pending', role: 'viewer', permissions: data.permissions || {}, displayName: data.displayName },
-          ],
-        }));
-      }
-      return { previousWorkspace };
-    },
-    onError: (error, variables, context) => {
-      console.error('Invite error:', error);
-      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
-      toast.error(error.message || 'Failed to send invitation');
-    },
-  });
-
-  const membersKey = currentWorkspace?.members ? JSON.stringify(currentWorkspace.members) : null;
-  const sharedUsers = useMemo(() => {
-    if (!currentWorkspace?.members) return [];
-    return currentWorkspace.members
-      .filter((m) => m.userId !== user?.id && m.userId !== user?._id && m.email !== user?.email)
-      .map((m) => ({
-        id: m._id || m.userId,
-        invitedEmail: m.email,
-        displayName: m.email.split('@')[0],
-        status: m.status,
-        permissions: m.permissions,
-        role: m.role,
-      }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [membersKey, user?.id, user?._id, user?.email]);
-
-  const canManageUsers = hasPermission('manageUsers');
-
-  const updateSharedUserMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      if (!currentWorkspace) return;
-      return ascent.workspaces.updateMember(currentWorkspace.id || currentWorkspace._id, id, data);
-    },
-    onMutate: async ({ id, data }) => {
-      const previousWorkspace = currentWorkspace;
-      if (currentWorkspace?.members) {
-        const members = currentWorkspace.members.map((m) => ((m._id || m.userId) === id ? { ...m, ...data } : m));
-        setCurrentWorkspace((prev) => ({ ...prev, members }));
-      }
-      return { previousWorkspace };
-    },
-    onSuccess: () => toast.success('Permissions updated'),
-    onError: (error, variables, context) => {
-      console.error('[Settings] Permission update failed, rolling back:', error);
-      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
-      toast.error('Failed to update permissions');
-    },
-  });
-
-  const deleteSharedUserMutation = useMutation({
-    mutationFn: async (id) => {
-      if (!currentWorkspace) return;
-      return ascent.workspaces.removeMember(currentWorkspace.id || currentWorkspace._id, id);
-    },
-    onMutate: async (id) => {
-      const previousWorkspace = currentWorkspace;
-      if (currentWorkspace?.members) {
-        const members = currentWorkspace.members.filter((m) => (m._id || m.userId) !== id);
-        setCurrentWorkspace((prev) => ({ ...prev, members }));
-      }
-      return { previousWorkspace };
-    },
-    onSuccess: () => toast.success('User access revoked!'),
-    onError: (error, variables, context) => {
-      console.error('[Settings] Failed to remove user, rolling back:', error);
-      if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
-      toast.error('Failed to remove user');
-    },
-  });
-
-  const handleInviteUser = useCallback(() => setInviteDialogOpen(true), []);
-  const handleUpdateUser = useCallback((id, data) => updateSharedUserMutation.mutate({ id, data }), [updateSharedUserMutation.mutate]);
-  const handleDeleteUser = useCallback((id) => deleteSharedUserMutation.mutate(id), [deleteSharedUserMutation.mutate]);
-
   const selectLook = (id) => {
     if (id === 'light') {
       if (theme !== 'light') saveUser({ theme: 'light' });
@@ -244,12 +132,12 @@ export default function Settings() {
     { key: 'emailNotifications', label: t('emailNotifications'), desc: t('receiveImportantUpdates'), checked: user?.emailNotifications !== false },
   ].filter(Boolean);
 
-  const roleLabel = permissions ? t('sharedUser') : t('owner');
+  const roleLabel = memberRoleLabel(t, isOwner ? 'owner' : currentMember?.role);
   const show = {
     profile: hit(t('setNavProfile'), t('fullName'), t('email'), roleLabel),
     appearance: hit(t('setNavAppearance'), t('setThemeLabel'), t('language'), t('defaultCurrency'), t('blurValues'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark')),
     notifications: hit(t('setNavNotifications'), ...notificationRows.flatMap((r) => [r.label, r.desc])),
-    household: isOwner && hit(t('setNavHousehold'), t('workspaceName'), t('sharedAccess'), t('inviteUser')),
+    household: hit(t('setNavHousehold'), t('workspaceName'), t('wsMembers'), t('wsInviteMember')),
     cards: hasPermission('manageCards') && hit(t('setNavCards'), t('paymentCards'), t('addCard')),
     applepay: hasPermission('editExpenses') && hit('Apple Pay', t('apDesc')),
     data: hit(t('setNavData'), t('exportData'), t('expenses'), t('notes'), 'csv'),
@@ -261,7 +149,7 @@ export default function Settings() {
     { id: 'profile', label: t('setNavProfile'), icon: UserCircle },
     { id: 'appearance', label: t('setNavAppearance'), icon: Palette },
     { id: 'notifications', label: t('setNavNotifications'), icon: Bell },
-    isOwner && { id: 'household', label: t('setNavHousehold'), icon: Users },
+    { id: 'household', label: t('setNavHousehold'), icon: Users },
     hasPermission('manageCards') && { id: 'cards', label: t('setNavCards'), icon: CreditCard },
     hasPermission('editExpenses') && { id: 'applepay', label: 'Apple Pay', icon: Smartphone },
     { id: 'data', label: t('setNavData'), icon: Database },
@@ -456,19 +344,14 @@ export default function Settings() {
                       id="settings-workspace-name"
                       value={currentWorkspace?.name || ''}
                       icon={Users}
+                      disabled={!isOwner}
                       onSave={(v) => updateWorkspaceMutation.mutateAsync(v)}
                     />
                   </Row>
                 )}
-                {(sectionHit(t('setNavHousehold')) || hit(t('sharedAccess'), t('inviteUser'))) && (
+                {(sectionHit(t('setNavHousehold')) || hit(t('wsMembers'), t('wsInviteMember'))) && (
                   <div>
-                    <SharedUsersSection
-                      sharedUsers={sharedUsers}
-                      onInvite={handleInviteUser}
-                      onUpdate={handleUpdateUser}
-                      onDelete={handleDeleteUser}
-                      canManageUsers={canManageUsers}
-                    />
+                    <MembersSection />
                   </div>
                 )}
               </Group>
@@ -522,12 +405,6 @@ export default function Settings() {
         </div>
       </div>
 
-      <InviteUserDialog
-        open={inviteDialogOpen}
-        onClose={() => setInviteDialogOpen(false)}
-        onSubmit={inviteUserMutation.mutate}
-        isLoading={inviteUserMutation.isPending}
-      />
     </div>
   );
 }

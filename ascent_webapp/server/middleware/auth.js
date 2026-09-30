@@ -39,16 +39,18 @@ export async function authMiddleware(req, res) {
     const workspaceId = req.headers['x-workspace-id'];
     if (workspaceId) {
       try {
+        // Pending and declined invitees have no access; only accepted members do.
         const workspace = await Workspace.findOne({
           _id: workspaceId,
-          'members.userId': user._id
+          members: { $elemMatch: { userId: user._id, status: 'accepted' } }
         }).lean();
 
         if (workspace) {
           req.workspace = workspace;
           // Attach the member details for this user (permissions, role)
-          const member = workspace.members.find(m => m.userId.toString() === user._id.toString());
-          req.member = member;
+          req.member = workspace.members.find(
+            m => m.status === 'accepted' && m.userId && m.userId.toString() === user._id.toString()
+          );
         }
       } catch (wsError) {
         console.error('[AuthMiddleware] Error fetching workspace:', wsError);
