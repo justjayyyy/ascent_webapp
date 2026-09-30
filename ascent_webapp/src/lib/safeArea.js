@@ -25,18 +25,3 @@ export function popperCollisionPadding() {
   return cached;
 }
 
-// Some iOS versions report env(safe-area-inset-top) as 0 in a home-screen app until
-// the first layout. Fall back to a typical notch height so the header never sits
-// under the status bar.
-export function ensureStandaloneTopInset() {
-  if (typeof window === 'undefined') return;
-  const standalone = window.navigator.standalone === true;
-  const iphone = /iPhone/.test(navigator.userAgent);
-  if (!standalone || !iphone) return;
-  const probe = document.createElement('div');
-  probe.style.cssText = 'position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top)';
-  document.body.appendChild(probe);
-  const inset = parseFloat(getComputedStyle(probe).paddingTop) || 0;
-  probe.remove();
-  if (inset < 20) document.documentElement.style.setProperty('--safe-top', 'calc(47px + 0.5rem)');
-}

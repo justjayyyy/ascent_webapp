@@ -686,11 +686,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 .note-mark { background: hsl(var(--primary) / 0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
 
-/* One source of truth for the top inset. Installed on an iPhone the page runs edge to
-   edge under the notch / Dynamic Island, so everything that clears it reads --safe-top.
-   In standalone we add breathing room below the cut-out so the header content is fully
-   inside the tappable, un-blurred area. */
+/* One source of truth for the top inset. The iOS status bar is opaque ("black" in
+   index.html), so an installed app starts below the notch / Dynamic Island and this is
+   normally 0. It stays a variable so every top offset moves together if that changes. */
 :root { --safe-top: env(safe-area-inset-top); }
-@media (display-mode: standalone) {
-  :root { --safe-top: calc(env(safe-area-inset-top) + 0.5rem); }
-}
