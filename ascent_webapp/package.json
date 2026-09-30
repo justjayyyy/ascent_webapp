@@ -16,7 +16,7 @@
     "seed:test-data": "node --env-file=.env server/scripts/seed-test-data.mjs",
     "create:demo": "node --env-file=.env server/scripts/create-demo-account.mjs",
     "test:email": "node --env-file=.env server/scripts/test-email.mjs",
-    "test:server": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\"",
+    "test:server": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\"",
     "ensure:indexes": "node --env-file=.env server/scripts/ensure-indexes.mjs",
     "backfill:ingest": "node --env-file=.env server/scripts/backfill-ingest-fields.mjs"
   },
@@ -82,6 +82,7 @@
     "motion": "^13.4.6",
     "next-themes": "^0.4.4",
     "nodemailer": "^6.9.16",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.2.0",

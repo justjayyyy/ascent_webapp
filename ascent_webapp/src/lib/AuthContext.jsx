@@ -19,6 +19,22 @@ const isPublicRoute = (pathname) => {
   });
 };
 
+const sameId = (a, b) => !!a && !!b && String(a) === String(b);
+
+// The caller's accepted membership in a workspace (pending or declined invitations grant nothing).
+const findMe = (ws, u) =>
+  (ws?.members || []).find(
+    (m) => m.status === 'accepted' && (sameId(m.userId, u?.id) || sameId(m.userId, u?._id) || (!m.userId && m.email === u?.email))
+  );
+
+// null = full access (owner/admin), otherwise the explicit permission flags.
+const permissionsOf = (member) => {
+  if (!member) return {};
+  return member.role === 'owner' || member.role === 'admin' ? null : member.permissions || {};
+};
+
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -69,22 +85,9 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('ascent_current_workspace_id', activeWs.id || activeWs._id);
 
         // Determine permissions for this workspace
-        const member = activeWs.members.find(m =>
-          (m.userId && (m.userId === currentUser.id || m.userId === currentUser._id)) ||
-          m.email === currentUser.email
-        );
-
-        if (member) {
-          console.log(`[AuthContext] Active Workspace: ${activeWs.name}, Role: ${member.role}`);
-          if (member.role === 'owner' || member.role === 'admin') {
-            setPermissions(null); // Full access
-          } else {
-            setPermissions(member.permissions || {});
-          }
-        } else {
-          console.warn('[AuthContext] User is not a member of the active workspace?');
-          setPermissions({}); // No access?
-        }
+        const member = findMe(activeWs, currentUser);
+        setPermissions(permissionsOf(member));
+        if (!member) console.warn('[AuthContext] User is not a member of the active workspace');
       }
     } catch (wsError) {
       console.error('Failed to load workspaces:', wsError);
@@ -177,77 +180,30 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, [checkAppState]);
 
+  // Quiet background sync: picks up renames, new members, role and permission changes made by others,
+  // and recovers when the caller has been removed from the workspace they are viewing.
   const refreshWorkspaces = useCallback(async () => {
     if (!user) return;
 
     try {
-      console.log('[AuthContext] Fetching updated workspaces...');
       const wsList = await ascent.workspaces.list();
-
-      // Find and update only the current workspace without triggering full workspaces update
       const storedWsId = localStorage.getItem('ascent_current_workspace_id');
-      const updatedCurrentWs = wsList.find(w => (w.id || w._id) === storedWsId);
+      const updatedCurrentWs = wsList.find((w) => (w.id || w._id) === storedWsId);
 
-      if (updatedCurrentWs) {
-        // Update current workspace members only (most surgical update possible)
-        setCurrentWorkspace(prevWs => {
-          if (!prevWs) return updatedCurrentWs;
-
-          // Deep compare only the members array
-          const membersChanged = JSON.stringify(prevWs.members) !== JSON.stringify(updatedCurrentWs.members);
-
-          if (membersChanged) {
-            console.log('[AuthContext] Members changed, updating only members array');
-            // Return a new object but preserve other properties to minimize re-renders
-            return { ...prevWs, members: updatedCurrentWs.members };
-          }
-
-          console.log('[AuthContext] No member changes, keeping current workspace reference');
-          return prevWs;
-        });
-
-        // Update workspaces list (less frequently accessed, so lower priority)
-        setWorkspaces(prevWorkspaces => {
-          // Find and update only the changed workspace in the list
-          const wsIndex = prevWorkspaces.findIndex(w => (w.id || w._id) === storedWsId);
-          if (wsIndex !== -1) {
-            const needsUpdate = JSON.stringify(prevWorkspaces[wsIndex].members) !== JSON.stringify(updatedCurrentWs.members);
-            if (needsUpdate) {
-              console.log('[AuthContext] Updating workspace in list');
-              const newWorkspaces = [...prevWorkspaces];
-              newWorkspaces[wsIndex] = updatedCurrentWs;
-              return newWorkspaces;
-            }
-          }
-          return prevWorkspaces;
-        });
-
-        // Update permissions for current user in this workspace
-        const member = updatedCurrentWs.members.find(m =>
-          (m.userId && (m.userId === user.id || m.userId === user._id)) ||
-          m.email === user.email
-        );
-
-        if (member) {
-          const newPermissions = (member.role === 'owner' || member.role === 'admin')
-            ? null
-            : (member.permissions || {});
-
-          // Only update permissions if they actually changed
-          setPermissions(prevPerms => {
-            if (JSON.stringify(prevPerms) !== JSON.stringify(newPermissions)) {
-              console.log('[AuthContext] Permissions changed, updating state');
-              return newPermissions;
-            }
-            console.log('[AuthContext] No permission changes');
-            return prevPerms;
-          });
-        }
+      if (!updatedCurrentWs) {
+        await loadWorkspaces(user);
+        return;
       }
+
+      setWorkspaces((prev) => (sameJson(prev, wsList) ? prev : wsList));
+      setCurrentWorkspace((prev) => (prev && sameJson(prev, updatedCurrentWs) ? prev : updatedCurrentWs));
+
+      const newPermissions = permissionsOf(findMe(updatedCurrentWs, user));
+      setPermissions((prev) => (sameJson(prev, newPermissions) ? prev : newPermissions));
     } catch (wsError) {
       console.error('Failed to refresh workspaces:', wsError);
     }
-  }, [user]);
+  }, [user, loadWorkspaces]);
 
   const login = useCallback(async (email, password) => {
     try {
@@ -355,26 +311,19 @@ export const AuthProvider = ({ children }) => {
       setCurrentWorkspace(ws);
       localStorage.setItem('ascent_current_workspace_id', ws.id || ws._id);
 
-      // Reload permissions
-      const member = ws.members.find(m =>
-        (m.userId && (m.userId === user.id || m.userId === user._id)) ||
-        m.email === user.email
-      );
-
-      if (member) {
-        if (member.role === 'owner' || member.role === 'admin') {
-          setPermissions(null);
-        } else {
-          setPermissions(member.permissions || {});
-        }
-      }
+      setPermissions(permissionsOf(findMe(ws, user)));
 
       // Instead of reload, we'll let the app re-render with the new workspace context
       // Components using useAuth() will see the change and re-fetch their data
     }
   }, [workspaces, user]);
 
+  const currentMember = useMemo(() => findMe(currentWorkspace, user), [currentWorkspace, user]);
+  const isWorkspaceOwner = currentMember?.role === 'owner' || sameId(currentWorkspace?.ownerId, user?.id || user?._id);
+
   const value = useMemo(() => ({
+    currentMember,
+    isWorkspaceOwner,
     user,
     setUser,
     isAuthenticated,
@@ -396,6 +345,8 @@ export const AuthProvider = ({ children }) => {
     navigateToLogin,
     checkAppState
   }), [
+    currentMember,
+    isWorkspaceOwner,
     user,
     setUser,
     isAuthenticated,

@@ -1,271 +1,204 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Loader2, Mail, User, Shield } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Loader2, Mail, ShieldCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 import { ascent } from '@/api/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/AuthContext';
+import { translations } from '@/lib/translations';
+import { fmt, roleLabel } from '@/components/workspace/utils';
 
-// Google Client ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const API = import.meta.env.VITE_API_URL || '';
+
+const pickLanguage = (userLanguage) => {
+  if (translations[userLanguage]) return userLanguage;
+  const browser = (navigator.language || 'en').slice(0, 2);
+  return translations[browser] ? browser : 'en';
+};
 
 export default function AcceptInvitation() {
   const { token } = useParams();
   const navigate = useNavigate();
+  const { user, isAuthenticated, logout, refreshWorkspaces } = useAuth();
   const [invitation, setInvitation] = useState(null);
+  const [failed, setFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const language = pickLanguage(user?.language);
+  const t = useMemo(() => (key) => translations[language]?.[key] || translations.en[key] || key, [language]);
 
   useEffect(() => {
-    // Load Google Identity Services script
-    if (GOOGLE_CLIENT_ID) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = initializeGoogleSignIn;
-      document.body.appendChild(script);
-
-      return () => {
-        const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-        if (existingScript) {
-          existingScript.remove();
-        }
-      };
-    }
-  }, [invitation]); // Re-initialize when invitation loads
-
-  useEffect(() => {
-    fetchInvitation();
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`${API}/api/invitations/${token}`);
+        const result = await response.json();
+        const data = result.data || result;
+        if (!response.ok || !data?.invitedEmail) throw new Error(result.error || result.message);
+        if (!cancelled) setInvitation(data);
+      } catch {
+        if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [token]);
 
-  const fetchInvitation = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/invitations/${token}`);
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || result.message || 'Failed to load invitation');
-      }
-
-      // The API wraps data in { success: true, data: {...} }
-      const invitationData = result.data || result;
-      
-      // Ensure we have the expected structure
-      if (invitationData && invitationData.invitedEmail) {
-        setInvitation(invitationData);
-      } else {
-        console.error('Invalid invitation data structure:', result);
-        throw new Error('Invalid invitation data');
-      }
-    } catch (error) {
-      console.error('Error fetching invitation:', error);
-      toast.error(error.message || 'Invalid or expired invitation');
-      setTimeout(() => navigate('/login'), 3000);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const initializeGoogleSignIn = () => {
-    if (!window.google || !GOOGLE_CLIENT_ID || !invitation) return;
-
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleGoogleCallback,
-      auto_select: false,
-    });
-
-    // Render the Google Sign-In button - wait a bit for DOM to be ready
-    setTimeout(() => {
-      const buttonContainer = document.getElementById('google-signin-button');
-      if (buttonContainer && window.google?.accounts?.id) {
-        // Clear any existing content
-        buttonContainer.innerHTML = '';
-        window.google.accounts.id.renderButton(buttonContainer, {
-          type: 'standard',
-          theme: 'filled_black',
-          size: 'large',
-          text: 'continue_with',
-          shape: 'rectangular',
-        });
-      }
-    }, 100);
-  };
+  const signedIn = isAuthenticated && !!user;
+  const emailMatches = signedIn && user.email?.toLowerCase() === invitation?.invitedEmail?.toLowerCase();
 
   const handleGoogleCallback = async (response) => {
-    if (!response.credential) {
-      setIsSigningIn(false);
-      return;
-    }
-
-    // Ensure invitation is still available
-    if (!invitation || !invitation.invitedEmail) {
-      setIsSigningIn(false);
-      toast.error('Invitation data not available. Please refresh the page.');
-      return;
-    }
-
-    setIsSigningIn(true);
-
+    if (!response.credential) return;
+    setBusy(true);
     try {
-      // Verify the email matches the invitation
-      const tokenResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${response.credential}`);
-      
-      if (!tokenResponse.ok) {
-        throw new Error('Failed to verify Google token');
-      }
-      
-      const tokenData = await tokenResponse.json();
-      
-      if (!tokenData?.email) {
-        throw new Error('Unable to verify email address from Google');
-      }
-      
-      const userEmail = tokenData.email.toLowerCase();
-      const invitedEmail = invitation.invitedEmail.toLowerCase();
-      
-      if (userEmail !== invitedEmail) {
-        throw new Error(`You must sign in with ${invitation.invitedEmail} to accept this invitation`);
-      }
-      
-      // Login with Google (invitation will be auto-accepted on backend)
-      const loginResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/google`, {
+      const loginResponse = await fetch(`${API}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          credential: response.credential,
-          clientId: GOOGLE_CLIENT_ID
-        })
+        body: JSON.stringify({ credential: response.credential, clientId: GOOGLE_CLIENT_ID }),
       });
-
-      const responseJson = await loginResponse.json();
-
-      if (!loginResponse.ok) {
-        throw new Error(responseJson.message || 'Login failed');
-      }
-
-      // The API wraps data in { success: true, data: {...} }
-      const loginData = responseJson.data || responseJson;
-
-      if (!loginData.token) {
-        throw new Error('No token received from server');
-      }
-
-      // Store token
-      localStorage.setItem('ascent_access_token', loginData.token);
-
-      toast.success('Welcome! Your invitation has been accepted.');
-      
-      // Force a hard navigation to ensure auth context updates
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      const json = await loginResponse.json();
+      if (!loginResponse.ok) throw new Error(json.message || 'Login failed');
+      const data = json.data || json;
+      if (!data.token) throw new Error('No token received from server');
+      localStorage.setItem('ascent_access_token', data.token);
+      localStorage.removeItem('ascent_current_workspace_id');
+      toast.success(fmt(t('wsJoined'), { workspace: invitation.workspaceName }));
+      setTimeout(() => { window.location.href = '/'; }, 100);
     } catch (error) {
-      console.error('Google login error:', error);
-      toast.error(error.message || 'Failed to sign in');
-    } finally {
-      setIsSigningIn(false);
+      toast.error(error.message || t('wsFailed'));
+      setBusy(false);
     }
   };
 
+  useEffect(() => {
+    if (!invitation || signedIn || !GOOGLE_CLIENT_ID) return undefined;
+    const init = () => {
+      const container = document.getElementById('google-signin-button');
+      if (!window.google?.accounts?.id || !container) return;
+      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCallback, auto_select: false });
+      container.innerHTML = '';
+      window.google.accounts.id.renderButton(container, { type: 'standard', theme: 'filled_black', size: 'large', text: 'continue_with', shape: 'rectangular' });
+    };
+    if (window.google?.accounts?.id) {
+      init();
+      return undefined;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = init;
+    document.body.appendChild(script);
+    return () => script.remove();
+  }, [invitation, signedIn]);
+
+  const respond = async (accept) => {
+    setBusy(true);
+    try {
+      if (accept) {
+        await ascent.workspaces.acceptInvitation(token);
+        localStorage.setItem('ascent_current_workspace_id', invitation.workspaceId);
+        toast.success(fmt(t('wsJoined'), { workspace: invitation.workspaceName }));
+        await refreshWorkspaces();
+        window.location.href = '/';
+      } else {
+        await ascent.workspaces.declineInvitation(token);
+        toast.success(t('wsInviteDeclined'));
+        navigate('/');
+      }
+    } catch (error) {
+      toast.error(error.message || t('wsFailed'));
+      setBusy(false);
+    }
+  };
+
+  const shell = (children) => (
+    <div
+      dir={language === 'he' ? 'rtl' : 'ltr'}
+      className="flex min-h-dvh items-center justify-center bg-background p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]"
+    >
+      <Card className="w-full max-w-md border-border bg-card">{children}</Card>
+    </div>
+  );
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <Card className="bg-card border-primary/30 max-w-md w-full">
-          <CardContent className="p-6 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading invitation...</p>
-          </CardContent>
-        </Card>
-      </div>
+    return shell(
+      <CardContent className="p-6 text-center">
+        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+        <p className="text-muted-foreground">{t('wsAcceptLoading')}</p>
+      </CardContent>
     );
   }
 
-  if (!invitation) {
-    return null;
+  if (failed || !invitation) {
+    return shell(
+      <CardContent className="space-y-4 p-6 text-center">
+        <UserX className="mx-auto h-10 w-10 text-muted-foreground" aria-hidden="true" />
+        <p className="text-foreground text-pretty">{t('wsAcceptInvalid')}</p>
+        <Button asChild className="h-11 rounded-xl"><Link to="/login">{t('wsContinueEmail')}</Link></Button>
+      </CardContent>
+    );
   }
 
-  const permissionsList = [];
-  if (invitation?.permissions?.viewPortfolio) permissionsList.push('View Portfolio');
-  if (invitation?.permissions?.editPortfolio) permissionsList.push('Edit Portfolio');
-  if (invitation?.permissions?.viewExpenses) permissionsList.push('View Expenses');
-  if (invitation?.permissions?.editExpenses) permissionsList.push('Edit Expenses');
-  if (invitation?.permissions?.viewNotes) permissionsList.push('View Notes');
-  if (invitation?.permissions?.editNotes) permissionsList.push('Edit Notes');
-  if (invitation?.permissions?.viewGoals) permissionsList.push('View Goals');
-  if (invitation?.permissions?.editGoals) permissionsList.push('Edit Goals');
-  if (invitation?.permissions?.viewBudgets) permissionsList.push('View Budgets');
-  if (invitation?.permissions?.editBudgets) permissionsList.push('Edit Budgets');
-  if (invitation?.permissions?.viewSettings) permissionsList.push('View Settings');
-  if (invitation?.permissions?.manageUsers) permissionsList.push('Manage Users');
+  const loginHref = `/login?redirect=${encodeURIComponent(`/accept-invitation/${token}`)}`;
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
-      <Card className="bg-card border-primary/30 max-w-md w-full">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Shield className="w-12 h-12 text-primary" />
+  return shell(
+    <>
+      <CardHeader className="text-center">
+        <div className="mb-2 flex items-center justify-center">
+          <ShieldCheck className="h-12 w-12 text-primary" aria-hidden="true" />
+        </div>
+        <CardTitle className="text-2xl font-bold text-foreground">{t('wsAcceptTitle')}</CardTitle>
+        <CardDescription className="text-pretty">
+          {fmt(t('wsAcceptFrom'), { name: invitation.invitedByName || t('wsSomeone'), workspace: invitation.workspaceName })}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-2 rounded-2xl bg-muted/50 p-4">
+          <p className="flex items-center gap-2 text-sm text-foreground" dir="ltr">
+            <Mail className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            {invitation.invitedEmail}
+          </p>
+          <p className="text-sm text-muted-foreground">{fmt(t('wsJoinAs'), { role: roleLabel(t, invitation.role) })}</p>
+        </div>
+
+        {signedIn && emailMatches && (
+          <div className="flex gap-2">
+            <Button variant="ghost" className="h-11 flex-1 rounded-xl" disabled={busy} onClick={() => respond(false)}>{t('wsDecline')}</Button>
+            <Button className="h-11 flex-1 rounded-xl" disabled={busy} onClick={() => respond(true)}>
+              {busy && <Loader2 className="me-1.5 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {t('wsAccept')}
+            </Button>
           </div>
-          <CardTitle className="text-2xl font-bold text-muted-foreground">
-            You've Been Invited!
-          </CardTitle>
-          <CardDescription className="text-primary mt-2">
-            Sign in with Google to accept this invitation
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        )}
+
+        {signedIn && !emailMatches && (
+          <div className="space-y-3 text-center">
+            <p className="text-sm text-muted-foreground text-pretty">{fmt(t('wsSignedInAs'), { email: user.email })}</p>
+            <p className="text-sm text-foreground text-pretty">{fmt(t('wsWrongAccount'), { email: invitation.invitedEmail })}</p>
+            <Button variant="secondary" className="h-11 w-full rounded-xl" onClick={() => logout()}>{t('wsSignOut')}</Button>
+          </div>
+        )}
+
+        {!signedIn && (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg">
-              <Mail className="w-5 h-5 text-primary" />
-              <div>
-                <p className="text-xs text-primary">Invited Email</p>
-                <p className="text-sm font-medium text-muted-foreground">{invitation.invitedEmail || 'Not specified'}</p>
-              </div>
-            </div>
-            {invitation.displayName && (
-              <div className="flex items-center gap-3 p-3 bg-background rounded-lg">
-                <User className="w-5 h-5 text-primary" />
-                <div>
-                  <p className="text-xs text-primary">Display Name</p>
-                  <p className="text-sm font-medium text-muted-foreground">{invitation.displayName}</p>
-                </div>
-              </div>
+            <p className="text-center text-sm text-muted-foreground text-pretty">{fmt(t('wsUseEmail'), { email: invitation.invitedEmail })}</p>
+            {GOOGLE_CLIENT_ID && <div id="google-signin-button" className="flex min-h-11 w-full justify-center" />}
+            {busy && (
+              <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{t('wsSigningIn')}
+              </p>
             )}
+            <Button asChild variant="outline" className="h-11 w-full rounded-xl">
+              <Link to={loginHref}>{t('wsContinueEmail')}</Link>
+            </Button>
           </div>
-
-          {permissionsList.length > 0 && (
-            <div className="p-4 bg-background rounded-lg">
-              <p className="text-sm font-medium text-muted-foreground mb-2">Your Permissions:</p>
-              <ul className="space-y-1">
-                {permissionsList.map((perm, idx) => (
-                  <li key={idx} className="text-xs text-primary">• {perm}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="pt-4">
-            {/* Google Sign-In Button Container - visible and ready */}
-            <div 
-              id="google-signin-button" 
-              className="w-full flex justify-center"
-              style={{ minHeight: '44px' }}
-            />
-            {isSigningIn && (
-              <div className="mt-3 text-center">
-                <Loader2 className="w-4 h-4 animate-spin text-primary mx-auto mb-2" />
-                <p className="text-xs text-primary">Signing in...</p>
-              </div>
-            )}
-            <p className="text-xs text-primary text-center mt-3">
-              You must sign in with <strong>{invitation.invitedEmail}</strong> to accept this invitation
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+      </CardContent>
+    </>
   );
 }

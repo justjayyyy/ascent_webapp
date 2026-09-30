@@ -20,15 +20,15 @@ export function useHousehold() {
   const { user } = useTheme();
 
   return useMemo(() => {
-    const emails = new Set();
-    if (user?.email) emails.add(user.email);
+    const known = new Map();
+    if (user?.email) known.set(user.email, {});
     (currentWorkspace?.members || []).forEach((m) => {
-      if (m?.email && m.status !== 'declined') emails.add(m.email);
+      if (m?.email && m.status === 'accepted') known.set(m.email, { name: m.name, avatar: m.avatar });
     });
-    const members = [...emails].map((email, i) => {
+    const members = [...known].map(([email, info], i) => {
       const isMe = email === user?.email;
-      const name = isMe && user?.full_name ? user.fullName : nameFromEmail(email);
-      return { email, name, initials: initialsOf(name), isMe, color: `hsl(${SERIES[i % SERIES.length]})` };
+      const name = (isMe ? user?.full_name : info.name) || nameFromEmail(email);
+      return { email, name, avatar: info.avatar, initials: initialsOf(name), isMe, color: `hsl(${SERIES[i % SERIES.length]})` };
     });
     const byEmail = Object.fromEntries(members.map((m) => [m.email, m]));
     return { members, byEmail, isShared: members.length > 1, meEmail: user?.email };

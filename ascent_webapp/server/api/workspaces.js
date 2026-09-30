@@ -3,9 +3,93 @@ import Workspace from '../models/Workspace.js';
 import User from '../models/User.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { handleCors } from '../lib/cors.js';
-import { success, error, serverError, unauthorized, notFound } from '../lib/response.js';
+import { success, error, serverError, unauthorized, notFound, forbidden } from '../lib/response.js';
 import { sendEmail } from '../lib/email-helper.js';
 import { getEmailTemplate } from '../lib/email-templates.js';
+import {
+  ASSIGNABLE_ROLES,
+  MAX_MEMBERS,
+  buildPermissions,
+  canAssignRole,
+  canManageMember,
+  escapeHtml,
+  findAcceptedMember,
+  isManagerRole,
+  isOwnerMember,
+  isSame,
+  isValidEmail,
+} from '../../shared/workspaceAccess.js';
+
+const strip = (html) => html.replace(/<[^>]*>/g, '');
+
+const inviteCopy = (language, inviter, workspaceName) => {
+  const w = escapeHtml(workspaceName);
+  const who = escapeHtml(inviter);
+  const copy = {
+    he: {
+      subject: `הזמנה להצטרף ל-${workspaceName}`,
+      greeting: 'שלום,',
+      message: `<strong>${who}</strong> הזמין/ה אותך להצטרף לסביבת העבודה "<strong>${w}</strong>" ב-Ascent.`,
+      cta: 'קבל הזמנה',
+      footer: 'אם אין לך חשבון, תתבקש ליצור אחד.',
+    },
+    ru: {
+      subject: `Приглашение в ${workspaceName}`,
+      greeting: 'Здравствуйте,',
+      message: `<strong>${who}</strong> приглашает вас присоединиться к рабочей области "<strong>${w}</strong>" в Ascent.`,
+      cta: 'Принять приглашение',
+      footer: 'Если у вас нет учетной записи, вам будет предложено создать ее.',
+    },
+    en: {
+      subject: `Invitation to join ${workspaceName}`,
+      greeting: 'Hello,',
+      message: `<strong>${who}</strong> invited you to join the workspace "<strong>${w}</strong>" on Ascent.`,
+      cta: 'Accept Invitation',
+      footer: "If you don't have an account, you will be asked to create one.",
+    },
+  };
+  return copy[language] || copy.en;
+};
+
+async function sendInvitation({ req, workspace, member, inviter, language }) {
+  const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
+  const inviteLink = `${origin}/accept-invitation/${member._id}`;
+  const inviterName = inviter.full_name || inviter.email;
+  const c = inviteCopy(language, inviterName, workspace.name);
+
+  const html = getEmailTemplate({
+    language,
+    title: c.subject,
+    body: `<p>${c.greeting}</p><p>${c.message}</p><br/><p style="font-size: 14px; opacity: 0.8;">${c.footer}</p>`,
+    cta: { text: c.cta, link: inviteLink },
+  });
+  const result = await sendEmail({
+    to: member.email,
+    subject: c.subject,
+    body: `${c.greeting}\n\n${strip(c.message)}\n\n${c.cta}: ${inviteLink}\n\n${c.footer}`,
+    html,
+  });
+  if (!result.sent) console.error('Failed to send invitation email:', result.error || result.message);
+  return { inviteLink, emailSent: !!result.sent, emailError: result.error || result.message };
+}
+
+// Plain workspace with each member's display name and avatar, so the UI can show people rather than emails.
+async function present(workspace) {
+  const plain = workspace.toObject ? workspace.toObject() : { ...workspace };
+  const ids = plain.members.map((m) => m.userId).filter(Boolean);
+  const users = ids.length ? await User.find({ _id: { $in: ids } }).select('full_name avatar').lean() : [];
+  const byId = new Map(users.map((u) => [String(u._id), u]));
+  plain.id = String(plain._id);
+  plain.members = plain.members.map((m) => {
+    const u = byId.get(String(m.userId));
+    return { ...m, name: u?.full_name || '', avatar: u?.avatar || null };
+  });
+  return plain;
+}
+
+const memberScope = (user) => ({ $elemMatch: { userId: user._id, status: 'accepted' } });
+const findTarget = (workspace, memberId) =>
+  workspace.members.find((m) => isSame(m._id, memberId) || (m.userId && isSame(m.userId, memberId)));
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
@@ -16,278 +100,231 @@ export default async function handler(req, res) {
     if (!user) return;
 
     const { method } = req;
-    const { id, action } = req.query;
+    const { id, action, memberId } = req.query;
+    const body = req.body || {};
+
+    // Loads the workspace and the acting member; replies with 404 when the caller isn't an accepted member.
+    const load = async () => {
+      if (!id) { error(res, 'Workspace ID required', 400); return null; }
+      const workspace = await Workspace.findOne({ _id: id, members: memberScope(user) });
+      if (!workspace) { notFound(res, 'Workspace not found or access denied'); return null; }
+      return { workspace, actor: findAcceptedMember(workspace, user._id) };
+    };
+    // Same, but the caller must be an owner or admin.
+    const loadManager = async () => {
+      const ctx = await load();
+      if (!ctx) return null;
+      if (!isManagerRole(ctx.actor.role)) { forbidden(res, 'Only owners and admins can manage members'); return null; }
+      return ctx;
+    };
 
     switch (method) {
-      case 'GET':
-        if (id) {
-          // Get specific workspace
-          const workspace = await Workspace.findOne({
-            _id: id,
-            'members.userId': user._id
-          }).lean();
-
-          if (!workspace) {
-            return notFound(res, 'Workspace not found or access denied');
-          }
-          return success(res, workspace);
-        } else {
-          // List user's workspaces
+      case 'GET': {
+        if (action === 'invitations') {
+          // Only email-verified (Google) accounts see invitations in-app; everyone else uses the emailed link.
+          if (user.authProvider !== 'google') return success(res, []);
           const workspaces = await Workspace.find({
-            'members.userId': user._id
-          }).sort('-createdAt').lean();
-
-          return success(res, workspaces);
+            members: { $elemMatch: { email: user.email, status: 'pending' } },
+          }).lean();
+          const inviterIds = workspaces.map((w) => w.members.find((m) => m.email === user.email)?.invitedBy || w.ownerId);
+          const inviters = await User.find({ _id: { $in: inviterIds } }).select('full_name email').lean();
+          const nameOf = (uid) => {
+            const u = inviters.find((x) => isSame(x._id, uid));
+            return u?.full_name || u?.email || '';
+          };
+          return success(res, workspaces.map((w) => {
+            const m = w.members.find((x) => x.email === user.email && x.status === 'pending');
+            return {
+              id: String(m._id),
+              workspaceId: String(w._id),
+              workspaceName: w.name,
+              role: m.role,
+              invitedAt: m.invitedAt,
+              invitedByName: nameOf(m.invitedBy || w.ownerId),
+            };
+          }));
         }
+        if (id) {
+          const workspace = await Workspace.findOne({ _id: id, members: memberScope(user) });
+          if (!workspace) return notFound(res, 'Workspace not found or access denied');
+          return success(res, await present(workspace));
+        }
+        const workspaces = await Workspace.find({ members: memberScope(user) }).sort('-created_date');
+        return success(res, await Promise.all(workspaces.map(present)));
+      }
 
-      case 'POST':
+      case 'POST': {
         if (action === 'invite') {
-          // Invite member
-          if (!id) return error(res, 'Workspace ID required', 400);
+          const ctx = await loadManager();
+          if (!ctx) return;
+          const { workspace, actor } = ctx;
 
-          const { email, role, permissions } = req.body;
-          if (!email) return error(res, 'Email required', 400);
+          const email = String(body.email || '').toLowerCase().trim();
+          if (!isValidEmail(email)) return error(res, 'A valid email is required', 400);
+          if (email === user.email) return error(res, 'You are already in this workspace', 400);
 
-          const workspace = await Workspace.findOne({
-            _id: id,
-            'members.userId': user._id,
-            'members.role': { $in: ['owner', 'admin'] } // Only owners/admins can invite
-          });
+          const role = body.role || 'viewer';
+          if (!canAssignRole(workspace, actor, role)) return forbidden(res, 'You cannot assign this role');
+          if (workspace.members.length >= MAX_MEMBERS) return error(res, `A workspace can have up to ${MAX_MEMBERS} members`, 400);
 
-          if (!workspace) return unauthorized(res, 'Not authorized to invite to this workspace');
-
-          const normalizedEmail = email.toLowerCase().trim();
-
-          // Check if already a member
-          const existingMember = workspace.members.find(m => m.email === normalizedEmail);
-          if (existingMember) {
-            return error(res, 'User is already a member or invited', 400);
-          }
-
-          // Check if user exists in system
-          const invitedUser = await User.findOne({ email: normalizedEmail });
-
-          workspace.members.push({
-            userId: invitedUser ? invitedUser._id : null,
-            email: normalizedEmail,
-            role: role || 'viewer',
+          const invitedUser = await User.findOne({ email }).select('_id language').lean();
+          const fields = {
+            userId: invitedUser?._id || null,
+            role,
             status: 'pending',
-            permissions: permissions || {}
-          });
+            permissions: buildPermissions(role, body.permissions),
+            invitedBy: user._id,
+            invitedAt: new Date(),
+            joinedAt: null,
+          };
 
+          let member = workspace.members.find((m) => m.email === email);
+          if (member && !['declined', 'rejected'].includes(member.status)) {
+            return error(res, member.status === 'accepted' ? 'This person is already a member' : 'This person has already been invited', 409);
+          }
+          if (member) Object.assign(member, fields);
+          else {
+            workspace.members.push({ email, ...fields });
+            member = workspace.members[workspace.members.length - 1];
+          }
           await workspace.save();
 
-          // Get the newly added member to get their ID (token)
-          const newMember = workspace.members.find(m => m.email === normalizedEmail);
-
-          if (newMember) {
-            const token = newMember._id;
-            const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
-            const inviteLink = `${origin}/accept-invitation/${token}`;
-
-            // Determine language based on inviter's preference (user.language)
-            const language = user.language || 'en';
-
-            // Content translations
-            const contentMap = {
-              he: {
-                subject: `הזמנה להצטרף ל-${workspace.name}`,
-                title: `הזמנה להצטרף ל-${workspace.name}`,
-                greeting: 'שלום,',
-                message: `הוזמנת להצטרף לסביבת העבודה "<strong>${workspace.name}</strong>" ב-Ascent.`,
-                cta: 'קבל הזמנה',
-                footerText: 'אם אין לך חשבון, תתבקש ליצור אחד.',
-              },
-              ru: {
-                subject: `Приглашение в ${workspace.name}`,
-                title: `Приглашение в ${workspace.name}`,
-                greeting: 'Здравствуйте,',
-                message: `Вас пригласили присоединиться к рабочей области "<strong>${workspace.name}</strong>" в Ascent.`,
-                cta: 'Принять приглашение',
-                footerText: 'Если у вас нет учетной записи, вам будет предложено создать ее.',
-              },
-              en: {
-                subject: `Invitation to join ${workspace.name}`,
-                title: `Invitation to join ${workspace.name}`,
-                greeting: 'Hello,',
-                message: `You have been invited to join the workspace "<strong>${workspace.name}</strong>" on Ascent.`,
-                cta: 'Accept Invitation',
-                footerText: 'If you don\'t have an account, you will be asked to create one.',
-              }
-            };
-
-            const content = contentMap[language] || contentMap.en;
-
-            const emailHtml = getEmailTemplate({
-              language,
-              title: content.title,
-              body: `
-                <p>${content.greeting}</p>
-                <p>${content.message}</p>
-                <br/>
-                <p style="font-size: 14px; opacity: 0.8;">${content.footerText}</p>
-              `,
-              cta: {
-                text: content.cta,
-                link: inviteLink
-              }
-            });
-
-            // Plain text fallback
-            const emailBody = `
-              ${content.greeting}
-              
-              ${content.message.replace(/<[^>]*>/g, '')}
-              
-              ${content.cta}: ${inviteLink}
-              
-              ${content.footerText}
-            `;
-            const emailSubject = content.subject;
-
-            // Send email and wait for result to provide feedback
-            const emailResult = await sendEmail({
-              to: normalizedEmail,
-              subject: emailSubject,
-              body: emailBody,
-              html: emailHtml
-            });
-
-            if (!emailResult.sent) {
-              console.error('Failed to send invitation email:', emailResult.error || emailResult.message);
-            } else {
-              console.log('Invitation email sent to:', normalizedEmail);
-            }
-
-            return success(res, {
-              message: emailResult.sent ? 'Invitation sent' : 'Invitation created (Email failed)',
-              workspace,
-              emailSent: emailResult.sent,
-              emailError: emailResult.error || emailResult.message
-            });
-          }
-        } else if (action === 'accept') {
-          // Accept invitation logic here if needed via POST
-          // Usually handled via a separate token-based endpoint or just by logging in if we auto-add
-          return error(res, 'Use the invitation link to accept', 400);
-        } else {
-          // Create new workspace
-          const { name } = req.body;
-          if (!name) return error(res, 'Workspace name required', 400);
-
-          const workspace = await Workspace.create({
-            name,
-            ownerId: user._id,
-            members: [{
-              userId: user._id,
-              email: user.email,
-              role: 'owner',
-              status: 'accepted',
-              permissions: {
-                viewPortfolio: true,
-                editPortfolio: true,
-                viewExpenses: true,
-                editExpenses: true,
-                viewNotes: true,
-                editNotes: true,
-                viewGoals: true,
-                editGoals: true,
-                viewBudgets: true,
-                editBudgets: true,
-                viewSettings: true,
-                manageUsers: true
-              }
-            }]
+          const sent = await sendInvitation({
+            req, workspace, member, inviter: user, language: invitedUser?.language || user.language || 'en',
           });
-
-          return success(res, workspace, 201);
+          return success(res, { message: sent.emailSent ? 'Invitation sent' : 'Invitation created (Email failed)', workspace: await present(workspace), ...sent });
         }
 
-      case 'PUT':
-        if (!id) return error(res, 'Workspace ID required', 400);
+        if (action === 'resend') {
+          const ctx = await loadManager();
+          if (!ctx) return;
+          const member = memberId && findTarget(ctx.workspace, memberId);
+          if (!member) return notFound(res, 'Invitation not found');
+          if (member.status !== 'pending') return error(res, 'This invitation is no longer pending', 400);
+          const invitedUser = member.userId ? await User.findById(member.userId).select('language').lean() : null;
+          const sent = await sendInvitation({
+            req, workspace: ctx.workspace, member, inviter: user, language: invitedUser?.language || user.language || 'en',
+          });
+          return success(res, sent);
+        }
+
+        if (action === 'accept' || action === 'decline') {
+          // The member id doubles as the emailed invitation token.
+          const token = req.query.token || memberId;
+          if (!token || !/^[a-f\d]{24}$/i.test(token)) return error(res, 'Invitation token required', 400);
+          const workspace = await Workspace.findOne({ 'members._id': token });
+          const member = workspace?.members.find((m) => isSame(m._id, token));
+          if (!member || member.email !== user.email) return notFound(res, 'Invitation not found');
+
+          if (action === 'accept') {
+            if (member.status === 'pending') {
+              member.status = 'accepted';
+              member.userId = user._id;
+              member.joinedAt = new Date();
+              await workspace.save();
+            } else if (member.status !== 'accepted') {
+              return error(res, 'This invitation is no longer valid', 400);
+            }
+            return success(res, await present(workspace));
+          }
+          if (member.status === 'pending') {
+            member.status = 'declined';
+            await workspace.save();
+          }
+          return success(res, { message: 'Invitation declined' });
+        }
+
+        if (action === 'leave') {
+          const ctx = await load();
+          if (!ctx) return;
+          if (isOwnerMember(ctx.workspace, ctx.actor)) {
+            return error(res, 'The owner cannot leave. Delete the workspace instead.', 400);
+          }
+          ctx.workspace.members = ctx.workspace.members.filter((m) => !isSame(m._id, ctx.actor._id));
+          await ctx.workspace.save();
+          return success(res, { message: 'You left the workspace' });
+        }
+
+        if (action === 'heartbeat') {
+          if (!id) return error(res, 'Workspace ID required', 400);
+          await Workspace.updateOne(
+            { _id: id, members: memberScope(user) },
+            { $set: { 'members.$[me].lastSeenAt': new Date() } },
+            { arrayFilters: [{ 'me.userId': user._id, 'me.status': 'accepted' }], timestamps: false }
+          );
+          return success(res, { ok: true });
+        }
+
+        // Create a new workspace
+        const name = String(body.name || '').trim();
+        if (!name) return error(res, 'Workspace name required', 400);
+        const workspace = await Workspace.create({
+          name: name.slice(0, 80),
+          ownerId: user._id,
+          members: [{
+            userId: user._id,
+            email: user.email,
+            role: 'owner',
+            status: 'accepted',
+            joinedAt: new Date(),
+            permissions: buildPermissions('owner'),
+          }],
+        });
+        return success(res, await present(workspace), 201);
+      }
+
+      case 'PUT': {
+        const ctx = await load();
+        if (!ctx) return;
+        const { workspace, actor } = ctx;
 
         if (action === 'updateMember') {
-          const { memberId } = req.query;
-          const { role, permissions } = req.body;
+          if (!isManagerRole(actor.role)) return forbidden(res, 'Only owners and admins can manage members');
+          const target = memberId && findTarget(workspace, memberId);
+          if (!target) return notFound(res, 'Member not found');
+          if (!canManageMember(workspace, actor, target)) return forbidden(res, 'You cannot change this member');
 
-          if (!memberId) return error(res, 'Member ID required', 400);
-
-          const workspace = await Workspace.findOne({
-            _id: id,
-            'members.userId': user._id,
-            'members.role': { $in: ['owner', 'admin'] }
-          });
-
-          if (!workspace) return unauthorized(res, 'Not authorized');
-
-          const memberIndex = workspace.members.findIndex(m => (m._id && m._id.toString() === memberId) || (m.userId && m.userId.toString() === memberId));
-          if (memberIndex === -1) return notFound(res, 'Member not found');
-
-          // Prevent modifying owner
-          if (workspace.members[memberIndex].role === 'owner' && workspace.members[memberIndex].userId.toString() !== user._id.toString()) {
-            // Only owner can modify themselves? No, owner shouldn't be modified easily.
-            // Let's just prevent demoting the last owner.
+          const role = body.role ?? target.role;
+          if (body.role && body.role !== target.role && !canAssignRole(workspace, actor, body.role)) {
+            return forbidden(res, 'You cannot assign this role');
           }
+          if (!ASSIGNABLE_ROLES.includes(role)) return error(res, 'Invalid role', 400);
 
-          if (role) workspace.members[memberIndex].role = role;
-          if (permissions) workspace.members[memberIndex].permissions = permissions;
+          const roleChanged = role !== target.role;
+          if (body.permissions !== undefined) target.permissions = buildPermissions(role, body.permissions);
+          else if (roleChanged) target.permissions = buildPermissions(role);
+          target.role = role;
 
           await workspace.save();
-          return success(res, workspace);
+          return success(res, await present(workspace));
         }
 
-        const { name } = req.body;
+        if (!actor || actor.role !== 'owner') return forbidden(res, 'Only the owner can rename the workspace');
+        const name = String(body.name || '').trim();
+        if (!name) return error(res, 'Workspace name required', 400);
+        workspace.name = name.slice(0, 80);
+        await workspace.save();
+        return success(res, await present(workspace));
+      }
 
-        const updatedWorkspace = await Workspace.findOneAndUpdate(
-          {
-            _id: id,
-            'members.userId': user._id,
-            'members.role': 'owner' // Only owner can rename for now
-          },
-          { name },
-          { new: true }
-        );
-
-        if (!updatedWorkspace) return unauthorized(res, 'Not authorized to update this workspace');
-
-        return success(res, updatedWorkspace);
-
-      case 'DELETE':
-        if (!id) return error(res, 'Workspace ID required', 400);
-
+      case 'DELETE': {
         if (action === 'removeMember') {
-          const { memberId } = req.query;
-          if (!memberId) return error(res, 'Member ID required', 400);
-
-          const workspace = await Workspace.findOne({
-            _id: id,
-            'members.userId': user._id,
-            'members.role': { $in: ['owner', 'admin'] }
-          });
-
-          if (!workspace) return unauthorized(res, 'Not authorized');
-
-          // Prevent removing self if owner (must delete workspace instead)
-          // Actually, owner can leave if there is another owner.
-
-          workspace.members = workspace.members.filter(m => {
-            const mId = m._id ? m._id.toString() : (m.userId ? m.userId.toString() : null);
-            return mId !== memberId;
-          });
-
+          const ctx = await loadManager();
+          if (!ctx) return;
+          const { workspace, actor } = ctx;
+          const target = memberId && findTarget(workspace, memberId);
+          if (!target) return notFound(res, 'Member not found');
+          if (!canManageMember(workspace, actor, target)) return forbidden(res, 'You cannot remove this member');
+          workspace.members = workspace.members.filter((m) => !isSame(m._id, target._id));
           await workspace.save();
-          return success(res, workspace);
+          return success(res, await present(workspace));
         }
 
-        // Only owner can delete workspace
-        const deletedWorkspace = await Workspace.findOneAndDelete({
-          _id: id,
-          ownerId: user._id
-        });
-
-        if (!deletedWorkspace) return unauthorized(res, 'Not authorized to delete this workspace');
-
+        if (!id) return error(res, 'Workspace ID required', 400);
+        const deleted = await Workspace.findOneAndDelete({ _id: id, ownerId: user._id });
+        if (!deleted) return unauthorized(res, 'Not authorized to delete this workspace');
         return success(res, { message: 'Workspace deleted' });
+      }
 
       default:
         return error(res, 'Method not allowed', 405);
