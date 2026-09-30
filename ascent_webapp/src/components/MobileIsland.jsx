@@ -59,9 +59,10 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
   const shell = useRef(null);
   const { w, h } = useSize(shell);
   const { scrollYProgress } = useScroll();
-  // The ring closes a little before the very bottom (iOS never reports exactly 1 at the end),
+  // The ring closes a little before the very bottom (iOS never reports exactly 1 at the end) and
+  // overlaps its own start by ~1% so the seam at the top centre is fully covered,
   // and stays invisible at the top instead of drawing a dot.
-  const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1], { clamp: true });
+  const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1.012], { clamp: true });
   const progress = useSpring(scaled, { stiffness: 260, damping: 40, restDelta: 0.0005 });
   const ringOpacity = useTransform(progress, [0, 0.015], [0, 1], { clamp: true });
   const isCompact = compact && !menuOpen;
