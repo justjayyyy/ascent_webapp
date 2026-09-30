@@ -378,7 +378,6 @@ function Expenses() {
     }
   }, [selectedYear, selectedMonths, t]);
 
-  const scrollerRef = useRef(null);
   const pullY = useMotionValue(0);
   const pullRotate = useTransform(pullY, [0, 72], [0, 270]);
   const pullOpacity = useTransform(pullY, [0, 24, 72], [0, 0.6, 1]);
@@ -387,14 +386,13 @@ function Expenses() {
   const [refreshing, setRefreshing] = useState(false);
 
   const onTouchStart = useCallback((e) => {
-    const el = scrollerRef.current;
-    if (el && el.scrollTop <= 0 && !refreshing) pullStart.current = e.touches[0].clientY;
+    if (window.scrollY <= 0 && !refreshing) pullStart.current = e.touches[0].clientY;
   }, [refreshing]);
 
   const onTouchMove = useCallback((e) => {
     if (pullStart.current === null) return;
     const dy = e.touches[0].clientY - pullStart.current;
-    if (dy > 0 && scrollerRef.current?.scrollTop <= 0) pullY.set(Math.min(dy * 0.5, 96));
+    if (dy > 0 && window.scrollY <= 0) pullY.set(Math.min(dy * 0.5, 96));
     else pullStart.current = null;
   }, [pullY]);
 
@@ -421,9 +419,9 @@ function Expenses() {
   }
 
   return (
-    <div className="relative flex flex-col h-[calc(100dvh-10rem)] md:h-auto md:min-h-dvh p-2 sm:p-4 md:p-8">
+    <div className="relative flex flex-col md:min-h-dvh p-2 pb-24 sm:p-4 sm:pb-24 md:p-8">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.16),transparent_70%)]" />
-      <div className="max-w-7xl mx-auto flex flex-col flex-1 md:flex-none md:block min-h-0 w-full">
+      <div className="max-w-7xl mx-auto flex flex-col md:block w-full">
         <header className="mb-2 flex flex-shrink-0 items-center justify-between gap-3 sm:mb-4">
           <div className="min-w-0">
             <h1 className={cn("text-3xl font-bold tracking-tight md:text-4xl", colors.textPrimary)}>{t('expenses')}</h1>
@@ -464,7 +462,7 @@ function Expenses() {
           />
         </div>
 
-        <div className="relative mt-3 flex-1 min-h-0 sm:mt-5 md:flex-none">
+        <div className="relative mt-3 sm:mt-5">
           <motion.div
             aria-hidden={!refreshing}
             style={{ opacity: refreshing ? 1 : pullOpacity, y: pullIndicatorY }}
@@ -477,12 +475,11 @@ function Expenses() {
             </span>
           </motion.div>
           <motion.div
-            ref={scrollerRef}
             style={{ y: pullY }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
-            className="h-full overflow-y-auto overscroll-y-contain pb-28 custom-scrollbar md:h-auto md:overflow-visible md:pb-0"
+            className="touch-pan-y"
           >
             <ExpenseMonthView
               transactions={selectedPeriodTransactions}

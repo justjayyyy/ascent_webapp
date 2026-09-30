@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
 import { CalendarDays } from 'lucide-react';
 import AscentLogo from '@/components/AscentLogo';
 import { cn } from '@/lib/utils';
@@ -19,17 +19,53 @@ const useViewportWidth = () => {
   return w;
 };
 
+// Size of an element, kept current through the morph (the capsule's width animates)
+const useSize = (ref) => {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.target.getBoundingClientRect();
+      setSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return size;
+};
+
+// Capsule outline that starts at the top centre, runs clockwise and carries on 10px past its own
+// start (an open path, not Z) so the finished ring overlaps itself and leaves no seam
+const capsulePath = (w, h, inset) => {
+  const r = h / 2 - inset;
+  const left = inset;
+  const right = w - inset;
+  const top = inset;
+  const bottom = h - inset;
+  const cx = w / 2;
+  return `M ${cx} ${top} H ${right - r} A ${r} ${r} 0 0 1 ${right - r} ${bottom} H ${left + r} A ${r} ${r} 0 0 1 ${left + r} ${top} H ${cx + 10}`;
+};
+
 /**
  * Phone header, "the island": a capsule that hangs below the status bar and morphs with the page.
  * Expanded: menu, logo + current page, calendar. Scrolling down morphs it (spring) into a small
- * capsule; scrolling up expands it again. A gold light orbits its edge and a hairline along the
- * bottom fills with the page's scroll progress. Nothing tappable sits in the system blur zone.
+ * capsule; scrolling up expands it again. Page scroll progress is drawn as a gold line that traces
+ * the whole outline of the capsule, starting at the top centre. Nothing tappable sits in the
+ * system blur zone.
  */
 export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, title, t }) {
   const reduce = useReducedMotion();
   const viewport = useViewportWidth();
+  const shell = useRef(null);
+  const { w, h } = useSize(shell);
   const { scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 260, damping: 40, restDelta: 0.001 });
+  // The ring closes a little before the very bottom (iOS never reports exactly 1 at the end) and
+  // overlaps its own start by ~1% so the seam at the top centre is fully covered,
+  // and stays invisible at the top instead of drawing a dot.
+  const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1], { clamp: true });
+  const progress = useSpring(scaled, { stiffness: 260, damping: 40, restDelta: 0.0005 });
+  const ringOpacity = useTransform(progress, [0, 0.03], [0, 1], { clamp: true });
   const isCompact = compact && !menuOpen;
   const spring = reduce ? { duration: 0 } : SPRING;
 
@@ -39,21 +75,13 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
       style={{ paddingTop: 'calc(var(--safe-top) + 0.5rem)' }}
     >
       <motion.div
+        ref={shell}
         initial={false}
         animate={{ width: isCompact ? COMPACT_WIDTH : viewport - SIDE_GUTTER }}
         transition={spring}
-        className="pointer-events-auto relative h-[var(--header-bar)] overflow-hidden rounded-full p-px shadow-[0_14px_34px_-16px_hsl(var(--glow)/0.55),0_8px_22px_-14px_hsl(0_0%_0%/0.8)]"
+        className="pointer-events-auto relative h-[var(--header-bar)] rounded-full border border-border/70 bg-card shadow-[0_14px_34px_-16px_hsl(var(--glow)/0.5),0_8px_22px_-14px_hsl(0_0%_0%/0.8)]"
       >
-        {/* Orbiting light along the edge */}
-        <motion.div
-          aria-hidden="true"
-          className="absolute left-1/2 top-1/2 aspect-square w-[260%] -translate-x-1/2 -translate-y-1/2"
-          style={{ background: 'conic-gradient(from 0deg, hsl(var(--border) / 0.7) 0 55%, hsl(var(--primary) / 0.95) 78%, hsl(var(--border) / 0.7) 100%)' }}
-          animate={reduce ? undefined : { rotate: 360 }}
-          transition={{ duration: 7, ease: 'linear', repeat: Infinity }}
-        />
-
-        <div className="relative flex h-full w-full items-center overflow-hidden rounded-full bg-card">
+        <div className="relative flex h-full w-full items-center overflow-hidden rounded-full">
           <button
             type="button"
             onClick={onMenu}
@@ -111,14 +139,26 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
               </motion.button>
             )}
           </AnimatePresence>
-
-          {/* Scroll progress hairline */}
-          <motion.div
-            aria-hidden="true"
-            className="absolute inset-x-8 bottom-0 h-[2px] origin-left rounded-full bg-primary/80 rtl:origin-right"
-            style={{ scaleX: progress }}
-          />
         </div>
+
+        {/* Scroll progress: a gold line tracing the whole outline of the capsule */}
+        {w > 0 && (
+          <svg
+            aria-hidden="true"
+            viewBox={`0 0 ${w} ${h}`}
+            className="pointer-events-none absolute -left-px -top-px overflow-visible"
+            style={{ width: w, height: h }}
+          >
+            <motion.path
+              d={capsulePath(w, h, 1)}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2"
+              strokeLinecap="round"
+              style={{ pathLength: progress, opacity: ringOpacity, filter: 'drop-shadow(0 0 4px hsl(var(--primary) / 0.7))' }}
+            />
+          </svg>
+        )}
       </motion.div>
     </div>
   );

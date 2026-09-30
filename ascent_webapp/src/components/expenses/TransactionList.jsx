@@ -153,7 +153,7 @@ function TransactionList({ transactions, cards = [], categories = [], onEdit, on
       <div className="-mx-1">
         {groups.map((group) => (
           <section key={group.key} aria-label={dayLabel(group.key)}>
-            <h3 className="sticky top-0 z-10 bg-background/80 px-3 pb-1 pt-4 text-xs font-medium text-muted-foreground backdrop-blur-md">
+            <h3 className="sticky top-[calc(4rem+var(--safe-top,0px))] z-10 bg-background/80 md:top-0 px-3 pb-1 pt-4 text-xs font-medium text-muted-foreground backdrop-blur-md">
               {dayLabel(group.key)}
             </h3>
             <ul>
