@@ -52,7 +52,10 @@ export function ensureStandaloneTopInset() {
     const envTop = readEnv('top');
     const fullScreen = window.innerHeight >= long - 12;
     let top = null;
-    if (standalone && iphone && portrait && fullScreen) {
+    // env() > 0 means the page really runs under the status bar. That reading is
+    // stable; the viewport height is not (it shifts while scrolling), so only fall
+    // back to the geometry check when env() claims 0.
+    if (standalone && iphone && portrait && (envTop >= 20 || fullScreen)) {
       // The system draws a soft edge a little below the status bar, so keep content
       // clear of it: the real inset (or a typical one if iOS reports 0) plus a margin.
       const base = envTop >= 20 ? envTop : long >= 930 ? 59 : long >= 850 ? 54 : long >= 812 ? 47 : 20;
@@ -70,7 +73,7 @@ export function ensureStandaloneTopInset() {
   const start = () => { run(); requestAnimationFrame(run); setTimeout(run, 400); };
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
   window.addEventListener('orientationchange', () => setTimeout(run, 150));
-  window.addEventListener('resize', run);
+  window.addEventListener('ascent:safe-refresh', run);
   window.addEventListener('pageshow', run);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run(); });
 }
@@ -110,7 +113,7 @@ if (typeof window !== 'undefined') {
         if (localStorage.getItem('ascent_safedebug') === '1') localStorage.removeItem('ascent_safedebug');
         else localStorage.setItem('ascent_safedebug', '1');
       } catch { /* storage unavailable */ }
-      window.dispatchEvent(new Event('resize'));
+      window.dispatchEvent(new Event('ascent:safe-refresh'));
     }
   }, { passive: true });
 }
