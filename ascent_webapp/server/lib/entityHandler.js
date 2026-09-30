@@ -7,7 +7,7 @@ const NEVER_FILTER = new Set(['workspaceId', 'createdBy', '_id', 'sort', 'limit'
 const NEVER_WRITE = new Set(['workspaceId', 'createdBy', '_id', 'id']);
 
 // Owners and admins may do anything in their workspace; everyone else needs the named member permission.
-function memberMay(req, user, permission) {
+export function memberMay(req, user, permission) {
   if (!permission) return true;
   const member = req.member;
   if (!member) return false;

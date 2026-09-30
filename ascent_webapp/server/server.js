@@ -192,7 +192,7 @@ const entities = [
   'accounts', 'positions', 'day-trades', 'transactions',
   'budgets', 'categories', 'cards', 'goals',
   'dashboard-widgets', 'page-layouts', 'snapshots', 'notes',
-  'portfolio-transactions', 'plans'
+  'portfolio-transactions', 'plans', 'settlements'
 ];
 
 entities.forEach(entity => {
@@ -204,6 +204,16 @@ entities.forEach(entity => {
   app.delete(`/api/entities/${entity}`, wrapHandler(handlerPath));
   app.options(`/api/entities/${entity}`, (req, res) => res.sendStatus(200));
 });
+
+// Card statement import (rows parsed on the device, matched against what is already recorded)
+app.post('/api/import/statement', wrapHandler('./api/import-statement.js'));
+app.options('/api/import/*', (req, res) => res.sendStatus(200));
+
+// Smart help: category suggestions while typing, and the opt-in AI assistant
+const assistHandler = wrapHandler('./api/assist.js');
+app.get('/api/assist', assistHandler);
+app.post('/api/assist', assistHandler);
+app.options('/api/assist', (req, res) => res.sendStatus(200));
 
 // Public invitation route (no auth required)
 app.get('/api/invitations/:token', wrapHandler('./api/get-invitation.js'));

@@ -56,7 +56,14 @@ const workspaceSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
-  members: [memberSchema]
+  members: [memberSchema],
+  // Household-wide choices the owner makes. The AI assistant is off until someone turns it on, since
+  // it sends summaries of the workspace's spending to an outside service.
+  settings: {
+    aiAssistant: { type: Boolean, default: false },
+    largeExpenseAlert: { type: Number, default: null, min: 0 }, // notify the others at or above this amount
+    largeExpenseCurrency: { type: String, default: null }
+  }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
 });

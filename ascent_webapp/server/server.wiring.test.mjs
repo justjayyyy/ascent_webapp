@@ -68,3 +68,15 @@ test('existing routes still work behind the new ones', async () => {
   assert.equal(r.code, 200);
   assert.equal(r.json.status, 'ok');
 });
+
+test('SMS alerts share the ingest route and its credentials check', async () => {
+  const r = await send('/api/ingest/sms', { body: JSON.stringify({ v: 1, text: 'חיוב בסך 30 ש"ח' }) });
+  assert.equal(r.code, 401);
+});
+
+test('statement import, smart help and settlements require a login', async () => {
+  assert.equal((await send('/api/import/statement', { body: JSON.stringify({ rows: [] }) })).code, 401);
+  assert.equal((await send('/api/assist', { method: 'GET' })).code, 401);
+  assert.equal((await send('/api/assist?action=ask', { body: JSON.stringify({ question: 'x' }) })).code, 401);
+  assert.equal((await send('/api/entities/settlements', { method: 'GET' })).code, 401);
+});

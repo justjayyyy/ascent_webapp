@@ -3778,3 +3778,6 @@ export function translateCategory(categoryNameOrKey, language = 'en') {
   };
   return keyMap[categoryNameOrKey]?.[language] || categoryNameOrKey;
 }
+
+import { smartTranslations } from './translationsSmart';
+['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], smartTranslations[lang]));

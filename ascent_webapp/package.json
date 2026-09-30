@@ -16,11 +16,12 @@
     "seed:test-data": "node --env-file=.env server/scripts/seed-test-data.mjs",
     "create:demo": "node --env-file=.env server/scripts/create-demo-account.mjs",
     "test:email": "node --env-file=.env server/scripts/test-email.mjs",
-    "test:server": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\"",
+    "test:server": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\" \"src/lib/**/*.test.mjs\"",
     "ensure:indexes": "node --env-file=.env server/scripts/ensure-indexes.mjs",
     "backfill:ingest": "node --env-file=.env server/scripts/backfill-ingest-fields.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.130.0",
     "@fontsource-variable/heebo": "^5.3.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@hello-pangea/dnd": "^17.0.0",
@@ -102,6 +103,7 @@
     "three": "^0.171.0",
     "vaul": "^1.1.2",
     "web-push": "^3.6.7",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.24.2"
   },
   "devDependencies": {

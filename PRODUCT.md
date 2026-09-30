@@ -15,14 +15,14 @@ Ascent is a personal finance tracker that puts day-to-day spending and long-term
 ## Positioning
 - Expenses and investment portfolio live together, not in separate tools.
 - Hebrew, Russian and English are first-class, including real right-to-left layout.
-- Manual and private: the user enters their own data; there is no bank linking or third-party aggregator.
+- Private by default: data comes from the household itself (typed in, Apple Pay taps and card SMS forwarded by an iOS Shortcut, or statements imported from a file read on the device); there is no bank linking or third-party aggregator.
 - Shared access with permissions: owners invite others and control what they can see.
 
 ## Operating Context
-Installable PWA (React, Vite, Tailwind, Radix UI) with a Node/Vercel serverless API and MongoDB; JWT auth with optional Google sign-in. Multi-currency amounts are converted for dashboard and portfolio totals. Optional Google Calendar integration and a weekly summary email. Data can be exported as CSV from Settings; there is no import yet.
+Installable PWA (React, Vite, Tailwind, Radix UI) with a Node/Vercel serverless API and MongoDB; JWT auth with optional Google sign-in. Multi-currency amounts are converted for dashboard and portfolio totals. Optional Google Calendar integration and a weekly summary email. Data can be exported as CSV from Settings, and card or bank statements (Excel/CSV) can be imported; imported rows are matched against payments already recorded. An optional AI assistant (Claude by Anthropic, `ANTHROPIC_API_KEY`) logs expenses from plain language and answers questions from an aggregated spending summary; it is off until a workspace owner or admin turns it on.
 
 ## Capabilities and Constraints
-- Areas: Dashboard, Expenses (transactions, categories, budgets, cards, recurring, big purchases paid in installments), Income (its own page), Plans (big upcoming events such as a trip or a wedding, with dated costs paid over months), Portfolio (accounts, positions, sell/day-trade history), Notes (Keep-style: lists, labels, colours, reminders, multi-select, dictation), Calendar, Settings (profile, shared users, import/export).
+- Areas: Dashboard (safe to spend this month, month-end forecast, budget pace, subscriptions, who owes whom), Expenses (transactions, categories, budgets, cards, recurring, big purchases paid in installments), Income (its own page), Plans (big upcoming events such as a trip or a wedding, with dated costs paid over months), Portfolio (accounts, positions, sell/day-trade history), Notes (Keep-style: lists, labels, colours, reminders, multi-select, dictation), Calendar, Settings (profile, household options, shared users, Apple Pay and SMS capture, statement import, export). Expenses can record who paid and be split between members, with a settle-up balance.
 - Roles: an owner plus invited users with per-area permissions (for example view expenses).
 - Every UI string must exist in English, Hebrew and Russian; layout must work in RTL.
 - Portfolio and account-detail pages are hidden in this build (see `src/lib/features.js`); investment features return later. Whether Ascent becomes a public, billed product is undecided.

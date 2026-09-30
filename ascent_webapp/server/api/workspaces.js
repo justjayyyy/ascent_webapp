@@ -339,6 +339,21 @@ export default async function handler(req, res) {
           return success(res, await present(workspace));
         }
 
+        // Household options: the AI assistant and alerts for large expenses (owners and admins)
+        if (action === 'settings') {
+          if (!isManagerRole(actor?.role) && !isSame(workspace.ownerId, user._id)) return forbidden(res, 'Only owners and admins can change household settings');
+          const next = { ...(workspace.settings?.toObject?.() ?? workspace.settings ?? {}) };
+          if (body.aiAssistant !== undefined) next.aiAssistant = body.aiAssistant === true;
+          if (body.largeExpenseAlert !== undefined) {
+            const amount = Number(body.largeExpenseAlert);
+            next.largeExpenseAlert = body.largeExpenseAlert === null || !(amount > 0) ? null : Math.min(amount, 1e9);
+            next.largeExpenseCurrency = next.largeExpenseAlert ? String(body.largeExpenseCurrency || user.currency || 'ILS').toUpperCase().slice(0, 3) : null;
+          }
+          workspace.settings = next;
+          await workspace.save();
+          return success(res, await present(workspace));
+        }
+
         if (!actor || actor.role !== 'owner') return forbidden(res, 'Only the owner can rename the workspace');
         const name = String(body.name || '').trim();
         if (!name) return error(res, 'Workspace name required', 400);

@@ -1,14 +1,18 @@
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Database, Loader2, Receipt, StickyNote, PieChart } from 'lucide-react';
+import { Download, Database, Loader2, Receipt, StickyNote, PieChart, FileSpreadsheet, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../ThemeProvider';
 import { Section, Group, Row } from './SettingsShell';
+import StatementImportDialog from './StatementImportDialog';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function ImportExportSection({ accounts, positions, transactions, notes, budgets, categories, cards, index }) {
   const { t } = useTheme();
+  const { hasPermission } = useAuth();
   const [exporting, setExporting] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const formatCSV = (data, headers) => {
     const csvHeaders = headers.join(',');
@@ -99,6 +103,20 @@ export default function ImportExportSection({ accounts, positions, transactions,
 
   return (
     <Section id="data" index={index} icon={Database} title={t('setNavData')} description={t('setDataDesc')}>
+      {hasPermission('editExpenses') && (
+        <Group className="mb-4">
+          <Row
+            label={<span className="flex items-center gap-2"><FileSpreadsheet className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{t('impRow')}</span>}
+            description={t('impRowDesc')}
+          >
+            <Button onClick={() => setImportOpen(true)} variant="secondary" aria-label={t('impTitle')} className="h-11 rounded-xl sm:h-9">
+              <Upload className="h-4 w-4 sm:me-1.5" aria-hidden="true" />
+              <span className="max-sm:sr-only">{t('impChoose')}</span>
+            </Button>
+          </Row>
+        </Group>
+      )}
+      <StatementImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <Group>
         {datasets.map(({ key, label, icon: Icon, count }) => (
           <Row

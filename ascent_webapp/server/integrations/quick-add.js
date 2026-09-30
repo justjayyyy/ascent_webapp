@@ -4,6 +4,7 @@ import { handleCors } from '../lib/cors.js';
 import { success, error, serverError, unauthorized } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { suggestCategory } from '../lib/categorize.js';
+import { loadRules, ruleKeyFor } from '../lib/merchantRules.js';
 import { categoryTranslations } from '../lib/categoryTranslations.js';
 import User from '../models/User.js';
 import Category from '../models/Category.js';
@@ -79,14 +80,16 @@ async function addFromShortcut(req, res, token) {
     return success(res, { id: recent._id.toString(), duplicate: true, category: recent.category, message: 'Already added' });
   }
 
-  const [categories, history, cards] = await Promise.all([
+  const ruleKey = ruleKeyFor({ merchant });
+  const [categories, history, cards, rules] = await Promise.all([
     Category.find({ workspaceId }).lean(),
     ExpenseTransaction.find({ workspaceId, type: 'Expense' }).sort('-date').limit(500).select('description category type').lean(),
     Card.find({ workspaceId, isActive: { $ne: false } }).lean(),
+    ruleKey ? loadRules(workspaceId, [ruleKey]) : [],
   ]);
 
   const suggestion = merchant
-    ? suggestCategory({ description: merchant, type: 'Expense', categories, history })
+    ? suggestCategory({ description: merchant, merchantKey: ruleKey, type: 'Expense', categories, history, rules })
     : null;
   const expenseCats = categories.filter(c => c.type === 'Expense' || c.type === 'Both');
   const fallback = expenseCats.find(c => (c.nameKey || c.name) === 'other_expense' || c.name === 'Other') || expenseCats[0];

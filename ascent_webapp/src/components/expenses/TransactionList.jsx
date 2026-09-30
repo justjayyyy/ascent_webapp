@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
-import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag } from 'lucide-react';
+import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
@@ -159,7 +159,8 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
             <ul>
               {group.items.map((tx, i) => {
                 const income = tx.type === 'Income';
-                const author = isShared ? byEmail[tx.created_by] : null;
+                // The person who paid (the one who added it, unless someone else is named)
+                const author = isShared ? byEmail[tx.paidBy || tx.created_by] : null;
                 const conv = converted(tx);
                 const pending = tx.status === 'pending';
                 const cat = isObjectId(tx.category) ? '' : translateCategory(tx.category, language);
@@ -181,6 +182,7 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                         <span className="flex items-center gap-1.5">
                           <span className="truncate text-[0.9375rem] font-medium text-foreground">{tx.description}</span>
                           {tx.isRecurring && <Repeat aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                          {tx.split?.mode && <Users aria-label={t('splitBadge')} className="h-3.5 w-3.5 shrink-0 text-primary" />}
                           {tx.isBigPurchase && !(tx.installmentCount > 1) && <ShoppingBag aria-label={t('bigPurchase')} className="h-3.5 w-3.5 shrink-0 text-primary" />}
                           {tx.installmentCount > 1 && (
                             <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[0.6875rem] font-semibold tabular-nums text-primary" dir="ltr" aria-label={t('installmentOf').replace('{index}', tx.installmentIndex).replace('{count}', tx.installmentCount)}>

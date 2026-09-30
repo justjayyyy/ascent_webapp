@@ -12,6 +12,12 @@ import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import { translateCategory } from '@/lib/translations';
 import { createPageUrl } from '@/utils';
 import { cn } from '@/lib/utils';
+import { useHousehold } from '@/hooks/useHousehold';
+import { useInsights } from '@/components/insights/useInsights';
+import SafeToSpendCard from '@/components/insights/SafeToSpendCard';
+import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
+import HouseholdBalanceCard from '@/components/insights/HouseholdBalanceCard';
+import AssistantBar from '@/components/insights/AssistantBar';
 
 const MAX_CATEGORY_SLICES = 6;
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -102,6 +108,17 @@ export default function Dashboard() {
       _day: parseInt(String(tx.date).slice(8, 10), 10),
       _amount: toUserCurrency(tx),
     })), [transactions, toUserCurrency]);
+
+  // Budgets and plans keep their own currency; everything on this page is shown in the user's
+  const convert = useCallback((amount, from) => {
+    if (!amount) return 0;
+    if (!from || from === userCurrency || !rates || !Object.keys(rates).length) return amount;
+    return convertCurrency(amount, from, userCurrency, rates);
+  }, [userCurrency, rates, convertCurrency]);
+
+  const { isShared } = useHousehold();
+  const { forecast, subscriptions, balances } = useInsights({ rows: normalized, selectedMonth, convert });
+  const showForecast = forecast.phase === 'current';
 
   const selectedKey = monthKey(selectedMonth);
   const prevKey = monthKey(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1));
@@ -231,7 +248,14 @@ export default function Dashboard() {
       grid: { left: 4, right: 8, top: 16, bottom: 4, containLabel: true },
       tooltip: blur ? { show: false } : {
         ...baseTooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: tokens.primary, type: 'dashed' } },
-        formatter: (ps) => `${ps[0].axisValue}<br/>${ps.map((p) => `${p.marker} ${p.seriesName}: <b>${fmtMoney(p.value)}</b>`).join('<br/>')}`,
+        formatter: (ps) => {
+          const lines = ps.filter((p) => p.value !== null && p.value !== undefined && p.seriesName !== 'band-floor').map((p) => {
+            if (p.seriesName !== t('dashForecastBand')) return `${p.marker} ${p.seriesName}: <b>${fmtMoney(p.value)}</b>`;
+            const day = forecast.path[p.dataIndex];
+            return `${p.marker} ${p.seriesName}: <b>${fmtMoney(day.low)} – ${fmtMoney(day.high)}</b>`;
+          });
+          return `${ps[0].axisValue}<br/>${lines.join('<br/>')}`;
+        },
       },
       xAxis: { type: 'category', boundaryGap: false, data: dailyData.map((d) => d.day), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: tokens.muted, fontFamily: tokens.fontFamily } },
       yAxis: { type: 'value', show: !blur, axisLabel: { color: tokens.muted, formatter: fmtCompact, fontFamily: tokens.fontFamily }, splitLine: { lineStyle: { color: tokens.grid, type: 'dashed' } } },
@@ -240,12 +264,27 @@ export default function Dashboard() {
           name: t('dashCumulative'), type: 'line', smooth: 0.35, symbol: 'none', z: 3,
           lineStyle: { width: 3, color: tokens.primary, shadowBlur: 14, shadowColor: tokens.primary },
           areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: withAlpha(tokens.primary, 0.35) }, { offset: 1, color: withAlpha(tokens.primary, 0) }] } },
-          data: dailyData.map((d) => d.cumulative),
+          // This month: what really went out up to today; the forecast draws the rest
+          data: showForecast ? forecast.path.map((p) => p.actual) : dailyData.map((d) => d.cumulative),
         },
-        { name: t('dashDailySpending'), type: 'bar', barMaxWidth: 8, itemStyle: { borderRadius: [4, 4, 0, 0], color: withAlpha(tokens.series[1], 0.55) }, data: dailyData.map((d) => d.amount) },
+        {
+          name: t('dashDailySpending'), type: 'bar', barMaxWidth: 8, itemStyle: { borderRadius: [4, 4, 0, 0], color: withAlpha(tokens.series[1], 0.55) },
+          data: dailyData.map((d) => (showForecast && d.day > forecast.elapsed ? null : d.amount)),
+        },
+        ...(showForecast ? [
+          // Likely range: an invisible floor with the band stacked on top of it
+          { name: 'band-floor', type: 'line', stack: 'band', symbol: 'none', smooth: 0.35, lineStyle: { opacity: 0 }, tooltip: { show: false }, silent: true,
+            data: forecast.path.map((p) => p.low) },
+          { name: t('dashForecastBand'), type: 'line', stack: 'band', symbol: 'none', smooth: 0.35, lineStyle: { opacity: 0 }, silent: true,
+            areaStyle: { color: withAlpha(tokens.primary, 0.1) },
+            data: forecast.path.map((p) => (p.high === null || p.low === null ? null : p.high - p.low)) },
+          { name: t('dashForecast'), type: 'line', smooth: 0.35, symbol: 'none', z: 4,
+            lineStyle: { width: 2, type: [6, 5], color: tokens.primary },
+            data: forecast.path.map((p) => p.expected) },
+        ] : []),
       ],
     };
-  }, [tokens, baseTooltip, dailyData, fmtMoney, fmtCompact, blur, t]);
+  }, [tokens, baseTooltip, dailyData, fmtMoney, fmtCompact, blur, t, showForecast, forecast]);
 
   const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
@@ -288,10 +327,17 @@ export default function Dashboard() {
           </div>
         </motion.header>
 
+        <AssistantBar />
+
         {/* Bento grid */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-6 md:gap-5">
-          {/* Hero: net + cumulative curve */}
-          <Tile i={1} className="p-6 md:col-span-4 md:row-span-1">
+          {/* Headline: what is left to spend, together */}
+          <Tile i={1} className="md:col-span-3">
+            <SafeToSpendCard forecast={forecast} isShared={isShared} />
+          </Tile>
+
+          {/* Net + cumulative curve, with the forecast for the rest of this month */}
+          <Tile i={1} className="p-6 md:col-span-3">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className={cn('text-sm', muted)}>{t('netAmount')}</p>
@@ -309,19 +355,28 @@ export default function Dashboard() {
                 </span>
               )}
             </div>
-            <div className="mt-4 h-52">
+            <div className="mt-4 h-52 md:h-64" dir="ltr">
               {hasData && areaOption ? <EChart option={areaOption} className="h-full w-full" ariaLabel={t('dashDailySpending')} /> : empty}
             </div>
           </Tile>
 
-          {/* Stat stack */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:col-span-2 md:grid-cols-1 md:gap-5">
+          {/* Stat row */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:col-span-6 md:gap-5">
             {stat(t('income'), <Money value={kpis.income} locale={locale} currency={userCurrency} blur={blur} />, TrendingUp, 'text-success')}
             {stat(t('expenses'), <Money value={kpis.expenses} locale={locale} currency={userCurrency} blur={blur} />, TrendingDown, 'text-danger')}
             {stat(t('savingsRate'),
               kpis.savingsRate === null ? '—' : <NumberFlow value={kpis.savingsRate / 100} locales={locale} format={{ style: 'percent', maximumFractionDigits: 0 }} trend={0} />,
               PiggyBank, 'text-primary')}
           </div>
+
+          {isShared && (
+            <Tile i={3} className="md:col-span-3 xl:col-span-2">
+              <HouseholdBalanceCard balances={balances} />
+            </Tile>
+          )}
+          <Tile i={3} className={isShared ? 'md:col-span-3 xl:col-span-4' : 'md:col-span-6'}>
+            <SubscriptionsCard subscriptions={subscriptions} />
+          </Tile>
 
           {/* Categories */}
           <Tile i={3} className="p-6 md:col-span-3">

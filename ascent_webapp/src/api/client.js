@@ -313,6 +313,7 @@ const entities = {
   PageLayout: createEntity('page-layouts'),
   SharedUser: createEntity('shared-users'),
   PortfolioSnapshot: createEntity('snapshots'),
+  Settlement: createEntity('settlements'),
   Note: {
     ...createEntity('notes'),
     // Permanently delete everything the caller has in the trash
@@ -472,7 +473,31 @@ const workspaces = {
   },
   async declineInvitation(token) {
     return request(`/workspaces?action=decline&token=${token}`, { method: 'POST' });
+  },
+  // Household options: { aiAssistant, largeExpenseAlert, largeExpenseCurrency }
+  async updateSettings(id, settings) {
+    return request(`/workspaces?id=${id}&action=settings`, { method: 'PUT', body: JSON.stringify(settings) });
   }
+};
+
+const localDay = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// Smart help: category suggestions while typing, and the opt-in AI assistant
+const assist = {
+  status: () => request('/assist'),
+  suggestCategory: (description, type = 'Expense') =>
+    request('/assist?action=suggest-category', { method: 'POST', body: JSON.stringify({ description, type }) }),
+  parse: (text) => request('/assist?action=parse', { method: 'POST', body: JSON.stringify({ text, today: localDay() }) }),
+  ask: (question) => request('/assist?action=ask', { method: 'POST', body: JSON.stringify({ question, today: localDay() }) }),
+};
+
+// Card statements read on the device: rows are matched against what is already recorded
+const imports = {
+  statement: (rows, { review = false } = {}) =>
+    request('/import/statement', { method: 'POST', body: JSON.stringify({ rows, review }) }),
 };
 
 // Apple Pay: a personal key lets an iOS Shortcut add each purchase as a transaction
@@ -507,6 +532,8 @@ export const ascent = {
   applePay,
   ingestTokens,
   push,
+  assist,
+  imports,
   appLogs
 };
 

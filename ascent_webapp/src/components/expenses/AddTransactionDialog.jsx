@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Repeat, ShoppingBag, Minus, Plus } from 'lucide-react';
+import { Loader2, Repeat, ShoppingBag, Minus, Plus, Sparkles } from 'lucide-react';
 import { format, addMonths, parseISO, isAfter } from 'date-fns';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
@@ -15,6 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ascent } from '@/api/client';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
+import HouseholdFields, { splitIsValid } from './HouseholdFields';
+import { useCategorySuggestion } from './useCategorySuggestion';
 
 const LAST_KEY = 'ascent_last_transaction_choices';
 const readLastChoices = () => {
@@ -76,9 +78,20 @@ export default function AddTransactionDialog({
     installmentCount: '1',
     planId: '',
     planItemId: '',
+    paidBy: '',
+    split: null,
   });
 
   const [errors, setErrors] = useState({});
+  // A category picked by hand is never replaced by a suggestion
+  const categoryTouched = useRef(false);
+  const suggestion = useCategorySuggestion(formData.description, formData.type, open && !isEditing);
+  useEffect(() => {
+    if (!suggestion || categoryTouched.current) return;
+    if (!categories.some((c) => c.name === suggestion.name)) return;
+    setFormData((f) => (f.category === suggestion.name ? f : { ...f, category: suggestion.name }));
+  }, [suggestion, categories]);
+  const showSuggested = !!suggestion && !categoryTouched.current && formData.category === suggestion.name;
 
   // Category chips: last-used first, the rest behind a "more" menu
   const { quickCategories, moreCategories } = useMemo(() => {
@@ -173,6 +186,8 @@ export default function AddTransactionDialog({
         installmentCount: '1',
         planId: editTransaction.planId || '',
         planItemId: editTransaction.planItemId || '',
+        paidBy: editTransaction.paidBy || '',
+        split: editTransaction.split?.mode ? editTransaction.split : null,
       });
       // If editing and no amountInGlobalCurrency exists, we'll recalculate it on submit
     } else {
@@ -197,8 +212,11 @@ export default function AddTransactionDialog({
         installmentCount: '1',
         planId: '',
         planItemId: '',
+        paidBy: '',
+        split: null,
       });
     }
+    categoryTouched.current = false;
     setErrors({});
   }, [editTransaction, open, user?.currency, categories, startType]);
 
@@ -247,6 +265,10 @@ export default function AddTransactionDialog({
       newErrors.amount = t('amountGreaterThanZero');
     }
 
+    if (formData.type === 'Expense' && !splitIsValid(formData.split)) {
+      newErrors.split = t('splitMustTotal');
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -271,6 +293,8 @@ export default function AddTransactionDialog({
       installmentCount: splitting ? installments : 1,
       planId: (isExpense && formData.planId) || null,
       planItemId: (isExpense && formData.planId && formData.planItemId) || null,
+      paidBy: (isExpense && formData.paidBy) || null,
+      split: (isExpense && formData.split) || null,
     });
   };
 
@@ -356,7 +380,14 @@ export default function AddTransactionDialog({
             </div>
 
           <div className="space-y-1 sm:space-y-2">
-            <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
+            <Label className={cn("flex items-center gap-2 text-xs sm:text-sm", colors.textSecondary)}>
+              {t('category')} *
+              {showSuggested && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  <Sparkles className="h-3 w-3" aria-hidden />{t('suggestedCategory')}
+                </span>
+              )}
+            </Label>
             <div role="radiogroup" aria-label={t('category')} className="flex flex-wrap gap-2">
               {quickCategories.map((category) => {
                 const active = formData.category === category.name;
@@ -366,7 +397,7 @@ export default function AddTransactionDialog({
                     type="button"
                     role="radio"
                     aria-checked={active}
-                    onClick={() => setFormData({ ...formData, category: category.name })}
+                    onClick={() => { categoryTouched.current = true; setFormData({ ...formData, category: category.name }); }}
                     className={cn(
                       "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors sm:min-h-9 sm:px-3",
                       active ? "border-primary bg-primary/15 text-primary" : cn(colors.border, colors.textSecondary, "hover:bg-primary/10")
@@ -377,7 +408,7 @@ export default function AddTransactionDialog({
                 );
               })}
               {moreCategories.length > 0 && (
-                <Select value="" onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <Select value="" onValueChange={(value) => { categoryTouched.current = true; setFormData({ ...formData, category: value }); }}>
                   <SelectTrigger aria-label={t('category')} className={cn("h-11 w-auto min-w-[5.5rem] rounded-full text-sm sm:h-9", colors.bgTertiary, colors.border, colors.textSecondary)}>
                     <SelectValue placeholder="…" />
                   </SelectTrigger>
@@ -509,6 +540,18 @@ export default function AddTransactionDialog({
 
 
 
+
+          {/* Households: who paid, and whether the others owe their part */}
+          {formData.type === 'Expense' && (
+            <HouseholdFields
+              value={{ paidBy: formData.paidBy, split: formData.split }}
+              onChange={(v) => { setFormData({ ...formData, ...v }); if (errors.split) setErrors({ ...errors, split: '' }); }}
+              amount={parseFloat(formData.amount) || 0}
+              currency={formData.currency}
+              creator={editTransaction?.created_by}
+              error={errors.split}
+            />
+          )}
 
           {/* Big purchase: kept apart from everyday spending, optionally paid in installments */}
           {formData.type === 'Expense' && (!formData.isRecurring || isEditing) && (

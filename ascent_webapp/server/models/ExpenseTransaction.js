@@ -1,11 +1,22 @@
 import mongoose from 'mongoose';
+import { installTransactionHooks } from '../lib/transactionHooks.js';
 
 // One entry per automated report of a purchase (Wallet tap, SMS alert, statement row) that this row absorbed.
 const ingestSourceSchema = new mongoose.Schema({
   source: { type: String, enum: ['wallet', 'sms', 'statement'], required: true },
   at: Date,
   tokenId: mongoose.Schema.Types.ObjectId,
-  cardText: { type: String, maxlength: 80 }
+  cardText: { type: String, maxlength: 80 },
+  ref: String // statement imports: the replay key of the row that was merged in, so a re-import skips it
+}, { _id: false });
+
+// How one expense is shared between people: equal parts, or each person's percentage.
+const splitSchema = new mongoose.Schema({
+  mode: { type: String, enum: ['equal', 'custom'], required: true },
+  shares: {
+    type: [{ email: { type: String, required: true }, percent: { type: Number, min: 0, max: 100 } }],
+    default: []
+  }
 }, { _id: false });
 
 const expenseTransactionSchema = new mongoose.Schema({
@@ -111,6 +122,17 @@ const expenseTransactionSchema = new mongoose.Schema({
     default: null
   },
 
+  // Households: who actually paid (an email, like created_by; empty means whoever added it) and, for
+  // money that one person fronts for others, how it is shared. No split means shared money nobody owes back.
+  paidBy: {
+    type: String,
+    default: null
+  },
+  split: {
+    type: splitSchema,
+    default: undefined
+  },
+
   workspaceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Workspace',
@@ -183,6 +205,8 @@ expenseTransactionSchema.index(
   { workspaceId: 1, amount: 1, occurredAt: -1 },
   { partialFilterExpression: { occurredAt: { $type: 'date' } } }
 );
+
+installTransactionHooks(expenseTransactionSchema);
 
 expenseTransactionSchema.virtual('id').get(function() {
   return this._id.toHexString();

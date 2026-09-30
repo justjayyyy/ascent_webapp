@@ -1,5 +1,5 @@
-// POST /api/ingest/:kind  (kind: wallet)
-// Receives one purchase reported by a phone's Shortcut and files it as a pending expense.
+// POST /api/ingest/:kind  (kind: wallet | sms)
+// Receives one purchase reported by a phone's Shortcut (an Apple Pay tap, or a card company's SMS) and files it as a pending expense.
 // Auth is a per-device ingest token (never the login JWT); the workspace comes from the token, not from the request.
 import connectDB from '../lib/mongodb.js';
 import { success, error, unauthorized, serverError } from '../lib/response.js';
@@ -15,20 +15,22 @@ import { suggestCategory } from '../lib/categorize.js';
 import { hashToken, tokenFromHeader } from '../lib/ingest/tokens.js';
 import { memberCanSubmit } from '../lib/ingest/access.js';
 import { parseWalletPayload } from '../lib/ingest/wallet.js';
+import { parseSmsPayload } from '../lib/ingest/sms.js';
+import { loadRules } from '../lib/merchantRules.js';
 import { matchCard } from '../lib/ingest/cards.js';
 import { dedupeKey, decideMatch, planMerge, WINDOWS } from '../lib/ingest/match.js';
 import { shiftDate } from '../lib/ingest/time.js';
 import { notifyUser } from '../lib/push.js';
 import { paymentPush } from '../lib/ingest/notify.js';
 
-const PARSERS = { wallet: parseWalletPayload };
+const PARSERS = { wallet: parseWalletPayload, sms: parseSmsPayload };
 const RATE = { windowMs: 10 * 60_000, max: 60 };
 const CANDIDATE_FIELDS = 'amount currency occurredAt date status source cardId merchant merchantKey description ingest';
 
 const clip = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v).slice(0, 200) : undefined);
 const snapshot = (body) =>
   body && typeof body === 'object' && !Array.isArray(body)
-    ? { merchant: clip(body.merchant), amount: clip(body.amount), card: clip(body.card), at: clip(body.at) }
+    ? { merchant: clip(body.merchant), amount: clip(body.amount), card: clip(body.card), at: clip(body.at), text: clip(body.text) }
     : undefined;
 
 export default async function handler(req, res) {
@@ -115,7 +117,7 @@ export default async function handler(req, res) {
     // Layer 1: the same request replayed, caught atomically by the unique partial index and checked up front.
     const key = dedupeKey({
       tokenId: String(token._id), source: kind, at: ev.at, minor: ev.minor, currency: ev.currency,
-      merchantKey: ev.merchantKey, cardText: ev.cardText,
+      merchantKey: ev.merchantKey, cardText: ev.cardText, text: ev.text,
     });
     if (key) {
       const replay = await ExpenseTransaction.findOne({ workspaceId: workspace._id, dedupeKey: key }).select('_id').lean();
@@ -153,15 +155,16 @@ export default async function handler(req, res) {
 
     // Pre-fill the category from the user's own history and keywords; the row stays pending for review.
     // With no suggestion it takes the workspace's "other" category, or its first expense category.
-    const [categories, history] = await Promise.all([
+    const [categories, history, rules] = await Promise.all([
       Category.find({ workspaceId: workspace._id }).lean(),
       ev.merchant
         ? ExpenseTransaction.find({ workspaceId: workspace._id, type: 'Expense' }).sort('-date').limit(500).select('description category type').lean()
         : [],
+      ev.merchantKey ? loadRules(workspace._id, [ev.merchantKey]) : [],
     ]);
     const expenseCategories = categories.filter((c) => c.type === 'Expense' || c.type === 'Both');
     const fallback = expenseCategories.find((c) => (c.nameKey || c.name) === 'other_expense' || c.name === 'Other') || expenseCategories[0];
-    const category = (ev.merchant && suggestCategory({ description: ev.merchant, type: 'Expense', categories, history })?.name)
+    const category = (ev.merchant && suggestCategory({ description: ev.merchant, merchantKey: ev.merchantKey, type: 'Expense', categories, history, rules })?.name)
       || fallback?.name
       || 'other_expense';
 

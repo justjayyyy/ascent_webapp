@@ -13,6 +13,7 @@ import MembersSection from '../components/workspace/MembersSection';
 import { roleLabel as memberRoleLabel } from '../components/workspace/utils';
 import CardManagement from '../components/settings/CardManagement';
 import ApplePaySection from '../components/settings/ApplePaySection';
+import HouseholdSmartSettings from '../components/settings/HouseholdSmartSettings';
 import ThemePicker from '../components/settings/ThemePicker';
 import SettingsNav, { useActiveSection } from '../components/settings/SettingsNav';
 import { Section, Group, Row, Segmented, EditableField } from '../components/settings/SettingsShell';
@@ -354,6 +355,7 @@ export default function Settings() {
                     <MembersSection />
                   </div>
                 )}
+                {(sectionHit(t('setNavHousehold')) || hit(t('aiTitle'), t('largeAlertTitle'))) && <HouseholdSmartSettings />}
               </Group>
             </Section>
           )}

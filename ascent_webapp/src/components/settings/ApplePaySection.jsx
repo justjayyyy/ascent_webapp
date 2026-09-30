@@ -47,6 +47,7 @@ export default function ApplePaySection({ index }) {
   const [freshKey, setFreshKey] = useState(null);
   const [toRemove, setToRemove] = useState(null);
   const url = `${window.location.origin}/api/ingest/wallet`;
+  const smsUrl = `${window.location.origin}/api/ingest/sms`;
 
   const { data: tokens = [] } = useQuery({ queryKey: ['ingest-tokens'], queryFn: () => ascent.ingestTokens.list(), staleTime: 15 * 1000 });
   const { data: activity = [] } = useQuery({ queryKey: ['ingest-activity'], queryFn: () => ascent.ingestTokens.activity(), staleTime: 15 * 1000, refetchInterval: 30 * 1000 });
@@ -118,6 +119,22 @@ export default function ApplePaySection({ index }) {
             ))}
           </ol>
           <p className="mt-4 text-sm text-muted-foreground text-pretty">{t('apCategoryNote')}</p>
+        </div>
+
+        {/* Card company SMS alerts: the same device keys, a different address */}
+        <div className="px-4 py-4 sm:px-5">
+          <h3 className="text-sm font-medium text-foreground">{t('smsTitle')}</h3>
+          <p className="mt-1 text-sm text-muted-foreground text-pretty">{t('smsDesc')}</p>
+          {tokens.length > 0 && <div className="mt-3"><CopyField label={t('smsUrl')} value={smsUrl} t={t} /></div>}
+          <ol className="mt-3 space-y-3">
+            {[1, 2, 3, 4].map((n) => (
+              <li key={n} className="flex gap-3 text-sm text-muted-foreground">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{n}</span>
+                <span className="pt-0.5 text-pretty">{t(`smsStep${n}`)}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm text-muted-foreground text-pretty">{t('smsNote')}</p>
         </div>
 
         <div className="px-4 py-4 sm:px-5">

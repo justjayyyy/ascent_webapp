@@ -1,4 +1,5 @@
 import { categoryTranslations } from './categoryTranslations.js';
+import { merchantKey as toMerchantKey } from './ingest/text.js';
 
 // Words that point at a default category, in English, Hebrew and Russian. Matching is on
 // the description only, so nothing leaves the device.
@@ -183,14 +184,19 @@ function fromKeywords(text, type, categories) {
 
 /**
  * Work out which category a transaction belongs to from its description.
- * `history` is the user's earlier transactions (newest first); `categories` are the ones
- * they can pick from. Returns { name, source: 'history' | 'keywords' } or null.
+ * `rules` are the workspace's learned merchant rules (see merchantRules.js), `history` is the user's
+ * earlier transactions (newest first), `categories` are the ones they can pick from.
+ * A rule for this exact merchant wins, then history, then keywords.
+ * Returns { name, source: 'rule' | 'history' | 'keywords' } or null.
  */
-export function suggestCategory({ description, type = 'Expense', categories = [], history = [] }) {
-  const text = norm(description);
-  if (text.length < 3) return null;
+export function suggestCategory({ description, merchantKey, type = 'Expense', categories = [], history = [], rules = [] }) {
   const usable = categories.filter(c => c.type === type || c.type === 'Both');
   if (!usable.length) return null;
+  const key = merchantKey || toMerchantKey(description || '');
+  const rule = key && rules.find(r => r.merchantKey === key && (r.type || 'Expense') === type && usable.some(c => c.name === r.category));
+  if (rule) return { name: rule.category, source: 'rule' };
+  const text = norm(description);
+  if (text.length < 3) return null;
   const fromPast = fromHistory(text, type, usable, history);
   if (fromPast) return { name: fromPast, source: 'history' };
   const fromWords = fromKeywords(text, type, usable);
