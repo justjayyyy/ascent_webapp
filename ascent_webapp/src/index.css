@@ -692,6 +692,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 :root { --safe-top: env(safe-area-inset-top); }
 
 /* Sticky page bars sit under the phone header, and follow it when it slides away */
-:root { --header-bar: 2.75rem; --header-hide: calc(var(--header-bar) + 1.75rem); --header-total: calc(var(--header-bar) + 0.75rem); --sticky-top: calc(var(--header-total) + var(--safe-top)); }
+:root { --header-bar: 3.25rem; --header-hide: calc(var(--header-bar) + 2rem); --header-total: calc(var(--header-bar) + 1rem); --sticky-top: calc(var(--header-total) + var(--safe-top)); }
 html[data-header-hidden] { --sticky-top: var(--safe-top); }
 @media (min-width: 768px) { :root, html[data-header-hidden] { --sticky-top: 0px; } }

@@ -60,7 +60,7 @@ export function ensureStandaloneTopInset() {
       // clear of it: the real inset (or a typical one if iOS reports 0) plus a margin.
       const base = envTop >= 20 ? envTop : long >= 930 ? 59 : long >= 850 ? 54 : long >= 812 ? 47 : 20;
       top = base;
-      root.style.setProperty('--safe-top', `${base + 8}px`);
+      root.style.setProperty('--safe-top', `${base + 12}px`);
     } else {
       root.style.removeProperty('--safe-top');
     }

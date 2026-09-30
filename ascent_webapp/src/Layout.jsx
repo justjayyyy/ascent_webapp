@@ -192,9 +192,8 @@ function LayoutContent({ children, currentPageName }) {
 
       {/* Mobile Header */}
       <div className={cn(
-        "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top safe-area-inset-x",
-        "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-                colors.border
+        "md:hidden fixed top-0 start-0 end-0 z-50 safe-area-inset-top safe-area-inset-x",
+        "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
       )}
       // The strip behind the status bar is the page background, so the system's soft
       // edge under the clock/battery fades into black instead of showing as a grey blur
@@ -207,7 +206,7 @@ function LayoutContent({ children, currentPageName }) {
             aria-label={t('menu')}
             aria-expanded={mobileMenuOpen}
             className={cn(
-              "absolute start-2 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-xl transition-colors",
+              "absolute start-1 top-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-xl transition-colors active:bg-foreground/[0.1]",
               "hover:bg-foreground/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               mobileMenuOpen ? "text-primary" : "text-foreground"
             )}
@@ -220,8 +219,14 @@ function LayoutContent({ children, currentPageName }) {
           </button>
           {/* The logo sits on the header's bottom border, half over the bar and half over the page */}
           <div className="pointer-events-none absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2">
-            <AscentLogo motion="full" alt="Ascent logo" className="w-16" />
+            <AscentLogo motion="full" alt="Ascent logo" className="w-[4.25rem]" />
           </div>
+          {/* Hairline along the bottom edge: fades out at both ends and leaves a clear gap around the logo */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
+            style={{ background: 'linear-gradient(to right, transparent 0, hsl(var(--border)) 14%, hsl(var(--border)) calc(50% - 3.25rem), transparent calc(50% - 3.25rem), transparent calc(50% + 3.25rem), hsl(var(--border)) calc(50% + 3.25rem), hsl(var(--border)) 86%, transparent 100%)' }}
+          />
         </div>
       </div>
 
