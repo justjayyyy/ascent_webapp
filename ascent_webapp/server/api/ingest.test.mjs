@@ -17,6 +17,9 @@ const chain = (value) => {
   return c;
 };
 
+mock.module(at('../lib/push.js'), { exports: { notifyUser: async (userId, payload) => { pushed.push({ userId, payload }); }, pushConfigured: () => true } });
+const pushed = [];
+
 const models = {
   IngestToken: {
     findOne(q) {
@@ -130,6 +133,7 @@ beforeEach(() => {
   TOKEN = newToken();
   TOKEN_DOC = { _id: oid(), userId: ME._id, workspaceId: WS._id, label: 'iPhone', prefix: TOKEN.prefix, tokenHash: TOKEN.tokenHash, revokedAt: null, expiresAt: null, useCount: 0 };
   limiter = { limited: false, calls: 0 };
+  pushed.length = 0;
   db = {
     tokens: [TOKEN_DOC],
     users: [ME],
@@ -273,6 +277,18 @@ test('with no suggestion the workspace own "other" or first expense category is 
   db.categories = [{ name: 'Groceries', type: 'Expense' }];
   await call({ body: payload({ merchant: 'Zzzq Corp', at: iso(-30 * 60_000) }) });
   assert.equal(db.rows[1].category, 'Groceries');
+});
+
+test('a new payment sends one push to its owner, and nothing else does', async () => {
+  await call();
+  assert.equal(pushed.length, 1);
+  assert.equal(String(pushed[0].userId), String(ME._id));
+  assert.equal(pushed[0].payload.title, 'Aroma Espresso Bar');
+  assert.match(pushed[0].payload.body, /18\.00.*Needs review/);
+  assert.equal(pushed[0].payload.url, '/Expenses');
+  await call();                                              // replay: duplicate
+  await call({ body: payload({ amount: 'x' }) });            // rejected
+  assert.equal(pushed.length, 1);
 });
 
 test('the request is recorded and the token shows activity', async () => {

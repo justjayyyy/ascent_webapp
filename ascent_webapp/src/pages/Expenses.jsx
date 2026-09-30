@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, useRef, memo } from 'react';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Target, Tag } from 'lucide-react';
-import { startOfMonth, endOfMonth, parseISO, eachMonthOfInterval, format as formatDate, getYear, getMonth, startOfYear, endOfYear } from 'date-fns';
+import { Plus, Loader2, Target, Tag, RefreshCw } from 'lucide-react';
+import { motion, useMotionValue, useTransform, animate } from 'motion/react';
+import { parseISO, eachMonthOfInterval, format as formatDate, getYear, getMonth } from 'date-fns';
 import AddTransactionDialog from '../components/expenses/AddTransactionDialog';
 import BudgetManager from '../components/expenses/BudgetManager';
 import CategoryManager from '../components/expenses/CategoryManager';
@@ -377,6 +378,37 @@ function Expenses() {
     }
   }, [selectedYear, selectedMonths, t]);
 
+  const pullY = useMotionValue(0);
+  const pullRotate = useTransform(pullY, [0, 72], [0, 270]);
+  const pullOpacity = useTransform(pullY, [0, 24, 72], [0, 0.6, 1]);
+  const pullIndicatorY = useTransform(pullY, (v) => v - 40);
+  const pullStart = useRef(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onTouchStart = useCallback((e) => {
+    if (window.scrollY <= 0 && !refreshing) pullStart.current = e.touches[0].clientY;
+  }, [refreshing]);
+
+  const onTouchMove = useCallback((e) => {
+    if (pullStart.current === null) return;
+    const dy = e.touches[0].clientY - pullStart.current;
+    if (dy > 0 && window.scrollY <= 0) pullY.set(Math.min(dy * 0.5, 96));
+    else pullStart.current = null;
+  }, [pullY]);
+
+  const onTouchEnd = useCallback(async () => {
+    if (pullStart.current === null) return;
+    pullStart.current = null;
+    if (pullY.get() >= 72) {
+      setRefreshing(true);
+      if (navigator.vibrate) navigator.vibrate(10);
+      animate(pullY, 56, { duration: 0.2 });
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setRefreshing(false);
+    }
+    animate(pullY, 0, { type: 'spring', stiffness: 400, damping: 36 });
+  }, [pullY, queryClient]);
+
   // Loading state - after all hooks
   if (!user) {
     return (
@@ -390,61 +422,36 @@ function Expenses() {
     <div className="relative flex flex-col md:min-h-dvh p-2 pb-24 sm:p-4 sm:pb-24 md:p-8">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.16),transparent_70%)]" />
       <div className="max-w-7xl mx-auto flex flex-col md:block w-full">
-        {/* Header */}
-        <div className="mb-3 sm:mb-6 flex-shrink-0">
-          <div className="flex items-center justify-between mb-2 sm:mb-4">
-            <div>
-              <h1 className={cn("text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-1 sm:mb-2", colors.textPrimary)}>{t('expenses')}</h1>
-              <p className={cn("text-xs sm:text-base", colors.textTertiary)}>{t('trackYourIncomeExpenses')}</p>
-            </div>
-            <div className="flex gap-1 sm:gap-2">
-              {canEdit && (
-                <>
-                  <Button
-                    onClick={() => setCategoryDialogOpen(true)}
-                    variant="outline"
-                    size="sm"
-                    aria-label={t('categories')}
-                    className={cn("bg-transparent hover:bg-primary/20 h-11 w-11 p-0 sm:h-10 sm:w-auto sm:px-3", colors.border, colors.textSecondary)}
-                  >
-                    <Tag className="w-4 h-4 sm:w-5 sm:h-5 sm:me-2" />
-                    <span className="hidden md:inline">{t('categories')}</span>
-                  </Button>
-                </>
-              )}
-              {canViewBudgets && (
-                <Button
-                  onClick={() => setBudgetDialogOpen(true)}
-                  variant="outline"
-                  size="sm"
-                  aria-label={t('budgets')}
-                  className={cn("bg-transparent hover:bg-primary/20 h-11 w-11 p-0 sm:h-10 sm:w-auto sm:px-3", colors.border, colors.textSecondary)}
-                >
-                  <Target className="w-4 h-4 sm:w-5 sm:h-5 sm:me-2" />
-                  <span className="hidden md:inline">{t('budgets')}</span>
-                </Button>
-              )}
-              {canEdit && (
-                <>
-                  <Button
-                    onClick={() => {
-                      setEditingTransaction(null);
-                      setAddDialogOpen(true);
-                    }}
-                    size="sm"
-                    className="hidden bg-primary hover:bg-primary/80 text-primary-foreground sm:inline-flex sm:h-10 sm:text-base"
-                  >
-                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:me-2" />
-                    <span className="hidden sm:inline">{t('addTransaction')}</span>
-                    <span className="sm:hidden">{t('add')}</span>
-                  </Button>
-                </>
-              )}
-            </div>
+        <header className="mb-2 flex flex-shrink-0 items-center justify-between gap-3 sm:mb-4">
+          <div className="min-w-0">
+            <h1 className={cn("text-3xl font-bold tracking-tight md:text-4xl", colors.textPrimary)}>{t('expenses')}</h1>
+            <p className={cn("mt-1 hidden text-base sm:block", colors.textTertiary)}>{t('trackYourIncomeExpenses')}</p>
           </div>
-        </div>
+          <div className="flex items-center gap-1">
+            {canEdit && (
+              <Button onClick={() => setCategoryDialogOpen(true)} variant="ghost" aria-label={t('categories')} className="h-11 w-11 rounded-full p-0 text-muted-foreground hover:bg-foreground/10 md:w-auto md:px-4">
+                <Tag className="h-5 w-5 md:me-2" />
+                <span className="hidden md:inline">{t('categories')}</span>
+              </Button>
+            )}
+            {canViewBudgets && (
+              <Button onClick={() => setBudgetDialogOpen(true)} variant="ghost" aria-label={t('budgets')} className="h-11 w-11 rounded-full p-0 text-muted-foreground hover:bg-foreground/10 md:w-auto md:px-4">
+                <Target className="h-5 w-5 md:me-2" />
+                <span className="hidden md:inline">{t('budgets')}</span>
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                onClick={() => { setEditingTransaction(null); setAddDialogOpen(true); }}
+                className="hidden h-10 rounded-full bg-primary px-5 text-base text-primary-foreground hover:bg-primary/85 sm:inline-flex"
+              >
+                <Plus className="me-2 h-5 w-5" />
+                {t('addTransaction')}
+              </Button>
+            )}
+          </div>
+        </header>
 
-        {/* Period Selector */}
         <div className="flex-shrink-0">
           <PeriodSelector
             transactions={transactions}
@@ -455,23 +462,41 @@ function Expenses() {
           />
         </div>
 
-        {/* Period View with integrated filters - Scrollable on mobile */}
-        <div className="mt-3 sm:mt-6">
-          <ExpenseMonthView
-            transactions={selectedPeriodTransactions}
-            budgets={budgets}
-            cards={cards}
-            categories={categories}
-            onEdit={handleEditTransaction}
-            onDelete={handleDeleteTransaction}
-            onDuplicate={handleDuplicateTransaction}
-            onConfirm={confirmTransactionMutation.mutate}
-            isLoading={isLoading}
-            monthLabel={selectedPeriodLabel}
-            selectedYear={selectedYear}
-            selectedMonths={selectedMonths}
-            canEdit={canEdit}
-          />
+        <div className="relative mt-3 sm:mt-5">
+          <motion.div
+            aria-hidden={!refreshing}
+            style={{ opacity: refreshing ? 1 : pullOpacity, y: pullIndicatorY }}
+            className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center md:hidden"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-popover text-primary shadow-lg">
+              <motion.span style={{ rotate: refreshing ? undefined : pullRotate }} className={cn(refreshing && "animate-spin")}>
+                <RefreshCw className="h-4 w-4" />
+              </motion.span>
+            </span>
+          </motion.div>
+          <motion.div
+            style={{ y: pullY }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            className="touch-pan-y"
+          >
+            <ExpenseMonthView
+              transactions={selectedPeriodTransactions}
+              budgets={budgets}
+              cards={cards}
+              categories={categories}
+              onEdit={handleEditTransaction}
+              onDelete={handleDeleteTransaction}
+              onDuplicate={handleDuplicateTransaction}
+              onConfirm={confirmTransactionMutation.mutate}
+              isLoading={isLoading}
+              monthLabel={selectedPeriodLabel}
+              selectedYear={selectedYear}
+              selectedMonths={selectedMonths}
+              canEdit={canEdit}
+            />
+          </motion.div>
         </div>
 
         {/* Thumb-reach quick add (phones) */}
@@ -479,7 +504,7 @@ function Expenses() {
           <Button
             onClick={() => { setEditingTransaction(null); setAddDialogOpen(true); }}
             aria-label={t('addTransaction')}
-            className="fixed end-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-lg sm:hidden"
+            className="fixed end-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-[0_10px_30px_-8px_hsl(var(--glow)/0.7)] transition-transform active:scale-90 sm:hidden"
           >
             <Plus className="!size-6" />
           </Button>

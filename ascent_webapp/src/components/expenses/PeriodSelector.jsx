@@ -1,203 +1,89 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { ChevronDown, Calendar } from 'lucide-react';
+import React, { useMemo, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
-import { getYear, getMonth, parseISO } from 'date-fns';
+import { getYear, parseISO } from 'date-fns';
 
-const MONTHS = [
-  { value: 1, labelKey: 'jan', fullLabelKey: 'january' },
-  { value: 2, labelKey: 'feb', fullLabelKey: 'february' },
-  { value: 3, labelKey: 'mar', fullLabelKey: 'march' },
-  { value: 4, labelKey: 'apr', fullLabelKey: 'april' },
-  { value: 5, labelKey: 'may', fullLabelKey: 'may' },
-  { value: 6, labelKey: 'jun', fullLabelKey: 'june' },
-  { value: 7, labelKey: 'jul', fullLabelKey: 'july' },
-  { value: 8, labelKey: 'aug', fullLabelKey: 'august' },
-  { value: 9, labelKey: 'sep', fullLabelKey: 'september' },
-  { value: 10, labelKey: 'oct', fullLabelKey: 'october' },
-  { value: 11, labelKey: 'nov', fullLabelKey: 'november' },
-  { value: 12, labelKey: 'dec', fullLabelKey: 'december' },
-];
+const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const FULL_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 
-function PeriodSelector({ 
-  transactions = [],
-  selectedYear, 
-  selectedMonths = [], 
-  onYearChange, 
-  onMonthChange
-}) {
-  const { colors, t } = useTheme();
-  const [isExpanded, setIsExpanded] = useState(false);
-  
+function PeriodSelector({ transactions = [], selectedYear, selectedMonths = [], onYearChange, onMonthChange }) {
+  const { t } = useTheme();
+  const stripRef = useRef(null);
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1-indexed
+  const currentMonth = now.getMonth() + 1;
+  const yearNum = parseInt(selectedYear);
 
-  // Get available years from transactions (only years with data)
-  const availableYears = useMemo(() => {
-    const yearsSet = new Set();
-    transactions.forEach(t => {
-      yearsSet.add(getYear(parseISO(t.date)));
-    });
-    return Array.from(yearsSet).sort((a, b) => b - a); // Sort descending
-  }, [transactions]);
+  const years = useMemo(() => {
+    const set = new Set([currentYear, yearNum]);
+    transactions.forEach((tx) => tx.date && set.add(getYear(parseISO(tx.date))));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [transactions, currentYear, yearNum]);
 
-  // Check if this is the current month - memoized
-  const isCurrentMonth = useCallback((year, month) => {
-    return parseInt(year) === currentYear && month === currentMonth;
-  }, [currentYear, currentMonth]);
+  const yearIdx = years.indexOf(yearNum);
+  const canPrev = yearIdx > 0;
+  const canNext = yearIdx < years.length - 1;
 
-  const hasSelectedMonths = selectedMonths && selectedMonths.length > 0;
-  
-  // Get display text for selected months
-  const getSelectedMonthsDisplay = useMemo(() => {
-    if (!hasSelectedMonths) {
-      return `${selectedYear} (${t('all') || 'All'})`;
-    }
-    if (selectedMonths.length === 1) {
-      const monthData = MONTHS.find(m => m.value === parseInt(selectedMonths[0]));
-      return monthData ? `${t(monthData.fullLabelKey)} ${selectedYear}` : `${selectedYear}`;
-    }
-    return `${selectedMonths.length} ${t('months') || 'months'} ${selectedYear}`;
-  }, [selectedMonths, selectedYear, hasSelectedMonths, t]);
+  const changeYear = useCallback((next) => {
+    onYearChange(String(next));
+    onMonthChange([]);
+  }, [onYearChange, onMonthChange]);
 
-  const isViewingCurrentMonth = hasSelectedMonths && selectedMonths.some(m => 
-    isCurrentMonth(selectedYear, parseInt(m))
+  const toggleMonth = useCallback((value) => {
+    const key = String(value);
+    onMonthChange(selectedMonths.includes(key) ? selectedMonths.filter((m) => m !== key) : [...selectedMonths, key]);
+    if (navigator.vibrate) navigator.vibrate(8);
+  }, [selectedMonths, onMonthChange]);
+
+  useEffect(() => {
+    const target = stripRef.current?.querySelector('[data-active="true"]');
+    target?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [selectedYear, selectedMonths.length]);
+
+  const chip = (active, current) => cn(
+    "relative shrink-0 snap-center rounded-full px-4 min-h-11 text-sm font-medium transition-[background-color,color,transform] duration-200 active:scale-95 sm:min-h-9",
+    active
+      ? "bg-primary text-primary-foreground shadow-[0_6px_18px_-8px_hsl(var(--glow)/0.7)]"
+      : "bg-foreground/[0.05] text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
+    current && !active && "text-foreground"
   );
 
+  const arrow = "grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/10 disabled:opacity-30 sm:h-9 sm:w-9";
+
   return (
-    <Card className={cn(colors.cardBg, colors.cardBorder)}>
-      {/* Collapsible Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={cn(
-          "w-full p-2 sm:p-4 flex items-center justify-between",
-          "hover:bg-primary/5 transition-colors rounded-t-lg",
-          !isExpanded && "rounded-b-lg"
-        )}
-      >
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className={cn(
-            "p-1.5 sm:p-2 rounded-lg",
-            isViewingCurrentMonth ? "bg-primary/20" : colors.bgTertiary
-          )}>
-            <Calendar className={cn("w-4 h-4 sm:w-5 sm:h-5", isViewingCurrentMonth ? "text-primary" : colors.textSecondary)} />
-          </div>
-          <div className="text-start">
-            <p className={cn("text-base sm:text-lg font-semibold", colors.textPrimary)}>
-              {getSelectedMonthsDisplay}
-            </p>
-            <p className={cn("text-xs", colors.textTertiary)}>
-              {isViewingCurrentMonth 
-                ? t('currentMonth')
-                : hasSelectedMonths
-                ? t('clickToChangePeriod')
-                : t('yearlyView') || 'Yearly view'
-              }
-            </p>
-          </div>
-        </div>
-        <ChevronDown 
-          className={cn(
-            "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200",
-            colors.textSecondary,
-            isExpanded && "rotate-180"
-          )} 
-        />
-      </button>
-
-      {/* Expandable Content */}
-      <div className={cn(
-        "overflow-hidden transition-all duration-300 ease-in-out",
-        isExpanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-      )}>
-        <CardContent className="p-2 sm:p-4 pt-0 space-y-3 sm:space-y-4">
-          {/* Years Row */}
-          <div>
-            <p className={cn("text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
-              {t('year')}
-            </p>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {availableYears.map(year => {
-                  const isSelected = parseInt(selectedYear) === year;
-                  const isCurrent = year === currentYear;
-                  
-                  return (
-                    <button
-                      key={year}
-                      onClick={() => {
-                        onYearChange(year.toString());
-                        // Reset selected months when year changes
-                        onMonthChange([]);
-                      }}
-                      className={cn(
-                        "min-h-11 px-3 sm:min-h-0 sm:px-4 py-1.5 sm:py-2 rounded-xl text-sm font-medium transition-all duration-200",
-                        "border min-w-[60px] sm:min-w-[70px]",
-                        isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-[0_6px_18px_-6px_hsl(var(--glow)/0.6)]"
-                          : isCurrent
-                          ? cn("border-primary/50 hover:border-primary", colors.textPrimary, colors.bgTertiary)
-                          : cn("border-transparent hover:border-primary/30", colors.textSecondary, colors.bgTertiary)
-                      )}
-                    >
-                      {year}
-                      {isCurrent && !isSelected && (
-                        <span className="ms-0.5 sm:ms-1 text-[8px] sm:text-[10px] text-primary">●</span>
-                      )}
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-
-          {/* Months Row */}
-          <div>
-            <p className={cn("text-xs font-medium mb-1.5 sm:mb-2 uppercase tracking-wider", colors.textTertiary)}>
-              {t('month')}
-            </p>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {MONTHS.map(month => {
-                const monthValueStr = month.value.toString();
-                const isSelected = selectedMonths.includes(monthValueStr);
-                const isCurrent = isCurrentMonth(selectedYear, month.value);
-
-                return (
-                  <button
-                    key={month.value}
-                    onClick={() => {
-                      // Toggle month selection
-                      if (isSelected) {
-                        // Deselect: remove from array
-                        const newSelectedMonths = selectedMonths.filter(m => m !== monthValueStr);
-                        onMonthChange(newSelectedMonths);
-                      } else {
-                        // Select: add to array
-                        const newSelectedMonths = [...selectedMonths, monthValueStr];
-                        onMonthChange(newSelectedMonths);
-                      }
-                      // Don't collapse - allow multiple selections
-                    }}
-                    title={t(month.fullLabelKey)}
-                    className={cn(
-                      "min-h-11 px-2 sm:min-h-0 py-1.5 sm:py-2.5 rounded-xl text-xs font-medium transition-all duration-200",
-                      "border relative",
-                      isSelected
-                        ? "bg-primary text-primary-foreground border-primary shadow-[0_6px_18px_-6px_hsl(var(--glow)/0.6)]"
-                        : isCurrent
-                        ? cn("border-primary bg-primary/10", colors.textPrimary)
-                        : cn("border-transparent hover:border-primary/30", colors.textSecondary, colors.bgTertiary)
-                    )}
-                  >
-                    {t(month.labelKey)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </CardContent>
+    <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center">
+        <button type="button" className={arrow} disabled={!canPrev} onClick={() => changeYear(years[yearIdx - 1])} aria-label={String(years[yearIdx - 1] ?? '')}>
+          <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
+        </button>
+        <span className="min-w-[3.25rem] text-center text-base font-semibold tabular-nums text-foreground">{selectedYear}</span>
+        <button type="button" className={arrow} disabled={!canNext} onClick={() => changeYear(years[yearIdx + 1])} aria-label={String(years[yearIdx + 1] ?? '')}>
+          <ChevronRight className="h-5 w-5 rtl:rotate-180" />
+        </button>
       </div>
-    </Card>
+
+      <div
+        ref={stripRef}
+        role="group"
+        className="flex flex-1 snap-x gap-1.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent,#000_12px,#000_calc(100%-12px),transparent)]"
+      >
+        <button type="button" data-active={selectedMonths.length === 0} aria-pressed={selectedMonths.length === 0} onClick={() => onMonthChange([])} className={chip(selectedMonths.length === 0)}>
+          {t('all')}
+        </button>
+        {MONTH_KEYS.map((key, i) => {
+          const value = i + 1;
+          const active = selectedMonths.includes(String(value));
+          const isCurrent = yearNum === currentYear && value === currentMonth;
+          return (
+            <button key={key} type="button" data-active={active} aria-pressed={active} aria-label={t(FULL_KEYS[i])} onClick={() => toggleMonth(value)} className={chip(active, isCurrent)}>
+              {t(key)}
+              {isCurrent && !active && <span aria-hidden className="absolute bottom-1 start-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary rtl:translate-x-1/2" />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

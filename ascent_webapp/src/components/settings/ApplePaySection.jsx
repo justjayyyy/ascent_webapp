@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useTheme } from '../ThemeProvider';
 import { Section, Group, Row } from './SettingsShell';
+import PushToggle from './PushToggle';
 
 function CopyField({ label, value, t, mono = true }) {
   const [done, setDone] = useState(false);
@@ -93,6 +94,8 @@ export default function ApplePaySection({ index }) {
             {t('apAddDevice')}
           </Button>
         </form>
+
+        <PushToggle />
 
         {freshKey && (
           <div className="space-y-4 px-4 py-4 sm:px-5">
