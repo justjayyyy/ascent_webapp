@@ -27,6 +27,7 @@ function ExpenseMonthView({
   onEdit,
   onDelete,
   onDuplicate,
+  onConfirm,
   isLoading,
   monthLabel,
   selectedYear,
@@ -51,16 +52,19 @@ function ExpenseMonthView({
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [personFilter, setPersonFilter] = useState('all');
+  const [reviewOnly, setReviewOnly] = useState(false);
+  const pendingCount = useMemo(() => transactions.filter((x) => x.status === 'pending').length, [transactions]);
   const { members, isShared } = useHousehold();
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
 
-  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || personFilter !== 'all';
+  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || personFilter !== 'all' || reviewOnly;
 
   const clearFilters = useCallback(() => {
     setSearchQuery('');
     setCategoryFilter('all');
     setPersonFilter('all');
+    setReviewOnly(false);
     setCurrentPage(1);
   }, []);
 
@@ -95,11 +99,13 @@ function ExpenseMonthView({
       // Person filter (who added it)
       if (personFilter !== 'all' && t.created_by !== personFilter) return false;
 
+      if (reviewOnly && t.status !== 'pending') return false;
+
       return true;
     });
 
     return filtered;
-  }, [transactions, debouncedSearchQuery, categoryFilter, personFilter]);
+  }, [transactions, debouncedSearchQuery, categoryFilter, personFilter, reviewOnly]);
 
   // Pagination
   const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
@@ -111,7 +117,7 @@ function ExpenseMonthView({
   // Reset page when filters change (using debounced search)
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, categoryFilter, personFilter]);
+  }, [debouncedSearchQuery, categoryFilter, personFilter, reviewOnly]);
 
   // Adjust current page if it's beyond total pages (e.g., after deleting last transaction on a page)
   React.useEffect(() => {
@@ -502,6 +508,16 @@ function ExpenseMonthView({
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6 space-y-2 sm:space-y-4">
+          {canEdit && pendingCount > 0 && (
+            <div role="status" className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/10 px-3 py-2.5">
+              <p className="text-sm font-medium text-foreground">{t('reviewBanner').replace('{count}', pendingCount)}</p>
+              <button type="button" aria-pressed={reviewOnly} onClick={() => setReviewOnly((v) => !v)}
+                className="min-h-11 rounded-full px-3 text-sm font-medium text-primary hover:bg-primary/15 sm:min-h-9">
+                {reviewOnly ? t('reviewShowAll') : t('reviewShowOnly')}
+              </button>
+            </div>
+          )}
+
           {/* Filters Row */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             {/* Search Input */}
@@ -594,6 +610,7 @@ function ExpenseMonthView({
             onEdit={onEdit}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
+            onConfirm={onConfirm}
             canEdit={canEdit}
           />
 

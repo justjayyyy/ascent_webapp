@@ -1,5 +1,5 @@
 import Budget from '../models/Budget.js';
 import { createEntityHandler } from '../lib/entityHandler.js';
 
-export default createEntityHandler(Budget, { checkSharing: true });
+export default createEntityHandler(Budget, { checkSharing: true, permission: { read: 'viewBudgets', write: 'editBudgets' } });
 

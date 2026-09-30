@@ -452,6 +452,7 @@ export default function AddTransactionDialog({
                   <SelectItem value="Card" className={colors.textPrimary}>{t('card')}</SelectItem>
                   <SelectItem value="Cash" className={colors.textPrimary}>{t('cash')}</SelectItem>
                   <SelectItem value="Transfer" className={colors.textPrimary}>{t('transfer')}</SelectItem>
+                  <SelectItem value="Apple Pay" className={colors.textPrimary}>Apple Pay</SelectItem>
                   <SelectItem value="Paybox" className={colors.textPrimary}>Paybox</SelectItem>
                   <SelectItem value="PayPal" className={colors.textPrimary}>PayPal</SelectItem>
                   <SelectItem value="Bit" className={colors.textPrimary}>Bit</SelectItem>

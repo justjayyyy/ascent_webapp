@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import BlurValue from '../BlurValue';
 import { Section, Group } from './SettingsShell';
 
-const EMPTY = { name: '', lastFourDigits: '', type: 'credit' };
+const EMPTY = { name: '', lastFourDigits: '', type: 'credit', walletName: '' };
 
 export default function CardManagement({ user: propUser, index }) {
   const { t, user } = useTheme();
@@ -78,7 +78,7 @@ export default function CardManagement({ user: propUser, index }) {
 
   const handleEdit = (card) => {
     setEditingCard(card);
-    setFormData({ name: card.name, lastFourDigits: card.lastFourDigits, type: card.type });
+    setFormData({ name: card.name, lastFourDigits: card.lastFourDigits, type: card.type, walletName: card.walletName || '' });
     setIsAdding(true);
   };
 
@@ -135,6 +135,19 @@ export default function CardManagement({ user: propUser, index }) {
                   <SelectItem value="debit">{t('debit')}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5 sm:col-span-3">
+              <Label htmlFor="card-wallet-name">{t('walletNameLabel')}</Label>
+              <Input
+                id="card-wallet-name"
+                value={formData.walletName}
+                onChange={(e) => setFormData({ ...formData, walletName: e.target.value })}
+                placeholder="Visa ••1234"
+                maxLength={80}
+                dir="ltr"
+                className="h-11 rounded-xl sm:h-10"
+              />
+              <p className="text-xs text-muted-foreground">{t('walletNameHint')}</p>
             </div>
             <div className="flex gap-2 sm:col-span-3 sm:justify-end">
               <Button type="button" variant="ghost" onClick={close} className="h-11 flex-1 rounded-xl sm:h-10 sm:flex-none">

@@ -1,7 +1,7 @@
 import Category from '../models/Category.js';
 import connectDB from '../lib/mongodb.js';
 import { handleCors } from '../lib/cors.js';
-import { success, error, serverError } from '../lib/response.js';
+import { success, error, forbidden, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 // Default categories with translation keys and colors
@@ -66,7 +66,15 @@ export default async function handler(req, res) {
     }
 
     const { method } = req;
-    const { id } = req.query;
+    const id = typeof req.query.id === 'string' ? req.query.id : undefined;
+
+    // Same rule as the generic handler: owners and admins, or members with the expenses permission
+    const member = req.member;
+    const privileged = member && (member.role === 'owner' || member.role === 'admin');
+    if (!privileged && member?.permissions?.[method === 'GET' ? 'viewExpenses' : 'editExpenses'] !== true) {
+      return forbidden(res, 'You do not have permission for this action');
+    }
+    const clean = (b) => Object.fromEntries(Object.entries(b || {}).filter(([k]) => !['workspaceId', 'createdBy', '_id', 'id'].includes(k) && !k.startsWith('$')));
 
     // Filter by workspace
     const baseFilter = { workspaceId: req.workspace._id };
@@ -87,7 +95,7 @@ export default async function handler(req, res) {
       case 'POST': {
         // Create new category
         const category = await Category.create({
-          ...req.body,
+          ...clean(req.body),
           isDefault: false, // User-created categories are not default
           workspaceId: req.workspace._id,
           createdBy: user._id
@@ -103,7 +111,7 @@ export default async function handler(req, res) {
 
         const category = await Category.findOneAndUpdate(
           { _id: id, ...baseFilter },
-          req.body,
+          clean(req.body),
           { new: true }
         );
 

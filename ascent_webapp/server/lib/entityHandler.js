@@ -1,15 +1,44 @@
 import connectDB from './mongodb.js';
 import { handleCors } from './cors.js';
-import { success, error, notFound, serverError } from './response.js';
+import { success, error, notFound, forbidden, serverError } from './response.js';
 import { authMiddleware } from '../middleware/auth.js';
 
+const NEVER_FILTER = new Set(['workspaceId', 'createdBy', '_id', 'sort', 'limit', '_single', 'path']);
+const NEVER_WRITE = new Set(['workspaceId', 'createdBy', '_id', 'id']);
+
+// Owners and admins may do anything in their workspace; everyone else needs the named member permission.
+function memberMay(req, user, permission) {
+  if (!permission) return true;
+  const member = req.member;
+  if (!member) return false;
+  if (member.role === 'owner' || member.role === 'admin') return true;
+  if (req.workspace?.ownerId && req.workspace.ownerId.toString() === user._id.toString()) return true;
+  return member.permissions?.[permission] === true;
+}
+
+// Only plain values for real schema fields become filters: no operators, no tenant fields.
+function safeFilters(Model, filters) {
+  const out = {};
+  for (const [key, value] of Object.entries(filters)) {
+    if (NEVER_FILTER.has(key) || key.startsWith('$') || key.includes('.')) continue;
+    if (typeof value !== 'string' || !Model.schema?.path(key)) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+const safeBody = (body) =>
+  Object.fromEntries(Object.entries(body).filter(([k]) => !NEVER_WRITE.has(k) && !k.startsWith('$')));
+
 // Generic CRUD handler for entities
+// options.permission: { read, write } member permission names (see the Workspace model), e.g. { read: 'viewExpenses', write: 'editExpenses' }
 export function createEntityHandler(Model, options = {}) {
   const { 
     allowPublic = false,
     filterByUser = true,
     userField = 'created_by',
-    checkSharing = false
+    checkSharing = false,
+    permission = null
   } = options;
 
   return async function handler(req, res) {
@@ -22,6 +51,15 @@ export function createEntityHandler(Model, options = {}) {
       if (!user) return;
       
       const { method } = req;
+
+      // Every request is scoped to a workspace the caller belongs to; auth sets req.workspace only for members.
+      if (!req.workspace) {
+        return req.headers['x-workspace-id']
+          ? forbidden(res, 'Not a member of this workspace')
+          : error(res, 'Workspace context required', 400);
+      }
+      const needed = permission ? (method === 'GET' ? permission.read : permission.write) : null;
+      if (!memberMay(req, user, needed)) return forbidden(res, 'You do not have permission for this action');
       
       // Connect to MongoDB
       try {
@@ -33,7 +71,8 @@ export function createEntityHandler(Model, options = {}) {
         return serverError(res, dbError);
       }
 
-      const { id, _single } = req.query;
+      const { _single } = req.query;
+      const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
       // Helper function to build user filter (workspace-based)
       const buildUserFilter = async () => {
@@ -92,18 +131,12 @@ export function createEntityHandler(Model, options = {}) {
           // Build query from filters
           let query = await buildUserFilter();
             
-          // Add additional filters from query params
-          for (const [key, value] of Object.entries(filters)) {
-            // IGNORE 'path' - it might be injected by the router
-            if (!['sort', 'limit', '_single', 'path'].includes(key) && value !== undefined && value !== null) {
-              // Map 'id' to '_id' for MongoDB
-              const queryKey = key === 'id' ? '_id' : key;
-              query[queryKey] = value;
-            }
-          }
+          // Add client filters: real fields, plain values only, never the tenant scope
+          Object.assign(query, safeFilters(Model, filters));
+          if (id) query._id = id;
 
           // Parse sort - MongoDB accepts string format like "-created_date"
-          const sortField = sort || '-created_date';
+          const sortField = typeof sort === 'string' && /^-?[A-Za-z_]+$/.test(sort) ? sort : '-created_date';
           const limitValue = Math.min(parseInt(limit) || 1000, 10000); // Cap at 10k
           
           // Try main query first
@@ -206,7 +239,7 @@ export function createEntityHandler(Model, options = {}) {
           try {
             const item = await Model.findOneAndUpdate(
               updateQuery,
-              req.body,
+              safeBody(req.body),
               { new: true, runValidators: true }
             ).lean();
 

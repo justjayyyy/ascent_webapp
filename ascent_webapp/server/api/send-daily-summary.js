@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import { connectDB } from '../lib/mongodb.js';
@@ -14,10 +15,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify cron secret if set (Vercel Cron Jobs don't send custom headers, so skip for now)
-  // For manual testing, you can add: x-cron-secret header
+  // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set. Without a secret this only runs outside production.
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers['x-cron-secret'] && req.headers['x-cron-secret'] !== cronSecret) {
+  if (cronSecret) {
+    const given = Buffer.from(String(req.headers.authorization || ''));
+    const want = Buffer.from(`Bearer ${cronSecret}`);
+    if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  } else if (process.env.NODE_ENV === 'production') {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

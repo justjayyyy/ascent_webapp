@@ -1,5 +1,5 @@
 import Card from '../models/Card.js';
 import { createEntityHandler } from '../lib/entityHandler.js';
 
-export default createEntityHandler(Card);
+export default createEntityHandler(Card, { permission: { read: 'viewExpenses', write: 'editExpenses' } });
 
