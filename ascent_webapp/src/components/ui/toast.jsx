@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const ToastProvider = React.forwardRef(({ ...props }, ref) => (
   <div
     ref={ref}
-    className="fixed top-0 z-[100] flex max-h-dvh w-full flex-col-reverse p-4 pt-[max(1rem,var(--safe-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-0 sm:end-0 sm:top-auto sm:flex-col md:max-w-[420px]"
+    className="pointer-events-none fixed top-0 z-[100] flex max-h-dvh w-full flex-col-reverse p-4 pt-[max(1rem,var(--safe-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-0 sm:end-0 sm:top-auto sm:flex-col md:max-w-[420px]"
     {...props}
   />
 ));
@@ -15,7 +15,7 @@ ToastProvider.displayName = "ToastProvider";
 const ToastViewport = React.forwardRef(({ ...props }, ref) => (
   <div
     ref={ref}
-    className="fixed top-0 z-[100] flex max-h-dvh w-full flex-col-reverse p-4 pt-[max(1rem,var(--safe-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-0 sm:end-0 sm:top-auto sm:flex-col md:max-w-[420px]"
+    className="pointer-events-none fixed top-0 z-[100] flex max-h-dvh w-full flex-col-reverse p-4 pt-[max(1rem,var(--safe-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-0 sm:end-0 sm:top-auto sm:flex-col md:max-w-[420px]"
     {...props}
   />
 ));
