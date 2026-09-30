@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import AscentLogo from '@/components/AscentLogo';
+import { translations } from '@/lib/translations';
 
 // Google Client ID - set this in your .env file as VITE_GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -25,6 +26,8 @@ export default function Login() {
   const navigate = useNavigate();
   const { login, register, loginWithGoogle, isAuthenticated } = useAuth();
   const { t } = useTheme();
+  // `t` is bound to the pre-login language; the signed-in user's own language is only known from the login result
+  const welcomeBack = (user) => translations[user?.language]?.welcomeBack || t('welcomeBack');
 
   // Get redirect URL, but exclude public pages (terms-of-service, privacy-policy, login)
   const rawRedirectUrl = searchParams.get('redirect') || '/Dashboard';
@@ -147,8 +150,8 @@ export default function Login() {
             const userInfo = await userInfoResponse.json();
 
             // Login with the user info
-            await loginWithGoogle(response.access_token, GOOGLE_CLIENT_ID, userInfo);
-            toast.success(t('welcomeBack'));
+            const signedIn = await loginWithGoogle(response.access_token, GOOGLE_CLIENT_ID, userInfo);
+            toast.success(welcomeBack(signedIn));
             navigate(redirectUrl);
           } catch (error) {
             console.error('Google login error:', error);
@@ -212,8 +215,8 @@ export default function Login() {
     setIsGoogleLoading(true);
 
     try {
-      await loginWithGoogle(response.credential, GOOGLE_CLIENT_ID);
-      toast.success(t('welcomeBack'));
+      const signedIn = await loginWithGoogle(response.credential, GOOGLE_CLIENT_ID);
+      toast.success(welcomeBack(signedIn));
       navigate(redirectUrl);
     } catch (error) {
       console.error('Google login error:', error);
@@ -228,8 +231,8 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(loginData.email, loginData.password);
-      toast.success(t('welcomeBack'));
+      const signedIn = await login(loginData.email, loginData.password);
+      toast.success(welcomeBack(signedIn));
       navigate(redirectUrl);
     } catch (error) {
       toast.error(error.message || t('loginFailed'));

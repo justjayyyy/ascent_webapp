@@ -8,7 +8,7 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import { ThemeProvider } from '@/components/ThemeProvider';
+import { ThemeProvider, useTheme } from '@/components/ThemeProvider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 const Login = React.lazy(() => import('./pages/Login'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
@@ -129,6 +129,20 @@ const AuthenticatedApp = () => {
 };
 
 
+// Sonner needs the app's theme (it defaults to light, which clashes with dark mode)
+function AppSonnerToaster() {
+  const { theme } = useTheme();
+  return (
+    <SonnerToaster
+      theme={theme === 'light' ? 'light' : 'dark'}
+      position="top-right"
+      richColors
+      offset={{ top: 'calc(var(--safe-top) + 16px)', right: 16 }}
+      mobileOffset={{ top: 'calc(var(--safe-top) + 8px)', left: 12, right: 12 }}
+    />
+  );
+}
+
 function App() {
 
   return (
@@ -166,12 +180,7 @@ function App() {
             </Routes>
           </Router>
           <Toaster />
-          <SonnerToaster
-            position="top-right"
-            richColors
-            offset={{ top: 'calc(var(--safe-top) + 16px)', right: 16 }}
-            mobileOffset={{ top: 'calc(var(--safe-top) + 8px)', left: 12, right: 12 }}
-          />
+          <AppSonnerToaster />
           <Analytics />
           <SpeedInsights />
         </ThemeProvider>
