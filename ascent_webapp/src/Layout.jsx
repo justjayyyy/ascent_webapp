@@ -198,7 +198,7 @@ function LayoutContent({ children, currentPageName }) {
       )}
       // The strip behind the status bar is the page background, so the system's soft
       // edge under the clock/battery fades into black instead of showing as a grey blur
-      style={{ background: 'linear-gradient(to bottom, hsl(var(--background)) var(--safe-top), hsl(var(--card)) var(--safe-top))', transform: hideHeader ? 'translateY(calc(var(--header-bar) * -1))' : undefined }}
+      style={{ background: 'linear-gradient(to bottom, hsl(var(--background)) var(--safe-top), hsl(var(--card)) var(--safe-top))', transform: hideHeader ? 'translateY(calc(var(--header-hide) * -1))' : undefined }}
       >
         <div className="relative flex items-center justify-center h-[var(--header-bar)] px-4">
           <button
@@ -218,7 +218,10 @@ function LayoutContent({ children, currentPageName }) {
               <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 -rotate-45" : "top-3")} />
             </span>
           </button>
-          <AscentLogo motion="full" alt="Ascent logo" className="w-[3.75rem]" />
+          {/* The logo sits on the header's bottom border, half over the bar and half over the page */}
+          <div className="pointer-events-none absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2">
+            <AscentLogo motion="full" alt="Ascent logo" className="w-16" />
+          </div>
         </div>
       </div>
 
@@ -240,7 +243,7 @@ function LayoutContent({ children, currentPageName }) {
       <main
         onClick={mobileMenuOpen ? () => setMobileMenuOpen(false) : undefined}
         className={cn(
-          "min-h-dvh min-w-0 pt-[calc(var(--header-bar)+var(--safe-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          "min-h-dvh min-w-0 pt-[calc(var(--header-total)+var(--safe-top))] md:pt-0 md:flex-1 transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           // On phones the menu sheet pushes the page aside instead of covering it
           mobileMenuOpen && (isRTL ? "-translate-x-[17rem]" : "translate-x-[17rem]")
         )}

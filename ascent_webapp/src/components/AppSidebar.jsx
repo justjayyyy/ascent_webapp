@@ -141,7 +141,7 @@ export default function AppSidebar({
           'group/sb z-30',
           mobile
             ? cn(
-                'fixed start-0 z-40 w-[17rem] md:hidden top-[calc(var(--header-bar)+var(--safe-top))] bottom-0 pb-[env(safe-area-inset-bottom)]',
+                'fixed start-0 z-40 w-[17rem] md:hidden top-[calc(var(--header-total)+var(--safe-top))] bottom-0 pb-[env(safe-area-inset-bottom)]',
                 'transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
                 open ? 'translate-x-0' : (isRTL ? 'translate-x-full' : '-translate-x-full'),
               )
