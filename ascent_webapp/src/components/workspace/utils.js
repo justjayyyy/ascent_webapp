@@ -12,7 +12,7 @@ export const fmt = (text, vars = {}) => String(text).replace(/\{(\w+)\}/g, (_, k
 
 export const memberKey = (m) => String(m._id || m.id);
 
-export const memberName = (m) => m.name || m.email?.split('@')[0] || '';
+export const memberName = (m, t) => m.name || m.email?.split('@')[0] || (m.inviteKind === 'link' ? t?.('wsQrInvitation') : '') || '';
 
 export const isOnline = (m, now = Date.now()) => !!m.lastSeenAt && now - new Date(m.lastSeenAt).getTime() < ONLINE_WINDOW_MS;
 

@@ -45,7 +45,13 @@ export default async function handler(req, res) {
     // Return invitation details (without sensitive info)
     const inviter = await User.findById(invitation.invitedBy || workspace.ownerId).select('full_name email').lean();
 
+    const isLink = invitation.inviteKind === 'link';
+    const expired = isLink && (!invitation.expiresAt || new Date(invitation.expiresAt) <= new Date());
+
     const invitationData = {
+      kind: isLink ? 'link' : 'email',
+      expired,
+      expiresAt: invitation.expiresAt || null,
       id: invitation._id.toString(),
       workspaceId: workspace._id.toString(),
       workspaceName: workspace.name,

@@ -37,7 +37,7 @@ export default function AcceptInvitation() {
         const response = await fetch(`${API}/api/invitations/${token}`);
         const result = await response.json();
         const data = result.data || result;
-        if (!response.ok || !data?.invitedEmail) throw new Error(result.error || result.message);
+        if (!response.ok || !(data?.invitedEmail || data?.kind === 'link')) throw new Error(result.error || result.message);
         if (!cancelled) setInvitation(data);
       } catch {
         if (!cancelled) setFailed(true);
@@ -49,7 +49,8 @@ export default function AcceptInvitation() {
   }, [token]);
 
   const signedIn = isAuthenticated && !!user;
-  const emailMatches = signedIn && user.email?.toLowerCase() === invitation?.invitedEmail?.toLowerCase();
+  const isLink = invitation?.kind === 'link';
+  const emailMatches = signedIn && (isLink || user.email?.toLowerCase() === invitation?.invitedEmail?.toLowerCase());
 
   const handleGoogleCallback = async (response) => {
     if (!response.credential) return;
@@ -144,6 +145,16 @@ export default function AcceptInvitation() {
     );
   }
 
+  if (isLink && invitation.expired) {
+    return shell(
+      <CardContent className="space-y-4 p-6 text-center">
+        <UserX className="mx-auto h-10 w-10 text-muted-foreground" aria-hidden="true" />
+        <p className="text-foreground text-pretty">{t('wsInviteExpired')}</p>
+        <Button asChild className="h-11 rounded-xl"><Link to="/">OK</Link></Button>
+      </CardContent>
+    );
+  }
+
   const loginHref = `/login?redirect=${encodeURIComponent(`/accept-invitation/${token}`)}`;
 
   return shell(
@@ -159,10 +170,12 @@ export default function AcceptInvitation() {
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-2 rounded-2xl bg-muted/50 p-4">
-          <p className="flex items-center gap-2 text-sm text-foreground" dir="ltr">
-            <Mail className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            {invitation.invitedEmail}
-          </p>
+          {!isLink && (
+            <p className="flex items-center gap-2 text-sm text-foreground" dir="ltr">
+              <Mail className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              {invitation.invitedEmail}
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">{fmt(t('wsJoinAs'), { role: roleLabel(t, invitation.role) })}</p>
         </div>
 
@@ -186,7 +199,7 @@ export default function AcceptInvitation() {
 
         {!signedIn && (
           <div className="space-y-3">
-            <p className="text-center text-sm text-muted-foreground text-pretty">{fmt(t('wsUseEmail'), { email: invitation.invitedEmail })}</p>
+            <p className="text-center text-sm text-muted-foreground text-pretty">{isLink ? t('wsSignInToJoin') : fmt(t('wsUseEmail'), { email: invitation.invitedEmail })}</p>
             {GOOGLE_CLIENT_ID && <div id="google-signin-button" className="flex min-h-11 w-full justify-center" />}
             {busy && (
               <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
