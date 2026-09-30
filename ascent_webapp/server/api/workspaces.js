@@ -88,7 +88,9 @@ async function present(workspace) {
   plain.id = String(plain._id);
   plain.members = plain.members.map((m) => {
     const u = byId.get(String(m.userId));
-    return { ...m, name: u?.full_name || '', avatar: u?.avatar || null };
+    // Workspaces created before roles existed can have the owner stored as a viewer.
+    const role = m.status === 'accepted' && isSame(m.userId, plain.ownerId) ? 'owner' : m.role;
+    return { ...m, role, name: u?.full_name || '', avatar: u?.avatar || null };
   });
   return plain;
 }
