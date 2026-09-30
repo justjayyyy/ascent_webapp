@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils';
 import { AutoTextarea } from './NoteParts';
 import { blankItem, fmt } from './noteUtils';
 
-function Row({ item, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, registerRef }) {
+const cleanLine = (l) => l.replace(/^\s*(?:[-*•]\s+|\[[ xX]\]\s*)/, '').trim();
+
+function Row({ item, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, onPasteLines, registerRef }) {
   const controls = useDragControls();
   const Wrapper = reorderable ? Reorder.Item : 'div';
   const wrapperProps = reorderable
@@ -39,6 +41,16 @@ function Row({ item, reorderable, readOnly, t, onChange, onRemove, onEnter, onBa
         value={item.text}
         readOnly={readOnly}
         onChange={(e) => onChange({ ...item, text: e.target.value.replace(/\n/g, ' ') })}
+        onPaste={(e) => {
+          // Pasting several lines makes one item per line, like Keep
+          if (readOnly || !onPasteLines) return;
+          const text = e.clipboardData?.getData('text') || '';
+          if (!/\r?\n/.test(text.trim())) return;
+          const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
+          if (lines.length < 2) return;
+          e.preventDefault();
+          onPasteLines(lines);
+        }}
         onKeyDown={(e) => {
           if (readOnly) return;
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onEnter(); }
@@ -93,6 +105,17 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
 
   const remove = (id) => patch(items.filter(i => i.id !== id));
 
+  const pasteLines = (id, lines) => {
+    const idx = items.findIndex(i => i.id === id);
+    if (idx < 0) return;
+    const current = items[idx];
+    const fresh = lines.slice(1).map(text => ({ ...blankItem(), text }));
+    const next = [...items];
+    next.splice(idx, 1, { ...current, text: current.text ? `${current.text} ${lines[0]}` : lines[0] }, ...fresh);
+    patch(next);
+    focusSoon((fresh[fresh.length - 1] || current).id);
+  };
+
   const backspaceEmpty = (id) => {
     const idx = open.findIndex(i => i.id === id);
     remove(id);
@@ -122,6 +145,7 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
             onRemove={() => remove(item.id)}
             onEnter={() => insertAfter(item.id)}
             onBackspaceEmpty={() => backspaceEmpty(item.id)}
+            onPasteLines={(lines) => pasteLines(item.id, lines)}
             registerRef={(el) => { if (el) refs.current[item.id] = el; else delete refs.current[item.id]; }}
           />
         ))}

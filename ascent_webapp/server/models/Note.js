@@ -22,7 +22,9 @@ const attachmentSchema = new mongoose.Schema({
 // A personal reminder: each person sets their own time for a note
 const reminderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  at: { type: Date, required: true }
+  at: { type: Date, required: true },
+  // After it fires the client moves `at` to the next occurrence
+  repeat: { type: String, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'], default: 'none' }
 }, { _id: false });
 
 const noteSchema = new mongoose.Schema({

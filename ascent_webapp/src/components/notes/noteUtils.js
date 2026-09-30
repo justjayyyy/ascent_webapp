@@ -278,3 +278,60 @@ export function formatReminder(iso, language) {
 }
 
 export const isOverdue = (iso) => !!iso && new Date(iso).getTime() <= Date.now();
+
+export const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
+
+/** The next time a repeating reminder is due after `after` (default now), or null. */
+export function nextOccurrence(iso, repeat, after = Date.now()) {
+  if (!iso || !repeat || repeat === 'none') return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  for (let i = 0; d.getTime() <= after && i < 5000; i += 1) {
+    if (repeat === 'daily') d.setDate(d.getDate() + 1);
+    else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+    else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
+    else if (repeat === 'yearly') d.setFullYear(d.getFullYear() + 1);
+    else return null;
+  }
+  return d.toISOString();
+}
+
+// ---- links ----
+
+const URL_RE = /\bhttps?:\/\/[^\s<>"'()]+[^\s<>"'().,;:!?]/gi;
+const WWW_RE = /(^|\s)(www\.[^\s<>"'()]+[^\s<>"'().,;:!?])/gi;
+
+/** Web links in a note's text and list items, de-duplicated, in order. */
+export function extractLinks(note) {
+  const text = [note.title, note.content, ...(note.items || []).map(i => i.text)].filter(Boolean).join('\n');
+  const found = [];
+  (text.match(URL_RE) || []).forEach(u => found.push(u));
+  let m;
+  WWW_RE.lastIndex = 0;
+  while ((m = WWW_RE.exec(text))) found.push(`https://${m[2]}`);
+  const seen = new Set();
+  return found.filter(u => {
+    const k = u.toLowerCase().replace(/\/$/, '');
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 5);
+}
+
+export function linkHost(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+}
+
+// ---- search filters (Keep's "types" and colours) ----
+
+export const NOTE_FILTERS = ['lists', 'images', 'links', 'reminders', 'files'];
+
+export function matchesFilter(note, filter) {
+  if (!filter) return true;
+  if (filter === 'lists') return note.type === 'checklist';
+  if (filter === 'images') return (note.attachments || []).some(a => isPreviewable(a.type));
+  if (filter === 'files') return (note.attachments || []).some(a => !isPreviewable(a.type));
+  if (filter === 'links') return extractLinks(note).length > 0;
+  if (filter === 'reminders') return !!note.reminder;
+  return true;
+}

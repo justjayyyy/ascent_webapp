@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Repeat } from 'lucide-react';
-import { format, addMonths, startOfMonth, parseISO, isBefore, isAfter, eachMonthOfInterval } from 'date-fns';
+import { Loader2, Repeat, ShoppingBag, Minus, Plus } from 'lucide-react';
+import { format, addMonths, parseISO, isAfter } from 'date-fns';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
@@ -46,15 +46,21 @@ export default function AddTransactionDialog({
   isLoading,
   categories = [],
   editTransaction = null,
-  accounts = []
+  accounts = [],
+  defaultType = null,
+  plans = [],
 }) {
   const { user, t, language, colors } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates, isLoading: isLoadingRates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
-  const defaultCategory = categories.find(c => c.type === 'Expense' || c.type === 'Both');
+  const startType = defaultType || 'Expense';
+  const isEditing = !!(editTransaction && (editTransaction.id || editTransaction._id));
+  const activePlans = useMemo(() => plans.filter(p => p.status !== 'archived'), [plans]);
+  const loc = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
+  const defaultCategory = categories.find(c => c.type === startType || c.type === 'Both');
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
-    type: 'Expense',
+    type: startType,
     category: defaultCategory?.name || '',
     description: '',
     amount: '',
@@ -66,6 +72,10 @@ export default function AddTransactionDialog({
     recurringFrequency: 'monthly',
     recurringStartDate: format(new Date(), 'yyyy-MM-dd'),
     recurringEndDate: format(addMonths(new Date(), 11), 'yyyy-MM-dd'), // Default to 12 months
+    isBigPurchase: false,
+    installmentCount: '1',
+    planId: '',
+    planItemId: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -159,15 +169,19 @@ export default function AddTransactionDialog({
         recurringFrequency: editTransaction.recurringFrequency || 'monthly',
         recurringStartDate: editTransaction.recurringStartDate || format(new Date(), 'yyyy-MM-dd'),
         recurringEndDate: editTransaction.recurringEndDate || format(addMonths(new Date(), 11), 'yyyy-MM-dd'),
+        isBigPurchase: !!editTransaction.isBigPurchase,
+        installmentCount: '1',
+        planId: editTransaction.planId || '',
+        planItemId: editTransaction.planItemId || '',
       });
       // If editing and no amountInGlobalCurrency exists, we'll recalculate it on submit
     } else {
       const last = readLastChoices();
-      const usable = (n) => categories.some(c => c.name === n && (c.type === 'Expense' || c.type === 'Both'));
-      const defaultCategory = categories.find(c => c.type === 'Expense' || c.type === 'Both');
+      const usable = (n) => startType === 'Expense' && categories.some(c => c.name === n && (c.type === 'Expense' || c.type === 'Both'));
+      const defaultCategory = categories.find(c => c.type === startType || c.type === 'Both');
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
-        type: 'Expense',
+        type: startType,
         category: usable(last.category) ? last.category : (defaultCategory?.name || ''),
         description: '',
         amount: '',
@@ -179,10 +193,14 @@ export default function AddTransactionDialog({
         recurringFrequency: 'monthly',
         recurringStartDate: format(new Date(), 'yyyy-MM-dd'),
         recurringEndDate: format(addMonths(new Date(), 11), 'yyyy-MM-dd'),
+        isBigPurchase: false,
+        installmentCount: '1',
+        planId: '',
+        planItemId: '',
       });
     }
     setErrors({});
-  }, [editTransaction, open, user?.currency, categories]);
+  }, [editTransaction, open, user?.currency, categories, startType]);
 
   // Prevent date input from auto-focusing on mobile when dialog opens
   useEffect(() => {
@@ -205,7 +223,7 @@ export default function AddTransactionDialog({
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.isRecurring) {
+    if (!formData.isRecurring || isEditing) {
       if (!formData.date) {
         newErrors.date = t('dateRequired');
       }
@@ -241,6 +259,7 @@ export default function AddTransactionDialog({
     }
 
     rememberChoices(formData);
+    const isExpense = formData.type === 'Expense';
     await onSubmit({
       ...formData,
       description: formData.description.trim() || translateCategory(formData.category, language),
@@ -248,8 +267,29 @@ export default function AddTransactionDialog({
       amountInGlobalCurrency: conversionInfo.convertedAmount,
       exchangeRate: conversionInfo.exchangeRate,
       relatedAccountId: formData.relatedAccountId || undefined,
+      isBigPurchase: isExpense && formData.isBigPurchase,
+      installmentCount: splitting ? installments : 1,
+      planId: (isExpense && formData.planId) || null,
+      planItemId: (isExpense && formData.planId && formData.planItemId) || null,
     });
   };
+
+  const installments = Math.max(1, Math.min(60, parseInt(formData.installmentCount, 10) || 1));
+  const splitting = formData.type === 'Expense' && formData.isBigPurchase && !isEditing && installments > 1;
+  const inCurrency = (n, currency = formData.currency) => new Intl.NumberFormat(loc, {
+    style: 'currency', currency: currency || userCurrency, maximumFractionDigits: 2,
+  }).format(n || 0);
+  const installmentPreview = (() => {
+    const total = parseFloat(formData.amount) || 0;
+    if (!splitting || !total || !formData.date) return '';
+    const month = (d) => new Intl.DateTimeFormat(loc, { month: 'short', year: 'numeric' }).format(d);
+    const first = parseISO(formData.date);
+    return t('installmentPreview')
+      .replace('{count}', installments)
+      .replace('{amount}', inCurrency(Math.round((total / installments) * 100) / 100))
+      .replace('{from}', month(first))
+      .replace('{to}', month(addMonths(first, installments - 1)));
+  })();
 
   // Filter categories based on transaction type
   const getFilteredCategories = () => {
@@ -263,9 +303,9 @@ export default function AddTransactionDialog({
       <DialogContent className={cn(colors.cardBg, colors.cardBorder, "w-[95vw] max-w-[95vw] sm:w-full sm:max-w-md max-h-[90dvh] overflow-y-auto p-3 sm:p-6")}>
         <DialogHeader className="pb-1.5 sm:pb-4">
           <DialogTitle className={cn("text-base sm:text-xl font-bold", colors.accentText)}>
-            {editTransaction && (editTransaction.id || editTransaction._id)
+            {isEditing
               ? t('editTransaction')
-              : t('addTransactionTitle')
+              : defaultType === 'Income' ? t('addIncome') : defaultType === 'Expense' ? t('addExpense') : t('addTransactionTitle')
             }
           </DialogTitle>
           <DialogDescription className={cn("text-xs sm:text-sm hidden sm:block", colors.textTertiary)}>
@@ -365,17 +405,17 @@ export default function AddTransactionDialog({
             {errors.description && <p className="text-xs text-danger">{errors.description}</p>}
           </div>
 
-          <div className={cn("grid gap-2 sm:gap-4", formData.isRecurring ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-            {!formData.isRecurring && (
+          <div className={cn("grid gap-2 sm:gap-4", (formData.isRecurring && !isEditing) || (defaultType && !isEditing) ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+            {(!formData.isRecurring || isEditing) && (
               <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="date" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('date')} *</Label>
+                <Label htmlFor="date" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{splitting ? t('firstPayment') : t('date')} *</Label>
                 <Input
                   ref={dateInputRef}
                   id="date"
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  max={format(new Date(), 'yyyy-MM-dd')}
+                  max={splitting ? undefined : format(new Date(), 'yyyy-MM-dd')}
                   autoFocus={false}
                   onFocus={(e) => {
                     // Prevent auto-opening date picker on mobile when dialog first opens
@@ -392,7 +432,7 @@ export default function AddTransactionDialog({
               </div>
             )}
 
-            <div className="space-y-1 sm:space-y-2">
+            {(!defaultType || isEditing) && <div className="space-y-1 sm:space-y-2">
               <Label htmlFor="type" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
               <Select
                 value={formData.type}
@@ -402,7 +442,8 @@ export default function AddTransactionDialog({
                     ...formData,
                     type: value,
                     category: availableCategories.length > 0 ? availableCategories[0].name : '',
-                    isRecurring: value === 'Income' ? false : formData.isRecurring // Remove recurring for Income
+                    isBigPurchase: value === 'Income' ? false : formData.isBigPurchase,
+                    planId: value === 'Income' ? '' : formData.planId,
                   });
                 }}
               >
@@ -414,7 +455,7 @@ export default function AddTransactionDialog({
                   <SelectItem value="Income" className={colors.textPrimary}>{t('income')}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </div>}
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
@@ -469,8 +510,100 @@ export default function AddTransactionDialog({
 
 
 
-          {/* Recurring Transaction Toggle - Only show for Expenses */}
-          {formData.type === 'Expense' && (
+          {/* Big purchase: kept apart from everyday spending, optionally paid in installments */}
+          {formData.type === 'Expense' && (!formData.isRecurring || isEditing) && (
+            <div className={cn("rounded-2xl border p-2 transition-colors sm:p-3", formData.isBigPurchase ? "border-primary/40 bg-primary/[0.06]" : colors.border)}>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="isBigPurchase"
+                  checked={formData.isBigPurchase}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isBigPurchase: !!checked })}
+                  className={cn(colors.border)}
+                />
+                <Label htmlFor="isBigPurchase" className={cn("flex cursor-pointer items-center gap-1.5 text-xs sm:text-sm", colors.textSecondary)}>
+                  <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>{t('bigPurchase')}</span>
+                </Label>
+              </div>
+              {formData.isBigPurchase && (
+                <div className="mt-2 space-y-2 ps-6">
+                  <p className={cn("text-xs", colors.textTertiary)}>{t('bigPurchaseHelp')}</p>
+                  {isEditing ? (
+                    editTransaction?.installmentCount > 1 && (
+                      <p className={cn("text-xs font-medium", colors.textSecondary)}>
+                        {t('installmentOf').replace('{index}', editTransaction.installmentIndex).replace('{count}', editTransaction.installmentCount)}
+                        {editTransaction.installmentTotal ? ` · ${t('totalPrice')} ${inCurrency(editTransaction.installmentTotal, editTransaction.currency)}` : ''}
+                      </p>
+                    )
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('installments')}</span>
+                        <div className="flex items-center gap-1" role="group" aria-label={t('installments')}>
+                          <button type="button" aria-label={t('fewerPayments')} onClick={() => setFormData({ ...formData, installmentCount: String(Math.max(1, installments - 1)) })} className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.06] transition-colors hover:bg-foreground/10 active:scale-95">
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            max="60"
+                            aria-label={t('installments')}
+                            value={formData.installmentCount}
+                            onChange={(e) => setFormData({ ...formData, installmentCount: e.target.value })}
+                            className={cn("h-10 w-14 text-center tabular-nums", colors.bgTertiary, colors.border, colors.textPrimary)}
+                          />
+                          <button type="button" aria-label={t('morePayments')} onClick={() => setFormData({ ...formData, installmentCount: String(Math.min(60, installments + 1)) })} className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.06] transition-colors hover:bg-foreground/10 active:scale-95">
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[1, 3, 6, 12, 24, 36].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            aria-pressed={installments === n}
+                            onClick={() => setFormData({ ...formData, installmentCount: String(n) })}
+                            className={cn("min-h-9 rounded-full px-3 text-xs font-medium tabular-nums transition-colors", installments === n ? "bg-primary text-primary-foreground" : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10")}
+                          >
+                            {n === 1 ? t('singlePayment') : `×${n}`}
+                          </button>
+                        ))}
+                      </div>
+                      {installmentPreview && <p className="text-xs font-medium text-primary">{installmentPreview}</p>}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Part of a plan (a trip, a wedding): counts towards that plan's budget */}
+          {formData.type === 'Expense' && activePlans.length > 0 && (
+            <div className="space-y-1 sm:space-y-2">
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('partOfPlan')} ({t('optional')})</Label>
+              <Select
+                value={formData.planId || 'none'}
+                onValueChange={(value) => setFormData({ ...formData, planId: value === 'none' ? '' : value, planItemId: value === formData.planId ? formData.planItemId : '' })}
+              >
+                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
+                  <SelectItem value="none" className={colors.textPrimary}>{t('none')}</SelectItem>
+                  {activePlans.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className={colors.textPrimary}>
+                      {p.emoji ? `${p.emoji} ` : ''}{p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Monthly recurring (rent, salary, subscriptions) */}
+          {!(formData.type === 'Expense' && formData.isBigPurchase) && !isEditing && (
             <div className="flex items-center gap-2 p-2 rounded-md">
               <Checkbox
                 id="isRecurring"
@@ -491,26 +624,16 @@ export default function AddTransactionDialog({
                 className={cn("text-xs sm:text-sm cursor-pointer flex items-center gap-1.5", colors.textSecondary)}
               >
                 <Repeat className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>{t('monthlyRecurring') !== 'monthlyRecurring' ? t('monthlyRecurring') : 'Monthly Recurring'}</span>
+                <span>{t('monthlyRecurring')}</span>
               </Label>
             </div>
           )}
 
           {/* Recurring Transaction Date Range */}
-          {formData.isRecurring && (
+          {formData.isRecurring && !isEditing && (
             <div className="space-y-0 sm:space-y-2 p-1 sm:p-2 pt-0 sm:pt-1 pb-0 sm:pb-2 rounded-md -my-2 sm:my-0" style={{ backgroundColor: colors.bgTertiary }}>
               <p className={cn("text-xs mb-0 pb-0", colors.textTertiary)}>
-                {(() => {
-                  const helpText = t('recurringTransactionHelp');
-                  if (helpText !== 'recurringTransactionHelp') {
-                    return helpText;
-                  }
-                  const altHelpText = t('recurringHelpText');
-                  if (altHelpText !== 'recurringHelpText') {
-                    return altHelpText;
-                  }
-                  return 'Transactions will be created monthly from start to end date';
-                })()}
+                {t('recurringTransactionHelp')}
               </p>
               <div className="grid grid-cols-2 gap-0 sm:gap-4">
                 <div className="space-y-0 sm:space-y-2">
@@ -654,7 +777,7 @@ export default function AddTransactionDialog({
                   <span className="hidden sm:inline">{editTransaction && (editTransaction.id || editTransaction._id) ? t('updating') : t('adding')}</span>
                 </>
               ) : (
-                editTransaction && (editTransaction.id || editTransaction._id) ? t('updateTransaction') : t('addTransaction')
+                isEditing ? t('updateTransaction') : splitting ? t('addInstallments').replace('{count}', installments) : t('addTransaction')
               )}
             </Button>
           </div>

@@ -1,10 +1,12 @@
 import React, { useMemo, useState, useCallback, memo, useEffect } from 'react';
-import { Loader2, Search, X, ChevronDown } from 'lucide-react';
+import { Loader2, Search, X, ChevronDown, ShoppingBag } from 'lucide-react';
 import NumberFlow from '@number-flow/react';
 import { motion } from 'motion/react';
 import { useDonutPalette } from '@/components/charts/DonutChart';
 import TransactionList from './TransactionList';
 import BudgetProgress from './BudgetProgress';
+import BigPurchases from './BigPurchases';
+import PlannedPayments from './PlannedPayments';
 import BlurValue from '../BlurValue';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
@@ -75,10 +77,24 @@ function Breakdown({ title, rows, total, format, blur }) {
   );
 }
 
+function Stat({ dot, label, value, tone, blur }) {
+  return (
+    <div className="min-w-0">
+      <dt className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+        {dot && <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", dot)} />}{label}
+      </dt>
+      <dd className={cn("mt-0.5 truncate text-lg font-semibold tabular-nums", tone || "text-foreground")} dir="ltr">
+        <BlurValue blur={blur}>{value}</BlurValue>
+      </dd>
+    </div>
+  );
+}
+
 function ExpenseMonthView({
-  transactions, budgets, cards, categories = [], onEdit, onDelete, onDuplicate, onConfirm,
-  isLoading, selectedYear, selectedMonths = [], canEdit = true,
+  kind = 'Expense', transactions, allTransactions = [], counterpart = [], budgets, cards, categories = [], plans = [],
+  onEdit, onDelete, onDuplicate, onConfirm, isLoading, selectedYear, selectedMonths = [], canEdit = true,
 }) {
+  const isIncome = kind === 'Income';
   const { user, colors, t, language } = useTheme();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
@@ -95,30 +111,37 @@ function ExpenseMonthView({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [personFilter, setPersonFilter] = useState('all');
   const [reviewOnly, setReviewOnly] = useState(false);
+  const [bigOnly, setBigOnly] = useState(false);
   const { members, isShared } = useHousehold();
   const pendingCount = useMemo(() => transactions.filter((x) => x.status === 'pending').length, [transactions]);
-  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || personFilter !== 'all' || reviewOnly;
+  const bigCount = useMemo(() => (isIncome ? 0 : transactions.filter((x) => x.isBigPurchase).length), [transactions, isIncome]);
+  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || personFilter !== 'all' || reviewOnly || bigOnly;
 
   const clearFilters = useCallback(() => {
     setSearchQuery('');
     setCategoryFilter('all');
     setPersonFilter('all');
     setReviewOnly(false);
+    setBigOnly(false);
   }, []);
+
+  const planById = useMemo(() => Object.fromEntries(plans.map((p) => [p.id, p])), [plans]);
 
   const filteredTransactions = useMemo(() => {
     const q = debouncedSearchQuery.toLowerCase().trim();
     return transactions.filter((x) => {
       if (q) {
-        const hay = [x.description, x.category, x.notes, x.amount?.toString(), x.paymentMethod, x.type, x.date].map((v) => (v || '').toString().toLowerCase());
+        const hay = [x.description, x.category, x.notes, x.amount?.toString(), x.paymentMethod, x.date, planById[x.planId]?.name]
+          .map((v) => (v || '').toString().toLowerCase());
         if (!hay.some((v) => v.includes(q))) return false;
       }
       if (categoryFilter !== 'all' && x.category !== categoryFilter) return false;
       if (personFilter !== 'all' && x.created_by !== personFilter) return false;
       if (reviewOnly && x.status !== 'pending') return false;
+      if (bigOnly && !x.isBigPurchase) return false;
       return true;
     });
-  }, [transactions, debouncedSearchQuery, categoryFilter, personFilter, reviewOnly]);
+  }, [transactions, debouncedSearchQuery, categoryFilter, personFilter, reviewOnly, bigOnly, planById]);
 
   const money = useCallback((value, currency) => new Intl.NumberFormat(numLocale, {
     style: 'currency', currency: currency || userCurrency, minimumFractionDigits: 0, maximumFractionDigits: 0,
@@ -132,20 +155,28 @@ function ExpenseMonthView({
   }, [userCurrency, rates, convertCurrency]);
 
   const metrics = useMemo(() => {
-    let income = 0;
-    let expenses = 0;
+    let total = 0;
+    let big = 0;
     transactions.forEach((x) => {
-      if (x.type === 'Income') income += toUser(x);
-      else if (x.type === 'Expense') expenses += toUser(x);
+      const v = toUser(x);
+      total += v;
+      if (x.isBigPurchase) big += v;
     });
-    return { income, expenses, net: income - expenses };
-  }, [transactions, toUser]);
+    const other = counterpart.reduce((s, x) => s + toUser(x), 0);
+    const income = isIncome ? total : other;
+    const expenses = isIncome ? other : total;
+    return { total, big, everyday: total - big, income, expenses, net: income - expenses };
+  }, [transactions, counterpart, toUser, isIncome]);
+
+  const iconByCategory = useMemo(() => {
+    const map = {};
+    categories.forEach((c) => { if (c.icon) map[c.nameKey || c.name] = c.icon; });
+    return map;
+  }, [categories]);
 
   const categoryRows = useMemo(() => {
     const totals = {};
-    filteredTransactions.forEach((x) => {
-      if (x.type === 'Expense') totals[x.category] = (totals[x.category] || 0) + toUser(x);
-    });
+    filteredTransactions.forEach((x) => { totals[x.category] = (totals[x.category] || 0) + toUser(x); });
     return Object.entries(totals)
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
@@ -153,11 +184,11 @@ function ExpenseMonthView({
   }, [filteredTransactions, toUser, language, palette]);
 
   const methodRows = useMemo(() => {
+    if (isIncome) return [];
     const groups = {};
     const cardIdx = new Map();
     const cardLabel = t('card');
     transactions.forEach((x) => {
-      if (x.type !== 'Expense') return;
       const amount = toUser(x);
       if (amount <= 0) return;
       const method = x.paymentMethod || 'Other';
@@ -175,7 +206,7 @@ function ExpenseMonthView({
       groups[key].value += amount;
     });
     return Object.values(groups).sort((a, b) => b.value - a.value);
-  }, [transactions, toUser, cards, blur, t]);
+  }, [transactions, toUser, cards, blur, t, isIncome]);
 
   const categoryTotal = useMemo(() => categoryRows.reduce((s, r) => s + r.value, 0), [categoryRows]);
   const methodTotal = useMemo(() => methodRows.reduce((s, r) => s + r.value, 0), [methodRows]);
@@ -188,40 +219,73 @@ function ExpenseMonthView({
     );
   }
 
-  const flow = metrics.income + metrics.expenses;
-  const incomeShare = flow > 0 ? (metrics.income / flow) * 100 : 50;
-  const netTone = metrics.net >= 0 ? 'text-success' : 'text-danger';
-  const showBudget = budgets?.length > 0;
+  // Share of the period's income that went out (Expenses) or was kept (Income)
+  const spentShare = metrics.income > 0 ? Math.min(100, (metrics.expenses / metrics.income) * 100) : null;
+  const showBudget = !isIncome && budgets?.length > 0;
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
       <motion.section
-        className="order-1 rounded-3xl bg-gradient-to-b from-primary/[0.12] to-foreground/[0.03] p-5 sm:p-6"
+        className={cn(
+          "order-1 rounded-3xl bg-gradient-to-b to-foreground/[0.03] p-5 sm:p-6",
+          isIncome ? "from-success/[0.12]" : "from-primary/[0.12]"
+        )}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        aria-label={t('net')}
+        aria-label={isIncome ? t('totalIncome') : t('totalSpent')}
       >
-        <p className="text-sm text-muted-foreground">{t('net')}</p>
-        <p className={cn("mt-1 text-4xl font-bold tracking-tight tabular-nums sm:text-5xl", netTone)} dir="ltr">
+        <p className="text-sm text-muted-foreground">{isIncome ? t('totalIncome') : t('totalSpent')}</p>
+        <p className={cn("mt-1 text-4xl font-bold tracking-tight tabular-nums sm:text-5xl", isIncome ? 'text-success' : 'text-foreground')} dir="ltr">
           {blur ? <BlurValue blur /> : (
-            <NumberFlow value={metrics.net} locales={numLocale} trend={0} format={{ style: 'currency', currency: userCurrency, maximumFractionDigits: 0 }} />
+            <NumberFlow value={metrics.total} locales={numLocale} trend={0} format={{ style: 'currency', currency: userCurrency, maximumFractionDigits: 0 }} />
           )}
         </p>
-        <div className="mt-5 flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-foreground/10" aria-hidden>
-          <motion.span className="h-full rounded-full bg-success" initial={{ width: 0 }} animate={{ width: `${incomeShare}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
-        </div>
+        {spentShare !== null && (
+          <>
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-foreground/10" aria-hidden>
+              <motion.span
+                className={cn("block h-full rounded-full", isIncome ? "bg-success" : spentShare >= 100 ? "bg-danger" : "bg-primary")}
+                initial={{ width: 0 }}
+                animate={{ width: `${isIncome ? 100 - spentShare : spentShare}%` }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </div>
+            <p className="mt-1.5 text-xs tabular-nums text-muted-foreground">
+              {isIncome
+                ? t('keptOfIncome').replace('{pct}', Math.max(0, Math.round(100 - spentShare)))
+                : t('spentOfIncome').replace('{pct}', Math.round((metrics.expenses / metrics.income) * 100))}
+            </p>
+          </>
+        )}
         <dl className="mt-3 grid grid-cols-2 gap-4">
-          <div>
-            <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><span aria-hidden className="h-2 w-2 rounded-full bg-success" />{t('income')}</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums text-foreground" dir="ltr"><BlurValue blur={blur}>{money(metrics.income)}</BlurValue></dd>
-          </div>
-          <div>
-            <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><span aria-hidden className="h-2 w-2 rounded-full bg-foreground/30" />{t('expenses')}</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums text-foreground" dir="ltr"><BlurValue blur={blur}>{money(metrics.expenses)}</BlurValue></dd>
-          </div>
+          {isIncome ? (
+            <>
+              <Stat dot="bg-foreground/30" label={t('spent')} value={money(metrics.expenses)} blur={blur} />
+              <Stat
+                dot={metrics.net >= 0 ? 'bg-success' : 'bg-danger'}
+                label={metrics.net >= 0 ? t('leftOver') : t('overspent')}
+                value={money(Math.abs(metrics.net))}
+                tone={metrics.net >= 0 ? 'text-success' : 'text-danger'}
+                blur={blur}
+              />
+            </>
+          ) : (
+            <>
+              <Stat dot="bg-primary" label={t('everydaySpending')} value={money(metrics.everyday)} blur={blur} />
+              {metrics.big > 0
+                ? <Stat dot="bg-chart-4" label={t('bigPurchases')} value={money(metrics.big)} blur={blur} />
+                : <Stat dot="bg-success" label={t('income')} value={money(metrics.income)} blur={blur} />}
+            </>
+          )}
         </dl>
       </motion.section>
+
+      {!isIncome && (
+        <div className="order-2 empty:hidden">
+          <PlannedPayments plans={plans} selectedYear={selectedYear} selectedMonths={selectedMonths} />
+        </div>
+      )}
 
       {showBudget && (
         <div className="order-2">
@@ -229,8 +293,14 @@ function ExpenseMonthView({
         </div>
       )}
 
+      {!isIncome && (
+        <div className="order-2 empty:hidden">
+          <BigPurchases periodRows={transactions} allRows={allTransactions} iconByCategory={iconByCategory} onOpen={onEdit} />
+        </div>
+      )}
+
       <div className="order-4 grid grid-cols-1 gap-4 md:order-3 md:grid-cols-2">
-        {categoryRows.length > 0 && <Breakdown title={t('expensesByCategory')} rows={categoryRows} total={categoryTotal} format={money} blur={blur} />}
+        {categoryRows.length > 0 && <Breakdown title={isIncome ? t('incomeBySource') : t('expensesByCategory')} rows={categoryRows} total={categoryTotal} format={money} blur={blur} />}
         {methodRows.length > 0 && <Breakdown title={t('expensesByPaymentMethod')} rows={methodRows} total={methodTotal} format={money} blur={blur} />}
       </div>
 
@@ -267,12 +337,18 @@ function ExpenseMonthView({
             )}
           </div>
 
-          {(canEdit && pendingCount > 0) || isShared ? (
+          {(canEdit && pendingCount > 0) || isShared || bigCount > 0 ? (
             <div role="group" aria-label={t('filterByPerson')} className={scrollStrip}>
               {canEdit && pendingCount > 0 && (
                 <Chip active={reviewOnly} onClick={() => setReviewOnly((v) => !v)}>
                   {t('needsReview')}
                   <span className="rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground">{pendingCount}</span>
+                </Chip>
+              )}
+              {bigCount > 0 && (
+                <Chip active={bigOnly} onClick={() => setBigOnly((v) => !v)}>
+                  <ShoppingBag aria-hidden className="h-4 w-4" />
+                  {t('bigPurchases')}
                 </Chip>
               )}
               {isShared && [{ email: 'all', label: t('everyone') }, ...members.map((m) => ({ email: m.email, label: m.isMe ? t('me') : m.name, member: m }))].map((opt) => (
@@ -309,11 +385,13 @@ function ExpenseMonthView({
             transactions={filteredTransactions}
             cards={cards}
             categories={categories}
+            plans={planById}
             onEdit={onEdit}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             onConfirm={onConfirm}
             canEdit={canEdit}
+            emptyTitle={isIncome ? t('noIncomeFound') : t('noExpensesFound')}
           />
         </div>
       </section>

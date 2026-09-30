@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
-import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2 } from 'lucide-react';
+import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
@@ -68,7 +68,7 @@ function ActionRow({ icon: Icon, label, onClick, tone }) {
   );
 }
 
-function TransactionList({ transactions, cards = [], categories = [], onEdit, onDelete, onDuplicate, onConfirm, canEdit = true }) {
+function TransactionList({ transactions, cards = [], categories = [], plans = {}, onEdit, onDelete, onDuplicate, onConfirm, canEdit = true, emptyTitle }) {
   const { t, language, user } = useTheme();
   const { byEmail, isShared } = useHousehold();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
@@ -139,7 +139,7 @@ function TransactionList({ transactions, cards = [], categories = [], onEdit, on
         <span className="mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-primary/12 text-primary">
           <Receipt className="h-8 w-8" />
         </span>
-        <h3 className="text-lg font-semibold text-foreground">{t('noTransactionsFound')}</h3>
+        <h3 className="text-lg font-semibold text-foreground">{emptyTitle || t('noTransactionsFound')}</h3>
         <p className="mt-1 max-w-xs text-sm text-muted-foreground">{t('addFirstTransactionOrAdjust')}</p>
       </div>
     );
@@ -181,12 +181,24 @@ function TransactionList({ transactions, cards = [], categories = [], onEdit, on
                         <span className="flex items-center gap-1.5">
                           <span className="truncate text-[0.9375rem] font-medium text-foreground">{tx.description}</span>
                           {tx.isRecurring && <Repeat aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                          {tx.isBigPurchase && !(tx.installmentCount > 1) && <ShoppingBag aria-label={t('bigPurchase')} className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                          {tx.installmentCount > 1 && (
+                            <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[0.6875rem] font-semibold tabular-nums text-primary" dir="ltr" aria-label={t('installmentOf').replace('{index}', tx.installmentIndex).replace('{count}', tx.installmentCount)}>
+                              {tx.installmentIndex}/{tx.installmentCount}
+                            </span>
+                          )}
                         </span>
                         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                           {pending && (
                             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-medium text-primary">
                               <Nfc className="h-3 w-3" aria-hidden />
                               {tx.ingest?.flags?.includes('possibleDuplicate') ? t('possibleDuplicate') : t('needsReview')}
+                            </span>
+                          )}
+                          {plans[tx.planId] && (
+                            <span className="inline-flex max-w-[45%] shrink-0 items-center gap-1 truncate rounded-full bg-foreground/[0.07] px-2 py-0.5 font-medium text-foreground/80">
+                              {plans[tx.planId].emoji && <span aria-hidden>{plans[tx.planId].emoji}</span>}
+                              <span className="truncate">{plans[tx.planId].name}</span>
                             </span>
                           )}
                           <span className="truncate">{meta}</span>
@@ -238,6 +250,8 @@ function TransactionList({ transactions, cards = [], categories = [], onEdit, on
                     cardText(active),
                     activeAuthor ? (activeAuthor.isMe ? t('me') : activeAuthor.name) : '',
                     activeConverted !== null ? money(activeConverted, userCurrency, 0) : '',
+                    active.installmentCount > 1 ? `${t('installmentOf').replace('{index}', active.installmentIndex).replace('{count}', active.installmentCount)} · ${t('totalPrice')} ${money(active.installmentTotal, active.currency, 0)}` : (active.isBigPurchase ? t('bigPurchase') : ''),
+                    plans[active.planId] ? `${plans[active.planId].emoji || ''} ${plans[active.planId].name}`.trim() : '',
                   ].filter(Boolean).join(' · ')}
                 </DrawerDescription>
               </DrawerHeader>

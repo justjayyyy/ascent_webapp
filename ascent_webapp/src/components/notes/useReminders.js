@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { noteToText } from './noteUtils';
+import { nextOccurrence, noteToText } from './noteUtils';
 
 const STORE = 'ascent_notes_notified';
 
@@ -35,13 +35,13 @@ async function systemNotify(note, key, title, body) {
  * Reminders live on the server per person, and are checked while the app is open or comes
  * back to the foreground (there is no push service behind this yet).
  */
-export function useReminders(notes, { t, onOpen, onDismiss }) {
-  const latest = useRef({ notes, t, onOpen, onDismiss });
-  latest.current = { notes, t, onOpen, onDismiss };
+export function useReminders(notes, { t, onOpen, onDismiss, onRepeat }) {
+  const latest = useRef({ notes, t, onOpen, onDismiss, onRepeat });
+  latest.current = { notes, t, onOpen, onDismiss, onRepeat };
 
   useEffect(() => {
     const check = () => {
-      const { notes: list, t: tr, onOpen: open, onDismiss: dismiss } = latest.current;
+      const { notes: list, t: tr, onOpen: open, onDismiss: dismiss, onRepeat: repeat } = latest.current;
       const notified = readNotified();
       const now = Date.now();
       let changed = false;
@@ -54,11 +54,14 @@ export function useReminders(notes, { t, onOpen, onDismiss }) {
         const title = n.title || tr('ntReminder');
         const body = noteToText(n, { withTitle: false }).slice(0, 140) || tr('ntReminderDue');
         systemNotify(n, key, title, body);
+        // A repeating reminder moves on to its next time straight away
+        const next = nextOccurrence(n.reminder, n.reminderRepeat, now);
+        if (next && repeat) repeat(n.id, next, n.reminderRepeat);
         toast(`${tr('ntReminder')}: ${title}`, {
           description: body,
           duration: 15000,
           action: { label: tr('ntOpen'), onClick: () => open(n.id) },
-          cancel: { label: tr('ntDismiss'), onClick: () => dismiss(n.id) },
+          ...(next ? {} : { cancel: { label: tr('ntDismiss'), onClick: () => dismiss(n.id) } }),
         });
       });
       if (changed) writeNotified(notified);

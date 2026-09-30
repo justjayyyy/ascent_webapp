@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { PieChart, Receipt, StickyNote } from 'lucide-react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -161,6 +161,8 @@ function LayoutContent({ children, currentPageName }) {
     // { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },
     { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewExpenses' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
+    { name: t('income'), page: 'Income', icon: HandCoins, permission: 'viewExpenses' },
+    { name: t('plans'), page: 'Plans', icon: Milestone, permission: 'viewExpenses' },
     // Open to every member: notes shared with someone need no workspace-wide notes permission
     { name: t('notes'), page: 'Notes', icon: StickyNote },
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },

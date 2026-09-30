@@ -75,6 +75,42 @@ const expenseTransactionSchema = new mongoose.Schema({
   tags: [{
     type: String
   }],
+
+  // Big purchases: a one-off large expense, optionally paid in installments. Every installment is its
+  // own row (so it lands in its month and budget) and shares installmentGroupId with its siblings.
+  isBigPurchase: {
+    type: Boolean,
+    default: false
+  },
+  installmentGroupId: {
+    type: String,
+    default: null,
+    index: true
+  },
+  installmentIndex: {
+    type: Number,
+    default: null // 1-based
+  },
+  installmentCount: {
+    type: Number,
+    default: null
+  },
+  installmentTotal: {
+    type: Number,
+    default: null // full price of the purchase, in the row's currency
+  },
+
+  // Money spent towards a Plan (a trip, a wedding...). planItemId is set when it pays a specific item.
+  planId: {
+    type: String,
+    default: null,
+    index: true
+  },
+  planItemId: {
+    type: String,
+    default: null
+  },
+
   workspaceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Workspace',

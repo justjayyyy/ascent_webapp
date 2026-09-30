@@ -1,12 +1,12 @@
 import React from 'react';
-import { Archive, Bell, Lightbulb, Tag, Trash2, Users } from 'lucide-react';
+import { Archive, Bell, Lightbulb, Pencil, Tag, Trash2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
  * Where you are in your notes: everything, shared, archive, trash, and your labels.
  * A vertical rail on large screens and a scrolling chip bar on phones.
  */
-export default function NotesNav({ view, label, labels, counts, onSelect, t, variant }) {
+export default function NotesNav({ view, label, labels, counts, onSelect, onEditLabels, t, variant }) {
   const main = [
     { key: 'notes', icon: Lightbulb, name: t('notes'), count: counts.notes },
     { key: 'shared', icon: Users, name: t('ntShared'), count: counts.shared },
@@ -55,6 +55,15 @@ export default function NotesNav({ view, label, labels, counts, onSelect, t, var
             <span className="text-xs opacity-70">{count}</span>
           </button>
         ))}
+        {onEditLabels && labels.length > 0 && (
+          <button
+            type="button"
+            onClick={onEditLabels}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-dashed border-border/70 px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Pencil className="h-4 w-4" /> {t('ntEditLabels')}
+          </button>
+        )}
       </nav>
     );
   }
@@ -82,7 +91,20 @@ export default function NotesNav({ view, label, labels, counts, onSelect, t, var
       </ul>
 
       <div>
-        <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('ntLabels')}</p>
+        <div className="mb-1 flex items-center justify-between gap-2 ps-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('ntLabels')}</p>
+          {onEditLabels && labels.length > 0 && (
+            <button
+              type="button"
+              onClick={onEditLabels}
+              aria-label={t('ntEditLabels')}
+              title={t('ntEditLabels')}
+              className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         {labels.length === 0 ? (
           <p className="px-3 text-sm text-muted-foreground">{t('ntNoLabels')}</p>
         ) : (

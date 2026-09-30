@@ -2,7 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from 'motion/react';
 import {
-  Archive, Bell, CloudOff, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, Trash2, Users, X,
+  Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -20,18 +20,31 @@ import NoteComposer from '@/components/notes/NoteComposer';
 import NoteEditor from '@/components/notes/NoteEditor';
 import NotesNav from '@/components/notes/NotesNav';
 import ShareNoteDialog from '@/components/notes/ShareNoteDialog';
+import SelectionBar from '@/components/notes/SelectionBar';
+import EditLabelsDialog from '@/components/notes/EditLabelsDialog';
+import SearchFilters from '@/components/notes/SearchFilters';
+import ShortcutsDialog from '@/components/notes/ShortcutsDialog';
+import MobileNoteBar from '@/components/notes/MobileNoteBar';
 import { useReminders } from '@/components/notes/useReminders';
 import { buildPeople } from '@/components/notes/NoteParts';
 import {
-  distribute, fmt, newItemId, noteToText, searchableText, useColumnCount,
+  NOTE_COLORS, NOTE_FILTERS, blankItem, distribute, fmt, matchesFilter, newItemId, noteToText, resolveColor, searchableText, useColumnCount,
 } from '@/components/notes/noteUtils';
 
 const VIEW_KEY = 'ascent_notes_view';
 const VIEWS = ['notes', 'shared', 'reminders', 'archive', 'trash'];
+const lower = (s) => s.toLowerCase();
 
 function readLayoutPref() {
   try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
 }
+
+const isWide = () => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 640px)').matches;
+const isTyping = () => {
+  const el = document.activeElement;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+};
+const canEditNote = (n) => n.myAccess === 'owner' || n.myAccess === 'edit';
 
 function Notes() {
   const { user, t, language, isRTL } = useTheme();
@@ -47,17 +60,42 @@ function Notes() {
   const label = params.get('label') || '';
 
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState(null);
+  const [colorFilter, setColorFilter] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [layout, setLayout] = useState(readLayoutPref);
   const [openId, setOpenId] = useState(null);
+  const [freshId, setFreshId] = useState(null);
   const [shareId, setShareId] = useState(null);
-  const [confirm, setConfirm] = useState(null); // { kind: 'delete' | 'empty', id? }
+  const [confirm, setConfirm] = useState(null); // { kind: 'delete' | 'empty' | 'deleteMany', id?, ids?, done? }
   const [composerRequest, setComposerRequest] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const searchRef = useRef(null);
   const gridRef = useRef(null);
 
   const people = useMemo(() => buildPeople(currentWorkspace, user), [currentWorkspace, user]);
   const listView = layout === 'list';
   const columnCount = useColumnCount(gridRef, listView);
+
+  // ---- new notes: straight into the full editor; left empty, they are thrown away on close ----
+  const newNote = useCallback((type = 'text', extra = {}) => {
+    const id = createNote({
+      type,
+      items: type === 'checklist' ? [blankItem()] : [],
+      tags: label ? [label] : [],
+      ...extra,
+    });
+    setFreshId(id);
+    setOpenId(id);
+    return id;
+  }, [createNote, label]);
+
+  const newImageNote = useCallback((files) => {
+    const id = newNote('text');
+    addFiles(id, files);
+  }, [newNote, addFiles]);
 
   // ---- entry points: install shortcut (?new=1) and text shared to the app (?share=1) ----
   useEffect(() => {
@@ -70,33 +108,23 @@ function Notes() {
       return;
     }
     const isNew = params.get('new') === '1' || params.get('share') === '1';
-    if (!isNew) return;
+    // Wait for this device's notes to load, so a new note has somewhere to go
+    if (!isNew || isLoading) return;
     if (canCreate) {
       const sharedText = [params.get('text'), params.get('url')].filter(Boolean).join('\n');
-      setComposerRequest({
+      const request = {
         title: params.get('title') || '',
         content: sharedText,
         type: params.get('type') === 'checklist' ? 'checklist' : 'text',
-      });
+      };
+      // Wide screens fill the inline composer; phones open the full editor
+      if (isWide()) setComposerRequest(request);
+      else newNote(request.type, { title: request.title, content: request.content });
     }
     const next = new URLSearchParams(params);
     ['new', 'share', 'title', 'text', 'url', 'type'].forEach(k => next.delete(k));
     setParams(next, { replace: true });
-  }, [params, setParams, canCreate]);
-
-  // ---- keyboard: "/" to search ----
-  useEffect(() => {
-    const onKey = (e) => {
-      const el = document.activeElement;
-      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [params, setParams, canCreate, newNote, isLoading]);
 
   const setLayoutPref = (value) => {
     setLayout(value);
@@ -143,13 +171,25 @@ function Notes() {
   }, [visible, language]);
   const labelNames = useMemo(() => labelList.map(l => l.name), [labelList]);
 
-  const searching = query.trim().length > 0;
+  // What the search filters can offer: only kinds and colours some note actually has
+  const { availableFilters, colorsInUse } = useMemo(() => {
+    const live = visible.filter(n => !n.trashedAt);
+    const kinds = new Set(NOTE_FILTERS.filter(k => live.some(n => matchesFilter(n, k))));
+    const used = new Set(live.map(n => resolveColor(n.color)));
+    return { availableFilters: kinds, colorsInUse: NOTE_COLORS.filter(c => used.has(c)) };
+  }, [visible]);
+
+  const filtering = !!filter || !!colorFilter;
+  const searching = query.trim().length > 0 || filtering;
 
   const shown = useMemo(() => {
     let list;
     if (searching) {
       const q = query.trim().toLowerCase();
-      list = visible.filter(n => !n.trashedAt && searchableText(n).includes(q));
+      list = visible.filter(n => !n.trashedAt
+        && (!q || searchableText(n).includes(q))
+        && matchesFilter(n, filter)
+        && (!colorFilter || resolveColor(n.color) === colorFilter));
     } else if (label) {
       list = visible.filter(n => !n.trashedAt && (n.tags || []).some(tag => tag.toLowerCase() === label.toLowerCase()));
     } else if (view === 'trash') {
@@ -170,32 +210,74 @@ function Notes() {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       return new Date(b.updated_date) - new Date(a.updated_date);
     });
-  }, [visible, view, label, query, searching]);
+  }, [visible, view, label, query, searching, filter, colorFilter]);
 
   const splitPins = !searching && view !== 'trash' && view !== 'archive' && view !== 'reminders';
   const pinned = splitPins ? shown.filter(n => n.isPinned) : [];
   const others = splitPins ? shown.filter(n => !n.isPinned) : shown;
 
+  // ---- selection ----
+  const selecting = selected.size > 0;
+  const selectedNotes = useMemo(() => shown.filter(n => selected.has(n.id)), [shown, selected]);
+  const toggleSelect = useCallback((id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  const selectAll = useCallback(() => setSelected(new Set(shown.map(n => n.id))), [shown]);
+
+  // A different list means a different selection
+  useEffect(() => { clearSelection(); }, [view, label, clearSelection]);
+  // Notes that left the list (archived, deleted elsewhere) drop out of the selection
+  useEffect(() => {
+    if (!selected.size) return;
+    const ids = new Set(shown.map(n => n.id));
+    if ([...selected].some(id => !ids.has(id))) setSelected(prev => new Set([...prev].filter(id => ids.has(id))));
+  }, [shown, selected]);
+
   // ---- actions ----
   const actions = useMemo(() => {
-    const archiveToast = (id, archived) => toast(archived ? t('ntArchived') : t('ntUnarchived'), {
-      action: { label: t('ntUndo'), onClick: () => patchNote(id, { isArchived: !archived }) },
-    });
+    const archiveToast = (ids, archived) => toast(
+      ids.length > 1 ? fmt(t(archived ? 'ntArchivedMany' : 'ntUnarchivedMany'), { n: ids.length }) : (archived ? t('ntArchived') : t('ntUnarchived')),
+      { action: { label: t('ntUndo'), onClick: () => ids.forEach(id => patchNote(id, { isArchived: !archived })) } }
+    );
+    const trashToast = (ids) => toast(
+      ids.length > 1 ? fmt(t('ntTrashedMany'), { n: ids.length }) : t('ntTrashed'),
+      { action: { label: t('ntUndo'), onClick: () => ids.forEach(id => patchNote(id, { trashed: false })) } }
+    );
     return {
       meId: userId,
       patch: (id, changes) => {
         patchNote(id, changes);
-        if (typeof changes.isArchived === 'boolean') archiveToast(id, changes.isArchived);
+        if (typeof changes.isArchived === 'boolean') archiveToast([id], changes.isArchived);
+      },
+      patchQuiet: (id, changes) => patchNote(id, changes),
+      archiveMany: (ids, archived) => {
+        ids.forEach(id => patchNote(id, { isArchived: archived }));
+        archiveToast(ids, archived);
+      },
+      swipeArchive: (n) => {
+        patchNote(n.id, { isArchived: !n.isArchived });
+        archiveToast([n.id], !n.isArchived);
       },
       trash: (id) => {
         patchNote(id, { trashed: true });
-        toast(t('ntTrashed'), { action: { label: t('ntUndo'), onClick: () => patchNote(id, { trashed: false }) } });
+        trashToast([id]);
+      },
+      trashMany: (ids) => {
+        ids.forEach(id => patchNote(id, { trashed: true }));
+        trashToast(ids);
       },
       remove: (id) => {
         const n = notes.find(x => x.id === id);
         if (n && n.myAccess === 'owner') setConfirm({ kind: 'delete', id });
         else { deleteNote(id); toast.success(t('ntLeft')); }
       },
+      removeMany: (ids, done) => setConfirm({ kind: 'deleteMany', ids, done }),
+      discard: (id) => deleteNote(id),
       share: (id) => setShareId(id),
       addFiles,
       removeFile,
@@ -203,21 +285,47 @@ function Notes() {
         try { await navigator.clipboard.writeText(noteToText(n)); toast.success(t('ntCopied')); }
         catch { toast.error(t('ntCopyFailed')); }
       },
-      duplicate: (n) => {
+      duplicate: (n, { quiet } = {}) => {
         createNote({
           title: n.title ? `${n.title} (${t('ntCopySuffix')})` : '',
           content: n.content, type: n.type, color: n.color, tags: n.tags || [],
           items: (n.items || []).map(i => ({ ...i, id: newItemId() })),
         });
-        toast.success(t('noteCreated'));
+        if (!quiet) toast.success(t('noteCreated'));
       },
     };
   }, [patchNote, deleteNote, createNote, addFiles, removeFile, notes, t, userId]);
 
+  // ---- labels: rename or remove everywhere ----
+  const renameLabel = useCallback((from, to) => {
+    notes.forEach(n => {
+      if (!canEditNote(n) || !(n.tags || []).some(x => lower(x) === lower(from))) return;
+      const seen = new Set();
+      const tags = n.tags.map(x => (lower(x) === lower(from) ? to : x)).filter(x => !seen.has(lower(x)) && seen.add(lower(x)));
+      patchNote(n.id, { tags });
+    });
+    if (label && lower(label) === lower(from)) select('label', to);
+    toast.success(t('ntLabelRenamed'));
+  }, [notes, patchNote, label, select, t]);
+
+  const deleteLabel = useCallback((name) => {
+    const before = [];
+    notes.forEach(n => {
+      if (!canEditNote(n) || !(n.tags || []).some(x => lower(x) === lower(name))) return;
+      before.push([n.id, n.tags]);
+      patchNote(n.id, { tags: n.tags.filter(x => lower(x) !== lower(name)) });
+    });
+    if (label && lower(label) === lower(name)) select('notes');
+    toast(fmt(t('ntLabelDeleted'), { label: name }), {
+      action: { label: t('ntUndo'), onClick: () => before.forEach(([id, tags]) => patchNote(id, { tags })) },
+    });
+  }, [notes, patchNote, label, select, t]);
+
   useReminders(notes, {
     t,
     onOpen: setOpenId,
-    onDismiss: (id) => patchNote(id, { reminder: null }),
+    onDismiss: (id) => patchNote(id, { reminder: null, reminderRepeat: 'none' }),
+    onRepeat: (id, next, repeat) => patchNote(id, { reminder: next, reminderRepeat: repeat }),
   });
 
   const onCreate = useCallback((data) => {
@@ -230,10 +338,53 @@ function Notes() {
 
   // The note was deleted or unshared while it was open
   useEffect(() => {
-    if (openId && !isLoading && !openNote) setOpenId(null);
+    if (openId && !isLoading && !openNote) { setOpenId(null); setFreshId(null); }
   }, [openId, openNote, isLoading]);
 
-  const heading = label ? label : view === 'notes' ? t('notes')
+  const showComposer = canCreate && !searching && (view === 'notes' || view === 'shared' || !!label);
+
+  // ---- keyboard (Keep's shortcuts): c, l, /, ?, and actions on the selection ----
+  const keys = useRef({});
+  keys.current = { selecting, selectedNotes, shown, showComposer, canCreate, actions, view };
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = keys.current;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      if (e.key === 'Escape' && k.selecting) { e.preventDefault(); clearSelection(); return; }
+      if (isTyping() || e.altKey) return;
+      const mod = e.metaKey || e.ctrlKey;
+      // Letters by physical key too, so the shortcuts work with Hebrew and Russian layouts
+      const letter = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : e.key.toLowerCase();
+      if (mod && letter === 'a' && k.shown.length) { e.preventDefault(); setSelected(new Set(k.shown.map(n => n.id))); return; }
+      if (mod) return;
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus(); return; }
+      if (e.key === '?') { e.preventDefault(); setHelpOpen(true); return; }
+      if ((letter === 'c' || letter === 'l') && !e.shiftKey && k.canCreate && !k.selecting) {
+        e.preventDefault();
+        const type = letter === 'l' ? 'checklist' : 'text';
+        if (k.showComposer && isWide()) setComposerRequest({ type });
+        else newNote(type);
+        return;
+      }
+      if (!k.selecting || k.view === 'trash') return;
+      const list = k.selectedNotes;
+      if (letter === 'e') { e.preventDefault(); k.actions.archiveMany(list.map(n => n.id), !list.every(n => n.isArchived)); clearSelection(); }
+      else if (e.key === '#') {
+        e.preventDefault();
+        const owned = list.filter(n => n.myAccess === 'owner').map(n => n.id);
+        if (owned.length) { k.actions.trashMany(owned); clearSelection(); }
+      } else if (letter === 'f') {
+        e.preventDefault();
+        const pin = !list.every(n => n.isPinned);
+        list.forEach(n => k.actions.patchQuiet(n.id, { isPinned: pin }));
+        clearSelection();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [clearSelection, newNote]);
+
+  const heading = searching ? t('ntSearchResults') : label ? label : view === 'notes' ? t('notes')
     : view === 'shared' ? t('ntShared') : view === 'reminders' ? t('ntReminders') : view === 'archive' ? t('ntArchiveNav') : t('ntTrashNav');
 
   const emptyCopy = (() => {
@@ -263,6 +414,9 @@ function Notes() {
                 t={t}
                 language={language}
                 canCreate={canCreate}
+                selected={selected.has(n.id)}
+                selecting={selecting}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
@@ -282,7 +436,8 @@ function Notes() {
     </span>
   ) : null;
 
-  const showComposer = canCreate && !searching && (view === 'notes' || view === 'shared' || !!label);
+  const showFilters = filtersOpen || filtering;
+  const clearSearch = () => { setQuery(''); setFilter(null); setColorFilter(null); setFiltersOpen(false); };
 
   return (
     <MotionConfig reducedMotion="user">
@@ -290,11 +445,20 @@ function Notes() {
         {/* Header */}
         <header className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight text-balance md:text-4xl">{heading}</h1>
+            <h1 className="truncate text-3xl font-bold tracking-tight text-balance md:text-4xl">{heading}</h1>
             <p className="mt-1 hidden text-sm text-muted-foreground sm:block">{t('notesDescription')}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {statusPill}
+            <Button
+              variant="ghost" size="icon"
+              onClick={() => setHelpOpen(true)}
+              aria-label={t('ntShortcuts')}
+              title={`${t('ntShortcuts')} (?)`}
+              className="hidden md:inline-flex"
+            >
+              <Keyboard />
+            </Button>
             <Button
               variant="ghost" size="icon"
               onClick={() => refetch()}
@@ -329,51 +493,84 @@ function Notes() {
         </header>
 
         {/* Search */}
-        <div className="relative max-w-xl">
-          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={searchRef}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
-            placeholder={t('searchNotes')}
-            aria-label={t('searchNotes')}
-            enterKeyHint="search"
-            className="h-11 rounded-2xl border-border/70 bg-card/60 ps-10 pe-10 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => { setQuery(''); searchRef.current?.focus(); }}
-              aria-label={t('ntClearSearch')}
-              className="absolute end-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10"
-            >
-              <X className="h-4 w-4" />
-            </button>
+        <div className="space-y-3">
+          <div className="relative max-w-xl">
+            <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { clearSearch(); e.currentTarget.blur(); } }}
+              placeholder={t('searchNotes')}
+              aria-label={t('searchNotes')}
+              enterKeyHint="search"
+              className="h-11 rounded-2xl border-border/70 bg-card/60 ps-10 pe-20 [&::-webkit-search-cancel-button]:hidden"
+            />
+            <div className="absolute end-1.5 top-1/2 flex -translate-y-1/2 items-center">
+              {(query || filtering) && (
+                <button
+                  type="button"
+                  onClick={() => { clearSearch(); searchRef.current?.focus(); }}
+                  aria-label={t('ntClearSearch')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(v => !v)}
+                aria-expanded={showFilters}
+                aria-label={t('ntFilterBy')}
+                title={t('ntFilterBy')}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-foreground/10 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10',
+                  showFilters ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          {showFilters && (
+            <SearchFilters
+              available={availableFilters}
+              colors={colorsInUse}
+              filter={filter}
+              color={colorFilter}
+              onFilter={setFilter}
+              onColor={setColorFilter}
+              t={t}
+            />
           )}
         </div>
 
         <div className="lg:flex lg:items-start lg:gap-8">
           {/* Side rail (large screens) */}
           <aside className="sticky top-6 hidden w-56 shrink-0 lg:block">
-            <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} t={t} variant="rail" />
+            <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} onEditLabels={() => setLabelsOpen(true)} t={t} variant="rail" />
           </aside>
 
           <div className="min-w-0 flex-1 space-y-5">
-            <div className="lg:hidden">
-              <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} t={t} variant="chips" />
-            </div>
+            {!searching && (
+              <div className="lg:hidden">
+                <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} onEditLabels={() => setLabelsOpen(true)} t={t} variant="chips" />
+              </div>
+            )}
 
             {showComposer && (
-              <NoteComposer
-                t={t}
-                labels={labelNames}
-                defaultTag={label}
-                onCreate={onCreate}
-                request={composerRequest}
-                onRequestHandled={() => setComposerRequest(null)}
-              />
+              <div className="hidden sm:block">
+                <NoteComposer
+                  t={t}
+                  labels={labelNames}
+                  defaultTag={label}
+                  onCreate={onCreate}
+                  onImage={newImageNote}
+                  request={composerRequest}
+                  onRequestHandled={() => setComposerRequest(null)}
+                />
+              </div>
             )}
 
             {view === 'trash' && !searching && !label && counts.trash > 0 && (
@@ -432,6 +629,26 @@ function Notes() {
           </div>
         </div>
 
+        {/* Phones: Keep-style bottom bar, swapped for the selection bar while selecting */}
+        <AnimatePresence>
+          {selecting ? (
+            <SelectionBar
+              key="selection"
+              notes={selectedNotes}
+              labels={labelNames}
+              view={view}
+              onClear={clearSelection}
+              onSelectAll={selectAll}
+              allSelected={selectedNotes.length === shown.length}
+              actions={actions}
+              t={t}
+              canCreate={canCreate}
+            />
+          ) : canCreate && view !== 'trash' && !openNote && (
+            <MobileNoteBar key="bar" onNew={(type) => newNote(type)} onImage={newImageNote} t={t} />
+          )}
+        </AnimatePresence>
+
         {/* Editor */}
         <AnimatePresence>
           {openNote && (
@@ -441,7 +658,7 @@ function Notes() {
               people={people}
               labels={labelNames}
               actions={actions}
-              onClose={() => setOpenId(null)}
+              onClose={() => { setOpenId(null); setFreshId(null); }}
               onShare={(id) => setShareId(id)}
               t={t}
               language={language}
@@ -449,6 +666,7 @@ function Notes() {
               pending={pending}
               uploading={uploading}
               canCreate={canCreate}
+              fresh={freshId === openNote.id}
             />
           )}
         </AnimatePresence>
@@ -463,6 +681,17 @@ function Notes() {
           t={t}
         />
 
+        <EditLabelsDialog
+          open={labelsOpen}
+          onOpenChange={setLabelsOpen}
+          labels={labelList}
+          onRename={renameLabel}
+          onDelete={deleteLabel}
+          t={t}
+        />
+
+        <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} t={t} />
+
         <AlertDialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -470,7 +699,11 @@ function Notes() {
                 {confirm?.kind === 'empty' ? t('ntEmptyTrash') : t('ntDeleteForever')}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {confirm?.kind === 'empty' ? t('ntEmptyTrashConfirm') : t('ntDeleteForeverConfirm')}
+                {confirm?.kind === 'empty'
+                  ? t('ntEmptyTrashConfirm')
+                  : confirm?.kind === 'deleteMany'
+                    ? fmt(t('ntDeleteManyConfirm'), { n: confirm.ids.length })
+                    : t('ntDeleteForeverConfirm')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -478,7 +711,11 @@ function Notes() {
               <AlertDialogAction
                 onClick={() => {
                   if (confirm?.kind === 'empty') emptyTrash();
-                  else if (confirm?.id) { deleteNote(confirm.id); toast.success(t('ntDeleted')); }
+                  else if (confirm?.kind === 'deleteMany') {
+                    confirm.ids.forEach(id => deleteNote(id));
+                    confirm.done?.();
+                    toast.success(t('ntDeleted'));
+                  } else if (confirm?.id) { deleteNote(confirm.id); toast.success(t('ntDeleted')); }
                   setConfirm(null);
                 }}
               >

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ListChecks, Palette, Plus, Tag, Type } from 'lucide-react';
+import { Image as ImageIcon, ListChecks, Palette, Plus, Tag, Type } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,12 +13,13 @@ const blank = (tag) => ({
 });
 
 /** "Take a note…" bar that opens into a full inline editor, like Google Keep. */
-export default function NoteComposer({ t, labels, defaultTag, onCreate, request, onRequestHandled }) {
+export default function NoteComposer({ t, labels, defaultTag, onCreate, onImage, request, onRequestHandled }) {
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => blank(defaultTag));
   const rootRef = useRef(null);
   const bodyRef = useRef(null);
+  const fileRef = useRef(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -98,6 +99,21 @@ export default function NoteComposer({ t, labels, defaultTag, onCreate, request,
             <Button variant="ghost" size="icon" onClick={startChecklist} aria-label={t('ntNewChecklist')} title={t('ntNewChecklist')}>
               <ListChecks />
             </Button>
+            {onImage && (
+              <>
+                <Button variant="ghost" size="icon" onClick={() => fileRef.current?.click()} aria-label={t('ntNewImageNote')} title={t('ntNewImageNote')}>
+                  <ImageIcon />
+                </Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files?.length) onImage(e.target.files); e.target.value = ''; }}
+                />
+              </>
+            )}
           </motion.div>
         ) : (
           <motion.div

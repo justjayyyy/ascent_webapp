@@ -3,7 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, ListChecks, LogOut, MoreVertical,
-  Palette, Paperclip, Pin, Share2, Tag, Trash2, Type, Undo2, XCircle, Loader2, Check,
+  Palette, Paperclip, Pin, Share2, Tag, Trash2, Type, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -12,15 +12,20 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
-import { AutoTextarea, ColorPicker, LabelEditor, PersonDot } from './NoteParts';
+import { AutoTextarea, ColorPicker, LabelEditor, LinkChips, PersonDot } from './NoteParts';
 import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
-import { fmt, formatReminder, isOverdue, itemsToText, resolveColor, textToItems, timeAgo, blankItem } from './noteUtils';
+import { DictateButton, useDictation } from './useDictation';
+import {
+  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, itemsToText, noteToText, resolveColor, textToItems, timeAgo, blankItem,
+} from './noteUtils';
 
 const ib = 'h-11 w-11 sm:h-9 sm:w-9 [@media(pointer:coarse)]:before:hidden';
 const CONTENT_KEYS = ['title', 'content', 'type', 'items', 'tags', 'color'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const pick = (note) => Object.fromEntries(CONTENT_KEYS.map(k => [k, note[k]]));
+const HISTORY_GAP = 700; // keystrokes closer together than this are one undo step
+const HISTORY_MAX = 100;
 
 /** Height of the visible area, so the sheet shrinks above the on-screen keyboard on phones. */
 function useVisualViewport() {
@@ -40,7 +45,7 @@ function useVisualViewport() {
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export default function NoteEditor({
-  note, people, labels, actions, onClose, onShare, t, language, online, pending, canCreate, uploading,
+  note, people, labels, actions, onClose, onShare, t, language, online, pending, canCreate, uploading, fresh,
 }) {
   const reduce = useReducedMotion();
   const vv = useVisualViewport();
@@ -49,6 +54,9 @@ export default function NoteEditor({
   const canEdit = (isOwner || note.myAccess === 'edit') && !trashed;
 
   const [draft, setDraft] = useState(() => pick(note));
+  const draftRef = useRef(draft);
+  const history = useRef({ stack: [pick(note)], index: 0, last: 0 });
+  const [, setHistoryTick] = useState(0);
   const [hasDirty, setHasDirty] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const fileRef = useRef(null);
@@ -70,26 +78,104 @@ export default function NoteEditor({
   flushRef.current = flush;
   useEffect(() => () => flushRef.current(), []);
 
-  const change = useCallback((changes) => {
-    setDraft(d => ({ ...d, ...changes }));
+  const apply = useCallback((next, changes) => {
+    draftRef.current = next;
+    setDraft(next);
     dirty.current = { ...dirty.current, ...changes };
     setHasDirty(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => flushRef.current(), 600);
   }, []);
 
+  const change = useCallback((changes) => {
+    const next = { ...draftRef.current, ...changes };
+    // Undo history: a burst of typing is one step, anything else is its own
+    const h = history.current;
+    const now = Date.now();
+    h.stack = h.stack.slice(0, h.index + 1);
+    if (now - h.last < HISTORY_GAP && h.index > 0) h.stack[h.index] = next;
+    else {
+      h.stack.push(next);
+      if (h.stack.length > HISTORY_MAX) h.stack.shift();
+      h.index = h.stack.length - 1;
+    }
+    h.last = now;
+    setHistoryTick(n => n + 1);
+    apply(next, changes);
+  }, [apply]);
+
+  const travel = useCallback((step) => {
+    const h = history.current;
+    const to = h.index + step;
+    if (to < 0 || to >= h.stack.length) return;
+    h.index = to;
+    h.last = 0;
+    const snap = h.stack[to];
+    const changes = Object.fromEntries(CONTENT_KEYS.filter(k => !same(snap[k], draftRef.current[k])).map(k => [k, snap[k]]));
+    setHistoryTick(n => n + 1);
+    if (Object.keys(changes).length) apply({ ...draftRef.current, ...snap }, changes);
+  }, [apply]);
+  const canUndo = history.current.index > 0;
+  const canRedo = history.current.index < history.current.stack.length - 1;
+
   // Pick up edits other people make while this is open, without touching what you're typing
   useEffect(() => {
-    setDraft(d => {
-      let next = d;
-      for (const k of CONTENT_KEYS) {
-        if (!(k in dirty.current) && !same(d[k], note[k])) next = { ...next, [k]: note[k] };
-      }
-      return next;
-    });
+    let next = draftRef.current;
+    for (const k of CONTENT_KEYS) {
+      if (!(k in dirty.current) && !same(next[k], note[k])) next = { ...next, [k]: note[k] };
+    }
+    if (next !== draftRef.current) {
+      draftRef.current = next;
+      setDraft(next);
+    }
   }, [note]);
 
-  const close = useCallback(() => { flush(); onClose(); }, [flush, onClose]);
+  const close = useCallback(() => {
+    // A brand-new note you left empty is thrown away, as in Keep
+    if (fresh && isOwner && isEmptyNote(draftRef.current) && !(note.attachments || []).length && !uploading) {
+      clearTimeout(timer.current);
+      dirty.current = {};
+      actions.discard(noteId);
+      onClose();
+      return;
+    }
+    flush();
+    onClose();
+  }, [flush, onClose, fresh, isOwner, note.attachments, uploading, actions, noteId]);
+
+  const dictation = useDictation({
+    language,
+    t,
+    onText: (text) => {
+      if (!text) return;
+      const d = draftRef.current;
+      if (d.type === 'checklist') {
+        const items = (d.items || []).filter(i => i.text.trim() || i.done);
+        change({ items: [...items, { ...blankItem(), text }] });
+      } else {
+        const content = d.content || '';
+        const sep = content && !/\s$/.test(content) ? ' ' : '';
+        change({ content: content + sep + text });
+      }
+    },
+  });
+
+  const share = async () => {
+    try { await navigator.share({ title: draft.title || undefined, text: noteToText({ ...note, ...draft }, { withTitle: false }) }); }
+    catch { /* dismissed */ }
+  };
+  const canSend = typeof navigator !== 'undefined' && !!navigator.share;
+
+  const onKeyDown = (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+    const key = e.key.toLowerCase();
+    if (key === 'enter') { e.preventDefault(); close(); return; }
+    if (!canEdit) return;
+    if (e.shiftKey && (e.code === 'Digit8' || key === '8' || key === '*')) { e.preventDefault(); toggleType(); return; }
+    if (key === 'z') { e.preventDefault(); travel(e.shiftKey ? 1 : -1); return; }
+    if (key === 'y') { e.preventDefault(); travel(1); }
+  };
 
   const isChecklist = draft.type === 'checklist';
   const color = resolveColor(draft.color);
@@ -101,6 +187,11 @@ export default function NoteEditor({
       change({ type: 'checklist', items: textToItems(draft.content) });
     }
   };
+
+  const doneCount = isChecklist ? (draft.items || []).filter(i => i.done).length : 0;
+  const uncheckAll = () => change({ items: (draft.items || []).map(i => ({ ...i, done: false })) });
+  const deleteChecked = () => change({ items: (draft.items || []).filter(i => !i.done) });
+  const links = extractLinks(draft);
 
   const meId = actions.meId;
   const editor = note.updatedByEmail ? people.list.find(p => p.email === note.updatedByEmail) : null;
@@ -136,9 +227,10 @@ export default function NoteEditor({
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
-            if (canEdit && !isTouch()) bodyRef.current?.focus();
+            if (canEdit && (!isTouch() || fresh)) bodyRef.current?.focus();
           }}
           onPointerDown={(e) => { if (e.target === e.currentTarget) close(); }}
+          onKeyDown={onKeyDown}
           className="fixed inset-0 z-50 flex items-stretch justify-center focus:outline-none sm:items-center sm:p-6"
         >
           <DialogPrimitive.Title className="sr-only">{draft.title || t('ntUntitled')}</DialogPrimitive.Title>
@@ -231,6 +323,7 @@ export default function NoteEditor({
                     items={draft.items?.length ? draft.items : (canEdit ? [blankItem()] : [])}
                     onChange={(items) => change({ items })}
                     readOnly={!canEdit}
+                    autoFocus={fresh}
                     t={t}
                   />
                 ) : (
@@ -245,7 +338,15 @@ export default function NoteEditor({
                     className="min-h-[9rem] text-base leading-relaxed sm:min-h-[12rem] sm:text-[15px]"
                   />
                 )}
+                {dictation.listening && (
+                  <p className="mt-2 flex items-center gap-2 text-sm italic text-muted-foreground" aria-live="polite">
+                    <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-danger" />
+                    {dictation.interim || t('ntListening')}
+                  </p>
+                )}
               </div>
+
+              {links.length > 0 && <LinkChips links={links} className="mt-4" />}
 
               {draft.tags?.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-1.5">
@@ -266,23 +367,22 @@ export default function NoteEditor({
                 t={t}
               />
 
-              {(note.reminder || isShared) && (
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                  {note.reminder && (
-                    <span className={cn('inline-flex items-center gap-1.5 rounded-full bg-foreground/10 px-2.5 py-1 font-medium', overdue && 'text-danger')}>
-                      <BellRing className="h-3.5 w-3.5" /> {formatReminder(note.reminder, language)}
-                    </span>
-                  )}
-                  {isShared && (
-                    <span className="inline-flex items-center gap-1.5">
-                      {editor && !editor.isMe && <PersonDot person={editor} size={20} />}
-                      {editor && !editor.isMe
-                        ? fmt(t('ntEditedBy'), { name: editor.name, time: timeAgo(note.updated_date, language) })
-                        : fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })}
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                {note.reminder && (
+                  <span className={cn('inline-flex items-center gap-1.5 rounded-full bg-foreground/10 px-2.5 py-1 font-medium', overdue && 'text-danger')}>
+                    <BellRing className="h-3.5 w-3.5" /> {formatReminder(note.reminder, language)}
+                    {note.reminderRepeat && note.reminderRepeat !== 'none' && <><Repeat className="h-3.5 w-3.5" /> {t(`ntRepeat_${note.reminderRepeat}`)}</>}
+                  </span>
+                )}
+                <span className="ms-auto inline-flex items-center gap-1.5">
+                  {isShared && editor && !editor.isMe && <PersonDot person={editor} size={20} />}
+                  {isShared && editor && !editor.isMe
+                    ? fmt(t('ntEditedBy'), { name: editor.name, time: timeAgo(note.updated_date, language) })
+                    : isShared
+                      ? fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })
+                      : fmt(t('ntEditedAt'), { time: timeAgo(note.updated_date, language) })}
+                </span>
+              </div>
             </div>
 
             {/* Bottom toolbar */}
@@ -331,9 +431,10 @@ export default function NoteEditor({
                 <PopoverContent align="start" className="w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl p-2">
                   <ReminderPicker
                     value={note.reminder}
-                    onChange={(iso) => {
+                    repeat={note.reminderRepeat}
+                    onChange={(iso, repeat) => {
                       if (iso) askNotificationPermission();
-                      actions.patch(noteId, { reminder: iso });
+                      actions.patch(noteId, { reminder: iso, reminderRepeat: iso ? (repeat || 'none') : 'none' });
                     }}
                     onDone={() => setReminderOpen(false)}
                     t={t}
@@ -347,6 +448,7 @@ export default function NoteEditor({
                   <Paperclip />
                 </Button>
               )}
+              {canEdit && <DictateButton dictation={dictation} t={t} className={ib} />}
               <input ref={fileRef} type="file" multiple className="hidden" onChange={pickFiles} />
 
               <DropdownMenu>
@@ -354,6 +456,22 @@ export default function NoteEditor({
                   <Button variant="ghost" size="icon" className={ib} aria-label={t('ntMore')}><MoreVertical /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[13rem]">
+                  {canEdit && isChecklist && doneCount > 0 && (
+                    <>
+                      <DropdownMenuItem onSelect={uncheckAll}>
+                        <SquareCheck className="me-2 h-4 w-4" /> {t('ntUncheckAll')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={deleteChecked}>
+                        <Eraser className="me-2 h-4 w-4" /> {fmt(t('ntDeleteChecked'), { n: doneCount })}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  {canSend && (
+                    <DropdownMenuItem onSelect={share}>
+                      <Send className="me-2 h-4 w-4" /> {t('ntSend')}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onSelect={() => actions.copy({ ...note, ...draft })}>
                     <Copy className="me-2 h-4 w-4" /> {t('ntCopyText')}
                   </DropdownMenuItem>
@@ -381,8 +499,18 @@ export default function NoteEditor({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <div className="ms-auto flex min-w-0 items-center gap-2">
-                                <Button variant="ghost" onClick={close} className="hidden sm:inline-flex">
+              <div className="ms-auto flex min-w-0 items-center gap-0.5 sm:gap-2">
+                {canEdit && (
+                  <>
+                    <Button variant="ghost" size="icon" className={ib} onClick={() => travel(-1)} disabled={!canUndo} aria-label={t('ntUndo')} title={t('ntUndo')}>
+                      <Undo2 />
+                    </Button>
+                    <Button variant="ghost" size="icon" className={cn(ib, 'hidden min-[380px]:inline-flex')} onClick={() => travel(1)} disabled={!canRedo} aria-label={t('ntRedo')} title={t('ntRedo')}>
+                      <Redo2 />
+                    </Button>
+                  </>
+                )}
+                <Button variant="ghost" onClick={close} className="hidden sm:inline-flex">
                   <Check /> {t('ntDone')}
                 </Button>
               </div>

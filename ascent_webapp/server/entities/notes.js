@@ -13,6 +13,8 @@ const MAX_TEXT = 100_000;
 const MAX_FILES = 10;
 const MAX_FILE_BYTES = 3 * 1024 * 1024; // base64 in JSON stays under Vercel's 4.5 MB body limit
 
+const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
+
 const sameId = (a, b) => a && b && a.toString() === b.toString();
 
 // What the caller may do with a note:
@@ -46,6 +48,7 @@ function present(note, user, member) {
     isPinned: pinned,
     isArchived: (archivedBy || []).some(id => sameId(id, uid)),
     reminder: mine ? new Date(mine.at).toISOString() : null,
+    reminderRepeat: mine?.repeat || 'none',
     myAccess: access,
     collaborators: (note.collaborators || []).map(c => ({
       userId: c.userId.toString(), email: c.email, role: c.role
@@ -308,7 +311,8 @@ export default async function handler(req, res) {
           const at = body.reminder ? new Date(body.reminder) : null;
           if (at && Number.isNaN(at.getTime())) return error(res, 'Invalid reminder time', 400);
           await Note.updateOne({ _id: id }, { $pull: { reminders: { userId: uid } } });
-          if (at) update.$push = { ...(update.$push || {}), reminders: { userId: uid, at } };
+          const repeat = REPEATS.includes(body.reminderRepeat) ? body.reminderRepeat : 'none';
+          if (at) update.$push = { ...(update.$push || {}), reminders: { userId: uid, at, repeat } };
           else if (!Object.keys(set).length && !Object.keys(update).length) {
             const cleared = await Note.findById(id).lean();
             return success(res, present(cleared, user, member));

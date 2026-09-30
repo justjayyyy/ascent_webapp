@@ -1,8 +1,8 @@
 import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, Plus } from 'lucide-react';
+import { Check, ExternalLink, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { NOTE_COLORS, highlight, resolveColor } from './noteUtils';
+import { NOTE_COLORS, highlight, linkHost, resolveColor } from './noteUtils';
 
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
@@ -208,6 +208,32 @@ export function LabelEditor({ labels, suggestions, onChange, t, disabled }) {
         )}
         {!matches.length && !canCreate && <li className="px-2 py-2 text-sm text-muted-foreground">{t('ntNoLabels')}</li>}
       </ul>
+    </div>
+  );
+}
+
+/** Web links found in a note, as tappable chips (Keep shows them under the note). */
+export function LinkChips({ links, compact, className }) {
+  if (!links?.length) return null;
+  const shown = compact ? links.slice(0, 2) : links;
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      {shown.map(url => (
+        <a
+          key={url}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            'pointer-events-auto relative z-[2] flex min-w-0 items-center gap-2 rounded-xl bg-foreground/[0.07] text-start transition-colors hover:bg-foreground/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            compact ? 'min-h-9 px-2.5 text-xs' : 'min-h-11 px-3 text-sm'
+          )}
+        >
+          <ExternalLink className={cn('shrink-0 text-muted-foreground', compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+          <span className="min-w-0 flex-1 truncate font-medium" dir="ltr">{linkHost(url)}</span>
+        </a>
+      ))}
     </div>
   );
 }

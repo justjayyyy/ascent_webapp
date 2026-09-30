@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BellOff, Download, File as FileIcon, FileText, Image as ImageIcon, Loader2, X } from 'lucide-react';
+import { BellOff, Download, File as FileIcon, FileText, Image as ImageIcon, Loader2, Repeat, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ascent } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
-  base64ToBlob, formatBytes, formatReminder, isPreviewable, reminderPresets, toLocalInput,
+  REPEATS, base64ToBlob, formatBytes, formatReminder, isPreviewable, reminderPresets, toLocalInput,
 } from './noteUtils';
 
 async function fetchBlob(noteId, att) {
@@ -124,20 +124,46 @@ export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t 
   );
 }
 
-/** Pick when to be reminded: quick options, or an exact date and time. */
-export function ReminderPicker({ value, onChange, onDone, t, language }) {
+/** Pick when to be reminded: quick options, or an exact date and time, optionally repeating. */
+export function ReminderPicker({ value, repeat: repeatValue = 'none', onChange, onDone, t, language }) {
   const [custom, setCustom] = useState(() => toLocalInput(value || new Date(Date.now() + 3600000)));
+  const [repeat, setRepeat] = useState(repeatValue || 'none');
   const presets = reminderPresets();
 
-  const set = (date) => { onChange(date.toISOString()); onDone?.(); };
+  const set = (date) => { onChange(date.toISOString(), repeat); onDone?.(); };
+  const pickRepeat = (r) => {
+    setRepeat(r);
+    if (value) onChange(value, r); // already set: change how it repeats in place
+  };
 
   return (
     <div className="space-y-1">
       {value && (
         <p className="px-2 pb-1 text-xs text-muted-foreground">
           {t('ntRemindAt')}: <span className="font-medium text-foreground">{formatReminder(value, language)}</span>
+          {repeatValue && repeatValue !== 'none' && <> · {t(`ntRepeat_${repeatValue}`)}</>}
         </p>
       )}
+      <div className="px-2 pb-2">
+        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Repeat className="h-3.5 w-3.5" /> {t('ntRepeat')}</p>
+        <div role="radiogroup" aria-label={t('ntRepeat')} className="flex flex-wrap gap-1">
+          {REPEATS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="radio"
+              aria-checked={repeat === r}
+              onClick={() => pickRepeat(r)}
+              className={cn(
+                'min-h-9 rounded-full px-2.5 text-xs font-medium transition-colors',
+                repeat === r ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10'
+              )}
+            >
+              {t(`ntRepeat_${r}`)}
+            </button>
+          ))}
+        </div>
+      </div>
       {presets.map(({ key, date }) => (
         <button
           key={key}
@@ -169,7 +195,7 @@ export function ReminderPicker({ value, onChange, onDone, t, language }) {
             {t('ntSetReminder')}
           </Button>
           {value && (
-            <Button size="sm" variant="outline" onClick={() => { onChange(null); onDone?.(); }}>
+            <Button size="sm" variant="outline" onClick={() => { onChange(null, 'none'); onDone?.(); }}>
               <BellOff /> {t('ntRemoveReminder')}
             </Button>
           )}

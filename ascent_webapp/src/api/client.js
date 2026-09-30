@@ -308,6 +308,7 @@ const entities = {
   Category: createEntity('categories'),
   Card: createEntity('cards'),
   FinancialGoal: createEntity('goals'),
+  Plan: createEntity('plans'),
   DashboardWidget: createEntity('dashboard-widgets'),
   PageLayout: createEntity('page-layouts'),
   SharedUser: createEntity('shared-users'),

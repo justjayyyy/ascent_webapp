@@ -1,20 +1,22 @@
-import React, { memo, useMemo } from 'react';
-import { motion } from 'motion/react';
+import React, { memo, useMemo, useRef } from 'react';
+import { motion, useMotionValue, useTransform } from 'motion/react';
 import {
-  Archive, ArchiveRestore, BellRing, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Share2, Trash2, Undo2, Users, XCircle,
+  Archive, ArchiveRestore, BellRing, Check, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Repeat, Share2, Trash2, Undo2, Users, XCircle,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { PeopleStack } from './NoteParts';
-import { PersonDot } from './NoteParts';
-import { fmt, formatReminder, highlight, isOverdue, resolveColor, timeAgo } from './noteUtils';
+import { LinkChips, PeopleStack, PersonDot } from './NoteParts';
+import { extractLinks, fmt, formatReminder, highlight, isOverdue, resolveColor, timeAgo } from './noteUtils';
 
 const PREVIEW_ITEMS = 6;
+const LONG_PRESS = 450;
+const SWIPE = 110;
+const isCoarse = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
-function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language }) {
+function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect }) {
   const color = resolveColor(note.color);
   const isOwner = note.myAccess === 'owner';
   const canEdit = isOwner || note.myAccess === 'edit';
@@ -39,27 +41,102 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   const toggleItem = (id, done) =>
     actions.patch(note.id, { items: note.items.map(i => (i.id === id ? { ...i, done } : i)) });
 
+  const links = useMemo(() => extractLinks(note), [note.title, note.content, note.items]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Touch: hold to start selecting, swipe sideways to archive (Keep's gestures)
+  const coarse = useMemo(isCoarse, []);
+  const press = useRef(null);
+  const dragged = useRef(false);
+  const x = useMotionValue(0);
+  const swipeOpacity = useTransform(x, [-220, -SWIPE, 0, SWIPE, 220], [0.2, 0.55, 1, 0.55, 0.2]);
+  const swipeable = coarse && !trashed && !selecting && !!actions.swipeArchive;
+
+  const onPointerDown = (e) => {
+    if (e.pointerType !== 'touch' || !onToggleSelect) return;
+    const start = { x: e.clientX, y: e.clientY, fired: false };
+    start.timer = setTimeout(() => {
+      start.fired = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      onToggleSelect(note.id);
+    }, LONG_PRESS);
+    press.current = start;
+  };
+  const onPointerMove = (e) => {
+    const p = press.current;
+    if (p && !p.fired && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) { clearTimeout(p.timer); press.current = null; }
+  };
+  const endPress = () => { if (press.current) clearTimeout(press.current.timer); };
+
+  const activate = () => {
+    // The tap that ends a long press or a swipe is not a click
+    if (press.current?.fired || dragged.current) { press.current = null; dragged.current = false; return; }
+    press.current = null;
+    if (selecting) onToggleSelect(note.id);
+    else onOpen(note.id);
+  };
+
   return (
     <motion.article
       layout="position"
       layoutId={`note-${note.id}`}
       transition={{ type: 'spring', stiffness: 420, damping: 38 }}
       data-note-color={color === 'default' ? undefined : color}
+      drag={swipeable ? 'x' : false}
+      dragSnapToOrigin
+      dragDirectionLock
+      dragElastic={0.55}
+      dragConstraints={{ left: 0, right: 0 }}
+      onDragStart={() => { dragged.current = true; endPress(); }}
+      onDragEnd={(_, info) => {
+        if (Math.abs(info.offset.x) > SWIPE || Math.abs(info.velocity.x) > 700) {
+          if (navigator.vibrate) navigator.vibrate(10);
+          actions.swipeArchive(note);
+        }
+        setTimeout(() => { dragged.current = false; }, 50);
+      }}
+      style={swipeable ? { x, opacity: swipeOpacity } : undefined}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endPress}
+      onPointerCancel={endPress}
+      onContextMenu={(e) => { if (coarse) e.preventDefault(); }}
       className={cn(
-        'note-surface group relative overflow-hidden rounded-2xl border p-4 text-foreground',
+        'note-surface group relative overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
         'shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-16px_hsl(0_0%_0%/0.5)]',
         'transition-shadow hover:shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06),0_14px_36px_-14px_hsl(0_0%_0%/0.6)]',
         color === 'default' && 'border-border/60 bg-card/75 backdrop-blur-xl',
-        trashed && 'opacity-80'
+        trashed && !selected && 'opacity-80',
+        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
       )}
     >
       {/* Whole-card hit area sits underneath the real controls */}
       <button
         type="button"
-        onClick={() => onOpen(note.id)}
+        onClick={activate}
         aria-label={note.title || t('ntUntitled')}
+        aria-pressed={selecting ? !!selected : undefined}
         className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
+
+      {/* Select tick: on hover with a mouse, always while selecting */}
+      {onToggleSelect && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(note.id); }}
+          aria-label={selected ? t('ntDeselect') : t('ntSelect')}
+          aria-pressed={!!selected}
+          className={cn(
+            'absolute top-1.5 z-[3] grid h-7 w-7 place-items-center rounded-full border-2 transition-[opacity,transform,background-color] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            selecting ? 'end-2 top-2' : 'start-1.5',
+            selected
+              ? 'border-primary bg-primary text-primary-foreground opacity-100 scale-100'
+              : 'border-foreground/40 bg-background/80 text-transparent backdrop-blur',
+            !selected && (selecting ? 'opacity-100' : 'opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 [@media(pointer:coarse)]:hidden')
+          )}
+        >
+          <Check className="h-4 w-4" strokeWidth={3} />
+        </button>
+      )}
 
       <div className="pointer-events-none relative z-[1] space-y-2">
         {(note.title || !hasBody) && (
@@ -97,6 +174,8 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
           )
         )}
 
+        {links.length > 0 && <LinkChips links={links} compact className="pt-1" />}
+
         {note.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
             {note.tags.slice(0, 3).map(tag => (
@@ -115,6 +194,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
             {note.reminder && (
               <span className={cn('inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium', isOverdue(note.reminder) ? 'text-danger' : 'text-foreground/80')}>
                 <BellRing className="h-3 w-3" /> {formatReminder(note.reminder, language)}
+                {note.reminderRepeat && note.reminderRepeat !== 'none' && <Repeat className="h-3 w-3" aria-label={t(`ntRepeat_${note.reminderRepeat}`)} />}
               </span>
             )}
             {note.attachments?.length > 0 && (
@@ -149,7 +229,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
       </div>
 
       {/* Pin + menu: on hover / focus with a mouse, always visible on touch */}
-      <div className="pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5">
+      <div className={cn('pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5', selecting && 'hidden')}>
         {!trashed && note.isPinned && (
           <Pin aria-hidden="true" className="hidden h-4 w-4 fill-current text-foreground/80 [@media(pointer:coarse)]:block" />
         )}
