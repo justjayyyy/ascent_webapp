@@ -1,7 +1,7 @@
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
 import Workspace from '../models/Workspace.js';
-import { signToken } from '../lib/jwt.js';
+import { issueSession } from '../lib/session.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
 import { authRateLimit } from '../lib/rateLimit.js';
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     await user.save();
     
     // Generate token
-    const token = signToken({ userId: user._id, email: user.email });
+    const token = await issueSession(user);
     
     return success(res, {
       user: user.toJSON(),

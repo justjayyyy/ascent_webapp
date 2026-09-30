@@ -4,6 +4,17 @@ import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
 import Workspace from '../models/Workspace.js';
 
+// `signedInElsewhere` = the token was valid but has been superseded by a newer sign-in; the client
+// uses the code to tell the user why they were signed out. Tokens from before this check existed
+// (no sid) just get a plain expiry.
+function replaced(res, signedInElsewhere) {
+  return res.status(401).json({
+    success: false,
+    error: signedInElsewhere ? 'Signed in on another device' : 'Session expired',
+    code: signedInElsewhere ? 'SESSION_REPLACED' : 'SESSION_INVALID'
+  });
+}
+
 export async function authMiddleware(req, res) {
   try {
     const token = getTokenFromHeader(req);
@@ -34,6 +45,13 @@ export async function authMiddleware(req, res) {
       unauthorized(res, 'User email not found');
       return null;
     }
+
+    // Only the most recent sign-in is valid; an older token means the account was signed in elsewhere.
+    if (!user.sessionId || decoded.sid !== user.sessionId) {
+      replaced(res, decoded.sid && user.sessionId);
+      return null;
+    }
+    delete user.sessionId;
 
     // Handle Workspace Context
     const workspaceId = req.headers['x-workspace-id'];
@@ -82,7 +100,9 @@ export async function optionalAuth(req) {
   await connectDB();
   
   const user = await User.findById(decoded.userId);
-  
-  return user || null;
+
+  if (!user || !user.sessionId || decoded.sid !== user.sessionId) return null;
+
+  return user;
 }
 
