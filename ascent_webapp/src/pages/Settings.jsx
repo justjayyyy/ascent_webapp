@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
-  Loader2, User, Bell, Palette, Users, CreditCard, Database, LogOut, Search, X, Lock, Mail, SearchX, UserCircle,
+  Loader2, User, Bell, Palette, Users, CreditCard, Database, LogOut, Search, X, Lock, Mail, SearchX, UserCircle, Smartphone,
 } from 'lucide-react';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import ImportExportSection from '../components/settings/ImportExportSection';
 import SharedUsersSection from '../components/settings/SharedUsersSection';
 import InviteUserDialog from '../components/settings/InviteUserDialog';
 import CardManagement from '../components/settings/CardManagement';
+import ApplePaySection from '../components/settings/ApplePaySection';
 import ThemePicker from '../components/settings/ThemePicker';
 import SettingsNav, { useActiveSection } from '../components/settings/SettingsNav';
 import { Section, Group, Row, Segmented, EditableField } from '../components/settings/SettingsShell';
@@ -250,6 +251,7 @@ export default function Settings() {
     notifications: hit(t('setNavNotifications'), ...notificationRows.flatMap((r) => [r.label, r.desc])),
     household: isOwner && hit(t('setNavHousehold'), t('workspaceName'), t('sharedAccess'), t('inviteUser')),
     cards: hasPermission('manageCards') && hit(t('setNavCards'), t('paymentCards'), t('addCard')),
+    applepay: hasPermission('editExpenses') && hit('Apple Pay', t('apDesc')),
     data: hit(t('setNavData'), t('exportData'), t('expenses'), t('notes'), 'csv'),
     account: hit(t('setNavAccount'), t('logout')),
   };
@@ -261,6 +263,7 @@ export default function Settings() {
     { id: 'notifications', label: t('setNavNotifications'), icon: Bell },
     isOwner && { id: 'household', label: t('setNavHousehold'), icon: Users },
     hasPermission('manageCards') && { id: 'cards', label: t('setNavCards'), icon: CreditCard },
+    hasPermission('editExpenses') && { id: 'applepay', label: 'Apple Pay', icon: Smartphone },
     { id: 'data', label: t('setNavData'), icon: Database },
     { id: 'account', label: t('setNavAccount'), icon: User },
   ].filter((i) => i && show[i.id]);
@@ -474,6 +477,9 @@ export default function Settings() {
 
           {/* Cards */}
           {show.cards && <CardManagement user={user} index={order++} />}
+
+          {/* Apple Pay */}
+          {show.applepay && <ApplePaySection index={order++} />}
 
           {/* Data */}
           {show.data && (

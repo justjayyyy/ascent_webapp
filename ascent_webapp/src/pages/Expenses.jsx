@@ -127,6 +127,15 @@ function Expenses() {
     },
   });
 
+  const confirmTransactionMutation = useMutation({
+    mutationFn: (tx) => ascent.entities.ExpenseTransaction.update(tx.id, { status: 'confirmed' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      toast.success(t('transactionConfirmed'));
+    },
+    onError: () => toast.error(t('failedToConfirm')),
+  });
+
   const deleteTransactionMutation = useMutation({
     mutationFn: (transactionId) => ascent.entities.ExpenseTransaction.delete(transactionId),
     onSuccess: () => {
@@ -243,7 +252,11 @@ function Expenses() {
 
     if (isEditing) {
       // Editing existing transaction
-      await updateTransactionMutation.mutateAsync({ id: editingTransaction.id, data: transactionData });
+      await updateTransactionMutation.mutateAsync({
+        id: editingTransaction.id,
+        // Saving an automatically added payment after looking at it counts as reviewing it
+        data: editingTransaction.status === 'pending' ? { ...transactionData, status: 'confirmed' } : transactionData,
+      });
     } else {
       // Creating new transaction(s)
       const cleanData = { ...transactionData };
@@ -449,6 +462,7 @@ function Expenses() {
             onEdit={handleEditTransaction}
             onDelete={handleDeleteTransaction}
             onDuplicate={handleDuplicateTransaction}
+            onConfirm={confirmTransactionMutation.mutate}
             isLoading={isLoading}
             monthLabel={selectedPeriodLabel}
             selectedYear={selectedYear}

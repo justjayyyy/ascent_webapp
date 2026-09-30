@@ -87,6 +87,15 @@ const userSchema = new mongoose.Schema({
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
 });
 
+// Personal key for the iOS Shortcuts automation that adds Apple Pay purchases.
+// Only a hash is stored; the key itself is shown once when it is created.
+userSchema.add({
+  shortcutTokenHash: { type: String, index: true, sparse: true },
+  shortcutWorkspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', default: null },
+  shortcutCreatedAt: { type: Date, default: null },
+  shortcutLastUsedAt: { type: Date, default: null }
+});
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
@@ -109,6 +118,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 userSchema.methods.toJSON = function() {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.shortcutTokenHash;
   return obj;
 };
 

@@ -9,6 +9,12 @@ const cardSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // The name Apple Wallet shows for this card, so automated taps can be matched when the text has no last four
+  walletName: {
+    type: String,
+    default: '',
+    maxlength: 80
+  },
   type: {
     type: String,
     enum: ['credit', 'debit', 'prepaid'],

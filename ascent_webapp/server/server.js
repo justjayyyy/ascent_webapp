@@ -91,6 +91,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
+// Automation ingest (phone Shortcuts). Registered ahead of the global 10 MB parser so it gets its own small
+// limit, and malformed bodies get the same JSON error shape as everything else.
+const ingestJson = (req, res, next) =>
+  express.json({ limit: '8kb' })(req, res, (err) => {
+    if (!err) return next();
+    const tooLarge = err.type === 'entity.too.large';
+    res.status(tooLarge ? 413 : 400).json({ success: false, error: tooLarge ? 'payload_too_large' : 'invalid_json' });
+  });
+app.post('/api/ingest/:kind', ingestJson, wrapHandler('./api/ingest.js'));
+app.all('/api/ingest/:kind', (req, res) => res.status(405).json({ success: false, error: 'method_not_allowed' }));
+
 // Body parser with size limit - must be before routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -162,6 +173,13 @@ app.put('/api/workspaces', workspaceHandler);
 app.delete('/api/workspaces', workspaceHandler);
 app.options('/api/workspaces', (req, res) => res.sendStatus(200));
 
+// Ingest tokens: the credentials phones use to report purchases
+const ingestTokensHandler = wrapHandler('./api/ingest-tokens.js');
+app.get('/api/ingest-tokens', ingestTokensHandler);
+app.post('/api/ingest-tokens', ingestTokensHandler);
+app.delete('/api/ingest-tokens', ingestTokensHandler);
+app.options('/api/ingest-tokens', (req, res) => res.sendStatus(200));
+
 // Entity routes - generic handler
 const entities = [
   'accounts', 'positions', 'day-trades', 'transactions',
@@ -188,6 +206,12 @@ app.options('/api/invitations/*', (req, res) => res.sendStatus(200));
 app.post('/api/integrations/send-email', wrapHandler('./integrations/send-email.js'));
 app.post('/api/integrations/upload-file', wrapHandler('./integrations/upload-file.js'));
 app.get('/api/integrations/stock-quote', wrapHandler('./integrations/stock-quote.js'));
+
+// Apple Pay -> transaction (iOS Shortcuts automation) and its key management
+const quickAddHandler = wrapHandler('./integrations/quick-add.js');
+app.get('/api/integrations/quick-add', quickAddHandler);
+app.post('/api/integrations/quick-add', quickAddHandler);
+app.delete('/api/integrations/quick-add', quickAddHandler);
 
 // Google Calendar routes
 const googleCalendarHandler = wrapHandler('./integrations/google-calendar.js');

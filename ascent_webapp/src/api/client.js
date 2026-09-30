@@ -456,12 +456,29 @@ const workspaces = {
   }
 };
 
+// Apple Pay: a personal key lets an iOS Shortcut add each purchase as a transaction
+const applePay = {
+  status: () => request('/integrations/quick-add'),
+  createKey: () => request('/integrations/quick-add', { method: 'POST' }),
+  revoke: () => request('/integrations/quick-add', { method: 'DELETE' })
+};
+
+// Ingest tokens: per-device credentials for the iPhone Shortcut (Apple Pay taps)
+const ingestTokens = {
+  list: () => request('/ingest-tokens'),
+  create: (label) => request('/ingest-tokens', { method: 'POST', body: JSON.stringify({ label }) }),
+  revoke: (id) => request(`/ingest-tokens?id=${id}`, { method: 'DELETE' }),
+  activity: () => request('/ingest-tokens?activity=1')
+};
+
 // Main client export - maintains same interface as base44 client
 export const ascent = {
   auth,
   entities,
   workspaces,
   integrations,
+  applePay,
+  ingestTokens,
   appLogs
 };
 

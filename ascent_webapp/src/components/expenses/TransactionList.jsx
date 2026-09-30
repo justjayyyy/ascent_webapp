@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCard, Banknote, ArrowLeftRight, MoreVertical, Copy, Repeat } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, CreditCard, Banknote, ArrowLeftRight, MoreVertical, Copy, Repeat, Check, Nfc } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
@@ -28,7 +28,7 @@ const categoryColors = {
   'Other': 'bg-muted text-muted-foreground border-border',
 };
 
-const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true, author = null }) => {
+const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate, cards, colors, language, user, t, canEdit = true, author = null, onConfirm }) => {
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
 
@@ -120,6 +120,12 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                     {translateCategory(transaction.category, language)}
                   </Badge>
                 )}
+                {transaction.status === 'pending' && (
+                  <Badge className="text-xs px-1.5 py-0.5 bg-primary/15 text-primary border-primary/30 flex items-center gap-1">
+                    <Nfc className="w-2.5 h-2.5" aria-hidden="true" />
+                    {transaction.ingest?.flags?.includes('possibleDuplicate') ? t('possibleDuplicate') : t('needsReview')}
+                  </Badge>
+                )}
                 {transaction.isRecurring && (
                   <Badge className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary border-primary/30 flex items-center gap-1">
                     <Repeat className="w-2.5 h-2.5" />
@@ -186,6 +192,13 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                 </span>
               )}
             </div>
+
+            {canEdit && onConfirm && transaction.status === 'pending' && (
+              <Button size="icon" variant="ghost" aria-label={t('confirmTransaction')} title={t('confirmTransaction')}
+                onClick={() => onConfirm(transaction)} className="h-11 w-11 text-primary hover:bg-primary/20 sm:h-8 sm:w-8">
+                <Check className="w-4 h-4" />
+              </Button>
+            )}
 
             {/* 3-dots Dropdown Menu */}
             {canEdit && (
@@ -256,6 +269,7 @@ function TransactionList({
   onEdit,
   onDelete,
   onDuplicate,
+  onConfirm,
   canEdit = true
 }) {
   const { t, language, colors, user } = useTheme();
@@ -306,6 +320,7 @@ function TransactionList({
           user={user}
           t={t}
           canEdit={canEdit}
+          onConfirm={onConfirm}
           author={isShared ? byEmail[transaction.created_by] || null : null}
         />
       ))}
