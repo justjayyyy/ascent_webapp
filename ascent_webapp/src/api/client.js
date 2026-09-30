@@ -175,7 +175,7 @@ const auth = {
   async register(email, password, full_name) {
     const result = await request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, full_name })
+      body: JSON.stringify({ email, password, full_name, ...systemPrefs() })
     });
     setToken(result.token);
     return result.user;
@@ -184,8 +184,8 @@ const auth = {
   async googleLogin(credential, clientId, userInfo = null) {
     // If userInfo is provided, we're using the OAuth2 access token flow
     const body = userInfo 
-      ? { accessToken: credential, clientId, userInfo }
-      : { credential, clientId };
+      ? { accessToken: credential, clientId, userInfo, ...systemPrefs() }
+      : { credential, clientId, ...systemPrefs() };
     
     const result = await request('/auth/google', {
       method: 'POST',
@@ -513,3 +513,15 @@ export const ascent = {
 export const api = ascent;
 export default ascent;
 
+// Device language/theme, sent on sign-up so new accounts start in the user's own settings
+function systemPrefs() {
+  try {
+    const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    return {
+      language: ['en', 'he', 'ru'].includes(lang) ? lang : 'en',
+      theme: window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark',
+    };
+  } catch {
+    return {};
+  }
+}

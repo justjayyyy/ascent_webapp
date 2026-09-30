@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { credential, clientId, accessToken, userInfo } = req.body;
+    const { credential, clientId, accessToken, userInfo, language, theme } = req.body;
     
     let email, name, picture, googleId;
     
@@ -85,6 +85,8 @@ export default async function handler(req, res) {
           googleId,
           avatar: picture,
           authProvider: 'google',
+          ...(['en', 'he', 'ru'].includes(language) && { language }),
+          ...(['dark', 'light'].includes(theme) && { theme }),
           isFirstLogin: true
         });
         isFirstLogin = true;

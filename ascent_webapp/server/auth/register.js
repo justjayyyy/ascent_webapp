@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email, password, full_name } = req.body;
+    const { email, password, full_name, language, theme } = req.body;
     
     // Sanitize and validate inputs
     const cleanEmail = sanitize(email)?.toLowerCase();
@@ -49,6 +49,8 @@ export default async function handler(req, res) {
       email: cleanEmail,
       password,
       full_name: cleanName || '',
+      ...(['en', 'he', 'ru'].includes(language) && { language }),
+      ...(['dark', 'light'].includes(theme) && { theme }),
       isFirstLogin: true
     });
 
