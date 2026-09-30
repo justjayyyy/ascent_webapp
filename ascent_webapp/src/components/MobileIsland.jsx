@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
 import { CalendarDays } from 'lucide-react';
 import AscentLogo from '@/components/AscentLogo';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,11 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
   const shell = useRef(null);
   const { w, h } = useSize(shell);
   const { scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 260, damping: 40, restDelta: 0.001 });
+  // The ring closes a little before the very bottom (iOS never reports exactly 1 at the end),
+  // and stays invisible at the top instead of drawing a dot.
+  const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1], { clamp: true });
+  const progress = useSpring(scaled, { stiffness: 260, damping: 40, restDelta: 0.0005 });
+  const ringOpacity = useTransform(progress, [0, 0.015], [0, 1], { clamp: true });
   const isCompact = compact && !menuOpen;
   const spring = reduce ? { duration: 0 } : SPRING;
 
@@ -148,8 +152,8 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
               fill="none"
               stroke="hsl(var(--primary))"
               strokeWidth="2"
-              strokeLinecap="round"
-              style={{ pathLength: progress, filter: 'drop-shadow(0 0 4px hsl(var(--primary) / 0.7))' }}
+              strokeLinecap="butt"
+              style={{ pathLength: progress, opacity: ringOpacity, filter: 'drop-shadow(0 0 4px hsl(var(--primary) / 0.7))' }}
             />
           </svg>
         )}
