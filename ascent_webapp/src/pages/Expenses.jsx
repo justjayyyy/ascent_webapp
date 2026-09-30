@@ -52,6 +52,9 @@ function Expenses() {
     },
     enabled: !!userEmail,
     staleTime: 3 * 60 * 1000, // 3 minutes
+    // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return to the app and while it is open
+    refetchOnWindowFocus: 'always',
+    refetchInterval: 30 * 1000,
   });
 
   const { data: cards = [] } = useQuery({

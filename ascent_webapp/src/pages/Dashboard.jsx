@@ -63,6 +63,8 @@ export default function Dashboard() {
     },
     enabled: !!userEmail,
     staleTime: 3 * 60 * 1000,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: 30 * 1000,
   });
 
   useEffect(() => {
