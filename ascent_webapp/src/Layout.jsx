@@ -186,28 +186,33 @@ function LayoutContent({ children, currentPageName }) {
         onBlurChange={handleBlurValuesChange}
       />
 
-      {/* Solid strip behind the status bar. It stays put while the header bar slides up
-          underneath it, so the logo never shows through behind the clock. */}
+      {/* Solid strip behind the status bar. It stays put while the header slides away under
+          it, so page content never runs behind the clock and the system's soft edge fades
+          into black. */}
       <div aria-hidden="true" className="md:hidden fixed top-0 start-0 end-0 z-[51] bg-background" style={{ height: 'var(--safe-top)' }} />
 
-      {/* Mobile Header */}
-      <div className={cn(
-        "md:hidden fixed top-0 start-0 end-0 z-50 safe-area-inset-top safe-area-inset-x",
-        "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
-      )}
-      // The strip behind the status bar is the page background, so the system's soft
-      // edge under the clock/battery fades into black instead of showing as a grey blur
-      style={{ background: 'linear-gradient(to bottom, hsl(var(--background)) var(--safe-top), hsl(var(--card)) var(--safe-top))', transform: hideHeader ? 'translateY(calc(var(--header-hide) * -1))' : undefined }}
+      {/* Mobile header: a floating pill below the status bar. Nothing tappable sits in the
+          system's blur zone, and it slides up on scroll down / returns on scroll up. */}
+      <div
+        className={cn(
+          "md:hidden pointer-events-none fixed inset-x-0 top-0 z-50 safe-area-inset-x",
+          "transition-[transform,opacity] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          hideHeader && "opacity-0"
+        )}
+        style={{
+          paddingTop: 'calc(var(--safe-top) + 0.5rem)',
+          transform: hideHeader ? 'translateY(calc(var(--header-hide) * -1))' : undefined,
+        }}
       >
-        <div className="relative flex items-center justify-center h-[var(--header-bar)] px-4">
+        <div className="pointer-events-auto relative mx-3 flex h-[var(--header-bar)] items-center rounded-full border border-border/70 bg-card shadow-[0_10px_28px_-14px_hsl(0_0%_0%/0.7)]">
           <button
             type="button"
             onClick={() => setMobileMenuOpen((o) => !o)}
             aria-label={t('menu')}
             aria-expanded={mobileMenuOpen}
             className={cn(
-              "absolute start-1 top-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-xl transition-colors active:bg-foreground/[0.1]",
-              "hover:bg-foreground/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "relative z-10 ms-1 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-colors",
+              "active:bg-foreground/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               mobileMenuOpen ? "text-primary" : "text-foreground"
             )}
           >
@@ -217,16 +222,9 @@ function LayoutContent({ children, currentPageName }) {
               <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 -rotate-45" : "top-3")} />
             </span>
           </button>
-          {/* The logo sits on the header's bottom border, half over the bar and half over the page */}
-          <div className="pointer-events-none absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2">
-            <AscentLogo motion="full" alt="Ascent logo" className="w-[4.25rem]" />
+          <div className="pointer-events-none absolute inset-0 grid place-items-center">
+            <AscentLogo motion="full" alt="Ascent logo" className="w-[3.25rem]" />
           </div>
-          {/* Hairline along the bottom edge: fades out at both ends and leaves a clear gap around the logo */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
-            style={{ background: 'linear-gradient(to right, transparent 0, hsl(var(--border)) 14%, hsl(var(--border)) calc(50% - 3.25rem), transparent calc(50% - 3.25rem), transparent calc(50% + 3.25rem), hsl(var(--border)) calc(50% + 3.25rem), hsl(var(--border)) 86%, transparent 100%)' }}
-          />
         </div>
       </div>
 
