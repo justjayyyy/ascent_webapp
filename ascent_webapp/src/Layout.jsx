@@ -163,9 +163,12 @@ function LayoutContent({ children, currentPageName }) {
       {/* Mobile Header */}
       <div className={cn(
         "md:hidden fixed top-0 start-0 end-0 z-50 border-b safe-area-inset-top safe-area-inset-x",
-        "bg-card",
         colors.border
-      )}>
+      )}
+      // The strip behind the status bar is the page background, so the system's soft
+      // edge under the clock/battery fades into black instead of showing as a grey blur
+      style={{ background: 'linear-gradient(to bottom, hsl(var(--background)) var(--safe-top), hsl(var(--card)) var(--safe-top))' }}
+      >
         <div className="relative flex items-center justify-center h-16 px-4">
           <button
             type="button"
