@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import WelcomeDialog from './components/WelcomeDialog';
 import InstallHint from './components/InstallHint';
-import AscentLogo from '@/components/AscentLogo';
+import MobileIsland from '@/components/MobileIsland';
 
 // The calendar is heavy and only needed on demand
 const CalendarModal = lazy(() => import('@/components/GoogleCalendar/CalendarModal'));
@@ -40,7 +40,7 @@ function LayoutContent({ children, currentPageName }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const hideHeader = headerHidden && !mobileMenuOpen;
+  const hideHeader = headerHidden && !mobileMenuOpen; // compact island
   useEffect(() => {
     document.documentElement.toggleAttribute('data-header-hidden', hideHeader);
     return () => document.documentElement.removeAttribute('data-header-hidden');
@@ -163,6 +163,9 @@ function LayoutContent({ children, currentPageName }) {
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
   ].filter(item => !item.permission || hasPermission(item.permission)), [t, hasPermission]);
 
+  const pageTitle = navigation.find((n) => n.page === currentPageName)?.name
+    || (currentPageName === 'Settings' ? t('settings') : 'Ascent');
+
   return (
     <div className={cn(
       "min-h-dvh md:flex overflow-x-clip transition-colors bg-background text-foreground"
@@ -191,42 +194,15 @@ function LayoutContent({ children, currentPageName }) {
           into black. */}
       <div aria-hidden="true" className="md:hidden fixed top-0 start-0 end-0 z-[51] bg-background" style={{ height: 'var(--safe-top)' }} />
 
-      {/* Mobile header: a floating pill below the status bar. Nothing tappable sits in the
-          system's blur zone, and it slides up on scroll down / returns on scroll up. */}
-      <div
-        className={cn(
-          "md:hidden pointer-events-none fixed inset-x-0 top-0 z-50 safe-area-inset-x",
-          "transition-[transform,opacity] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-          hideHeader && "opacity-0"
-        )}
-        style={{
-          paddingTop: 'calc(var(--safe-top) + 0.5rem)',
-          transform: hideHeader ? 'translateY(calc(var(--header-hide) * -1))' : undefined,
-        }}
-      >
-        <div className="pointer-events-auto relative mx-3 flex h-[var(--header-bar)] items-center rounded-full border border-border/70 bg-card shadow-[0_10px_28px_-14px_hsl(0_0%_0%/0.7)]">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((o) => !o)}
-            aria-label={t('menu')}
-            aria-expanded={mobileMenuOpen}
-            className={cn(
-              "relative z-10 ms-1 grid h-12 w-12 shrink-0 place-items-center rounded-full transition-colors",
-              "active:bg-foreground/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              mobileMenuOpen ? "text-primary" : "text-foreground"
-            )}
-          >
-            <span className="relative block h-3.5 w-[18px]" aria-hidden="true">
-              <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 rotate-45" : "top-0")} />
-              <span className={cn("absolute inset-x-0 top-1.5 h-0.5 rounded-full bg-current transition-opacity duration-200", mobileMenuOpen && "opacity-0")} />
-              <span className={cn("absolute inset-x-0 h-0.5 rounded-full bg-current transition-all duration-300", mobileMenuOpen ? "top-1.5 -rotate-45" : "top-3")} />
-            </span>
-          </button>
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <AscentLogo motion="full" alt="Ascent logo" className="w-[3.25rem]" />
-          </div>
-        </div>
-      </div>
+      {/* Mobile header: a morphing capsule ("island") below the status strip */}
+      <MobileIsland
+        compact={headerHidden}
+        menuOpen={mobileMenuOpen}
+        onMenu={() => setMobileMenuOpen((o) => !o)}
+        onCalendar={() => { setMobileMenuOpen(false); setCalendarOpen(true); }}
+        title={pageTitle}
+        t={t}
+      />
 
       {/* Mobile: the same sidebar, as a drawer that pushes the page */}
       <AppSidebar

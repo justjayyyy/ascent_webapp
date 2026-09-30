@@ -693,5 +693,4 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 /* Sticky page bars sit under the phone header, and follow it when it slides away */
 :root { --header-bar: 3.5rem; --header-hide: calc(var(--header-bar) + 1.25rem); --header-total: calc(var(--header-bar) + 1.5rem); --sticky-top: calc(var(--header-total) + var(--safe-top)); }
-html[data-header-hidden] { --sticky-top: var(--safe-top); }
-@media (min-width: 768px) { :root, html[data-header-hidden] { --sticky-top: 0px; } }
+@media (min-width: 768px) { :root { --sticky-top: 0px; } }
