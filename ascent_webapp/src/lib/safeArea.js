@@ -52,9 +52,12 @@ export function ensureStandaloneTopInset() {
     const envTop = readEnv('top');
     const fullScreen = window.innerHeight >= long - 12;
     let top = null;
-    if (standalone && iphone && portrait && envTop < 20 && fullScreen) {
-      top = long >= 930 ? 59 : long >= 850 ? 54 : long >= 812 ? 47 : 20;
-      root.style.setProperty('--safe-top', `${top + 4}px`);
+    if (standalone && iphone && portrait && fullScreen) {
+      // The system draws a soft edge a little below the status bar, so keep content
+      // clear of it: the real inset (or a typical one if iOS reports 0) plus a margin.
+      const base = envTop >= 20 ? envTop : long >= 930 ? 59 : long >= 850 ? 54 : long >= 812 ? 47 : 20;
+      top = base;
+      root.style.setProperty('--safe-top', `${base + 14}px`);
     } else {
       root.style.removeProperty('--safe-top');
     }
