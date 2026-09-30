@@ -35,7 +35,8 @@ const useSize = (ref) => {
   return size;
 };
 
-// Capsule outline as one closed path that starts at the top centre and runs clockwise
+// Capsule outline that starts at the top centre, runs clockwise and carries on 10px past its own
+// start (an open path, not Z) so the finished ring overlaps itself and leaves no seam
 const capsulePath = (w, h, inset) => {
   const r = h / 2 - inset;
   const left = inset;
@@ -43,7 +44,7 @@ const capsulePath = (w, h, inset) => {
   const top = inset;
   const bottom = h - inset;
   const cx = w / 2;
-  return `M ${cx} ${top} H ${right - r} A ${r} ${r} 0 0 1 ${right - r} ${bottom} H ${left + r} A ${r} ${r} 0 0 1 ${left + r} ${top} Z`;
+  return `M ${cx} ${top} H ${right - r} A ${r} ${r} 0 0 1 ${right - r} ${bottom} H ${left + r} A ${r} ${r} 0 0 1 ${left + r} ${top} H ${cx + 10}`;
 };
 
 /**
@@ -62,7 +63,7 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
   // The ring closes a little before the very bottom (iOS never reports exactly 1 at the end) and
   // overlaps its own start by ~1% so the seam at the top centre is fully covered,
   // and stays invisible at the top instead of drawing a dot.
-  const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1.012], { clamp: true });
+  const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1], { clamp: true });
   const progress = useSpring(scaled, { stiffness: 260, damping: 40, restDelta: 0.0005 });
   const ringOpacity = useTransform(progress, [0, 0.03], [0, 1], { clamp: true });
   const isCompact = compact && !menuOpen;
