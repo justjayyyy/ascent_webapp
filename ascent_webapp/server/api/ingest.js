@@ -18,6 +18,8 @@ import { parseWalletPayload } from '../lib/ingest/wallet.js';
 import { matchCard } from '../lib/ingest/cards.js';
 import { dedupeKey, decideMatch, planMerge, WINDOWS } from '../lib/ingest/match.js';
 import { shiftDate } from '../lib/ingest/time.js';
+import { notifyUser } from '../lib/push.js';
+import { paymentPush } from '../lib/ingest/notify.js';
 
 const PARSERS = { wallet: parseWalletPayload };
 const RATE = { windowMs: 10 * 60_000, max: 60 };
@@ -72,13 +74,15 @@ export default async function handler(req, res) {
           { $set: { lastUsedAt: new Date() }, ...(accepted ? { $inc: { useCount: 1 } } : {}) }
         ).catch((err) => console.error('[Ingest] could not update token:', err.message)),
       ]);
+      // Tell the phone about a new payment to review (bounded wait, never fails the request)
+      if (ev && (outcome === 'created' || outcome === 'flagged')) await notifyUser(token.userId, paymentPush(ev, user?.language));
       if (code) return error(res, code, status);
       return success(res, { id: transactionId ? String(transactionId) : null, outcome }, status);
     };
 
     // Membership is checked on every request, so removing or demoting someone silences their token at once.
     const [user, workspace] = await Promise.all([
-      User.findById(token.userId).select('email currency').lean(),
+      User.findById(token.userId).select('email currency language').lean(),
       Workspace.findOne({
         _id: token.workspaceId,
         members: { $elemMatch: { userId: token.userId, status: { $in: ['accepted', null] } } },

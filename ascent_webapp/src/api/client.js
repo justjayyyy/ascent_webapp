@@ -471,6 +471,14 @@ const ingestTokens = {
   activity: () => request('/ingest-tokens?activity=1')
 };
 
+// Web Push subscriptions for this user's devices
+const push = {
+  config: () => request('/push'),
+  subscribe: (subscription) => request('/push', { method: 'POST', body: JSON.stringify({ subscription }) }),
+  test: () => request('/push', { method: 'POST', body: JSON.stringify({ test: true }) }),
+  unsubscribe: (endpoint) => request(`/push?endpoint=${encodeURIComponent(endpoint)}`, { method: 'DELETE' })
+};
+
 // Main client export - maintains same interface as base44 client
 export const ascent = {
   auth,
@@ -479,6 +487,7 @@ export const ascent = {
   integrations,
   applePay,
   ingestTokens,
+  push,
   appLogs
 };
 

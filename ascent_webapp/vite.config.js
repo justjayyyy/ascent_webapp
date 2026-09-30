@@ -68,7 +68,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         // Adds the notification-tap handler used by note reminders
-        importScripts: ['sw-notify.js'],
+        importScripts: ['sw-notify.js', 'sw-push.js'],
         skipWaiting: true,
         clientsClaim: true,
       },

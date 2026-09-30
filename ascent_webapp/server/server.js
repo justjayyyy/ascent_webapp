@@ -180,6 +180,13 @@ app.post('/api/ingest-tokens', ingestTokensHandler);
 app.delete('/api/ingest-tokens', ingestTokensHandler);
 app.options('/api/ingest-tokens', (req, res) => res.sendStatus(200));
 
+// Push notification subscriptions for the signed-in user
+const pushHandler = wrapHandler('./api/push.js');
+app.get('/api/push', pushHandler);
+app.post('/api/push', pushHandler);
+app.delete('/api/push', pushHandler);
+app.options('/api/push', (req, res) => res.sendStatus(200));
+
 // Entity routes - generic handler
 const entities = [
   'accounts', 'positions', 'day-trades', 'transactions',
