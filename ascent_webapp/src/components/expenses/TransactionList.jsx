@@ -140,7 +140,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
               <div className={cn("flex items-center gap-2 text-xs", colors.textTertiary)}>
                 <div className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {format(new Date(transaction.date), 'MMM dd, yyyy')}
+                  {format(new Date(transaction.date), 'MMM dd, yyyy')}{transaction.occurredAt && ` · ${format(new Date(transaction.occurredAt), 'HH:mm')}`}
                 </div>
                 <span className="text-primary">•</span>
                 <span className="uppercase">{transaction.currency}</span>
@@ -167,7 +167,7 @@ const TransactionItem = React.memo(({ transaction, onEdit, onDelete, onDuplicate
                       <span>
                         {transaction.paymentMethod === 'Card' && transaction.cardId
                           ? getCardInfo(transaction.cardId)
-                          : transaction.paymentMethod}
+                          : (transaction.paymentMethod === 'Card' && transaction.ingest?.sources?.[0]?.cardText) || transaction.paymentMethod}
                       </span>
                     </div>
                   </>

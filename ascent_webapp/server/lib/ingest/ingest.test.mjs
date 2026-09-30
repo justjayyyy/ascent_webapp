@@ -140,6 +140,19 @@ test('dedupeKey is stable for a replay, differs for another payload and is null 
 
 /* --------------------------------------------------------------- cards */
 
+test('matchCard falls back to the card name, then the network, only when unambiguous', () => {
+  const cards = [
+    { id: 'a', name: 'Isracard', network: 'mastercard', lastFourDigits: '1234', isActive: true },
+    { id: 'b', name: 'Max', network: 'visa', lastFourDigits: '5678', isActive: true },
+  ];
+  assert.equal(matchCard(cards, 'Isracard Mastercard').id, 'a');
+  assert.equal(matchCard(cards, 'ישראכרט'), null);
+  assert.equal(matchCard(cards, 'Visa').id, 'b');
+  assert.equal(matchCard(cards, 'Mastercard').id, 'a');
+  assert.equal(matchCard([...cards, { id: 'c', name: 'Other', network: 'visa', isActive: true }], 'Visa'), null);
+  assert.equal(matchCard(cards, 'ab'), null);
+});
+
 test('matchCard: last four, then the saved Wallet name, never a guess', () => {
   const cards = [
     { id: 'a', name: 'Isracard', lastFourDigits: '1234', isActive: true },

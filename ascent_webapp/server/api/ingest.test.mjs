@@ -266,6 +266,15 @@ test('the category is suggested from the merchant, with a fallback', async () =>
   assert.equal(db.rows[1].category, 'other_expense');
 });
 
+test('with no suggestion the workspace own "other" or first expense category is used', async () => {
+  db.categories = [{ name: 'Groceries', type: 'Expense' }, { name: 'Other', type: 'Expense' }, { name: 'Salary', type: 'Income' }];
+  await call({ body: payload({ merchant: 'Zzzq Corp' }) });
+  assert.equal(db.rows[0].category, 'Other');
+  db.categories = [{ name: 'Groceries', type: 'Expense' }];
+  await call({ body: payload({ merchant: 'Zzzq Corp', at: iso(-30 * 60_000) }) });
+  assert.equal(db.rows[1].category, 'Groceries');
+});
+
 test('the request is recorded and the token shows activity', async () => {
   await call();
   assert.equal(db.events.length, 1);
