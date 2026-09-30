@@ -148,14 +148,18 @@ export default async function handler(req, res) {
     }
 
     // Pre-fill the category from the user's own history and keywords; the row stays pending for review.
-    let category = 'other_expense';
-    if (ev.merchant) {
-      const [categories, history] = await Promise.all([
-        Category.find({ workspaceId: workspace._id }).lean(),
-        ExpenseTransaction.find({ workspaceId: workspace._id, type: 'Expense' }).sort('-date').limit(500).select('description category type').lean(),
-      ]);
-      category = suggestCategory({ description: ev.merchant, type: 'Expense', categories, history })?.name || category;
-    }
+    // With no suggestion it takes the workspace's "other" category, or its first expense category.
+    const [categories, history] = await Promise.all([
+      Category.find({ workspaceId: workspace._id }).lean(),
+      ev.merchant
+        ? ExpenseTransaction.find({ workspaceId: workspace._id, type: 'Expense' }).sort('-date').limit(500).select('description category type').lean()
+        : [],
+    ]);
+    const expenseCategories = categories.filter((c) => c.type === 'Expense' || c.type === 'Both');
+    const fallback = expenseCategories.find((c) => (c.nameKey || c.name) === 'other_expense' || c.name === 'Other') || expenseCategories[0];
+    const category = (ev.merchant && suggestCategory({ description: ev.merchant, type: 'Expense', categories, history })?.name)
+      || fallback?.name
+      || 'other_expense';
 
     const flags = [...ev.flags];
     if (decision.action === 'flag') flags.push('possibleDuplicate');
