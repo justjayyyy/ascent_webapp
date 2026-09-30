@@ -34,6 +34,13 @@ export default function Login() {
   const publicPages = ['/terms-of-service', '/privacy-policy', '/login'];
   const redirectUrl = publicPages.includes(rawRedirectUrl) ? '/Dashboard' : rawRedirectUrl;
 
+  // Explain why the user landed here after being signed out
+  const reason = searchParams.get('reason');
+  useEffect(() => {
+    if (reason === 'session_replaced') toast.info(t('sessionReplaced'));
+    else if (reason === 'session_expired') toast.info(t('sessionExpired'));
+  }, [reason, t]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {

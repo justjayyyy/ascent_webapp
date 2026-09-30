@@ -78,6 +78,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // Id of the one active login session; rotated on every sign-in (see lib/session.js)
+  sessionId: {
+    type: String,
+    default: null
+  },
   // Default workspace to load on login
   defaultWorkspace: {
     type: mongoose.Schema.Types.ObjectId,
@@ -119,6 +124,7 @@ userSchema.methods.toJSON = function() {
   const obj = this.toObject();
   delete obj.password;
   delete obj.shortcutTokenHash;
+  delete obj.sessionId;
   return obj;
 };
 

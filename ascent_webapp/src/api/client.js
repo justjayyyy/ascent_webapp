@@ -100,6 +100,16 @@ async function request(endpoint, options = {}, retryCount = 0) {
       throw error;
     }
     
+    // The account was signed in on another device (or the token predates single-session): drop
+    // this device's token and send the user to sign in again.
+    if (response.status === 401 && (data.code === 'SESSION_REPLACED' || data.code === 'SESSION_INVALID')) {
+      removeToken();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        const reason = data.code === 'SESSION_REPLACED' ? 'session_replaced' : 'session_expired';
+        window.location.href = `/login?reason=${reason}`;
+      }
+    }
+
     if (!response.ok) {
       const error = new Error(data.error || `Request failed with status ${response.status}`);
       error.status = response.status;
@@ -541,6 +551,7 @@ export const ascent = {
 export const api = ascent;
 export default ascent;
 
+
 // Device language/theme, sent on sign-up so new accounts start in the user's own settings
 export function systemPrefs() {
   try {
@@ -553,3 +564,4 @@ export function systemPrefs() {
     return {};
   }
 }
+
