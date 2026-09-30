@@ -25,3 +25,66 @@ export function popperCollisionPadding() {
   return cached;
 }
 
+
+const readEnv = (side) => {
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:fixed;visibility:hidden;padding-top:env(safe-area-inset-${side})`;
+  document.body.appendChild(probe);
+  const px = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  probe.remove();
+  return px;
+};
+
+// The installed iPhone app can end up drawn under the status bar / notch even though
+// env(safe-area-inset-top) says 0 (it depends on iOS version, status-bar style and the
+// launch state). Ignore what env() claims and look at the geometry instead: when the page
+// fills the whole physical screen in portrait, the status bar is on top of it, so reserve
+// its height. When the page starts below an opaque status bar the viewport is shorter than
+// the screen and nothing is added, so this never double-pads.
+export function ensureStandaloneTopInset() {
+  if (typeof window === 'undefined') return;
+  const root = document.documentElement;
+  const apply = () => {
+    const standalone = window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+    const iphone = /iPhone/.test(navigator.userAgent);
+    const portrait = window.innerHeight > window.innerWidth;
+    const long = Math.max(screen.width, screen.height);
+    const envTop = readEnv('top');
+    const fullScreen = window.innerHeight >= long - 12;
+    let top = null;
+    if (standalone && iphone && portrait && envTop < 20 && fullScreen) {
+      top = long >= 930 ? 59 : long >= 850 ? 54 : long >= 812 ? 47 : 20;
+      root.style.setProperty('--safe-top', `${top + 4}px`);
+    } else {
+      root.style.removeProperty('--safe-top');
+    }
+    renderDebug({ standalone, iphone, portrait, envTop, inner: `${window.innerWidth}x${window.innerHeight}`, screen: `${screen.width}x${screen.height}`, fullScreen, applied: top });
+  };
+  const run = () => { cached = undefined; apply(); };
+  const start = () => { run(); requestAnimationFrame(run); setTimeout(run, 400); };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  window.addEventListener('orientationchange', () => setTimeout(run, 150));
+  window.addEventListener('resize', run);
+  window.addEventListener('pageshow', run);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run(); });
+}
+
+// Open the app once with ?safedebug=1 to show what the device reports (stays on until ?safedebug=0)
+function renderDebug(info) {
+  let on = false;
+  try {
+    const q = new URLSearchParams(location.search).get('safedebug');
+    if (q === '1') localStorage.setItem('ascent_safedebug', '1');
+    if (q === '0') localStorage.removeItem('ascent_safedebug');
+    on = localStorage.getItem('ascent_safedebug') === '1';
+  } catch { /* storage unavailable */ }
+  let el = document.getElementById('safe-debug');
+  if (!on) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement('pre');
+    el.id = 'safe-debug';
+    el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;margin:0;padding:6px 8px;font:10px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.85);border-radius:6px;pointer-events:none;white-space:pre-wrap;max-width:70vw';
+    document.body.appendChild(el);
+  }
+  el.textContent = Object.entries(info).map(([k, v]) => `${k}: ${v}`).join('\n');
+}
