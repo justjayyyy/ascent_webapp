@@ -5,12 +5,15 @@ const memberSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
   },
-  email: { 
-    type: String, 
-    required: true, 
-    lowercase: true, 
-    trim: true 
+  // Empty for QR/link invites until someone accepts; the accepting account's email is stored then.
+  email: {
+    type: String,
+    default: '',
+    lowercase: true,
+    trim: true
   },
+  inviteKind: { type: String, enum: ['email', 'link'], default: 'email' },
+  expiresAt: { type: Date, default: null },
   role: { 
     type: String, 
     enum: ['owner', 'admin', 'editor', 'viewer'], 
@@ -37,6 +40,7 @@ const memberSchema = new mongoose.Schema({
     viewBudgets: { type: Boolean, default: false },
     editBudgets: { type: Boolean, default: false },
     viewSettings: { type: Boolean, default: false },
+    manageCards: { type: Boolean, default: false },
     manageUsers: { type: Boolean, default: false }
   }
 });

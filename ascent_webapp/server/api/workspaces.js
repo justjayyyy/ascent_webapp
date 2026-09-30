@@ -51,9 +51,15 @@ const inviteCopy = (language, inviter, workspaceName) => {
   return copy[language] || copy.en;
 };
 
-async function sendInvitation({ req, workspace, member, inviter, language }) {
+const LINK_INVITE_TTL_MS = 48 * 60 * 60 * 1000;
+
+const inviteLinkFor = (req, member) => {
   const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
-  const inviteLink = `${origin}/accept-invitation/${member._id}`;
+  return `${origin}/accept-invitation/${member._id}`;
+};
+
+async function sendInvitation({ req, workspace, member, inviter, language }) {
+  const inviteLink = inviteLinkFor(req, member);
   const inviterName = inviter.full_name || inviter.email;
   const c = inviteCopy(language, inviterName, workspace.name);
 
@@ -159,26 +165,31 @@ export default async function handler(req, res) {
           if (!ctx) return;
           const { workspace, actor } = ctx;
 
-          const email = String(body.email || '').toLowerCase().trim();
-          if (!isValidEmail(email)) return error(res, 'A valid email is required', 400);
-          if (email === user.email) return error(res, 'You are already in this workspace', 400);
+          const via = body.method === 'link' ? 'link' : 'email';
+          const email = via === 'email' ? String(body.email || '').toLowerCase().trim() : '';
+          if (via === 'email') {
+            if (!isValidEmail(email)) return error(res, 'A valid email is required', 400);
+            if (email === user.email) return error(res, 'You are already in this workspace', 400);
+          }
 
           const role = body.role || 'viewer';
           if (!canAssignRole(workspace, actor, role)) return forbidden(res, 'You cannot assign this role');
           if (workspace.members.length >= MAX_MEMBERS) return error(res, `A workspace can have up to ${MAX_MEMBERS} members`, 400);
 
-          const invitedUser = await User.findOne({ email }).select('_id language').lean();
+          const invitedUser = via === 'email' ? await User.findOne({ email }).select('_id language').lean() : null;
           const fields = {
             userId: invitedUser?._id || null,
             role,
             status: 'pending',
+            inviteKind: via,
+            expiresAt: via === 'link' ? new Date(Date.now() + LINK_INVITE_TTL_MS) : null,
             permissions: buildPermissions(role, body.permissions),
             invitedBy: user._id,
             invitedAt: new Date(),
             joinedAt: null,
           };
 
-          let member = workspace.members.find((m) => m.email === email);
+          let member = email ? workspace.members.find((m) => m.email === email) : null;
           if (member && !['declined', 'rejected'].includes(member.status)) {
             return error(res, member.status === 'accepted' ? 'This person is already a member' : 'This person has already been invited', 409);
           }
@@ -189,6 +200,15 @@ export default async function handler(req, res) {
           }
           await workspace.save();
 
+          if (via === 'link') {
+            return success(res, {
+              message: 'QR invitation created',
+              workspace: await present(workspace),
+              inviteLink: inviteLinkFor(req, member),
+              expiresAt: member.expiresAt,
+              memberId: String(member._id),
+            });
+          }
           const sent = await sendInvitation({
             req, workspace, member, inviter: user, language: invitedUser?.language || user.language || 'en',
           });
@@ -201,6 +221,7 @@ export default async function handler(req, res) {
           const member = memberId && findTarget(ctx.workspace, memberId);
           if (!member) return notFound(res, 'Invitation not found');
           if (member.status !== 'pending') return error(res, 'This invitation is no longer pending', 400);
+          if (member.inviteKind === 'link') return error(res, 'QR invitations have no email to resend', 400);
           const invitedUser = member.userId ? await User.findById(member.userId).select('language').lean() : null;
           const sent = await sendInvitation({
             req, workspace: ctx.workspace, member, inviter: user, language: invitedUser?.language || user.language || 'en',
@@ -214,7 +235,24 @@ export default async function handler(req, res) {
           if (!token || !/^[a-f\d]{24}$/i.test(token)) return error(res, 'Invitation token required', 400);
           const workspace = await Workspace.findOne({ 'members._id': token });
           const member = workspace?.members.find((m) => isSame(m._id, token));
-          if (!member || member.email !== user.email) return notFound(res, 'Invitation not found');
+          if (!member) return notFound(res, 'Invitation not found');
+
+          if (member.inviteKind === 'link') {
+            // Open invitation: whoever holds it can join once, until it expires.
+            if (action === 'decline') return success(res, { message: 'Invitation declined' });
+            if (findAcceptedMember(workspace, user._id)) return error(res, 'You are already a member of this workspace', 409);
+            if (member.status !== 'pending' || !member.expiresAt || member.expiresAt <= new Date()) {
+              return error(res, 'This invitation is no longer valid', 410);
+            }
+            const claimed = await Workspace.updateOne(
+              { _id: workspace._id, members: { $elemMatch: { _id: member._id, status: 'pending', inviteKind: 'link', expiresAt: { $gt: new Date() } } } },
+              { $set: { 'members.$.status': 'accepted', 'members.$.userId': user._id, 'members.$.email': user.email, 'members.$.joinedAt': new Date() } }
+            );
+            if (!claimed.modifiedCount) return error(res, 'This invitation is no longer valid', 410);
+            return success(res, await present(await Workspace.findById(workspace._id)));
+          }
+
+          if (member.email !== user.email) return notFound(res, 'Invitation not found');
 
           if (action === 'accept') {
             if (member.status === 'pending') {

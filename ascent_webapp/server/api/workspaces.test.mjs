@@ -71,7 +71,18 @@ mock.module(at('../models/Workspace.js'), {
         const i = store.findIndex((w) => matches(w, q));
         return i === -1 ? null : store.splice(i, 1)[0];
       },
-      updateOne: async () => ({}),
+      findById: async (id) => store.find((w) => same(w._id, id)) || null,
+      updateOne: async (q, update) => {
+        const ws = store.find((w) => same(w._id, q._id));
+        const cond = q.members?.$elemMatch;
+        const set = update.$set || {};
+        if (!ws || !cond || !Object.keys(set).every((k) => k.startsWith('members.$.'))) return { modifiedCount: 0 };
+        const ok = (m) => Object.entries(cond).every(([k, v]) => (v && v.$gt ? m[k] > v.$gt : same(m[k], v)));
+        const m = ws.members.find(ok);
+        if (!m) return { modifiedCount: 0 };
+        for (const [k, v] of Object.entries(set)) m[k.slice('members.$.'.length)] = v;
+        return { modifiedCount: 1 };
+      },
     },
   },
 });
@@ -301,4 +312,75 @@ test('only the owner can delete the workspace', async () => {
   currentUser = OWNER;
   assert.equal((await call('DELETE', { query: q() })).code, 200);
   assert.equal(store.length, 0);
+});
+
+/* ------------------------------------------------------------ QR / link invites */
+
+const createLink = async (extra = {}) => {
+  const res = await call('POST', { query: q({ action: 'invite' }), body: { method: 'link', role: 'editor', ...extra } });
+  return res;
+};
+const linkMember = () => ws.members.find((m) => m.inviteKind === 'link');
+
+test('a QR invite needs no email and returns a link with an expiry', async () => {
+  const res = await createLink();
+  assert.equal(res.code, 200);
+  const m = linkMember();
+  assert.ok(res.body.data.inviteLink.endsWith(`/accept-invitation/${m._id}`));
+  assert.equal(m.status, 'pending');
+  assert.equal(m.email, '');
+  assert.ok(m.expiresAt > new Date());
+  assert.equal(sent.length, 0);
+});
+
+test('anyone signed in can accept a QR invite, and it binds to their account', async () => {
+  await createLink();
+  const m = linkMember();
+  currentUser = OUTSIDER;
+  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  assert.equal(res.code, 200);
+  assert.equal(m.status, 'accepted');
+  assert.ok(same(m.userId, OUTSIDER._id));
+  assert.equal(m.email, OUTSIDER.email);
+  assert.equal(m.role, 'editor');
+});
+
+test('a QR invite is single use', async () => {
+  await createLink();
+  const m = linkMember();
+  currentUser = OUTSIDER;
+  await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  currentUser = mk('late@x.com');
+  users.push(currentUser);
+  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  assert.equal(res.code, 410);
+  assert.ok(same(m.userId, OUTSIDER._id));
+});
+
+test('an expired QR invite is rejected', async () => {
+  await createLink();
+  const m = linkMember();
+  m.expiresAt = new Date(Date.now() - 1000);
+  currentUser = OUTSIDER;
+  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  assert.equal(res.code, 410);
+  assert.equal(m.status, 'pending');
+});
+
+test('an existing member cannot consume a QR invite', async () => {
+  await createLink();
+  const m = linkMember();
+  currentUser = VIEWER;
+  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  assert.equal(res.code, 409);
+  assert.equal(m.status, 'pending');
+});
+
+test('QR invites cannot be resent, and a viewer cannot create one', async () => {
+  await createLink();
+  const m = linkMember();
+  const resend = await call('POST', { query: q({ action: 'resend', memberId: String(m._id) }) });
+  assert.equal(resend.code, 400);
+  currentUser = VIEWER;
+  assert.equal((await createLink()).code, 403);
 });

@@ -34,10 +34,12 @@ const copyText = async (text, t) => {
 function MemberRow({ member, isSelf, canManage, t, language, onEdit, onResend, onRemove, onQr }) {
   const pending = member.status === 'pending';
   const online = isSelf || isOnline(member);
+  const isLink = member.inviteKind === 'link';
   const preset = member.role === 'owner' ? 'owner' : presetOf(member.role, member.permissions);
 
   let subline;
-  if (pending) subline = member.invitedByName ? fmt(t('wsInvitedBy'), { name: member.invitedByName }) : member.email;
+  if (pending && isLink) subline = member.expiresAt && new Date(member.expiresAt) <= new Date() ? t('wsQrExpired') : fmt(t('wsQrExpiresIn'), { time: member.expiresAt ? timeAgo(member.expiresAt, language) : '' });
+  else if (pending) subline = member.invitedByName ? fmt(t('wsInvitedBy'), { name: member.invitedByName }) : member.email;
   else if (isSelf) subline = member.email;
   else if (online) subline = t('wsActiveNow');
   else if (member.lastSeenAt) subline = fmt(t('wsSeenAgo'), { time: timeAgo(member.lastSeenAt, language) });
@@ -48,13 +50,13 @@ function MemberRow({ member, isSelf, canManage, t, language, onEdit, onResend, o
       <MemberAvatar member={member} online={!pending && online} pending={pending} />
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <span className="truncate">{memberName(member)}</span>
+          <span className="truncate">{memberName(member, t)}</span>
           {isSelf && <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">{t('wsYou')}</span>}
         </p>
         <p className={`truncate text-sm ${!pending && online && !isSelf ? 'text-success' : 'text-muted-foreground'}`} dir={isSelf ? 'ltr' : undefined}>
           {subline}
         </p>
-        {pending && !isSelf && <p className="truncate text-sm text-muted-foreground" dir="ltr">{member.email}</p>}
+        {pending && !isSelf && !isLink && <p className="truncate text-sm text-muted-foreground" dir="ltr">{member.email}</p>}
       </div>
       {!pending && (
         <Badge variant="outline" className="hidden shrink-0 rounded-lg text-xs font-medium sm:inline-flex">
@@ -64,16 +66,18 @@ function MemberRow({ member, isSelf, canManage, t, language, onEdit, onResend, o
       {canManage && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 rounded-xl sm:h-9 sm:w-9" aria-label={memberName(member)}>
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 rounded-xl sm:h-9 sm:w-9" aria-label={memberName(member, t)}>
               <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-48 rounded-xl">
             {pending ? (
               <>
-                <DropdownMenuItem className="min-h-11 gap-2 sm:min-h-9" onSelect={() => onResend(member)}>
-                  <Send className="h-4 w-4" aria-hidden="true" />{t('wsResendInvite')}
-                </DropdownMenuItem>
+                {!isLink && (
+                  <DropdownMenuItem className="min-h-11 gap-2 sm:min-h-9" onSelect={() => onResend(member)}>
+                    <Send className="h-4 w-4" aria-hidden="true" />{t('wsResendInvite')}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem className="min-h-11 gap-2 sm:min-h-9" onSelect={() => onQr(member)}>
                   <QrCode className="h-4 w-4" aria-hidden="true" />{t('wsShowQr')}
                 </DropdownMenuItem>
@@ -127,7 +131,9 @@ export default function MembersSection() {
   const invite = useMutation({
     mutationFn: (data) => ascent.workspaces.invite(workspaceId, data),
     onSuccess: async (result) => {
-      if (result?.emailSent !== false) toast.success(t('wsInviteSent'));
+      if (result?.inviteLink && !result.emailSent && result.emailSent !== false) {
+        // QR invite: the dialog shows the code, no toast needed.
+      } else if (result?.emailSent !== false) toast.success(t('wsInviteSent'));
       await refreshWorkspaces();
     },
   });
@@ -257,13 +263,13 @@ export default function MembersSection() {
         title={t('wsShowQr')}
         footer={<Button className="h-11 rounded-xl sm:h-10" onClick={() => setQrFor(null)}>OK</Button>}
       >
-        {qrFor && <InviteShare link={inviteLinkFor(qrFor)} email={qrFor.email} />}
+        {qrFor && <InviteShare link={inviteLinkFor(qrFor)} email={qrFor.inviteKind === 'link' ? '' : qrFor.email} expiresAt={qrFor.expiresAt} />}
       </ResponsiveModal>
 
       <AlertDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{fmt(t('wsRemoveTitle'), { name: removing ? memberName(removing) : '' })}</AlertDialogTitle>
+            <AlertDialogTitle>{fmt(t('wsRemoveTitle'), { name: removing ? memberName(removing, t) : '' })}</AlertDialogTitle>
             <AlertDialogDescription>{t('wsRemoveDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
