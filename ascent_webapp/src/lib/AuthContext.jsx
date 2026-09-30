@@ -215,7 +215,8 @@ export const AuthProvider = ({ children }) => {
       if (isFirstLogin) {
         const prefs = systemPrefs();
         Object.assign(currentUser, prefs);
-        ascent.auth.updateMe(prefs).catch(() => {});
+        // Saved before anything re-fetches the user, so a refresh can't bring the defaults back
+        try { await ascent.auth.updateMe(prefs); } catch { /* keep the local prefs */ }
       }
 
       setUser(currentUser);
@@ -272,7 +273,8 @@ export const AuthProvider = ({ children }) => {
       if (isFirstLogin) {
         const prefs = systemPrefs();
         Object.assign(currentUser, prefs);
-        ascent.auth.updateMe(prefs).catch(() => {});
+        // Saved before anything re-fetches the user, so a refresh can't bring the defaults back
+        try { await ascent.auth.updateMe(prefs); } catch { /* keep the local prefs */ }
       }
 
       setUser(currentUser);
