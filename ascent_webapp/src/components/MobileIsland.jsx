@@ -64,7 +64,7 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
   // and stays invisible at the top instead of drawing a dot.
   const scaled = useTransform(scrollYProgress, [0, 0.98], [0, 1.012], { clamp: true });
   const progress = useSpring(scaled, { stiffness: 260, damping: 40, restDelta: 0.0005 });
-  const ringOpacity = useTransform(progress, [0, 0.015], [0, 1], { clamp: true });
+  const ringOpacity = useTransform(progress, [0, 0.03], [0, 1], { clamp: true });
   const isCompact = compact && !menuOpen;
   const spring = reduce ? { duration: 0 } : SPRING;
 
@@ -153,7 +153,7 @@ export default function MobileIsland({ compact, menuOpen, onMenu, onCalendar, ti
               fill="none"
               stroke="hsl(var(--primary))"
               strokeWidth="2"
-              strokeLinecap="butt"
+              strokeLinecap="round"
               style={{ pathLength: progress, opacity: ringOpacity, filter: 'drop-shadow(0 0 4px hsl(var(--primary) / 0.7))' }}
             />
           </svg>
