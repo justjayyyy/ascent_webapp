@@ -285,8 +285,8 @@ function Commitments() {
                 <p className="mt-1 hidden text-base text-muted-foreground sm:block">{t('cmSubtitle')}</p>
               </div>
               {canEdit && !empty && (
-                <Button onClick={() => setDialog({})} className="hidden h-10 rounded-full px-5 text-base sm:inline-flex">
-                  <Plus className="me-2 h-5 w-5" /> {t('cmNew')}
+                <Button onClick={() => setDialog({})} aria-label={t('cmNew')} className="h-11 w-11 shrink-0 rounded-full p-0 text-base sm:h-10 sm:w-auto sm:px-5">
+                  <Plus className="h-5 w-5 sm:me-2" /> <span className="hidden sm:inline">{t('cmNew')}</span>
                 </Button>
               )}
             </header>

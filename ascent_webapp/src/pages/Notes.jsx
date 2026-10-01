@@ -2,7 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from 'motion/react';
 import {
-  Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
+  Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, Plus, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
   ListChecks, Image as ImageIcon, StickyNote as NoteIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -463,6 +463,17 @@ function Notes() {
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {statusPill}
+            {/* Phones: the inline composer is hidden, so a + opens a new note */}
+            {showComposer && (
+              <Button
+                size="icon"
+                onClick={() => newNote('text')}
+                aria-label={t('ntNewNote')}
+                className="h-11 w-11 rounded-full sm:hidden"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            )}
             <Button
               variant="ghost" size="icon"
               onClick={() => setHelpOpen(true)}

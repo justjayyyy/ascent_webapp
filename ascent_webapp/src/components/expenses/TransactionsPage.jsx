@@ -210,9 +210,9 @@ function TransactionsPage({ kind }) {
               </Button>
             )}
             {canEdit && (
-              <Button onClick={openNew} className="hidden h-10 rounded-full bg-primary px-5 text-base text-primary-foreground hover:bg-primary/85 sm:inline-flex">
-                <Plus className="me-2 h-5 w-5" />
-                {addLabel}
+              <Button onClick={openNew} aria-label={addLabel} className="h-11 w-11 rounded-full bg-primary p-0 text-base text-primary-foreground hover:bg-primary/85 sm:h-10 sm:w-auto sm:px-5">
+                <Plus className="h-5 w-5 sm:me-2" />
+                <span className="hidden sm:inline">{addLabel}</span>
               </Button>
             )}
           </div>
