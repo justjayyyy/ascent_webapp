@@ -3973,3 +3973,5 @@ import { smartTranslations } from './translationsSmart';
 ['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], smartTranslations[lang]));
 import { mobileTranslations } from './translationsMobile';
 ['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], mobileTranslations[lang]));
+import { commitmentTranslations } from './translationsCommitments';
+['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], commitmentTranslations[lang]));

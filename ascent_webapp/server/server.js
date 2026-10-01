@@ -198,7 +198,7 @@ const entities = [
   'accounts', 'positions', 'day-trades', 'transactions',
   'budgets', 'categories', 'cards', 'goals',
   'dashboard-widgets', 'page-layouts', 'snapshots', 'notes',
-  'portfolio-transactions', 'plans', 'settlements'
+  'portfolio-transactions', 'plans', 'settlements', 'commitments'
 ];
 
 entities.forEach(entity => {

@@ -78,6 +78,7 @@ export default function AddTransactionDialog({
     installmentCount: '1',
     planId: '',
     planItemId: '',
+    commitmentId: '',
     paidBy: '',
     split: null,
   });
@@ -186,6 +187,7 @@ export default function AddTransactionDialog({
         installmentCount: '1',
         planId: editTransaction.planId || '',
         planItemId: editTransaction.planItemId || '',
+        commitmentId: editTransaction.commitmentId || '',
         paidBy: editTransaction.paidBy || '',
         split: editTransaction.split?.mode ? editTransaction.split : null,
       });
@@ -212,6 +214,7 @@ export default function AddTransactionDialog({
         installmentCount: '1',
         planId: '',
         planItemId: '',
+        commitmentId: '',
         paidBy: '',
         split: null,
       });
@@ -293,6 +296,7 @@ export default function AddTransactionDialog({
       installmentCount: splitting ? installments : 1,
       planId: (isExpense && formData.planId) || null,
       planItemId: (isExpense && formData.planId && formData.planItemId) || null,
+      commitmentId: (isExpense && formData.commitmentId) || null,
       paidBy: (isExpense && formData.paidBy) || null,
       split: (isExpense && formData.split) || null,
     });

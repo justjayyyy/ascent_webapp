@@ -21,7 +21,7 @@ export function addDays(date, days) {
  * Spending that follows the day-to-day rhythm, as opposed to fixed or one-off money: recurring
  * runs, installments, big purchases and plan payments are known in advance and never extrapolated.
  */
-export const isVariable = (tx) => !tx.isRecurring && !tx.installmentGroupId && !tx.isBigPurchase && !tx.planId;
+export const isVariable = (tx) => !tx.isRecurring && !tx.installmentGroupId && !tx.isBigPurchase && !tx.planId && !tx.commitmentId;
 
 /**
  * Average variable spending per day over earlier full months, so the first days of a month have
@@ -49,7 +49,8 @@ function stdev(values) {
  * @param {string} input.month         'YYYY-MM'
  * @param {string} input.today         'YYYY-MM-DD', the viewer's local date
  * @param {Array}  [input.budgets]     this month's budgets: { category, limit }
- * @param {Array}  [input.planDues]    unpaid plan costs: { name, date, amount, planName }
+ * @param {Array}  [input.planDues]    money due that is not a row yet: unpaid plan costs { name, date, amount, planName }
+ *                                    and loan payments { kind: 'loan', name, date, amount }
  * @param {number|null} [input.baseline] baselineDaily() of the months before
  */
 export function monthForecast({ transactions, month, today, budgets = [], planDues = [], baseline = null }) {
@@ -73,13 +74,13 @@ export function monthForecast({ transactions, month, today, budgets = [], planDu
   const dues = planDues.filter((d) => d.date >= first && d.date <= last && d.date > cutoff && d.amount > 0);
   const upcoming = [
     ...ahead.map((tx) => ({
-      kind: tx.installmentGroupId ? 'installment' : tx.isRecurring ? 'recurring' : tx.planId ? 'plan' : 'scheduled',
+      kind: tx.installmentGroupId ? 'installment' : tx.commitmentId ? 'loan' : tx.isRecurring ? 'recurring' : tx.planId ? 'plan' : 'scheduled',
       label: tx.description || tx.category,
       category: tx.category,
       date: tx.date,
       amount: tx.amount,
     })),
-    ...dues.map((d) => ({ kind: 'plan', label: d.name, planName: d.planName, date: d.date, amount: d.amount })),
+    ...dues.map((d) => ({ kind: d.kind || 'plan', label: d.name, planName: d.planName, date: d.date, amount: d.amount })),
   ].sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
   const committed = upcoming.reduce((s, u) => s + u.amount, 0);
 

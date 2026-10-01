@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { monthForecast, baselineDaily } from '../../../shared/forecast.js';
 import { detectSubscriptions } from '../../../shared/subscriptions.js';
 import { householdBalances } from '../../../shared/balances.js';
+import { duesBetween } from '../../../shared/commitments.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 export const localDay = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -50,6 +51,12 @@ export function useInsights({ rows, selectedMonth, convert }) {
     enabled,
     staleTime: 3 * 60 * 1000,
   });
+  const { data: commitments = [] } = useQuery({
+    queryKey: ['commitments', userId],
+    queryFn: () => ascent.entities.Commitment.list('-created_date'),
+    enabled,
+    staleTime: 3 * 60 * 1000,
+  });
   const { data: settlements = [] } = useQuery({
     queryKey: ['settlements', userId],
     queryFn: () => ascent.entities.Settlement.list('-date'),
@@ -75,9 +82,15 @@ export function useInsights({ rows, selectedMonth, convert }) {
       .flatMap((p) => (p.items || [])
         .filter((i) => i.status !== 'paid' && i.dueDate && i.amount > 0)
         .map((i) => ({ name: i.name, planName: p.name, date: i.dueDate, amount: convert(i.amount, p.currency) })));
+    // Loan payments due this month, unless that month's payment is already recorded in Expenses
+    const recorded = new Set(usable.filter((tx) => tx.commitmentId && !tx.commitmentPaymentId && String(tx.date).startsWith(month)).map((tx) => tx.commitmentId));
+    const loanDues = commitments
+      .filter((c) => c.direction !== 'lent' && !recorded.has(c.id))
+      .flatMap((c) => duesBetween(c, `${month}-01`, `${month}-31`)
+        .map((d) => ({ kind: 'loan', name: c.name, date: d.date, amount: convert(d.amount, c.currency) })));
     const earlier = [1, 2, 3].map((i) => monthOf(new Date(y, m - 1 - i, 1)));
-    return monthForecast({ transactions: usable, month, today, budgets: monthBudgets, planDues, baseline: baselineDaily(usable, earlier) });
-  }, [usable, budgets, plans, month, today, convert]);
+    return monthForecast({ transactions: usable, month, today, budgets: monthBudgets, planDues: [...planDues, ...loanDues], baseline: baselineDaily(usable, earlier) });
+  }, [usable, budgets, plans, commitments, month, today, convert]);
 
   const subscriptions = useMemo(() => detectSubscriptions(usable, today), [usable, today]);
 
@@ -86,5 +99,5 @@ export function useInsights({ rows, selectedMonth, convert }) {
     settlements: settlements.map((s) => ({ ...s, amount: convert(s.amount, s.currency) })),
   }), [usable, settlements, convert]);
 
-  return { forecast, subscriptions, balances, today };
+  return { forecast, subscriptions, balances, commitments, today };
 }

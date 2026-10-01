@@ -1,13 +1,13 @@
 import React from 'react';
 import NumberFlow from '@number-flow/react';
-import { Repeat, CreditCard, CalendarClock, CalendarDays, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Repeat, CreditCard, CalendarClock, CalendarDays, AlertTriangle, CheckCircle2, Landmark } from 'lucide-react';
 import BlurValue from '@/components/BlurValue';
 import { useTheme } from '@/components/ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { useMoneyFormat } from './useInsights';
 
-const KIND_ICON = { recurring: Repeat, installment: CreditCard, plan: CalendarClock, scheduled: CalendarDays };
+const KIND_ICON = { recurring: Repeat, installment: CreditCard, plan: CalendarClock, scheduled: CalendarDays, loan: Landmark };
 const fill = (s, vars) => Object.entries(vars).reduce((out, [k, v]) => out.replace(`{${k}}`, v), s);
 
 function Big({ value, blur, locale, currency, className }) {

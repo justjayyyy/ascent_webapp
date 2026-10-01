@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useR
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'motion/react';
-import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown } from 'lucide-react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -211,6 +211,7 @@ function LayoutContent({ children, currentPageName }) {
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('income'), page: 'Income', icon: HandCoins, permission: 'viewExpenses' },
     { name: t('plans'), page: 'Plans', icon: Milestone, permission: 'viewExpenses' },
+    { name: t('cmNavShort'), page: 'Commitments', icon: Landmark, permission: 'viewExpenses' },
     // Open to every member: notes shared with someone need no workspace-wide notes permission
     { name: t('notes'), page: 'Notes', icon: StickyNote },
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
@@ -234,6 +235,7 @@ function LayoutContent({ children, currentPageName }) {
     canAddMoney && { id: 'expense', label: t('addExpense'), icon: TrendingDown, run: () => openQuickAdd('Expense') },
     canAddMoney && { id: 'income', label: t('addIncome'), icon: HandCoins, run: () => openQuickAdd('Income') },
     canAddMoney && { id: 'plan', label: t('newPlan'), icon: Milestone, run: () => navigate('/Plans?new=1') },
+    canAddMoney && { id: 'commitment', label: t('cmNew'), icon: Landmark, run: () => navigate('/Commitments?new=1') },
     canAddNotes && { id: 'note', label: t('ntNewNote'), icon: StickyNote, run: () => navigate('/Notes?new=1') },
   ].filter(Boolean), [canAddMoney, canAddNotes, openQuickAdd, navigate, t]);
 

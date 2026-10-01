@@ -54,6 +54,7 @@ const PermissionGuard = ({ pageName, children }) => {
     'Expenses': 'viewExpenses',
     'Income': 'viewExpenses',
     'Plans': 'viewExpenses',
+    'Commitments': 'viewExpenses',
     // Notes is open to every member; the server only returns notes they can access
     // 'Settings': 'viewSettings', // Exposed to all authenticated users, internally gated
     // Dashboard currently only shows expense data, so it follows the expenses permission

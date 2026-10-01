@@ -346,6 +346,7 @@ const entities = {
   SharedUser: createEntity('shared-users'),
   PortfolioSnapshot: createEntity('snapshots'),
   Settlement: createEntity('settlements'),
+  Commitment: createEntity('commitments'),
   Note: {
     ...createEntity('notes'),
     // Permanently delete everything the caller has in the trash
