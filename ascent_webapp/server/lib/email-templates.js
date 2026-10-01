@@ -11,8 +11,21 @@
  * @param {string} [options.footer] - Footer text
  * @returns {string} HTML string
  */
+const FOOTER_COPY = {
+    en: { automated: 'Automated message from the Ascent team', fallback: "If the button above doesn't work, copy this link:", rights: 'All rights reserved.' },
+    he: { automated: 'הודעה אוטומטית מצוות Ascent', fallback: 'אם הלחצן למעלה אינו עובד, העתיקו את הקישור:', rights: 'כל הזכויות שמורות.' },
+    ru: { automated: 'Автоматическое сообщение от команды Ascent', fallback: 'Если кнопка выше не работает, скопируйте ссылку:', rights: 'Все права защищены.' },
+};
+
+const escapeHtml = (value) =>
+    String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// `body` is trusted HTML built by the caller; title, button text and link are escaped here.
 export function getEmailTemplate({ language = 'en', title, body, cta, footer }) {
     const isRtl = language === 'he';
+    const copy = FOOTER_COPY[language] || FOOTER_COPY.en;
+    title = escapeHtml(title);
+    cta = cta && { text: escapeHtml(cta.text), link: escapeHtml(cta.link) };
     const direction = isRtl ? 'rtl' : 'ltr';
     const textAlign = isRtl ? 'right' : 'left';
 
@@ -27,7 +40,7 @@ export function getEmailTemplate({ language = 'en', title, body, cta, footer }) 
 
     return `
 <!DOCTYPE html>
-<html>
+<html lang="${language}" dir="${direction}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,19 +83,19 @@ export function getEmailTemplate({ language = 'en', title, body, cta, footer }) 
       <div class="divider"></div>
       
       <p style="font-size: 14px; color: ${colors.textSecondary}; margin-bottom: 8px;">
-        ${footer || (isRtl ? 'הודעה אוטומטית מאת צוות Ascent' : 'Automated message from The Ascent Team')}
+        ${footer || copy.automated}
       </p>
       
       ${cta ? `
         <div style="margin-top: 24px; font-size: 12px; color: ${colors.textSecondary}; text-align: center;">
-          <p>${isRtl ? 'אם הלחץ למעלה אינו עובד, העתק את הקישור:' : 'If the button above doesn\'t work, copy this link:'}</p>
+          <p>${copy.fallback}</p>
           <a href="${cta.link}" class="link-fallback">${cta.link}</a>
         </div>
       ` : ''}
     </div>
     
     <div class="footer">
-      &copy; ${new Date().getFullYear()} Ascent. All rights reserved.
+      &copy; ${new Date().getFullYear()} Ascent. ${copy.rights}
     </div>
   </div>
 </body>

@@ -1,250 +1,136 @@
-import { google } from 'googleapis';
+// Google Calendar and Tasks, with the person's own Google access token (Authorization: Bearer ...).
+// A thin proxy over Google's REST APIs: the answers are Google's JSON, as the calendar UI expects.
+//   GET    ?action=list-calendars | list-events | get-event | get-colors | list-tasks
+//   POST   ?action=create-event | create-task
+//   PUT    ?action=update-event          PATCH|PUT ?action=update-task          DELETE ?action=delete-event
+import { getTokenFromHeader } from '../lib/jwt.js';
 
-// Google Calendar API integration
-export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+const CAL = 'https://www.googleapis.com/calendar/v3';
+const TASKS = 'https://tasks.googleapis.com/tasks/v1';
+const enc = encodeURIComponent;
+const DAY = 24 * 60 * 60 * 1000;
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Google access token required' });
-  }
-
-  const accessToken = authHeader.split(' ')[1];
-
-  // Create OAuth2 client with access token
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-  try {
-    const { action } = req.query;
-
-    switch (action) {
-      case 'list-calendars': {
-        const response = await calendar.calendarList.list();
-        return res.json(response.data.items || []);
-      }
-
-      case 'list-events': {
-        const { calendarId = 'primary', timeMin, timeMax, maxResults = 50 } = req.query;
-        const response = await calendar.events.list({
-          calendarId,
-          timeMin: timeMin || new Date().toISOString(),
-          timeMax: timeMax || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          maxResults: parseInt(maxResults),
-          singleEvents: true,
-          orderBy: 'startTime',
-        });
-        return res.json(response.data.items || []);
-      }
-
-      case 'get-event': {
-        const { calendarId = 'primary', eventId } = req.query;
-        if (!eventId) {
-          return res.status(400).json({ error: 'Event ID required' });
-        }
-        const response = await calendar.events.get({ calendarId, eventId });
-        return res.json(response.data);
-      }
-
-      case 'create-event': {
-        if (req.method !== 'POST') {
-          return res.status(405).json({ error: 'POST method required' });
-        }
-        const { calendarId = 'primary' } = req.query;
-        const event = req.body;
-        const response = await calendar.events.insert({
-          calendarId,
-          resource: event,
-        });
-        return res.json(response.data);
-      }
-
-      case 'update-event': {
-        if (req.method !== 'PUT') {
-          return res.status(405).json({ error: 'PUT method required' });
-        }
-        const { calendarId = 'primary', eventId } = req.query;
-        if (!eventId) {
-          return res.status(400).json({ error: 'Event ID required' });
-        }
-        const event = req.body;
-        const response = await calendar.events.update({
-          calendarId,
-          eventId,
-          resource: event,
-        });
-        return res.json(response.data);
-      }
-
-      case 'delete-event': {
-        if (req.method !== 'DELETE') {
-          return res.status(405).json({ error: 'DELETE method required' });
-        }
-        const { calendarId = 'primary', eventId } = req.query;
-        if (!eventId) {
-          return res.status(400).json({ error: 'Event ID required' });
-        }
-        await calendar.events.delete({ calendarId, eventId });
-        return res.json({ success: true });
-      }
-
-      case 'get-colors': {
-        // Get calendar color definitions
-        const response = await calendar.colors.get();
-        return res.json(response.data || {});
-      }
-
-      case 'list-tasks': {
-        // List tasks from Google Tasks API
-        try {
-          const tasks = google.tasks({ version: 'v1', auth: oauth2Client });
-          
-          // First get all task lists
-          const taskListsRes = await tasks.tasklists.list({ maxResults: 100 });
-          const taskLists = taskListsRes.data.items || [];
-          
-          if (taskLists.length === 0) {
-            return res.json([]);
-          }
-          
-          // Get ALL tasks from each list (including completed ones for history)
-          const allTasks = [];
-          for (const list of taskLists) {
-            try {
-              // Fetch incomplete tasks
-              const tasksRes = await tasks.tasks.list({
-                tasklist: list.id,
-                maxResults: 100,
-                showCompleted: true,  // Include completed tasks too
-                showHidden: true,     // Include hidden tasks
-              });
-              const listTasks = (tasksRes.data.items || []).map(task => ({
-                ...task,
-                taskListId: list.id,
-                taskListTitle: list.title,
-              }));
-              allTasks.push(...listTasks);
-            } catch (e) {
-              // Silently skip lists that fail
-            }
-          }
-          
-          return res.json(allTasks);
-        } catch (taskError) {
-          // Return empty if tasks not accessible
-          return res.json([]);
-        }
-      }
-
-      case 'create-task': {
-        if (req.method !== 'POST') {
-          return res.status(405).json({ error: 'POST method required' });
-        }
-        try {
-          const tasks = google.tasks({ version: 'v1', auth: oauth2Client });
-          const { tasklistId } = req.query;
-          
-          // Get the first task list if not specified
-          let listId = tasklistId;
-          if (!listId) {
-            const taskListsRes = await tasks.tasklists.list({ maxResults: 1 });
-            const taskLists = taskListsRes.data.items || [];
-            
-            if (taskLists.length === 0) {
-              // Create a default task list if none exists
-              const newList = await tasks.tasklists.insert({ resource: { title: 'My Tasks' } });
-              listId = newList.data.id;
-            } else {
-              listId = taskLists[0].id;
-            }
-          }
-          
-          const task = req.body;
-          const response = await tasks.tasks.insert({
-            tasklist: listId,
-            resource: task,
-          });
-          return res.json(response.data);
-        } catch (taskError) {
-          console.error('[create-task] Error:', taskError.message, taskError.code, taskError.response?.data);
-          
-          // Check for specific error types
-          if (taskError.code === 401 || taskError.message?.includes('invalid_token')) {
-            return res.status(401).json({ error: 'Invalid token', message: 'Please reconnect your Google account' });
-          }
-          if (taskError.code === 403 || taskError.message?.includes('insufficient')) {
-            return res.status(403).json({ error: 'Permission denied', message: 'Please reconnect to grant Tasks permission' });
-          }
-          
-          return res.status(500).json({ error: 'Failed to create task', message: taskError.message });
-        }
-      }
-
-      case 'update-task': {
-        if (req.method !== 'PATCH' && req.method !== 'PUT') {
-          return res.status(405).json({ error: 'PATCH method required' });
-        }
-        const { tasklistId, taskId } = req.query;
-        if (!tasklistId || !taskId) {
-          return res.status(400).json({ error: 'tasklistId and taskId are required' });
-        }
-        try {
-          const tasks = google.tasks({ version: 'v1', auth: oauth2Client });
-          const response = await tasks.tasks.patch({
-            tasklist: tasklistId,
-            task: taskId,
-            requestBody: req.body,
-          });
-          return res.json(response.data);
-        } catch (taskError) {
-          if (taskError.code === 401 || taskError.message?.includes('invalid_token')) {
-            return res.status(401).json({ error: 'Invalid token', message: 'Please reconnect your Google account' });
-          }
-          return res.status(500).json({ error: 'Failed to update task', message: taskError.message });
-        }
-      }
-
-      default:
-        return res.status(400).json({ error: 'Invalid action. Use: list-calendars, list-events, get-event, create-event, update-event, delete-event, get-colors, list-tasks' });
-    }
-  } catch (error) {
-    console.error('[Google Calendar] API error:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      data: error.response?.data
-    });
-    
-    // Handle various Google API errors
-    const errorMessage = error.message || '';
-    const errorCode = error.code || error.response?.status;
-    
-    if (errorCode === 401 || errorMessage.includes('invalid_token') || errorMessage.includes('Invalid Credentials') || errorMessage.includes('Request had invalid authentication credentials')) {
-      return res.status(401).json({ error: 'Invalid or expired Google token. Please re-authenticate.' });
-    }
-    
-    if (errorCode === 403 || errorMessage.includes('forbidden') || errorMessage.includes('insufficient')) {
-      return res.status(403).json({ error: 'Access denied. Please ensure calendar permissions are granted.' });
-    }
-
-    if (errorCode === 404) {
-      return res.status(404).json({ error: 'Calendar or event not found.' });
-    }
-    
-    return res.status(500).json({ 
-      error: 'Calendar API error', 
-      message: error.message || 'Unknown error occurred',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+export class GoogleApiError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
   }
 }
 
+/** A client for one access token. `fetchImpl` is swapped in tests. */
+export function googleClient(accessToken, fetchImpl = fetch) {
+  return async function call(url, { method = 'GET', body, query } = {}) {
+    const qs = query ? `?${new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null))}` : '';
+    const res = await fetchImpl(url + qs, {
+      method,
+      headers: { Authorization: `Bearer ${accessToken}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 204) return null;
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new GoogleApiError(res.status, data?.error?.message || `Google API error ${res.status}`);
+    return data;
+  };
+}
+
+const required = (value, name) => {
+  if (!value || typeof value !== 'string') throw new GoogleApiError(400, `${name} required`);
+  return value;
+};
+
+async function firstTaskList(call) {
+  const lists = (await call(`${TASKS}/users/@me/lists`, { query: { maxResults: 1 } }))?.items || [];
+  if (lists.length) return lists[0].id;
+  return (await call(`${TASKS}/users/@me/lists`, { method: 'POST', body: { title: 'My Tasks' } })).id;
+}
+
+const ACTIONS = {
+  'list-calendars': { method: 'GET', run: async (call) => (await call(`${CAL}/users/me/calendarList`))?.items || [] },
+  'list-events': {
+    method: 'GET',
+    run: async (call, q) => {
+      const now = Date.now();
+      const data = await call(`${CAL}/calendars/${enc(q.calendarId || 'primary')}/events`, {
+        query: {
+          timeMin: q.timeMin || new Date(now).toISOString(),
+          timeMax: q.timeMax || new Date(now + 30 * DAY).toISOString(),
+          maxResults: Math.min(parseInt(q.maxResults, 10) || 50, 2500),
+          singleEvents: 'true',
+          orderBy: 'startTime',
+        },
+      });
+      return data?.items || [];
+    },
+  },
+  'get-event': { method: 'GET', run: (call, q) => call(`${CAL}/calendars/${enc(q.calendarId || 'primary')}/events/${enc(required(q.eventId, 'eventId'))}`) },
+  'get-colors': { method: 'GET', run: async (call) => (await call(`${CAL}/colors`)) || {} },
+  'create-event': { method: 'POST', run: (call, q, body) => call(`${CAL}/calendars/${enc(q.calendarId || 'primary')}/events`, { method: 'POST', body }) },
+  'update-event': {
+    method: 'PUT',
+    run: (call, q, body) => call(`${CAL}/calendars/${enc(q.calendarId || 'primary')}/events/${enc(required(q.eventId, 'eventId'))}`, { method: 'PUT', body }),
+  },
+  'delete-event': {
+    method: 'DELETE',
+    run: async (call, q) => {
+      await call(`${CAL}/calendars/${enc(q.calendarId || 'primary')}/events/${enc(required(q.eventId, 'eventId'))}`, { method: 'DELETE' });
+      return { success: true };
+    },
+  },
+  'list-tasks': {
+    method: 'GET',
+    run: async (call) => {
+      // Tasks are a nice-to-have next to events: without the scope, or on any failure, show none
+      try {
+        const lists = (await call(`${TASKS}/users/@me/lists`, { query: { maxResults: 100 } }))?.items || [];
+        const perList = await Promise.all(lists.map(async (list) => {
+          try {
+            const items = (await call(`${TASKS}/lists/${enc(list.id)}/tasks`, { query: { maxResults: 100, showCompleted: 'true', showHidden: 'true' } }))?.items || [];
+            return items.map((task) => ({ ...task, taskListId: list.id, taskListTitle: list.title }));
+          } catch {
+            return [];
+          }
+        }));
+        return perList.flat();
+      } catch {
+        return [];
+      }
+    },
+  },
+  'create-task': {
+    method: 'POST',
+    run: async (call, q, body) => call(`${TASKS}/lists/${enc(q.tasklistId || (await firstTaskList(call)))}/tasks`, { method: 'POST', body }),
+  },
+  'update-task': {
+    method: ['PATCH', 'PUT'],
+    run: (call, q, body) =>
+      call(`${TASKS}/lists/${enc(required(q.tasklistId, 'tasklistId'))}/tasks/${enc(required(q.taskId, 'taskId'))}`, { method: 'PATCH', body }),
+  },
+};
+
+export function createHandler(fetchImpl = fetch) {
+  return async function handler(req, res) {
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    const token = getTokenFromHeader(req);
+    if (!token) return res.status(401).json({ error: 'Google access token required' });
+
+    const action = ACTIONS[req.query?.action];
+    if (!action) return res.status(400).json({ error: `Invalid action. Use: ${Object.keys(ACTIONS).join(', ')}` });
+    const methods = [].concat(action.method);
+    if (!methods.includes(req.method)) return res.status(405).json({ error: `${methods[0]} method required` });
+
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : undefined;
+      return res.json(await action.run(googleClient(token, fetchImpl), req.query, body));
+    } catch (err) {
+      const status = err instanceof GoogleApiError ? err.status : 502;
+      if (status === 401) return res.status(401).json({ error: 'Invalid or expired Google token. Please re-authenticate.' });
+      if (status === 403) return res.status(403).json({ error: 'Access denied. Please ensure calendar permissions are granted.' });
+      if (status === 404) return res.status(404).json({ error: 'Calendar or event not found.' });
+      if (status === 400) return res.status(400).json({ error: err.message });
+      console.error('[Google Calendar]', req.query.action, err?.message);
+      return res.status(502).json({ error: 'Calendar API error' });
+    }
+  };
+}
+
+export default createHandler();

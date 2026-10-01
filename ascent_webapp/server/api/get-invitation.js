@@ -1,9 +1,9 @@
-import 'dotenv/config';
 import { connectDB } from '../lib/mongodb.js';
 import Workspace from '../models/Workspace.js';
 import User from '../models/User.js';
 import { handleCors } from '../lib/cors.js';
-import { success, error, notFound } from '../lib/response.js';
+import { success, error, notFound, serverError } from '../lib/response.js';
+import { isValidObjectId } from '../lib/validate.js';
 
 // Public endpoint to get invitation details by token (no auth required)
 export default async function handler(req, res) {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     // Support both /api/invitations/:token and /api/invitations?token=...
     const token = req.params?.token || req.query?.token;
 
-    if (!token) {
+    if (!token || !isValidObjectId(token)) {
       return error(res, 'Invitation token is required', 400);
     }
 
@@ -65,7 +65,6 @@ export default async function handler(req, res) {
 
     return success(res, invitationData);
   } catch (err) {
-    console.error('[Get Invitation] Error:', err);
-    return error(res, err.message || 'Failed to fetch invitation', 500);
+    return serverError(res, err);
   }
 }

@@ -1,15 +1,17 @@
-// Simple in-memory rate limiter for API protection
+// In-memory rate limits per caller. On Vercel each warm instance keeps its own counts, so these are a
+// brake on bursts rather than a global quota.
 const rateLimitStore = new Map();
+
+// Express resolves req.ip from X-Forwarded-For using 'trust proxy' (set in server.js); never read the
+// header directly, a caller can put anything in it.
+export const clientIdOf = (req) => req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown';
 
 const WINDOW_MS = 60 * 1000; // 1 minute window
 const MAX_REQUESTS = 500;    // 500 requests per window (generous for development)
 
 export function rateLimit(req, res) {
   // Get client identifier (IP or auth token)
-  const clientId = req.headers['x-forwarded-for'] || 
-                   req.headers['x-real-ip'] || 
-                   req.connection?.remoteAddress ||
-                   'unknown';
+  const clientId = clientIdOf(req);
   
   const now = Date.now();
   const windowStart = now - WINDOW_MS;
@@ -61,10 +63,7 @@ const AUTH_WINDOW_MS = 5 * 60 * 1000;  // 5 minute window
 const AUTH_MAX_REQUESTS = 50;           // 50 attempts per window (generous for development)
 
 export function authRateLimit(req, res) {
-  const clientId = req.headers['x-forwarded-for'] || 
-                   req.headers['x-real-ip'] || 
-                   req.connection?.remoteAddress ||
-                   'unknown';
+  const clientId = clientIdOf(req);
   
   const now = Date.now();
   const windowStart = now - AUTH_WINDOW_MS;

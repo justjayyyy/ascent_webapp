@@ -8,7 +8,7 @@ const PROVIDERS = {
     name: 'Finnhub',
     baseUrl: 'https://finnhub.io/api/v1',
     getQuoteUrl: (symbol, apiKey) => 
-      `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`,
+      `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(apiKey)}`,
     parseResponse: (data) => ({
       price: data.c,           // Current price
       change: data.d,          // Change
@@ -22,7 +22,7 @@ const PROVIDERS = {
   alphavantage: {
     name: 'Alpha Vantage',
     getQuoteUrl: (symbol, apiKey) =>
-      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`,
+      `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`,
     parseResponse: (data) => {
       const quote = data['Global Quote'] || {};
       return {
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       : process.env.FINNHUB_API_KEY;
     
     if (!apiKey) {
-      return error(res, `API key not configured for ${provider}. Set ${provider.toUpperCase()}_API_KEY in .env`, 500);
+      return error(res, 'Stock quotes are not configured', 503);
     }
     
     const providerConfig = PROVIDERS[provider];
@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     
     // Handle multiple symbols
     if (symbols) {
-      const symbolList = symbols.split(',').map(s => s.trim().toUpperCase());
+      const symbolList = String(symbols).split(',').map(s => s.trim().toUpperCase()).filter((s) => /^[A-Z0-9.^=-]{1,20}$/.test(s)).slice(0, 50);
       const results = {};
       
       for (const sym of symbolList) {
@@ -129,7 +129,8 @@ export default async function handler(req, res) {
       return error(res, 'Symbol is required. Use ?symbol=AAPL or ?symbols=AAPL,GOOGL,MSFT', 400);
     }
     
-    const upperSymbol = symbol.toUpperCase();
+    const upperSymbol = String(symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.^=-]{1,20}$/.test(upperSymbol)) return error(res, 'Invalid symbol', 400);
     
     // Check cache first
     const cached = getCachedPrice(upperSymbol);
