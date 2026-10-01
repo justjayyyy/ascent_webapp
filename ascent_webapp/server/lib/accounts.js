@@ -32,12 +32,25 @@ export async function createWorkspaceFor(user, name = 'My Workspace') {
 /** A password nobody can guess or sign in with, for accounts that only ever use Google. */
 export const unusablePassword = () => `!google:${crypto.randomBytes(32).toString('hex')}`;
 
-/** Creates the user and their own workspace, which becomes the one they open by default. */
+/**
+ * Creates the user and their own workspace, which becomes the one they open by default. All or nothing:
+ * if the workspace cannot be made, the user is removed again, so a retry can sign up cleanly instead of
+ * finding an account with nowhere to put anything.
+ */
 export async function createAccount(fields) {
   // The caller signs the new account in straight away, so its first sign-in has already happened
   const user = await User.create({ ...fields, isFirstLogin: false });
-  const workspace = await createWorkspaceFor(user);
-  user.defaultWorkspace = workspace._id;
-  await user.save();
-  return user;
+  let workspace = null;
+  try {
+    workspace = await createWorkspaceFor(user);
+    user.defaultWorkspace = workspace._id;
+    await user.save();
+    return user;
+  } catch (err) {
+    await Promise.allSettled([
+      User.deleteOne({ _id: user._id }),
+      workspace ? Workspace.deleteOne({ _id: workspace._id }) : null,
+    ]);
+    throw err;
+  }
 }

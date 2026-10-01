@@ -20,6 +20,7 @@ class FakeUser {
     users.push(u);
     return u;
   }
+  static async deleteOne(q) { users = users.filter((u) => u._id !== q._id); }
   static async updateOne(q, u) { const user = users.find((x) => x._id === q._id); if (user) Object.assign(user, u.$set); }
   async save() { return this; }
   async comparePassword(p) { return p === this.password; }
@@ -29,11 +30,12 @@ mock.module(at('../models/User.js'), { exports: { default: FakeUser } });
 mock.module(at('../models/Workspace.js'), {
   exports: {
     default: {
-      async create(ws) { const w = { _id: `w${workspaces.length + 1}`, ...ws }; workspaces.push(w); return w; },
+      async create(ws) { if (failWorkspace) throw new Error('database hiccup'); const w = { _id: `w${workspaces.length + 1}`, ...ws }; workspaces.push(w); return w; },
       async updateMany(filter, update, opts) { workspaceUpdates.push({ filter, update, opts }); return { modifiedCount: 0 }; },
     },
   },
 });
+let failWorkspace = false;
 let sent; // emails "sent"
 mock.module(at('../lib/email-helper.js'), { exports: { sendEmail: async (m) => { sent.push(m); return { sent: true }; } } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
@@ -221,4 +223,18 @@ test('Google keeps the password of an account from before confirmation existed',
   await call(google, { credential: 'tok' });
   assert.equal(users[0].password, 'mine123');
   assert.equal(users[0].emailVerified, true);
+});
+
+test("if the new account's workspace cannot be made, no half-made account is left behind", async () => {
+  failWorkspace = true;
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    assert.equal((await call(register, { email: 'a@b.test', password: 'secret1' })).code, 500);
+  } finally {
+    failWorkspace = false;
+    console.error = quiet;
+  }
+  assert.deepEqual(users, []);
+  assert.equal((await call(register, { email: 'a@b.test', password: 'secret1' })).code, 201, 'signing up again works');
 });
