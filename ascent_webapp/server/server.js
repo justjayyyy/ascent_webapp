@@ -1,284 +1,123 @@
-// Local development server for API
-import 'dotenv/config';
-// Import all dependencies early to ensure Vercel bundles them
-// This ensures Vercel's static analysis includes all required packages
-import 'mongoose';
-import 'bcryptjs';
-import 'jsonwebtoken';
-import 'nodemailer';
-import 'googleapis';
+// The API: one Express app, served by api/index.js on Vercel and by `npm run dev:api` locally.
 import express from 'express';
 import cors from 'cors';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { rateLimit } from './lib/rateLimit.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { isAllowedOrigin } from './lib/cors.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Security middleware - CORS for Vercel
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-  process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null,
-  'https://ascentwebapp.vercel.app',
-  'https://ascentwebapp-*.vercel.app', // Pattern for preview deployments
-  'http://localhost:5173',
-  'http://localhost:3000',
-].filter(Boolean);
+// Vercel sits in front of the app: req.ip is the caller, not the proxy
+app.set('trust proxy', true);
+app.disable('x-powered-by');
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    // In development, allow all localhost origins
-    if (process.env.NODE_ENV === 'development' || origin.includes('localhost')) {
-      return callback(null, true);
-    }
-    
-    // Check if origin matches any allowed origin exactly
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // Check if origin matches Vercel pattern (for preview deployments)
-    if (origin.includes('vercel.app')) {
-      // Allow any *.vercel.app subdomain
-      if (origin.match(/^https:\/\/[\w-]+\.vercel\.app$/)) {
-        return callback(null, true);
-      }
-      // Allow the main vercel.app domain
-      if (origin === 'https://ascentwebapp.vercel.app') {
-        return callback(null, true);
-      }
-    }
-    
-    // Check if origin contains any allowed origin (fallback)
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (!allowed) return false;
-      // Exact match
-      if (origin === allowed) return true;
-      // Substring match (for preview deployments)
-      if (allowed.includes('*') && origin.match(new RegExp(allowed.replace(/\*/g, '.*')))) {
-        return true;
-      }
-      // Contains match
-      if (origin.includes(allowed.replace('https://', '').replace('http://', ''))) {
-        return true;
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
-      return callback(null, true);
-    }
-    
-    // In production on Vercel, be more permissive with vercel.app domains
-    if (process.env.VERCEL === '1' && origin.includes('vercel.app')) {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+app.use((req, res, next) =>
+  cors({
+    // Requests without an Origin (Shortcuts, curl, same-origin GETs) carry no browser risk
+    origin: (origin, done) => done(null, !origin || isAllowedOrigin(origin, { host: req.headers.host })),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Workspace-Id', 'X-Api-Key'],
+  })(req, res, next)
+);
 
-// Automation ingest (phone Shortcuts). Registered ahead of the global 10 MB parser so it gets its own small
-// limit, and malformed bodies get the same JSON error shape as everything else.
-const ingestJson = (req, res, next) =>
-  express.json({ limit: '8kb' })(req, res, (err) => {
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+/**
+ * An Express route for a serverless-style handler module, loaded on first use. The import path must be a
+ * literal at each call site so Vercel's bundler can see and include it.
+ */
+export function route(load) {
+  let handler;
+  return async (req, res) => {
+    try {
+      handler ??= (await load()).default;
+      req.query = { ...req.query, ...req.params };
+      await handler(req, res);
+    } catch (err) {
+      console.error(`[API] ${req.method} ${req.path}:`, err?.message);
+      if (!res.headersSent) res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  };
+}
+
+const jsonError = (limit) => (req, res, next) =>
+  express.json({ limit })(req, res, (err) => {
     if (!err) return next();
     const tooLarge = err.type === 'entity.too.large';
     res.status(tooLarge ? 413 : 400).json({ success: false, error: tooLarge ? 'payload_too_large' : 'invalid_json' });
   });
-app.post('/api/ingest/:kind', ingestJson, wrapHandler('./api/ingest.js'));
+
+// Automation ingest (phone Shortcuts). Registered ahead of the general parser so it gets its own small limit.
+app.post('/api/ingest/:kind', jsonError('8kb'), route(() => import('./api/ingest.js')));
 app.all('/api/ingest/:kind', (req, res) => res.status(405).json({ success: false, error: 'method_not_allowed' }));
 
-// Body parser with size limit - must be before routes
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Note attachments travel as base64 inside JSON, so the general limit is generous
+app.use('/api', jsonError('10mb'));
 
-// Security headers
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  next();
-});
-
-// Rate limiting for all API routes
 app.use('/api', (req, res, next) => {
   if (rateLimit(req, res)) return;
   next();
 });
 
-// Helper to convert Vercel handler to Express route
-function wrapHandler(handlerPath) {
-  return async (req, res) => {
-    try {
-      const handlerUrl = new URL(handlerPath, import.meta.url).href;
-      const module = await import(handlerUrl);
-      const handler = module.default;
-      
-      if (typeof handler !== 'function') {
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Handler not found'
-        });
-      }
-      
-      // Add query params from Express to req.query
-      req.query = { ...req.query, ...req.params };
-      
-      await handler(req, res);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error(`[Server] Handler Error ${handlerPath}:`, error.message);
-      }
-      
-      // Only send response if headers haven't been sent
-      if (!res.headersSent) {
-        res.status(500).json({ 
-          success: false, 
-          error: 'Internal server error', 
-          message: error.message
-        });
-      }
-    }
-  };
+const any = (path, handler, methods = ['get', 'post', 'put', 'patch', 'delete']) => methods.forEach((m) => app[m](path, handler));
+
+// Accounts and sessions
+app.post('/api/auth/register', route(() => import('./auth/register.js')));
+app.post('/api/auth/login', route(() => import('./auth/login.js')));
+app.post('/api/auth/google', route(() => import('./auth/google.js')));
+any('/api/auth/me', route(() => import('./auth/me.js')), ['get', 'put', 'patch']);
+any('/api/auth/passkey', route(() => import('./auth/passkey.js')), ['get', 'post', 'put', 'delete']);
+
+any('/api/workspaces', route(() => import('./api/workspaces.js')), ['get', 'post', 'put', 'delete']);
+app.get('/api/invitations/:token', route(() => import('./api/get-invitation.js')));
+any('/api/ingest-tokens', route(() => import('./api/ingest-tokens.js')), ['get', 'post', 'delete']);
+any('/api/push', route(() => import('./api/push.js')), ['get', 'post', 'delete']);
+app.post('/api/import/statement', route(() => import('./api/import-statement.js')));
+any('/api/assist', route(() => import('./api/assist.js')), ['get', 'post']);
+
+// Workspace data
+const ENTITIES = {
+  accounts: () => import('./entities/accounts.js'),
+  positions: () => import('./entities/positions.js'),
+  'day-trades': () => import('./entities/day-trades.js'),
+  transactions: () => import('./entities/transactions.js'),
+  budgets: () => import('./entities/budgets.js'),
+  categories: () => import('./entities/categories.js'),
+  cards: () => import('./entities/cards.js'),
+  goals: () => import('./entities/goals.js'),
+  'dashboard-widgets': () => import('./entities/dashboard-widgets.js'),
+  'page-layouts': () => import('./entities/page-layouts.js'),
+  snapshots: () => import('./entities/snapshots.js'),
+  notes: () => import('./entities/notes.js'),
+  'portfolio-transactions': () => import('./entities/portfolio-transactions.js'),
+  plans: () => import('./entities/plans.js'),
+  settlements: () => import('./entities/settlements.js'),
+  commitments: () => import('./entities/commitments.js'),
+};
+for (const [name, load] of Object.entries(ENTITIES)) any(`/api/entities/${name}`, route(load));
+
+// Integrations
+app.get('/api/integrations/stock-quote', route(() => import('./integrations/stock-quote.js')));
+// Apple Pay via the older single-key Shortcut (new setups use /api/ingest with per-device tokens)
+any('/api/integrations/quick-add', route(() => import('./integrations/quick-add.js')), ['get', 'post', 'delete']);
+any('/api/integrations/google-calendar', route(() => import('./integrations/google-calendar.js')), ['get', 'post', 'put', 'patch', 'delete']);
+
+// Scheduled emails (Vercel Cron)
+any('/api/send-daily-summary', route(() => import('./api/send-daily-summary.js')), ['get', 'post']);
+any('/api/send-weekly-summary', route(() => import('./api/send-weekly-summary.js')), ['get', 'post']);
+
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+app.use('/api', (req, res) => res.status(404).json({ success: false, error: 'Not found' }));
+
+if (process.env.VERCEL !== '1' && process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => console.log(`API server running on http://localhost:${PORT}`));
 }
 
-// Auth routes
-app.post('/api/auth/register', wrapHandler('./auth/register.js'));
-app.post('/api/auth/login', wrapHandler('./auth/login.js'));
-app.post('/api/auth/google', wrapHandler('./auth/google.js'));
-app.get('/api/auth/me', wrapHandler('./auth/me.js'));
-app.put('/api/auth/me', wrapHandler('./auth/me.js'));
-app.patch('/api/auth/me', wrapHandler('./auth/me.js'));
-// Passkeys: Face ID / fingerprint sign-in and app unlock
-const passkeyHandler = wrapHandler('./auth/passkey.js');
-app.get('/api/auth/passkey', passkeyHandler);
-app.post('/api/auth/passkey', passkeyHandler);
-app.put('/api/auth/passkey', passkeyHandler);
-app.delete('/api/auth/passkey', passkeyHandler);
-app.options('/api/auth/*', (req, res) => res.sendStatus(200));
-
-// Workspace routes
-const workspaceHandler = wrapHandler('./api/workspaces.js');
-app.get('/api/workspaces', workspaceHandler);
-app.post('/api/workspaces', workspaceHandler);
-app.put('/api/workspaces', workspaceHandler);
-app.delete('/api/workspaces', workspaceHandler);
-app.options('/api/workspaces', (req, res) => res.sendStatus(200));
-
-// Ingest tokens: the credentials phones use to report purchases
-const ingestTokensHandler = wrapHandler('./api/ingest-tokens.js');
-app.get('/api/ingest-tokens', ingestTokensHandler);
-app.post('/api/ingest-tokens', ingestTokensHandler);
-app.delete('/api/ingest-tokens', ingestTokensHandler);
-app.options('/api/ingest-tokens', (req, res) => res.sendStatus(200));
-
-// Push notification subscriptions for the signed-in user
-const pushHandler = wrapHandler('./api/push.js');
-app.get('/api/push', pushHandler);
-app.post('/api/push', pushHandler);
-app.delete('/api/push', pushHandler);
-app.options('/api/push', (req, res) => res.sendStatus(200));
-
-// Entity routes - generic handler
-const entities = [
-  'accounts', 'positions', 'day-trades', 'transactions',
-  'budgets', 'categories', 'cards', 'goals',
-  'dashboard-widgets', 'page-layouts', 'snapshots', 'notes',
-  'portfolio-transactions', 'plans', 'settlements', 'commitments'
-];
-
-entities.forEach(entity => {
-  const handlerPath = `./entities/${entity}.js`;
-  app.get(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.post(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.put(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.patch(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.delete(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.options(`/api/entities/${entity}`, (req, res) => res.sendStatus(200));
-});
-
-// Card statement import (rows parsed on the device, matched against what is already recorded)
-app.post('/api/import/statement', wrapHandler('./api/import-statement.js'));
-app.options('/api/import/*', (req, res) => res.sendStatus(200));
-
-// Smart help: category suggestions while typing, and the opt-in AI assistant
-const assistHandler = wrapHandler('./api/assist.js');
-app.get('/api/assist', assistHandler);
-app.post('/api/assist', assistHandler);
-app.options('/api/assist', (req, res) => res.sendStatus(200));
-
-// Public invitation route (no auth required)
-app.get('/api/invitations/:token', wrapHandler('./api/get-invitation.js'));
-app.options('/api/invitations/*', (req, res) => res.sendStatus(200));
-
-// Integration routes
-app.post('/api/integrations/send-email', wrapHandler('./integrations/send-email.js'));
-app.post('/api/integrations/upload-file', wrapHandler('./integrations/upload-file.js'));
-app.get('/api/integrations/stock-quote', wrapHandler('./integrations/stock-quote.js'));
-
-// Apple Pay -> transaction (iOS Shortcuts automation) and its key management
-const quickAddHandler = wrapHandler('./integrations/quick-add.js');
-app.get('/api/integrations/quick-add', quickAddHandler);
-app.post('/api/integrations/quick-add', quickAddHandler);
-app.delete('/api/integrations/quick-add', quickAddHandler);
-
-// Google Calendar routes
-const googleCalendarHandler = wrapHandler('./integrations/google-calendar.js');
-app.get('/api/integrations/google-calendar', googleCalendarHandler);
-app.post('/api/integrations/google-calendar', googleCalendarHandler);
-app.put('/api/integrations/google-calendar', googleCalendarHandler);
-app.delete('/api/integrations/google-calendar', googleCalendarHandler);
-
-app.options('/api/integrations/*', (req, res) => res.sendStatus(200));
-
-// Cron job routes (for scheduled notifications)
-app.get('/api/send-daily-summary', wrapHandler('./api/send-daily-summary.js'));
-app.post('/api/send-daily-summary', wrapHandler('./api/send-daily-summary.js'));
-app.get('/api/send-weekly-summary', wrapHandler('./api/send-weekly-summary.js'));
-app.post('/api/send-weekly-summary', wrapHandler('./api/send-weekly-summary.js'));
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// MongoDB connection test endpoint
-app.get('/api/test-db', async (req, res) => {
-  try {
-    const connectDB = (await import('./lib/mongodb.js')).default;
-    await connectDB();
-    res.json({ status: 'ok', message: 'MongoDB connection successful' });
-  } catch (error) {
-    res.status(503).json({ 
-      status: 'error', 
-      message: error.message,
-      code: error.code 
-    });
-  }
-});
-
-// Only start server if not in Vercel environment
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
-    console.log(`🚀 API server running on http://localhost:${PORT}`);
-    console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
-  });
-}
-
-// Export for Vercel serverless functions
 export default app;
-

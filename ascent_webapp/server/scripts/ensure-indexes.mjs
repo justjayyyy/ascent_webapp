@@ -1,7 +1,8 @@
-// Creates the indexes the automation feature relies on (unique dedupeKey, inbox and match lookups, token hash, event TTL).
-// Only ever adds indexes; nothing is dropped. Safe to re-run.
+// Creates the indexes the app relies on (unique dedupeKey, inbox and match lookups, token hash, event TTL,
+// one copy of each default category per workspace). Only ever adds indexes; nothing is dropped. Safe to re-run.
 //
 //   npm run ensure:indexes
+//   npm run ensure:indexes -- --fix-duplicate-categories   (first removes default categories seeded twice)
 //
 // Run it once after deploying: the app does not depend on Mongoose creating indexes on its own.
 import 'dotenv/config';
@@ -10,10 +11,31 @@ import { connectDB } from '../lib/mongodb.js';
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import IngestToken from '../models/IngestToken.js';
 import IngestEvent from '../models/IngestEvent.js';
+import Category from '../models/Category.js';
+
+// Older versions could seed the default categories twice when two screens loaded at once. Transactions
+// refer to categories by name, so dropping the later copy loses nothing.
+async function duplicateDefaultCategories() {
+  const groups = await Category.aggregate([
+    { $match: { isDefault: true, nameKey: { $type: 'string' } } },
+    { $sort: { created_date: 1 } },
+    { $group: { _id: { w: '$workspaceId', k: '$nameKey' }, ids: { $push: '$_id' }, n: { $sum: 1 } } },
+    { $match: { n: { $gt: 1 } } },
+  ]);
+  return groups.flatMap((g) => g.ids.slice(1));
+}
 
 async function main() {
   await connectDB();
-  for (const Model of [ExpenseTransaction, IngestToken, IngestEvent]) {
+  const extra = await duplicateDefaultCategories();
+  if (extra.length) {
+    if (!process.argv.includes('--fix-duplicate-categories')) {
+      throw new Error(`${extra.length} duplicate default categories exist; re-run with --fix-duplicate-categories`);
+    }
+    await Category.deleteMany({ _id: { $in: extra } });
+    console.log(`Removed ${extra.length} duplicate default categories`);
+  }
+  for (const Model of [ExpenseTransaction, IngestToken, IngestEvent, Category]) {
     await Model.createIndexes();
     const indexes = await Model.collection.indexes();
     console.log(`\n${Model.modelName} (${Model.collection.name})`);

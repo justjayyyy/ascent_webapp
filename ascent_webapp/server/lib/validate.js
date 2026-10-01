@@ -27,12 +27,12 @@ export function sanitizeObject(obj) {
 // Email validation
 export function isValidEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return typeof email === 'string' && emailRegex.test(email);
+  return typeof email === 'string' && email.length <= 254 && emailRegex.test(email);
 }
 
 // Password validation
 export function isValidPassword(password) {
-  return typeof password === 'string' && password.length >= 6;
+  return typeof password === 'string' && password.length >= 6 && password.length <= 128;
 }
 
 // MongoDB ObjectId validation

@@ -35,6 +35,7 @@ function model() {
   };
 }
 const WS = { _id: 'ws1', ownerId: 'someone' };
+const ID = '66f0000000000000000000ab'; // a well-formed row id
 const OWNER = { role: 'owner', status: 'accepted' };
 const VIEWER = { role: 'viewer', status: 'accepted', permissions: { viewExpenses: true, editExpenses: false } };
 const PERM = { read: 'viewExpenses', write: 'editExpenses' };
@@ -78,18 +79,18 @@ test('tenant fields and operators in the query string cannot change the scope', 
 test('legitimate filters still work', async () => {
   ctx = { workspace: WS, member: OWNER };
   const M = model();
-  await call(M, 'GET', 'status=pending&isActive=true&created_by=u%40example.com&id=abc');
-  assert.deepEqual(M.calls.find[0], { workspaceId: 'ws1', status: 'pending', isActive: 'true', _id: 'abc' });
+  await call(M, 'GET', `status=pending&isActive=true&created_by=u%40example.com&id=${ID}`);
+  assert.deepEqual(M.calls.find[0], { workspaceId: 'ws1', status: 'pending', isActive: 'true', _id: ID });
 });
 
 test('update and delete stay in the workspace and cannot move rows or use operators', async () => {
   ctx = { workspace: WS, member: OWNER };
   const M = model();
-  await call(M, 'PUT', 'id=abc', { amount: 5, workspaceId: 'ws2', createdBy: 'x', _id: 'z', $set: { amount: 9 } });
-  assert.deepEqual(M.calls.update[0].q, { _id: 'abc', workspaceId: 'ws1' });
+  await call(M, 'PUT', `id=${ID}`, { amount: 5, workspaceId: 'ws2', createdBy: 'x', _id: 'z', $set: { amount: 9 } });
+  assert.deepEqual(M.calls.update[0].q, { _id: ID, workspaceId: 'ws1' });
   assert.deepEqual(M.calls.update[0].b, { amount: 5 });
-  await call(M, 'DELETE', 'id=abc');
-  assert.deepEqual(M.calls.del[0], { _id: 'abc', workspaceId: 'ws1' });
+  await call(M, 'DELETE', `id=${ID}`);
+  assert.deepEqual(M.calls.del[0], { _id: ID, workspaceId: 'ws1' });
   const N = model();
   await call(N, 'DELETE', 'id[$ne]=1');
   assert.equal(N.calls.del.length, 0);
@@ -100,7 +101,7 @@ test('a view-only member can read but not write', async () => {
   const M = model();
   assert.equal((await call(M, 'GET', '', undefined, { permission: PERM })).code, 200);
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-    assert.equal((await call(M, method, 'id=abc', { amount: 1 }, { permission: PERM })).code, 403, method);
+    assert.equal((await call(M, method, `id=${ID}`, { amount: 1 }, { permission: PERM })).code, 403, method);
   }
   assert.deepEqual([M.calls.update.length, M.calls.del.length, M.calls.create.length], [0, 0, 0]);
 });
@@ -170,4 +171,94 @@ test('clients cannot set automation dedupe keys', async () => {
   const M = keyedModel();
   await call(M, 'POST', '', { amount: 1, dedupeKey: 'wallet:abc123' });
   assert.equal(M.rows[0].dedupeKey, undefined);
+});
+
+test('a malformed id is refused before the database sees it', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  for (const [method, q] of [['GET', 'id=abc&_single=true'], ['PUT', 'id=abc'], ['DELETE', 'id=1'], ['GET', 'id[$ne]=1']]) {
+    const M = model();
+    const r = await call(M, method, q, { amount: 1 });
+    assert.equal(r.code, 400, `${method} ${q}`);
+    assert.deepEqual([M.calls.find.length, M.calls.update.length, M.calls.del.length], [0, 0, 0]);
+  }
+});
+
+test('a row that is missing or in another workspace is simply not found (no existence probe)', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const chain = (v) => ({ lean: async () => v });
+  let probed = false;
+  const M = {
+    modelName: 'Tx', schema: { path: () => true },
+    findOneAndUpdate: () => chain(null),
+    findOneAndDelete: () => chain(null),
+    findOne: () => chain(null),
+    findById: () => { probed = true; return chain({ _id: ID }); },
+  };
+  assert.equal((await call(M, 'PUT', `id=${ID}`, { amount: 1 })).code, 404);
+  assert.equal((await call(M, 'DELETE', `id=${ID}`)).code, 404);
+  assert.equal((await call(M, 'GET', `id=${ID}&_single=true`)).code, 404);
+  assert.equal(probed, false);
+});
+
+test('an update cannot set an automation dedupe key, and an empty update is refused', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = model();
+  M.schema = { path: (k) => PATHS.has(k) || k === 'dedupeKey' };
+  await call(M, 'PUT', `id=${ID}`, { amount: 2, dedupeKey: 'wallet:abc' });
+  assert.deepEqual(M.calls.update[0].b, { amount: 2 });
+  const r = await call(M, 'PUT', `id=${ID}`, { workspaceId: 'ws2', _id: 'z' });
+  assert.equal(r.code, 400);
+  assert.equal(M.calls.update.length, 1);
+});
+
+test('validation and cast errors are the caller\'s fault (400), anything else is a 500 without details', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const failing = (err) => ({ ...model(), async create() { throw err; } });
+  const invalid = Object.assign(new Error('bad'), { name: 'ValidationError', errors: { amount: { message: 'amount is required' } } });
+  let r = await call(failing(invalid), 'POST', '', { category: 'x' });
+  assert.equal(r.code, 400);
+  assert.match(r.body.error, /amount is required/);
+  r = await call(failing(Object.assign(new Error('cast'), { name: 'CastError', path: 'amount' })), 'POST', '', { amount: 'lots' });
+  assert.equal(r.code, 400);
+  const prev = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  r = await call(failing(new Error('connection string mongodb://secret@host')), 'POST', '', { amount: 1 });
+  process.env.NODE_ENV = prev;
+  assert.equal(r.code, 500);
+  assert.doesNotMatch(JSON.stringify(r.body), /secret/);
+});
+
+test('an empty body or empty batch is refused', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  for (const body of [undefined, {}, []]) {
+    const M = model();
+    assert.equal((await call(M, 'POST', '', body)).code, 400, JSON.stringify(body));
+    assert.equal(M.calls.create.length, 0);
+  }
+});
+
+test('the list limit is bounded and the sort field cannot be an expression', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const seen = [];
+  const M = {
+    ...model(),
+    find() { return { sort(s) { seen.push(['sort', s]); return this; }, limit(l) { seen.push(['limit', l]); return this; }, lean: async () => [{ _id: { toString: () => 'r1' } }] }; },
+  };
+  const r = await call(M, 'GET', 'limit=999999&sort=$where');
+  assert.deepEqual(seen, [['sort', '-created_date'], ['limit', 10000]]);
+  assert.equal(r.body.data[0].id, 'r1');
+  seen.length = 0;
+  await call(M, 'GET', 'limit=-5&sort=-date');
+  assert.deepEqual(seen, [['sort', '-date'], ['limit', 1]]);
+});
+
+test('shared-only entities: members see their own rows and shared ones, the owner sees all', async () => {
+  ctx = { workspace: WS, member: { role: 'editor', permissions: { viewBudgets: true } } };
+  const M = model();
+  await call(M, 'GET', '', undefined, { checkSharing: true });
+  assert.deepEqual(M.calls.find[0], { workspaceId: 'ws1', $or: [{ createdBy: 'u1' }, { isShared: true }] });
+  ctx = { workspace: { _id: 'ws1', ownerId: 'u1' }, member: OWNER };
+  const N = model();
+  await call(N, 'GET', '', undefined, { checkSharing: true });
+  assert.deepEqual(N.calls.find[0], { workspaceId: 'ws1' });
 });

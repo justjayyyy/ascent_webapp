@@ -1,99 +1,43 @@
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
-import Workspace from '../models/Workspace.js';
 import { issueSession } from '../lib/session.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
 import { authRateLimit } from '../lib/rateLimit.js';
 import { sanitize, isValidEmail, isValidPassword } from '../lib/validate.js';
+import { createAccount, startingPrefs } from '../lib/accounts.js';
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
-  
-  // Auth-specific rate limiting (stricter)
   if (authRateLimit(req, res)) return;
-  
-  if (req.method !== 'POST') {
-    return error(res, 'Method not allowed', 405);
-  }
-  
+  if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
+
   try {
-    const { email, password, full_name, language, theme } = req.body;
-    
-    // Sanitize and validate inputs
-    const cleanEmail = sanitize(email)?.toLowerCase();
-    const cleanName = sanitize(full_name);
-    
-    if (!cleanEmail || !password) {
-      return error(res, 'Email and password are required', 400);
-    }
-    
-    if (!isValidEmail(cleanEmail)) {
-      return error(res, 'Invalid email format', 400);
-    }
-    
-    if (!isValidPassword(password)) {
-      return error(res, 'Password must be at least 6 characters', 400);
-    }
-    
+    const { email, password, full_name, language, theme } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? sanitize(email).toLowerCase() : '';
+
+    if (!cleanEmail || !password) return error(res, 'Email and password are required', 400);
+    if (!isValidEmail(cleanEmail)) return error(res, 'Invalid email format', 400);
+    if (!isValidPassword(password)) return error(res, 'Password must be 6 to 128 characters', 400);
+
     await connectDB();
-    
-    // Check if user exists
-    const existingUser = await User.findOne({ email: cleanEmail });
-    if (existingUser) {
-      return error(res, 'Email already registered', 409);
+    if (await User.exists({ email: cleanEmail })) return error(res, 'Email already registered', 409);
+
+    let user;
+    try {
+      user = await createAccount({
+        email: cleanEmail,
+        password,
+        full_name: typeof full_name === 'string' ? sanitize(full_name).slice(0, 100) : '',
+        ...startingPrefs({ language, theme }),
+      });
+    } catch (err) {
+      if (err?.code === 11000) return error(res, 'Email already registered', 409); // a double-submitted form
+      throw err;
     }
-    
-    // Create user
-    const user = await User.create({
-      email: cleanEmail,
-      password,
-      full_name: cleanName || '',
-      ...(['en', 'he', 'ru'].includes(language) && { language }),
-      ...(['dark', 'light'].includes(theme) && { theme }),
-      isFirstLogin: true
-    });
 
-    // Create default workspace
-    const workspaceName = 'My Workspace';
-
-    const workspace = await Workspace.create({
-      name: workspaceName,
-      ownerId: user._id,
-      members: [{
-        userId: user._id,
-        email: user.email,
-        role: 'owner',
-        status: 'accepted',
-        permissions: {
-          viewPortfolio: true,
-          editPortfolio: true,
-          viewExpenses: true,
-          editExpenses: true,
-          viewNotes: true,
-          editNotes: true,
-          viewGoals: true,
-          editGoals: true,
-          viewBudgets: true,
-          editBudgets: true,
-          viewSettings: true,
-          manageUsers: true
-        }
-      }]
-    });
-
-    user.defaultWorkspace = workspace._id;
-    await user.save();
-    
-    // Generate token
     const token = await issueSession(user);
-    
-    return success(res, {
-      user: user.toJSON(),
-      token,
-      isFirstLogin: true
-    }, 201);
-    
+    return success(res, { user: user.toJSON(), token, isFirstLogin: true }, 201);
   } catch (err) {
     return serverError(res, err);
   }

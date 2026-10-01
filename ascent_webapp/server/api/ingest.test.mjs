@@ -97,6 +97,9 @@ const models = {
   },
 };
 
+// Without this, merchant-rule lookups reach real Mongoose and wait out its 10 s buffer timeout
+models.MerchantRule ??= { find: () => chain([]), findOne: () => chain(null), updateOne: async () => ({}) };
+
 for (const [name, model] of Object.entries(models)) {
   mock.module(at(`../models/${name}.js`), { exports: { default: model } });
 }

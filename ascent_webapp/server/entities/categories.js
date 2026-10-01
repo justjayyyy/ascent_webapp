@@ -1,11 +1,13 @@
 import Category from '../models/Category.js';
 import connectDB from '../lib/mongodb.js';
 import { handleCors } from '../lib/cors.js';
-import { success, error, forbidden, serverError } from '../lib/response.js';
+import { success, error, notFound, forbidden, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { memberMay, toPlain } from '../lib/entityHandler.js';
+import { isValidObjectId } from '../lib/validate.js';
 
 // Default categories with translation keys and colors
-const DEFAULT_CATEGORIES = [
+export const DEFAULT_CATEGORIES = [
   // Expense categories
   { nameKey: 'food_dining', type: 'Expense', icon: '🍽️', color: '#EF4444' },
   { nameKey: 'groceries', type: 'Expense', icon: '🛒', color: '#F59E0B' },
@@ -34,22 +36,35 @@ const DEFAULT_CATEGORIES = [
   { nameKey: 'other_income', type: 'Income', icon: '💵', color: '#78716C' },
 ];
 
-// Create default categories for a workspace
-async function createDefaultCategories(workspaceId, userId) {
-  const categories = DEFAULT_CATEGORIES.map(cat => ({
-    name: cat.nameKey, // Store the key as name, frontend will translate
-    nameKey: cat.nameKey,
-    type: cat.type,
-    icon: cat.icon,
-    color: cat.color,
-    isDefault: true,
-    workspaceId: workspaceId,
-    createdBy: userId,
-  }));
-  
-  await Category.insertMany(categories);
-  return Category.find({ workspaceId }).sort('-created_date');
+// Seeds the defaults once. Upserts on (workspace, nameKey) plus the unique index on the model mean two
+// first loads arriving together cannot add every default twice.
+export async function ensureDefaultCategories(workspaceId, userId) {
+  try {
+    await Category.bulkWrite(DEFAULT_CATEGORIES.map((cat) => ({
+      updateOne: {
+        filter: { workspaceId, nameKey: cat.nameKey, isDefault: true },
+        update: {
+          $setOnInsert: {
+            name: cat.nameKey, // the key is stored as the name; the app translates it
+            nameKey: cat.nameKey,
+            type: cat.type,
+            icon: cat.icon,
+            color: cat.color,
+            isDefault: true,
+            workspaceId,
+            createdBy: userId,
+          },
+        },
+        upsert: true,
+      },
+    })), { ordered: false });
+  } catch (err) {
+    if (!isDuplicate(err)) throw err; // a concurrent seed won the race for some rows: fine
+  }
 }
+
+const isDuplicate = (err) => err?.code === 11000 || err?.writeErrors?.every?.((e) => e.code === 11000 || e.err?.code === 11000);
+const clean = (b) => Object.fromEntries(Object.entries(b || {}).filter(([k]) => !['workspaceId', 'createdBy', '_id', 'id', 'isDefault'].includes(k) && !k.startsWith('$')));
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
@@ -57,90 +72,53 @@ export default async function handler(req, res) {
   try {
     const user = await authMiddleware(req, res);
     if (!user) return;
-
-    await connectDB();
-
-    // Ensure workspace context
-    if (!req.workspace) {
-      return error(res, 'Workspace context required', 400);
-    }
+    if (!req.workspace) return error(res, 'Workspace context required', 400);
 
     const { method } = req;
-    const id = typeof req.query.id === 'string' ? req.query.id : undefined;
-
-    // Same rule as the generic handler: owners and admins, or members with the expenses permission
-    const member = req.member;
-    const privileged = member && (member.role === 'owner' || member.role === 'admin');
-    if (!privileged && member?.permissions?.[method === 'GET' ? 'viewExpenses' : 'editExpenses'] !== true) {
+    // Same rule as the generic entity handler
+    if (!memberMay(req, user, method === 'GET' ? 'viewExpenses' : 'editExpenses')) {
       return forbidden(res, 'You do not have permission for this action');
     }
-    const clean = (b) => Object.fromEntries(Object.entries(b || {}).filter(([k]) => !['workspaceId', 'createdBy', '_id', 'id'].includes(k) && !k.startsWith('$')));
+    const id = req.query.id;
+    if (id !== undefined && !isValidObjectId(id)) return error(res, 'Invalid id', 400);
 
-    // Filter by workspace
-    const baseFilter = { workspaceId: req.workspace._id };
+    await connectDB();
+    const scope = { workspaceId: req.workspace._id };
 
     switch (method) {
       case 'GET': {
-        // Check if workspace has any categories
-        let categories = await Category.find(baseFilter).sort('-created_date');
-        
-        // If no categories, create defaults
+        let categories = await Category.find(scope).sort('-created_date').lean();
         if (categories.length === 0) {
-          categories = await createDefaultCategories(req.workspace._id, user._id);
+          await ensureDefaultCategories(req.workspace._id, user._id);
+          categories = await Category.find(scope).sort('-created_date').lean();
         }
-        
-        return success(res, categories);
+        return success(res, categories.map(toPlain));
       }
 
       case 'POST': {
-        // Create new category
-        const category = await Category.create({
-          ...clean(req.body),
-          isDefault: false, // User-created categories are not default
-          workspaceId: req.workspace._id,
-          createdBy: user._id
-        });
-        return success(res, category, 201);
+        const category = await Category.create({ ...clean(req.body), isDefault: false, ...scope, createdBy: user._id });
+        return success(res, toPlain(category), 201);
       }
 
       case 'PUT':
       case 'PATCH': {
-        if (!id) {
-          return error(res, 'ID is required for update');
-        }
-
-        const category = await Category.findOneAndUpdate(
-          { _id: id, ...baseFilter },
-          clean(req.body),
-          { new: true }
-        );
-
-        if (!category) {
-          return error(res, 'Category not found', 404);
-        }
-
-        return success(res, category);
+        if (!id) return error(res, 'ID is required for update');
+        const category = await Category.findOneAndUpdate({ _id: id, ...scope }, clean(req.body), { new: true, runValidators: true }).lean();
+        return category ? success(res, toPlain(category)) : notFound(res, 'Category not found');
       }
 
       case 'DELETE': {
-        if (!id) {
-          return error(res, 'ID is required for delete');
-        }
-
-        const category = await Category.findOneAndDelete({ _id: id, ...baseFilter });
-
-        if (!category) {
-          return error(res, 'Category not found', 404);
-        }
-
-        return success(res, { deleted: true });
+        if (!id) return error(res, 'ID is required for delete');
+        const category = await Category.findOneAndDelete({ _id: id, ...scope }).lean();
+        return category ? success(res, { deleted: true }) : notFound(res, 'Category not found');
       }
 
       default:
         return error(res, 'Method not allowed', 405);
     }
   } catch (err) {
-    console.error('[Categories API Error]', err);
+    if (err?.name === 'ValidationError' || err?.name === 'CastError') return error(res, err.message, 400);
+    console.error('[Categories API]', err?.message);
     return serverError(res, err);
   }
 }

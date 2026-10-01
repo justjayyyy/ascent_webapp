@@ -40,6 +40,12 @@ const categorySchema = new mongoose.Schema({
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
 });
 
+// One copy of each built-in category per workspace (see ensureDefaultCategories)
+categorySchema.index(
+  { workspaceId: 1, nameKey: 1 },
+  { unique: true, partialFilterExpression: { isDefault: true, nameKey: { $type: 'string' } } }
+);
+
 categorySchema.virtual('id').get(function() {
   return this._id.toHexString();
 });

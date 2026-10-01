@@ -17,12 +17,10 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { email, password } = req.body;
-    
-    // Validate inputs
-    const cleanEmail = sanitize(email)?.toLowerCase();
-    
-    if (!cleanEmail || !password) {
+    const { email, password } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? sanitize(email).toLowerCase() : '';
+
+    if (!cleanEmail || typeof password !== 'string' || !password) {
       return error(res, 'Email and password are required', 400);
     }
     
@@ -30,16 +28,8 @@ export default async function handler(req, res) {
       return error(res, 'Invalid email format', 400);
     }
     
-    // Connect to MongoDB
-    try {
-      await connectDB();
-    } catch (dbError) {
-      if (dbError.code === 'MONGODB_AUTH_FAILED' || dbError.code === 'MONGODB_CONNECTION_FAILED') {
-        return error(res, 'Database connection failed', 503);
-      }
-      return serverError(res, dbError);
-    }
-    
+    await connectDB();
+
     // Find user
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
@@ -53,17 +43,11 @@ export default async function handler(req, res) {
       return error(res, 'Invalid email or password', 401);
     }
     
-    // Check if first login
     const isFirstLogin = user.isFirstLogin === true;
-    
-    // Update last login and mark first login as complete
     user.lastLogin = new Date();
-    if (isFirstLogin) {
-      user.isFirstLogin = false;
-    }
+    user.isFirstLogin = false;
     await user.save();
-    
-    // Generate token
+
     const token = await issueSession(user);
     
     return success(res, {
