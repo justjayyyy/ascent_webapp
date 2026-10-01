@@ -79,10 +79,10 @@ export default function ImportExportSection({ accounts, positions, transactions,
 
       downloadCSV(csvContent, filename);
       const pageName = page === 'portfolio' ? t('portfolio') : page === 'expenses' ? t('expenses') : t('notes');
-      toast.success(`${pageName} ${t('exportedSuccessfully') || 'exported successfully'}!`);
+      toast.success(`${pageName} ${t('exportedSuccessfully')}!`);
     } catch (error) {
       console.error('Export error:', error);
-      toast.error(t('exportFailed') || 'Failed to export data');
+      toast.error(t('exportFailed'));
     } finally {
       setExporting(null);
     }

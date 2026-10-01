@@ -202,16 +202,16 @@ export default function AddTransactionDialog({
       }
     } else {
       if (!formData.recurringStartDate) {
-        newErrors.recurringStartDate = t('startDateRequired') || 'Start date is required';
+        newErrors.recurringStartDate = t('startDateRequired');
       }
       if (!formData.recurringEndDate) {
-        newErrors.recurringEndDate = t('endDateRequired') || 'End date is required';
+        newErrors.recurringEndDate = t('endDateRequired');
       }
       if (formData.recurringStartDate && formData.recurringEndDate) {
         const startDate = parseISO(formData.recurringStartDate);
         const endDate = parseISO(formData.recurringEndDate);
         if (isAfter(startDate, endDate)) {
-          newErrors.recurringEndDate = t('endDateAfterStartDate') || 'End date must be after start date';
+          newErrors.recurringEndDate = t('endDateAfterStartDate');
         }
       }
     }
@@ -622,7 +622,7 @@ export default function AddTransactionDialog({
               <div className="grid grid-cols-2 gap-0 sm:gap-4">
                 <div className="space-y-0 sm:space-y-2">
                   <Label htmlFor="recurringStartDate" className={cn("text-xs sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
-                    {t('fromDate') || 'From Date'} *
+                    {t('fromDate')} *
                   </Label>
                   <Input
                     id="recurringStartDate"
@@ -640,7 +640,7 @@ export default function AddTransactionDialog({
 
                 <div className="space-y-0 sm:space-y-2">
                   <Label htmlFor="recurringEndDate" className={cn("text-xs sm:text-sm mb-0 sm:mb-0 block", colors.textSecondary)}>
-                    {t('toDate') || 'To Date'} *
+                    {t('toDate')} *
                   </Label>
                   <Input
                     id="recurringEndDate"

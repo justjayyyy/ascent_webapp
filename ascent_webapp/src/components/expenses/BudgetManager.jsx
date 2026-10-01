@@ -259,7 +259,7 @@ export default function BudgetManager({
                     onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
                   >
                     <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                      <SelectValue placeholder={t('selectMonth') || 'Select month'} />
+                      <SelectValue placeholder={t('selectMonth')} />
                     </SelectTrigger>
                     <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
                       {MONTHS.map((month) => (
@@ -302,7 +302,7 @@ export default function BudgetManager({
                       <EyeOff className={cn("w-4 h-4", colors.textTertiary)} />
                     )}
                     <Label htmlFor="isShared" className={cn("text-sm cursor-pointer", colors.textSecondary)}>
-                      {t('shareWithTeam') || 'Share with team'}
+                      {t('shareWithTeam')}
                     </Label>
                   </div>
                   <Switch aria-label={t('shareWithTeam')}

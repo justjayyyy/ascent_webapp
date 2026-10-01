@@ -27,3 +27,23 @@ describe('translations', () => {
     expect(wrong).toEqual([]);
   });
 });
+
+describe('keys used in the code', () => {
+  // Every t('literal') in the app (portfolio pages are hidden and keep their own strings)
+  const sources = import.meta.glob(['/src/**/*.{js,jsx}', '!/src/**/*.test.*', '!/src/components/portfolio/**', '!/src/pages/Portfolio.jsx', '!/src/pages/AccountDetail.jsx'], { query: '?raw', import: 'default', eager: true });
+  const used = new Map();
+  for (const [file, text] of Object.entries(sources)) {
+    for (const m of text.matchAll(/\bt\(\s*'([A-Za-z0-9_]+)'\s*[,)]/g)) {
+      if (!used.has(m[1])) used.set(m[1], file);
+    }
+  }
+
+  test('the scan finds the app\'s strings', () => {
+    expect(used.size).toBeGreaterThan(300);
+  });
+
+  test('every key the app asks for exists (a missing one shows its raw key on screen)', () => {
+    const missing = [...used].filter(([k]) => !(k in translations.en)).map(([k, f]) => `${k} (${f})`);
+    expect(missing).toEqual([]);
+  });
+});

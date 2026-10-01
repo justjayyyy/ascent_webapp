@@ -79,7 +79,7 @@ export default function Settings() {
     onError: async (error) => {
       console.error('Update error:', error);
       await refreshUser(); // revert to server truth
-      toast.error('Failed to update settings');
+      toast.error(t('setUpdateFailed'));
     },
   });
   const saveUser = updateUserMutation.mutate;
@@ -109,7 +109,7 @@ export default function Settings() {
     },
     onError: (error, variables, context) => {
       if (context?.previousWorkspace) setCurrentWorkspace(context.previousWorkspace);
-      toast.error('Failed to update workspace name');
+      toast.error(t('wsRenameFailed'));
     },
   });
 

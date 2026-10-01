@@ -31,7 +31,7 @@ export default function CategoryManager({
     setError('');
     
     if (!formData.name.trim()) {
-      setError(t('categoryNameRequired') || 'Category name is required');
+      setError(t('categoryNameRequired'));
       return;
     }
 
@@ -40,7 +40,7 @@ export default function CategoryManager({
     );
 
     if (exists) {
-      setError(t('categoryExists') || 'Category already exists');
+      setError(t('categoryExists'));
       return;
     }
 
@@ -67,10 +67,10 @@ export default function CategoryManager({
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className={cn("text-lg sm:text-xl font-bold flex items-center gap-2", colors.accentText)}>
             <Tag className="w-4 h-4 sm:w-5 sm:h-5" />
-            {t('manageCategories') || 'Manage Categories'}
+            {t('manageCategories')}
           </DialogTitle>
           <DialogDescription className={cn("text-xs sm:text-sm", colors.textTertiary)}>
-            {t('addManageCategoriesDesc') || 'Add and manage categories for your transactions'}
+            {t('addManageCategoriesDesc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -79,10 +79,10 @@ export default function CategoryManager({
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('categoryName') || 'Category Name'} *</Label>
+              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('categoryName')} *</Label>
               <Input
                 type="text"
-                placeholder={t('categoryPlaceholder') || 'e.g., Subscription, Gifts'}
+                placeholder={t('categoryPlaceholder')}
                 value={formData.name}
                 onChange={(e) => {
                   setFormData({ ...formData, name: e.target.value });
@@ -104,7 +104,7 @@ export default function CategoryManager({
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
                   <SelectItem value="Expense" className={colors.textPrimary}>{t('expense')}</SelectItem>
                   <SelectItem value="Income" className={colors.textPrimary}>{t('income')}</SelectItem>
-                  <SelectItem value="Both" className={colors.textPrimary}>{t('both') || 'Both'}</SelectItem>
+                  <SelectItem value="Both" className={colors.textPrimary}>{t('both')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -127,18 +127,18 @@ export default function CategoryManager({
             ) : (
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 me-1.5 sm:me-2" />
             )}
-            {t('addCategory') || 'Add Category'}
+            {t('addCategory')}
           </Button>
         </form>
         )}
 
         {/* All Categories */}
         <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
-          <h3 className={cn("text-sm sm:text-base font-semibold", colors.textPrimary)}>{t('allCategories') || 'All Categories'}</h3>
+          <h3 className={cn("text-sm sm:text-base font-semibold", colors.textPrimary)}>{t('allCategories')}</h3>
           
           {categories.length === 0 ? (
             <p className={cn("text-xs sm:text-sm text-center py-3 sm:py-4", colors.textTertiary)}>
-              {t('noCategoriesYet') || 'No categories yet. Add your first category above.'}
+              {t('noCategoriesYet')}
             </p>
           ) : (
             <div className="space-y-1.5 sm:space-y-2">
