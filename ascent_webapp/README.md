@@ -59,6 +59,8 @@ npm run check      # all three
   `src/test/pages.test.jsx`, which renders every main screen in every language against an in-memory API
   (`src/test/fakeApi.js`).
 
+GitHub Actions (`.github/workflows/check.yml`) runs `npm run check` and a production `npm audit` on every push.
+
 ## Layout
 
 ```
@@ -88,6 +90,9 @@ Conventions worth knowing:
 - Transactions are read by view, never all at once: `useTransactions({ from })` is a date window (14 months
   by default, longer when someone browses back) and `useLinkedTransactions(field)` gets every row with that
   field set (`planId`, `commitmentId`, `installmentGroupId`, `split`). The API supports `from`, `to` and `has`.
+- Plan items and loan payments change one entry at a time (`changeEntry`, `PATCH ?list=`), never by rewriting the
+  list, so two people editing at once keep both changes (`src/lib/listEntries.js`).
+- The server sets who added a row (`created_by`); `paidBy`, split shares and settle-up people must be members.
 - CSV export (`src/lib/exportData.js`) fetches everything on demand and neutralises spreadsheet formulas.
 - Money in another currency: `shared/money.js` (`amountInCurrency`, `conversionFields`).
 - Every UI string lives in `src/lib/translations*.js` in all three languages (a test enforces it).
