@@ -14,7 +14,6 @@ import InvitationsBanner from '@/components/workspace/InvitationsBanner';
 import WelcomeDialog from './components/WelcomeDialog';
 import InstallHint from './components/InstallHint';
 import MobileIsland from '@/components/MobileIsland';
-import MobileDock from '@/components/shell/MobileDock';
 import PullToRefresh from '@/components/shell/PullToRefresh';
 import SyncStatus from '@/components/shell/SyncStatus';
 import { QuickActionsProvider } from '@/components/shell/QuickActions';
@@ -28,8 +27,6 @@ import { useOutbox } from '@/lib/offline/txOutbox';
 const CalendarModal = lazy(() => import('@/components/GoogleCalendar/CalendarModal'));
 
 const SIDEBAR_KEY = 'ascent.sidebarCollapsed';
-// The dock's four destinations, in order (Income, Settings and the rest stay in the menu)
-const DOCK_PAGES = ['Dashboard', 'Expenses', 'Plans', 'Notes'];
 
 // Each tab keeps its own scroll position, like the tabs of a native app
 const scrollMemory = new Map();
@@ -220,10 +217,6 @@ function LayoutContent({ children, currentPageName }) {
   const pageTitle = navigation.find((n) => n.page === currentPageName)?.name
     || (currentPageName === 'Settings' ? t('settings') : 'Ascent');
 
-  const dockItems = useMemo(
-    () => DOCK_PAGES.map((page) => navigation.find((n) => n.page === page)).filter(Boolean),
-    [navigation]
-  );
   const canAddMoney = hasPermission('editExpenses');
   const canAddNotes = hasPermission('editNotes');
   const openQuickAdd = useCallback((type) => setQuickAdd({ type, nonce: Date.now() }), []);
@@ -327,15 +320,6 @@ function LayoutContent({ children, currentPageName }) {
           </PullToRefresh>
         </div>
       </main>
-
-      {/* Phones: the floating dock */}
-      <MobileDock
-        items={dockItems}
-        currentPageName={mobileMenuOpen ? null : currentPageName}
-        compact={headerHidden && !mobileMenuOpen}
-        canCreate={canAddMoney || canAddNotes}
-        t={t}
-      />
 
       <SyncStatus />
       <QuickAddSheet request={quickAdd} onClose={() => setQuickAdd(null)} />

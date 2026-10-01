@@ -699,17 +699,9 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 @keyframes sheet-in { from { transform: translateY(100%); } }
 @keyframes sheet-out { to { transform: translateY(100%); } }
 
-/* ---- The phone dock ----
-   --dock-bottom: where the dock floats (a little into the home-indicator area, like a native
-   floating tab bar); --dock-space: what the page keeps free below its content. */
-:root {
-  --dock-bottom: max(0.625rem, calc(env(safe-area-inset-bottom) - 0.75rem));
-  --dock-space: calc(4rem + var(--dock-bottom) + 1rem);
-}
+/* --dock-space: what the page keeps free below its content on phones (the home indicator) */
+:root { --dock-space: max(1rem, env(safe-area-inset-bottom)); }
 @media (min-width: 768px) { :root { --dock-space: 0px; } }
-.mobile-dock { transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s; }
-html[data-keyboard] .mobile-dock,
-html[data-dock-hidden] .mobile-dock { transform: translateY(calc(100% + var(--dock-bottom) + 1rem)); opacity: 0; pointer-events: none; }
 
 @keyframes splash-sweep {
   0% { transform: translateX(-110%); }
