@@ -55,7 +55,9 @@ npm run check      # all three
 
 - `npm run test:node`: API handlers against in-memory stand-ins for the models, and the shared logic.
 - `npm run test:web`: Vitest + Testing Library in jsdom: API client, auth, data hooks, the offline queue,
-  translations (every key in en/he/ru, every key the app uses exists), components and helpers.
+  translations (every key in en/he/ru, every key the app uses exists), components and helpers, and
+  `src/test/pages.test.jsx`, which renders every main screen in every language against an in-memory API
+  (`src/test/fakeApi.js`).
 
 ## Layout
 
@@ -83,6 +85,10 @@ Conventions worth knowing:
 - Every request carries the workspace in `x-workspace-id`; the server scopes every query to it.
 - Lists are cached under `[name, workspaceId]` (see `useWorkspaceData.js`); invalidate with `['name']`.
 - Transactions are written through the offline queue (`src/lib/offline/txOutbox.js`), never directly.
+- Transactions are read by view, never all at once: `useTransactions({ from })` is a date window (14 months
+  by default, longer when someone browses back) and `useLinkedTransactions(field)` gets every row with that
+  field set (`planId`, `commitmentId`, `installmentGroupId`, `split`). The API supports `from`, `to` and `has`.
+- CSV export (`src/lib/exportData.js`) fetches everything on demand and neutralises spreadsheet formulas.
 - Money in another currency: `shared/money.js` (`amountInCurrency`, `conversionFields`).
 - Every UI string lives in `src/lib/translations*.js` in all three languages (a test enforces it).
 - Portfolio pages are hidden (`src/lib/features.js`) but kept; they are not linted for translations.
