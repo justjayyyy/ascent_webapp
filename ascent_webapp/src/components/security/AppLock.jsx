@@ -35,6 +35,11 @@ export function AppLockProvider({ children }) {
     return () => window.removeEventListener('ascent:lock-prefs', read);
   }, [userId]);
 
+  // Opened fresh with the lock on: locked, also when the account arrives after this mounted
+  useEffect(() => {
+    if (enabled && !unlockedThisSession()) setLocked(true);
+  }, [enabled]);
+
   const lockNow = useCallback(() => { if (enabled) setLocked(true); }, [enabled]);
 
   // Background: lock on return once the chosen time has passed; blur the app while it is away so the
