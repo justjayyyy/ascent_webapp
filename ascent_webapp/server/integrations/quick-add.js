@@ -1,12 +1,14 @@
 import crypto from 'crypto';
 import connectDB from '../lib/mongodb.js';
 import { handleCors } from '../lib/cors.js';
-import { success, error, serverError, unauthorized } from '../lib/response.js';
+import { success, error, serverError, unauthorized, forbidden } from '../lib/response.js';
+import { memberCanSubmit } from '../lib/ingest/access.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { suggestCategory } from '../lib/categorize.js';
 import { loadRules, ruleKeyFor } from '../lib/merchantRules.js';
 import { categoryTranslations } from '../lib/categoryTranslations.js';
 import User from '../models/User.js';
+import Workspace from '../models/Workspace.js';
 import Category from '../models/Category.js';
 import Card from '../models/Card.js';
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
@@ -61,6 +63,15 @@ function bearer(req) {
 async function addFromShortcut(req, res, token) {
   const user = await User.findOne({ shortcutTokenHash: hash(token) });
   if (!user || !user.shortcutWorkspaceId) return unauthorized(res, 'Invalid key');
+
+  // Checked on every use: someone removed from the household, or no longer allowed to add expenses,
+  // cannot keep adding them with a key made earlier
+  const workspace = await Workspace.findOne({
+    _id: user.shortcutWorkspaceId,
+    members: { $elemMatch: { userId: user._id, status: { $in: ['accepted', null] } } },
+  }).select('members').lean();
+  const member = workspace?.members?.find((m) => String(m.userId) === String(user._id));
+  if (!memberCanSubmit(member)) return forbidden(res, 'This key can no longer add expenses to that workspace');
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const merchant = String(body.merchant ?? body.name ?? body.description ?? body.title ?? '').trim().slice(0, 120);
@@ -118,8 +129,10 @@ async function addFromShortcut(req, res, token) {
     paymentMethod: 'Apple Pay',
     cardId: card ? card._id.toString() : null,
     tags: ['apple-pay'],
+    source: 'wallet',
     workspaceId,
     createdBy: user._id,
+    created_by: user.email,
   });
 
   await User.updateOne({ _id: user._id }, { $set: { shortcutLastUsedAt: new Date() } });
