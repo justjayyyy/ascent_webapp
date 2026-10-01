@@ -3,6 +3,7 @@ import { success, error, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import User from '../models/User.js';
 import { LANGUAGES, THEMES } from '../lib/accounts.js';
+import { deleteAccount } from '../lib/deleteAccount.js';
 
 const isBool = (v) => typeof v === 'boolean';
 
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       // user is a lean document, so toJSON() never ran: drop the secrets here
-      const { password, shortcutTokenHash, passkeys, ...safe } = user;
+      const { password, shortcutTokenHash, passkeys, verifyTokenHash, verifyExpiresAt, resetTokenHash, resetExpiresAt, ...safe } = user;
       return success(res, { ...safe, passkeyCount: Array.isArray(passkeys) ? passkeys.length : 0 });
     }
 
@@ -50,6 +51,14 @@ export default async function handler(req, res) {
       if (invalid) return error(res, `Invalid value for ${invalid}`, 400);
       const updated = await User.findByIdAndUpdate(user._id, updates, { new: true, runValidators: true });
       return success(res, updated.toJSON());
+    }
+
+    if (req.method === 'DELETE') {
+      // The person types their email to confirm; a stray request cannot delete an account
+      const confirm = String(req.body?.confirm || '').trim().toLowerCase();
+      if (!confirm || confirm !== String(user.email).toLowerCase()) return error(res, 'Type your email to confirm', 400);
+      await deleteAccount(user);
+      return success(res, { deleted: true });
     }
 
     return error(res, 'Method not allowed', 405);

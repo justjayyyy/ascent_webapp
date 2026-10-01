@@ -7,7 +7,9 @@ import { success, error, serverError, unauthorized, notFound, forbidden } from '
 import { sendEmail } from '../lib/email-helper.js';
 import { getEmailTemplate } from '../lib/email-templates.js';
 import { deleteWorkspaceData } from '../lib/workspaceData.js';
+import { deleteIfEmpty } from '../lib/deleteAccount.js';
 import { findInvitation, inviteKeyOf, newInviteToken } from '../lib/invitations.js';
+import { linkOrigin } from '../lib/links.js';
 import {
   ASSIGNABLE_ROLES,
   MAX_MEMBERS,
@@ -55,10 +57,7 @@ const inviteCopy = (language, inviter, workspaceName) => {
 
 const LINK_INVITE_TTL_MS = 48 * 60 * 60 * 1000;
 
-const inviteLinkFor = (req, member) => {
-  const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
-  return `${origin}/accept-invitation/${inviteKeyOf(member)}`;
-};
+const inviteLinkFor = (req, member) => `${linkOrigin(req)}/accept-invitation/${inviteKeyOf(member)}`;
 
 async function sendInvitation({ req, workspace, member, inviter, language }) {
   const inviteLink = inviteLinkFor(req, member);
@@ -134,8 +133,8 @@ export default async function handler(req, res) {
     switch (method) {
       case 'GET': {
         if (action === 'invitations') {
-          // Only email-verified (Google) accounts see invitations in-app; everyone else uses the emailed link.
-          if (user.authProvider !== 'google') return success(res, []);
+          // Only accounts that proved they own their email see invitations in-app; others use the emailed link.
+          if (user.authProvider !== 'google' && user.emailVerified !== true) return success(res, []);
           const workspaces = await Workspace.find({
             members: { $elemMatch: { email: user.email, status: 'pending' } },
           }).lean();
@@ -292,6 +291,29 @@ export default async function handler(req, res) {
           ctx.workspace.members = ctx.workspace.members.filter((m) => !isSame(m._id, ctx.actor._id));
           await ctx.workspace.save();
           return success(res, { message: 'You left the workspace' });
+        }
+
+        // The owner deleted their account: a remaining member keeps the workspace (and becomes its owner)
+        // or lets it go. The first to keep it wins; when the last one lets go it is deleted with its data.
+        if (action === 'claim') {
+          if (!id) return error(res, 'Workspace ID required', 400);
+          const claimed = await Workspace.updateOne(
+            { _id: id, ownerLeft: { $ne: null }, members: memberScope(user) },
+            { $set: { ownerId: user._id, ownerLeft: null, 'members.$.role': 'owner', 'members.$.permissions': buildPermissions('owner') } }
+          );
+          if (!claimed.matchedCount) return error(res, 'This workspace already has an owner', 409);
+          return success(res, await present(await Workspace.findById(id), user));
+        }
+
+        if (action === 'release') {
+          if (!id) return error(res, 'Workspace ID required', 400);
+          const left = await Workspace.updateOne(
+            { _id: id, ownerLeft: { $ne: null }, members: memberScope(user) },
+            { $pull: { members: { userId: user._id } } }
+          );
+          if (!left.matchedCount) return error(res, 'This workspace already has an owner', 409);
+          const deleted = await deleteIfEmpty(id);
+          return success(res, { left: true, deleted });
         }
 
         if (action === 'heartbeat') {

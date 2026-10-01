@@ -118,6 +118,18 @@ const passkeySchema = new mongoose.Schema({
 userSchema.add({ passkeys: { type: [passkeySchema], default: [] } });
 userSchema.index({ 'passkeys.credentialID': 1 }, { unique: true, sparse: true });
 
+// Email confirmation and password reset (lib/accountTokens.js keeps only token hashes). emailVerified is
+// false for email sign-ups until they confirm, true for Google; accounts from before it existed have none.
+userSchema.add({
+  emailVerified: { type: Boolean },
+  verifyTokenHash: { type: String },
+  verifyExpiresAt: { type: Date },
+  resetTokenHash: { type: String },
+  resetExpiresAt: { type: Date },
+});
+userSchema.index({ verifyTokenHash: 1 }, { sparse: true });
+userSchema.index({ resetTokenHash: 1 }, { sparse: true });
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
@@ -142,6 +154,10 @@ userSchema.methods.toJSON = function() {
   delete obj.password;
   delete obj.shortcutTokenHash;
   delete obj.sessionId;
+  delete obj.verifyTokenHash;
+  delete obj.verifyExpiresAt;
+  delete obj.resetTokenHash;
+  delete obj.resetExpiresAt;
   // The app only needs to know passkeys exist; details come from /api/auth/passkey?action=list
   obj.passkeyCount = Array.isArray(obj.passkeys) ? obj.passkeys.length : 0;
   delete obj.passkeys;

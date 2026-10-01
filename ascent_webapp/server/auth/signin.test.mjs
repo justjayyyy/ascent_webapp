@@ -20,7 +20,7 @@ class FakeUser {
     users.push(u);
     return u;
   }
-  static async updateOne() {}
+  static async updateOne(q, u) { const user = users.find((x) => x._id === q._id); if (user) Object.assign(user, u.$set); }
   async save() { return this; }
   async comparePassword(p) { return p === this.password; }
   toJSON() { const { password, ...rest } = this; return { ...rest }; }
@@ -34,6 +34,8 @@ mock.module(at('../models/Workspace.js'), {
     },
   },
 });
+let sent; // emails "sent"
+mock.module(at('../lib/email-helper.js'), { exports: { sendEmail: async (m) => { sent.push(m); return { sent: true }; } } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../lib/session.js'), { exports: { issueSession: async (u) => `token-for-${u._id}` } });
 mock.module(at('../lib/rateLimit.js'), { exports: { authRateLimit: () => false, rateLimit: () => false } });
@@ -64,6 +66,7 @@ beforeEach(() => {
   users = [];
   workspaces = [];
   workspaceUpdates = [];
+  sent = [];
   googleAnswer = { email: 'dana@gmail.com', name: 'Dana', picture: 'p.png', googleId: 'g-1' };
 });
 
@@ -190,4 +193,32 @@ test('profile edits accept only known fields with valid values', () => {
   assert.equal(profileChanges({ weeklyReports: 'yes' }).invalid, 'weeklyReports');
   assert.equal(profileChanges({ full_name: 'x'.repeat(101) }).invalid, 'full_name');
   assert.deepEqual(profileChanges({}).updates, {});
+});
+
+// ---- email confirmation ----
+test('an email sign-up starts unconfirmed and is sent a confirmation link; only the hash is stored', async () => {
+  const { hashToken } = await import('../lib/accountTokens.js');
+  await call(register, { email: 'a@b.test', password: 'secret1', language: 'ru' });
+  assert.equal(users[0].emailVerified, false);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'a@b.test');
+  const token = sent[0].body.match(/\/verify-email\/([A-Za-z0-9_-]{43})/)[1];
+  assert.equal(users[0].verifyTokenHash, hashToken(token));
+  assert.ok(users[0].verifyExpiresAt > new Date());
+  assert.match(sent[0].subject, /email/i);
+});
+
+test('Google confirms the address; an unconfirmed password someone else set on it stops working', async () => {
+  users.push(new FakeUser({ email: 'dana@gmail.com', password: 'squatter', emailVerified: false, isFirstLogin: false }));
+  await call(google, { credential: 'tok' });
+  assert.equal(users[0].emailVerified, true);
+  assert.match(users[0].password, /^!google:/);
+  assert.equal((await call(login, { email: 'dana@gmail.com', password: 'squatter' })).code, 401);
+});
+
+test('Google keeps the password of an account from before confirmation existed', async () => {
+  users.push(new FakeUser({ email: 'dana@gmail.com', password: 'mine123', isFirstLogin: false }));
+  await call(google, { credential: 'tok' });
+  assert.equal(users[0].password, 'mine123');
+  assert.equal(users[0].emailVerified, true);
 });

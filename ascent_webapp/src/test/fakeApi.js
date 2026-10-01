@@ -69,7 +69,21 @@ export function fakeFetch(data) {
 
     if (path === '/auth/me') {
       if (method === 'PUT') Object.assign(data.me, body);
+      if (method === 'DELETE') return body?.confirm === data.me.email ? ok({ deleted: true }) : fail(400, 'Type your email to confirm');
       return ok(data.me);
+    }
+    if (path === '/auth/password') {
+      if (q.action === 'forgot') return ok({ sent: true });
+      if (q.action === 'reset') return body.token === 'bad'.padEnd(43, 'x') ? fail(400, 'This link is invalid or has expired') : ok({ user: data.me, token: 'fresh-token' });
+    }
+    if (path === '/auth/verify-email') return ok(q.action === 'send' ? { sent: true } : { verified: true });
+    if (path === '/workspaces' && (q.action === 'claim' || q.action === 'release')) {
+      const ws = data.workspaces.find((w) => w.id === q.id);
+      if (!ws?.ownerLeft) return fail(409, 'This workspace already has an owner');
+      ws.ownerLeft = null;
+      if (q.action === 'claim') ws.ownerId = data.me.id;
+      else data.workspaces.splice(data.workspaces.indexOf(ws), 1);
+      return ok(q.action === 'claim' ? ws : { left: true });
     }
     if (path === '/workspaces') {
       if (q.action === 'invitations') return ok([]);

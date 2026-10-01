@@ -48,11 +48,16 @@ export default async function handler(req, res) {
         googleId: google.googleId,
         avatar: google.picture,
         authProvider: 'google',
+        emailVerified: true,
         ...startingPrefs({ language, theme }),
       });
       isFirstLogin = true;
     } else {
       isFirstLogin = user.isFirstLogin === true;
+      // Someone may have signed up with this address before its owner arrived and never confirmed it.
+      // Google has just proven who owns it, so that unconfirmed password stops working.
+      if (user.emailVerified === false) user.password = unusablePassword();
+      user.emailVerified = true;
       if (!user.googleId) {
         user.googleId = google.googleId;
         if (google.picture && !user.avatar) user.avatar = google.picture;

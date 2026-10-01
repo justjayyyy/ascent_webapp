@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
 import InvitationsBanner from '@/components/workspace/InvitationsBanner';
+import { OwnerLeftPrompt, VerifyEmailBanner } from '@/components/account/AccountPrompts';
 import WelcomeDialog from './components/WelcomeDialog';
 import InstallHint from './components/InstallHint';
 import MobileIsland from '@/components/MobileIsland';
@@ -299,7 +300,9 @@ function LayoutContent({ children, currentPageName }) {
       >
         <div className="pb-[var(--dock-space)] safe-area-inset-x md:pb-0 md:px-0">
           <PullToRefresh disabled={mobileMenuOpen} label={t('refresh')}>
+            <VerifyEmailBanner />
             <InvitationsBanner />
+            <OwnerLeftPrompt />
             {/* A new page rises in; the previous one is already gone, so nothing slides over it */}
             <motion.div
               key={currentPageName}

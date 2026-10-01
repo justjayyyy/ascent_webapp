@@ -6,6 +6,7 @@ import { success, error, serverError } from '../lib/response.js';
 import { authRateLimit } from '../lib/rateLimit.js';
 import { sanitize, isValidEmail, isValidPassword } from '../lib/validate.js';
 import { createAccount, startingPrefs } from '../lib/accounts.js';
+import { sendVerification } from './verify-email.js';
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
       user = await createAccount({
         email: cleanEmail,
         password,
+        emailVerified: false,
         full_name: typeof full_name === 'string' ? sanitize(full_name).slice(0, 100) : '',
         ...startingPrefs({ language, theme }),
       });
@@ -36,6 +38,7 @@ export default async function handler(req, res) {
       throw err;
     }
 
+    await sendVerification(req, user);
     const token = await issueSession(user);
     return success(res, { user: user.toJSON(), token, isFirstLogin: true }, 201);
   } catch (err) {

@@ -49,6 +49,17 @@ mock.module(at('../middleware/auth.js'), {
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../lib/email-helper.js'), { exports: { sendEmail: async (m) => { sent.push(m); return { sent: true }; } } });
 let wiped; // workspaces whose data was deleted
+mock.module(at('../lib/deleteAccount.js'), {
+  exports: {
+    deleteIfEmpty: async (id) => {
+      const i = store.findIndex((w) => same(w._id, id) && !w.members.some((m) => m.status === 'accepted'));
+      if (i === -1) return false;
+      store.splice(i, 1);
+      wiped.push(String(id));
+      return true;
+    },
+  },
+});
 mock.module(at('../lib/workspaceData.js'), { exports: { deleteWorkspaceData: async (id) => { wiped.push(String(id)); } } });
 mock.module(at('../lib/email-templates.js'), { exports: { getEmailTemplate: ({ body }) => `<html>${body}</html>` } });
 mock.module(at('../models/User.js'), {
@@ -79,12 +90,18 @@ mock.module(at('../models/Workspace.js'), {
         const ws = store.find((w) => same(w._id, q._id));
         const cond = q.members?.$elemMatch;
         const set = update.$set || {};
-        if (!ws || !cond || !Object.keys(set).every((k) => k.startsWith('members.$.'))) return { modifiedCount: 0 };
+        if (!ws || !cond) return { matchedCount: 0, modifiedCount: 0 };
+        if (q.ownerLeft && ws.ownerLeft == null) return { matchedCount: 0, modifiedCount: 0 };
         const ok = (m) => Object.entries(cond).every(([k, v]) => (v && v.$gt ? m[k] > v.$gt : same(m[k], v)));
         const m = ws.members.find(ok);
-        if (!m) return { modifiedCount: 0 };
-        for (const [k, v] of Object.entries(set)) m[k.slice('members.$.'.length)] = v;
-        return { modifiedCount: 1 };
+        if (!m) return { matchedCount: 0, modifiedCount: 0 };
+        for (const [k, v] of Object.entries(set)) {
+          if (k.startsWith('members.$.')) m[k.slice('members.$.'.length)] = v;
+          else ws[k] = v;
+        }
+        const pull = update.$pull?.members;
+        if (pull) ws.members = ws.members.filter((x) => !same(x.userId, pull.userId));
+        return { matchedCount: 1, modifiedCount: 1 };
       },
     },
   },
@@ -436,4 +453,52 @@ test('a made-up token is not found', async () => {
   currentUser = OUTSIDER;
   assert.equal((await call('POST', { query: { action: 'accept', token: 'x'.repeat(32) } })).code, 404);
   assert.equal((await call('POST', { query: { action: 'accept', token: 'nope' } })).code, 404);
+});
+
+/* ------------------------------------------------------------ the owner deleted their account */
+
+const ownerGone = () => {
+  ws.members = ws.members.filter((m) => m.role !== 'owner');
+  ws.ownerLeft = { email: OWNER.email, name: 'owner', at: new Date() };
+  wiped = [];
+};
+
+test('the first remaining member to keep the workspace becomes its owner; the next is told it has one', async () => {
+  ownerGone();
+  currentUser = VIEWER;
+  const r = await call('POST', { query: q({ action: 'claim' }) });
+  assert.equal(r.code, 200);
+  assert.ok(same(ws.ownerId, VIEWER._id));
+  assert.equal(ws.ownerLeft, null);
+  const me = ws.members.find((m) => same(m.userId, VIEWER._id));
+  assert.equal(me.role, 'owner');
+  assert.equal(me.permissions.manageUsers, true);
+  currentUser = EDITOR;
+  assert.equal((await call('POST', { query: q({ action: 'claim' }) })).code, 409);
+  assert.equal((await call('POST', { query: q({ action: 'release' }) })).code, 409);
+});
+
+test('members let an ownerless workspace go; the last one out deletes it with its data', async () => {
+  ownerGone();
+  for (const u of [ADMIN, EDITOR]) {
+    currentUser = u;
+    const r = await call('POST', { query: q({ action: 'release' }) });
+    assert.deepEqual(r.body.data, { left: true, deleted: false });
+  }
+  assert.equal(store.length, 1);
+  currentUser = VIEWER;
+  assert.deepEqual((await call('POST', { query: q({ action: 'release' }) })).body.data, { left: true, deleted: true });
+  assert.equal(store.length, 0);
+  assert.deepEqual(wiped, [String(ws._id)]);
+});
+
+test('a workspace that has its owner cannot be claimed or released, and outsiders cannot do either', async () => {
+  wiped = [];
+  currentUser = EDITOR;
+  assert.equal((await call('POST', { query: q({ action: 'claim' }) })).code, 409);
+  assert.equal((await call('POST', { query: q({ action: 'release' }) })).code, 409);
+  ownerGone();
+  currentUser = OUTSIDER;
+  assert.equal((await call('POST', { query: q({ action: 'claim' }) })).code, 409);
+  assert.ok(same(ws.ownerId, OWNER._id));
 });

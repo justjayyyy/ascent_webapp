@@ -757,7 +757,7 @@ const STEPS = { signin: ['email', 'password'], signup: ['email', 'name', 'passwo
 const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export default function SummitLogin({ flow }) {
-  const { t, isRTL, busy, entering, validateEmail, signIn, signUp } = flow;
+  const { t, isRTL, busy, entering, validateEmail, signIn, signUp, forgotPassword, resetSentTo } = flow;
   const height = useViewportHeight();
   const compact = height < 620; // keyboard open or a small phone: the tagline steps aside
   const short = height < 720; // small phones: the step title gives its room to the mountain
@@ -956,6 +956,18 @@ export default function SummitLogin({ flow }) {
                           errorKey={errorKey}
                           autoFocus
                         />
+                        {signin && (resetSentTo === email.trim()
+                          ? <p role="status" className="mt-3 text-pretty text-sm text-muted-foreground">{t('authResetSent', { email: email.trim() })}</p>
+                          : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={async () => { const problem = await forgotPassword(email); if (problem) fail(problem); }}
+                              className="-ms-1 mt-1 inline-flex min-h-11 items-center rounded px-1 text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                            >
+                              {t('authForgotPassword')}
+                            </button>
+                          ))}
                       </>
                     )}
 

@@ -20,6 +20,8 @@ const Login = React.lazy(() => import('./pages/Login'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
 const AcceptInvitation = React.lazy(() => import('./pages/AcceptInvitation'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const VerifyEmail = React.lazy(() => import('./pages/VerifyEmail'));
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -100,6 +102,8 @@ export default function App() {
               <Route path="/privacy-policy" element={lazyPage(PrivacyPolicy)} />
               <Route path="/terms-of-service" element={lazyPage(TermsOfService)} />
               <Route path="/accept-invitation/:token" element={lazyPage(AcceptInvitation)} />
+              <Route path="/reset-password/:token" element={lazyPage(ResetPassword)} />
+              <Route path="/verify-email/:token" element={lazyPage(VerifyEmail)} />
               <Route path="/*" element={<AuthenticatedApp />} />
             </Routes>
           </Router>

@@ -183,6 +183,12 @@ export const AuthProvider = ({ children }) => {
     [completeSignIn]
   );
 
+  // A new password from an emailed link signs in like any other way
+  const resetPassword = useCallback(
+    (token, password) => ascent.auth.resetPassword(token, password).then(completeSignIn),
+    [completeSignIn]
+  );
+
   // Face ID / fingerprint sign-in (and the lock screen's unlock, which keeps this device's session)
   const loginWithPasskey = useCallback(async ({ autofill = false } = {}) => {
     const result = await ascent.auth.passkeyLogin({ autofill });
@@ -198,6 +204,13 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     ascent.auth.logout(shouldRedirect ? window.location.href : undefined);
+  }, []);
+
+  const deleteAccount = useCallback(async (confirm) => {
+    await ascent.auth.deleteAccount(confirm);
+    setUser(null);
+    setIsAuthenticated(false);
+    ascent.auth.logout(undefined, { reason: 'account_deleted' });
   }, []);
 
   const navigateToLogin = useCallback(() => ascent.auth.redirectToLogin(window.location.href), []);
@@ -219,12 +232,12 @@ export const AuthProvider = ({ children }) => {
     currentMember, isWorkspaceOwner, user, setUser, isAuthenticated, permissions, hasPermission,
     workspaces, currentWorkspace, setCurrentWorkspace, switchWorkspace, refreshWorkspaces,
     isLoadingAuth, authError, login, register, loginWithGoogle, loginWithPasskey, logout,
-    navigateToLogin, checkAppState, saveUserPrefs,
+    navigateToLogin, checkAppState, saveUserPrefs, resetPassword, deleteAccount,
   }), [
     currentMember, isWorkspaceOwner, user, isAuthenticated, permissions, hasPermission,
     workspaces, currentWorkspace, switchWorkspace, refreshWorkspaces,
     isLoadingAuth, authError, login, register, loginWithGoogle, loginWithPasskey, logout,
-    navigateToLogin, checkAppState, saveUserPrefs,
+    navigateToLogin, checkAppState, saveUserPrefs, resetPassword, deleteAccount,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

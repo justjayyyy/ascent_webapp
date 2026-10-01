@@ -106,8 +106,12 @@ const signedIn = (result) => {
   return { user: result.user, isFirstLogin: result.isFirstLogin === true };
 };
 
-const toLogin = (redirectUrl) => {
-  window.location.href = redirectUrl ? `/login?redirect=${enc(redirectUrl)}` : '/login';
+// `reason` lets the sign-in page say why the person landed there (see useAuthFlow)
+const toLogin = (redirectUrl, reason) => {
+  const params = new URLSearchParams();
+  if (redirectUrl) params.set('redirect', redirectUrl);
+  if (reason) params.set('reason', reason);
+  window.location.href = params.size ? `/login?${params}` : '/login';
 };
 
 const auth = {
@@ -129,8 +133,17 @@ const auth = {
 
   me: () => request('/auth/me'),
   updateMe: (data) => request('/auth/me', json('PUT', data)),
+  // `confirm` is the account's email, typed by the person
+  deleteAccount: (confirm) => request('/auth/me', json('DELETE', { confirm })),
 
-  logout(redirectUrl) {
+  // Forgotten password: an emailed link, then a new password that also signs in
+  forgotPassword: (email) => request('/auth/password?action=forgot', json('POST', { email })),
+  resetPassword: async (token, password) => signedIn(await request('/auth/password?action=reset', json('POST', { token, password }))),
+  // Email confirmation
+  sendVerification: () => request('/auth/verify-email?action=send', json('POST', {})),
+  confirmEmail: (token) => request('/auth/verify-email?action=confirm', json('POST', { token })),
+
+  logout(redirectUrl, { reason } = {}) {
     removeToken();
     storage.remove(SESSION_CACHE_KEY);
     // Forget what this device kept for offline use (bounded, so sign-out never hangs)
@@ -140,7 +153,7 @@ const auth = {
         import('@/lib/offline/deviceData').then((m) => m.clearDeviceData()),
       ]),
       wait(800),
-    ]).catch(() => {}).finally(() => toLogin(redirectUrl));
+    ]).catch(() => {}).finally(() => toLogin(redirectUrl, reason));
   },
 
   redirectToLogin: toLogin,
@@ -215,6 +228,9 @@ const workspaces = {
   get: (id) => request(`/workspaces?id=${enc(id)}`),
   create: (data) => request('/workspaces', json('POST', data)),
   update: (id, data) => request(`/workspaces?id=${enc(id)}`, json('PUT', data)),
+  // The owner deleted their account: keep the workspace (becoming its owner) or leave it
+  claim: (id) => request(`/workspaces?id=${enc(id)}&action=claim`, { method: 'POST' }),
+  release: (id) => request(`/workspaces?id=${enc(id)}&action=release`, { method: 'POST' }),
   delete: (id) => request(`/workspaces?id=${enc(id)}`, { method: 'DELETE' }),
   invite: (id, data) => request(`/workspaces?id=${enc(id)}&action=invite`, json('POST', data)),
   updateMember: (id, memberId, data) => request(`/workspaces?id=${enc(id)}&action=updateMember&memberId=${enc(memberId)}`, json('PUT', data)),

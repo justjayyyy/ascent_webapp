@@ -3,13 +3,13 @@ import User from '../models/User.js';
 import Workspace from '../models/Workspace.js';
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import { sendEmail } from './email-helper.js';
+import { appUrl } from './links.js';
 import { periodFor, periodSummary, renderSummaryEmail } from './summaryEmail.js';
 import { isSame } from '../../shared/workspaceAccess.js';
 
 const PREF = { daily: 'dailySummary', weekly: 'weeklyReports' };
 
-export const appUrl = (env = process.env) =>
-  (env.FRONTEND_URL || env.NEXT_PUBLIC_APP_URL || 'https://ascentwebapp.vercel.app').replace(/\/+$/, '');
+export { appUrl } from './links.js';
 
 const canSeeExpenses = (workspace, member) =>
   member.role === 'owner' || member.role === 'admin' || isSame(workspace.ownerId, member.userId) || member.permissions?.viewExpenses === true;

@@ -9,7 +9,8 @@ Hebrew (right to left) and Russian. Installable PWA that keeps working offline. 
 - **Web app**: React 18, Vite, Tailwind, Radix UI, TanStack Query (persisted to IndexedDB), motion
 - **API**: one Express app (`server/server.js`), served on Vercel by `api/index.js`
 - **Database**: MongoDB via Mongoose
-- **Auth**: JWT (one live session per account), Google Sign-In (ID tokens), passkeys (WebAuthn)
+- **Auth**: JWT (one live session per account), Google Sign-In (ID tokens), passkeys (WebAuthn), password reset and
+  email confirmation by emailed one-time links (only their hashes are stored)
 
 ## Getting started
 
@@ -29,10 +30,10 @@ npm run dev:all        # web app on :5173 and API on :3002
 | `JWT_SECRET` | yes in production | Signs sessions. The API refuses to start signing without it in production |
 | `JWT_EXPIRES_IN` | no | Session length, default `7d` |
 | `VITE_GOOGLE_CLIENT_ID` (or `GOOGLE_CLIENT_ID`) | for Google sign-in | The OAuth client id; the API only accepts ID tokens issued for it |
-| `FRONTEND_URL` | for a custom domain | Extra allowed browser origin (CORS, passkeys) and the link in emails |
+| `FRONTEND_URL` | yes in production | The app's address: links in every email (invitations, password reset, email confirmation, summaries) and an allowed browser origin. In production emailed links never follow the request's Origin |
 | `PASSKEY_ORIGIN` | no | Another origin allowed to use passkeys |
 | `CRON_SECRET` | yes in production | Vercel Cron sends it to the summary-email routes |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email | Invitations and summary emails. `SMTP_ALLOW_SELF_SIGNED=true` only for a private relay |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email | Invitations, password reset, email confirmation and summary emails. `SMTP_ALLOW_SELF_SIGNED=true` only for a private relay |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | for push | Web Push |
 | `ANTHROPIC_API_KEY` | for the AI assistant | Off until a workspace owner turns it on |
 | `FINNHUB_API_KEY` | portfolio (hidden) | Stock quotes |
@@ -93,6 +94,9 @@ Conventions worth knowing:
 - Plan items and loan payments change one entry at a time (`changeEntry`, `PATCH ?list=`), never by rewriting the
   list, so two people editing at once keep both changes (`src/lib/listEntries.js`).
 - The server sets who added a row (`created_by`); `paidBy`, split shares and settle-up people must be members.
+- Deleting an account (`server/lib/deleteAccount.js`) deletes the workspaces only that person used. A shared one stays
+  with `ownerLeft` set, and each remaining member is asked whether to keep it (`claim`) or leave it (`release`); the
+  first to keep it becomes the owner, and when the last member leaves it is deleted with its data.
 - CSV export (`src/lib/exportData.js`) fetches everything on demand and neutralises spreadsheet formulas.
 - Money in another currency: `shared/money.js` (`amountInCurrency`, `conversionFields`).
 - Every UI string lives in `src/lib/translations*.js` in all three languages (a test enforces it).

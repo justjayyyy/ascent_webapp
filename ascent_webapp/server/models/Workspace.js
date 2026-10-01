@@ -59,6 +59,12 @@ const workspaceSchema = new mongoose.Schema({
     required: true 
   },
   members: [memberSchema],
+  // Set when the owner deleted their account while others still use the workspace. Each remaining member is
+  // asked whether to keep it: the first who does becomes the owner; when everyone declines it is deleted.
+  ownerLeft: {
+    type: new mongoose.Schema({ email: String, name: String, at: Date }, { _id: false }),
+    default: null
+  },
   // Household-wide choices the owner makes. The AI assistant is off until someone turns it on, since
   // it sends summaries of the workspace's spending to an outside service.
   settings: {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { ascent } from '@/api/client';
 import { setPageLanguage } from '@/lib/documentLanguage';
 import { translations } from '@/lib/translations';
 import { startEntry } from '@/components/EntryTransition';
@@ -45,6 +46,7 @@ export function useAuthFlow() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login, register, loginWithGoogle, loginWithPasskey, isAuthenticated } = useAuth();
+  const [resetSentTo, setResetSentTo] = useState(null);
 
   // ---- language (the visitor is not signed in, so it lives on the page) ----
   const [lang, setLangState] = useState(initialLanguage);
@@ -72,6 +74,7 @@ export function useAuthFlow() {
   useEffect(() => {
     if (reason === 'session_replaced') toast.info(t('sessionReplaced'));
     else if (reason === 'session_expired') toast.info(t('sessionExpired'));
+    else if (reason === 'account_deleted') toast.success(t('delDone'));
   }, [reason]);
 
   const [entering, setEntering] = useState(false);
@@ -224,6 +227,22 @@ export function useAuthFlow() {
     }
   }, [register, enter, t]);
 
+  /** Emails a link to choose a new password. Resolves to an error message, or null once sent. */
+  const forgotPassword = useCallback(async (email) => {
+    const problem = validateEmail(email);
+    if (problem) return problem;
+    setBusy(true);
+    try {
+      await ascent.auth.forgotPassword(email.trim());
+      setResetSentTo(email.trim());
+      return null;
+    } catch (error) {
+      return error.status === 429 ? error.message : t('authResetFailed');
+    } finally {
+      setBusy(false);
+    }
+  }, [validateEmail, t]);
+
   // The page scrolls inside itself; stop the iOS document bounce behind it
   useEffect(() => {
     const { body, documentElement: html } = document;
@@ -237,6 +256,6 @@ export function useAuthFlow() {
     t, lang, setLang, langs: LANGS, isRTL,
     passkeyReady, passkeyLoading, signInWithPasskey,
     googleEnabled: Boolean(GOOGLE_CLIENT_ID), googleLoading, signInWithGoogle, googleHost,
-    busy, entering, validateEmail, signIn, signUp,
+    busy, entering, validateEmail, signIn, signUp, forgotPassword, resetSentTo, setResetSentTo,
   };
 }
