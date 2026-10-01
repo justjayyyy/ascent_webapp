@@ -1,130 +1,88 @@
-# Ascent - Personal Finance Tracker
+# Ascent
 
-A comprehensive personal finance management application built with React and Node.js.
+A household finance app: income and expenses with categories, budgets and cards, plans paid over time,
+loans and commitments, Keep-style notes, and a dashboard that says what is safe to spend. English,
+Hebrew (right to left) and Russian. Installable PWA that keeps working offline. See `../PRODUCT.md`.
 
-## Features
+## Stack
 
-- 📊 **Portfolio Management** - Track investment accounts, positions, and performance
-- 💰 **Expense Tracking** - Monitor income and expenses with categories and budgets
-- 📈 **Dashboard** - Visual overview with customizable widgets
-- 🎯 **Financial Goals** - Set and track progress toward financial goals
-- 👥 **Shared Access** - Invite others to view your financial data
-- 🌙 **Dark/Light Theme** - Choose your preferred appearance
-- 🌍 **Multi-language** - Support for English, Hebrew, and Russian
+- **Web app**: React 18, Vite, Tailwind, Radix UI, TanStack Query (persisted to IndexedDB), motion
+- **API**: one Express app (`server/server.js`), served on Vercel by `api/index.js`
+- **Database**: MongoDB via Mongoose
+- **Auth**: JWT (one live session per account), Google Sign-In (ID tokens), passkeys (WebAuthn)
 
-## Tech Stack
+## Getting started
 
-- **Frontend**: React, Vite, TailwindCSS, Radix UI
-- **Backend**: Node.js, Vercel Serverless Functions
-- **Database**: MongoDB
-- **Auth**: JWT-based authentication
+Node 22+ and a MongoDB database.
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- MongoDB (local or MongoDB Atlas)
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone <repo-url>
-cd ascent_webapp
-```
-
-2. Install dependencies:
 ```bash
 npm install
+cp .env.example .env   # then fill it in, see below
+npm run dev:all        # web app on :5173 and API on :3002
 ```
 
-3. Create a `.env` file:
-```env
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/ascent
+### Environment
 
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRES_IN=7d
+| Variable | Needed | What it is |
+| --- | --- | --- |
+| `MONGODB_URI` | yes | MongoDB connection string |
+| `JWT_SECRET` | yes in production | Signs sessions. The API refuses to start signing without it in production |
+| `JWT_EXPIRES_IN` | no | Session length, default `7d` |
+| `VITE_GOOGLE_CLIENT_ID` (or `GOOGLE_CLIENT_ID`) | for Google sign-in | The OAuth client id; the API only accepts ID tokens issued for it |
+| `FRONTEND_URL` | for a custom domain | Extra allowed browser origin (CORS, passkeys) and the link in emails |
+| `PASSKEY_ORIGIN` | no | Another origin allowed to use passkeys |
+| `CRON_SECRET` | yes in production | Vercel Cron sends it to the summary-email routes |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email | Invitations and summary emails. `SMTP_ALLOW_SELF_SIGNED=true` only for a private relay |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | for push | Web Push |
+| `ANTHROPIC_API_KEY` | for the AI assistant | Off until a workspace owner turns it on |
+| `FINNHUB_API_KEY` | portfolio (hidden) | Stock quotes |
+| `API_PROXY_TARGET` | no | Where `npm run dev` proxies `/api` (default `http://localhost:3002`) |
 
-# Email (optional)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-SMTP_FROM=noreply@ascent.app
+After the first deploy, and whenever indexes change:
 
-# Frontend URL for CORS
-FRONTEND_URL=http://localhost:5173
-```
-
-4. Start development:
 ```bash
-# Start frontend
-npm run dev
-
-# In another terminal, if running API locally
-npm run dev:api
+npm run ensure:indexes
 ```
 
-## Deployment to Vercel
+## Checks
 
-1. Push your code to GitHub
-
-2. Connect your repo to Vercel
-
-3. Add environment variables in Vercel dashboard:
-   - `MONGODB_URI` - Your MongoDB Atlas connection string
-   - `JWT_SECRET` - A secure random string
-   - Other optional variables as needed
-
-4. Deploy!
-
-## Project Structure
-
-```
-├── api/                    # Vercel serverless functions
-│   ├── auth/              # Authentication endpoints
-│   ├── entities/          # CRUD endpoints for all entities
-│   ├── integrations/      # Email, file upload, etc.
-│   ├── lib/               # Shared utilities
-│   ├── middleware/        # Auth middleware
-│   └── models/            # MongoDB schemas
-├── src/
-│   ├── api/               # Frontend API client
-│   ├── components/        # React components
-│   ├── hooks/             # Custom hooks
-│   ├── lib/               # Utilities and context
-│   ├── pages/             # Page components
-│   └── utils/             # Helper functions
-└── public/                # Static assets
+```bash
+npm run lint       # ESLint over the server, shared code and the whole web app
+npm test           # node --test (API, shared) and Vitest (web app)
+npm run build
+npm run check      # all three
 ```
 
-## API Endpoints
+- `npm run test:node`: API handlers against in-memory stand-ins for the models, and the shared logic.
+- `npm run test:web`: Vitest + Testing Library in jsdom: API client, auth, data hooks, the offline queue,
+  translations (every key in en/he/ru, every key the app uses exists), components and helpers.
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login
-- `GET /api/auth/me` - Get current user
-- `PUT /api/auth/me` - Update user profile
+## Layout
 
-### Entities
-All entities support: `GET` (list/filter), `POST` (create), `PUT` (update), `DELETE`
+```
+api/index.js            Vercel entry: exports the Express app
+server/
+  server.js             routes, CORS, body limits, rate limit
+  auth/                 register, login, Google, passkeys, /me
+  api/                  workspaces, invitations, ingest (Apple Pay / SMS), statement import, assist, push, cron emails
+  entities/             CRUD per collection (most use lib/entityHandler.js; notes and categories are custom)
+  integrations/         Google Calendar proxy, stock quotes, legacy Apple Pay key
+  lib/                  shared server code (entity handler, auth helpers, email, summaries, ingest parsing...)
+  models/               Mongoose schemas
+  scripts/              maintenance (seed data, demo account, indexes, backfills)
+shared/                 pure logic used by both sides: money, forecast, commitments, subscriptions, balances, roles
+src/
+  api/client.js         the only way the app talks to the API
+  hooks/useWorkspaceData.js   every shared list, cached per workspace; exchange rates and conversion
+  lib/                  auth context, session, offline queue and cache, translations, helpers
+  components/, pages/   UI
+```
 
-- `/api/entities/accounts`
-- `/api/entities/positions`
-- `/api/entities/day-trades`
-- `/api/entities/transactions`
-- `/api/entities/budgets`
-- `/api/entities/categories`
-- `/api/entities/cards`
-- `/api/entities/goals`
-- `/api/entities/dashboard-widgets`
-- `/api/entities/page-layouts`
-- `/api/entities/shared-users`
-- `/api/entities/snapshots`
+Conventions worth knowing:
 
-## License
-
-MIT
+- Every request carries the workspace in `x-workspace-id`; the server scopes every query to it.
+- Lists are cached under `[name, workspaceId]` (see `useWorkspaceData.js`); invalidate with `['name']`.
+- Transactions are written through the offline queue (`src/lib/offline/txOutbox.js`), never directly.
+- Money in another currency: `shared/money.js` (`amountInCurrency`, `conversionFields`).
+- Every UI string lives in `src/lib/translations*.js` in all three languages (a test enforces it).
+- Portfolio pages are hidden (`src/lib/features.js`) but kept; they are not linted for translations.
