@@ -12,6 +12,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { rateLimit } from './lib/rateLimit.js';
+import { trackChanges } from './lib/live.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -99,7 +100,7 @@ const ingestJson = (req, res, next) =>
     const tooLarge = err.type === 'entity.too.large';
     res.status(tooLarge ? 413 : 400).json({ success: false, error: tooLarge ? 'payload_too_large' : 'invalid_json' });
   });
-app.post('/api/ingest/:kind', ingestJson, wrapHandler('./api/ingest.js'));
+app.post('/api/ingest/:kind', ingestJson, wrapHandler('./api/ingest.js', { live: true }));
 app.all('/api/ingest/:kind', (req, res) => res.status(405).json({ success: false, error: 'method_not_allowed' }));
 
 // Body parser with size limit - must be before routes
@@ -120,9 +121,11 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Helper to convert Vercel handler to Express route
-function wrapHandler(handlerPath) {
+// Helper to convert Vercel handler to Express route.
+// live: successful writes mark the workspace changed, so other members' open apps refresh.
+function wrapHandler(handlerPath, { live = false } = {}) {
   return async (req, res) => {
+    const settled = live ? trackChanges(req, res) : () => Promise.resolve();
     try {
       const handlerUrl = new URL(handlerPath, import.meta.url).href;
       const module = await import(handlerUrl);
@@ -139,12 +142,14 @@ function wrapHandler(handlerPath) {
       req.query = { ...req.query, ...req.params };
       
       await handler(req, res);
+      await settled();
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error(`[Server] Handler Error ${handlerPath}:`, error.message);
       }
       
       // Only send response if headers haven't been sent
+      await settled();
       if (!res.headersSent) {
         res.status(500).json({ 
           success: false, 
@@ -202,17 +207,17 @@ const entities = [
 ];
 
 entities.forEach(entity => {
-  const handlerPath = `./entities/${entity}.js`;
-  app.get(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.post(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.put(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.patch(`/api/entities/${entity}`, wrapHandler(handlerPath));
-  app.delete(`/api/entities/${entity}`, wrapHandler(handlerPath));
+  const handler = wrapHandler(`./entities/${entity}.js`, { live: true });
+  app.get(`/api/entities/${entity}`, handler);
+  app.post(`/api/entities/${entity}`, handler);
+  app.put(`/api/entities/${entity}`, handler);
+  app.patch(`/api/entities/${entity}`, handler);
+  app.delete(`/api/entities/${entity}`, handler);
   app.options(`/api/entities/${entity}`, (req, res) => res.sendStatus(200));
 });
 
 // Card statement import (rows parsed on the device, matched against what is already recorded)
-app.post('/api/import/statement', wrapHandler('./api/import-statement.js'));
+app.post('/api/import/statement', wrapHandler('./api/import-statement.js', { live: true }));
 app.options('/api/import/*', (req, res) => res.sendStatus(200));
 
 // Smart help: category suggestions while typing, and the opt-in AI assistant
@@ -231,7 +236,7 @@ app.post('/api/integrations/upload-file', wrapHandler('./integrations/upload-fil
 app.get('/api/integrations/stock-quote', wrapHandler('./integrations/stock-quote.js'));
 
 // Apple Pay -> transaction (iOS Shortcuts automation) and its key management
-const quickAddHandler = wrapHandler('./integrations/quick-add.js');
+const quickAddHandler = wrapHandler('./integrations/quick-add.js', { live: true });
 app.get('/api/integrations/quick-add', quickAddHandler);
 app.post('/api/integrations/quick-add', quickAddHandler);
 app.delete('/api/integrations/quick-add', quickAddHandler);

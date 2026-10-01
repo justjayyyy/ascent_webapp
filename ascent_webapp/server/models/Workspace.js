@@ -57,6 +57,8 @@ const workspaceSchema = new mongoose.Schema({
     required: true 
   },
   members: [memberSchema],
+  // Bumped on every change to the workspace's data; open apps poll it to refresh live (see lib/live.js)
+  dataRev: { type: Number, default: 0 },
   // Household-wide choices the owner makes. The AI assistant is off until someone turns it on, since
   // it sends summaries of the workspace's spending to an outside service.
   settings: {

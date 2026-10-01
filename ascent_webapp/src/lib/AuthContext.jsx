@@ -53,6 +53,25 @@ const clearCachedSession = () => {
   try { localStorage.removeItem(SESSION_CACHE); } catch { /* storage unavailable */ }
 };
 
+// An invitation opened while signed out (a scanned QR code or an emailed link). Sign-in can take a
+// detour (sign-up, Google, a passkey, reopening the app), so it's kept here and joined right after
+// sign-in, before a first workspace of their own is created.
+const PENDING_INVITE = 'ascent_pending_invite';
+const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
+export const rememberInvite = (token) => {
+  try { localStorage.setItem(PENDING_INVITE, JSON.stringify({ token, at: Date.now() })); } catch { /* storage unavailable */ }
+};
+export const forgetInvite = () => {
+  try { localStorage.removeItem(PENDING_INVITE); } catch { /* storage unavailable */ }
+};
+const takePendingInvite = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PENDING_INVITE) || 'null');
+    forgetInvite();
+    return saved?.token && Date.now() - saved.at < INVITE_TTL_MS ? saved.token : null;
+  } catch { return null; }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -82,6 +101,18 @@ export const AuthProvider = ({ children }) => {
 
   const loadWorkspaces = useCallback(async (currentUser) => {
     try {
+      const invite = takePendingInvite();
+      if (invite) {
+        try {
+          const joined = await ascent.workspaces.acceptInvitation(invite);
+          const joinedId = joined?.id || joined?._id;
+          if (joinedId) localStorage.setItem('ascent_current_workspace_id', joinedId);
+        } catch (inviteError) {
+          // No signal: try again next time. Otherwise it's expired, used, or for another email (the invitation page explains)
+          if (isNetworkError(inviteError)) rememberInvite(invite);
+        }
+      }
+
       const wsList = await ascent.workspaces.list();
       setWorkspaces(wsList);
 

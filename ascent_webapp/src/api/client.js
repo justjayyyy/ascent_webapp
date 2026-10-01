@@ -495,6 +495,10 @@ const workspaces = {
   async leave(workspaceId) {
     return request(`/workspaces?id=${workspaceId}&action=leave`, { method: 'POST' });
   },
+  // { dataRev, updated }: changes whenever anyone edits the workspace's data or its members
+  async pulse(workspaceId) {
+    return request(`/workspaces?id=${workspaceId}&action=pulse`, { timeout: 8000, retries: 0 });
+  },
   async heartbeat(workspaceId) {
     return request(`/workspaces?id=${workspaceId}&action=heartbeat`, { method: 'POST' });
   },
