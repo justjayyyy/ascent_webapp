@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useBudgets, useCommitments, usePlans, useSettlements } from '@/hooks/useWorkspaceData';
+import { mergeRows } from '@/lib/offline/outboxModel';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { monthForecast, baselineDaily } from '@shared/forecast';
@@ -27,11 +28,16 @@ export function useMoneyFormat() {
   return { money, shortDate, locale, currency, blur: !!user?.blurValues };
 }
 
+const trusted = (list) => list
+  .filter((tx) => !(tx.status === 'pending' && tx.ingest?.flags?.includes('possibleDuplicate')))
+  .map((tx) => ({ ...tx, amount: tx._amount }));
+
 /**
  * Forecast, subscriptions and household balances for the Dashboard, from the rows it already loaded.
- * `rows` carry `_amount` (the viewer's currency); `convert(amount, from)` handles budgets and plans.
+ * `rows` (the recent window) and `splitRows` (every shared expense, for balances) carry `_amount` in
+ * the viewer's currency; `convert(amount, from)` handles budgets and plans.
  */
-export function useInsights({ rows, selectedMonth, convert }) {
+export function useInsights({ rows, splitRows = [], selectedMonth, convert }) {
   const { hasPermission } = useAuth();
   const canBudgets = hasPermission('viewBudgets');
 
@@ -43,10 +49,9 @@ export function useInsights({ rows, selectedMonth, convert }) {
   const today = localDay();
   const month = monthOf(selectedMonth);
 
-  // Rows the forecast can trust: in the viewer's currency, without suspected duplicates still waiting for review
-  const usable = useMemo(() => rows
-    .filter((tx) => !(tx.status === 'pending' && tx.ingest?.flags?.includes('possibleDuplicate')))
-    .map((tx) => ({ ...tx, amount: tx._amount })), [rows]);
+  // Rows the insights can trust: in the viewer's currency, without suspected duplicates still waiting for review
+  const usable = useMemo(() => trusted(rows), [rows]);
+  const usableSplits = useMemo(() => trusted(splitRows), [splitRows]);
 
   const forecast = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
@@ -70,10 +75,11 @@ export function useInsights({ rows, selectedMonth, convert }) {
 
   const subscriptions = useMemo(() => detectSubscriptions(usable, today), [usable, today]);
 
+  // Debts last until settled, so balances need every shared expense, not just the loaded window
   const balances = useMemo(() => householdBalances({
-    transactions: usable,
+    transactions: mergeRows(usableSplits, usable),
     settlements: settlements.map((s) => ({ ...s, amount: convert(s.amount, s.currency) })),
-  }), [usable, settlements, convert]);
+  }), [usable, usableSplits, settlements, convert]);
 
   return { forecast, subscriptions, balances, commitments, today };
 }

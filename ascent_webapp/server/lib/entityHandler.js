@@ -4,7 +4,8 @@ import { success, error, notFound, forbidden, serverError } from './response.js'
 import { authMiddleware } from '../middleware/auth.js';
 import { isValidObjectId } from './validate.js';
 
-const NEVER_FILTER = new Set(['workspaceId', 'createdBy', '_id', 'sort', 'limit', '_single', 'path']);
+const NEVER_FILTER = new Set(['workspaceId', 'createdBy', '_id', 'sort', 'limit', '_single', 'path', 'from', 'to', 'has']);
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const NEVER_WRITE = new Set(['workspaceId', 'createdBy', '_id', 'id']);
 const DEFAULT_LIMIT = 1000;
 const MAX_LIMIT = 10000;
@@ -26,6 +27,30 @@ function safeFilters(Model, filters) {
     if (NEVER_FILTER.has(key) || key.startsWith('$') || key.includes('.')) continue;
     if (typeof value !== 'string' || !Model.schema?.path(key)) continue;
     out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * `from` / `to` (YYYY-MM-DD, inclusive) on the model's date field, and `has=<field>` for rows where a
+ * real schema field is set. Returns the conditions, or { invalid } naming the bad parameter.
+ */
+export function rangeAndPresence(Model, query, dateField) {
+  const out = {};
+  if (query.from !== undefined || query.to !== undefined) {
+    if (!dateField) return { invalid: 'from' };
+    for (const k of ['from', 'to']) if (query[k] !== undefined && (typeof query[k] !== 'string' || !DAY.test(query[k]))) return { invalid: k };
+    out[dateField] = {
+      ...(query.from && { $gte: query.from }),
+      // dates are stored as YYYY-MM-DD strings; anything after the day itself still sorts within it
+      ...(query.to && { $lte: `${query.to}\uffff` }),
+    };
+  }
+  if (query.has !== undefined) {
+    const field = query.has;
+    if (typeof field !== 'string' || NEVER_FILTER.has(field) || field.startsWith('$') || field.includes('.') || !Model.schema?.path(field)) return { invalid: 'has' };
+    // An empty string means "not set" only for text fields (other types cannot even hold one)
+    out[field] = Model.schema.path(field).instance === 'String' ? { $exists: true, $nin: [null, ''] } : { $exists: true, $ne: null };
   }
   return out;
 }
@@ -68,9 +93,10 @@ function clientFault(res, err) {
  * Generic CRUD for a workspace-scoped model.
  * options.permission: { read, write } member permission names (see the Workspace model), e.g. { read: 'viewExpenses', write: 'editExpenses' }
  * options.checkSharing: members other than the owner only see rows they created or that are marked isShared
+ * options.dateField: the YYYY-MM-DD field that `from` / `to` list filters apply to
  */
 export function createEntityHandler(Model, options = {}) {
-  const { checkSharing = false, permission = null } = options;
+  const { checkSharing = false, permission = null, dateField = null } = options;
   const entityName = Model.modelName || 'Entity';
 
   return async function handler(req, res) {
@@ -108,7 +134,9 @@ export function createEntityHandler(Model, options = {}) {
           }
 
           const { sort = '-created_date', limit, ...filters } = req.query;
-          const query = { ...scope, ...safeFilters(Model, filters) };
+          const extra = rangeAndPresence(Model, req.query, dateField);
+          if (extra.invalid) return error(res, `Invalid ${extra.invalid}`, 400);
+          const query = { ...scope, ...safeFilters(Model, filters), ...extra };
           if (id) query._id = id;
           const sortField = typeof sort === 'string' && /^-?[A-Za-z_]+$/.test(sort) ? sort : '-created_date';
           const limitValue = Math.min(Math.max(parseInt(limit, 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);

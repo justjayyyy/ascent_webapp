@@ -79,7 +79,7 @@ export function enqueue(ops, op, busyId = null) {
  * `_sync: 'pending' | 'failed'`; edited rows carry `_sync: 'pending'`. `idMap` turns the local id of an
  * add that has already reached the server into its real id, for edits queued behind it.
  */
-export function applyOutbox(serverRows = [], ops = [], idMap = {}) {
+export function applyOutbox(serverRows = [], ops = [], idMap = {}, include = () => true) {
   if (!ops.length) return serverRows;
   const resolve = (id) => idMap[id] || id;
   const deleted = new Set();
@@ -96,7 +96,8 @@ export function applyOutbox(serverRows = [], ops = [], idMap = {}) {
     for (const row of op.rows) {
       const id = localIdOf(row);
       if (storedKeys.has(row.dedupeKey) || deleted.has(id)) continue;
-      queued.push({ ...row, ...(edits.get(id) || {}), id, _sync: op.error ? 'failed' : 'pending' });
+      const drawn = { ...row, ...(edits.get(id) || {}), id, _sync: op.error ? 'failed' : 'pending' };
+      if (include(drawn)) queued.push(drawn);
     }
   }
 
@@ -105,6 +106,43 @@ export function applyOutbox(serverRows = [], ops = [], idMap = {}) {
     .map((r) => (edits.has(r.id) ? { ...r, ...edits.get(r.id), _sync: 'pending' } : r));
 
   return [...queued, ...stored];
+}
+
+// ---- views: which transactions a screen loads ----
+// A view is { from: 'YYYY-MM-DD' } (everything dated from then on, future months included) or
+// { has: 'planId' } (every row where that field is set, whatever its date).
+
+/** How far back the app loads history by default: enough for trends, forecasts and recaps. */
+export const HISTORY_MONTHS = 14;
+
+/** The first day of the month `months` before the month of `now`, as YYYY-MM-DD. */
+export function windowStart(now = new Date(), months = HISTORY_MONTHS) {
+  const d = new Date(now.getFullYear(), now.getMonth() - months, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/** The earliest of some YYYY-MM-DD days (missing ones ignored). */
+export const earliestDay = (...days) => days.filter(Boolean).sort()[0];
+
+/** Several views' rows as one list, each row once (the first list wins). */
+export function mergeRows(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const row of list || []) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      out.push(row);
+    }
+  }
+  return out;
+}
+
+/** Whether a row belongs in a view. */
+export function inView(row, view = {}) {
+  if (view.from && String(row?.date || '') < view.from) return false;
+  if (view.has && !row?.[view.has]) return false;
+  return true;
 }
 
 /** The waiting changes made in one workspace (ops queued before workspaces were recorded count everywhere). */

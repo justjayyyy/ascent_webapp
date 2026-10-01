@@ -7,79 +7,21 @@ import { useTheme } from '../ThemeProvider';
 import { Section, Group, Row } from './SettingsShell';
 import StatementImportDialog from './StatementImportDialog';
 import { useAuth } from '@/lib/AuthContext';
+import { DATASETS, downloadCSV } from '@/lib/exportData';
 
-export default function ImportExportSection({ accounts, positions, transactions, notes, budgets, categories, cards, index }) {
+export default function ImportExportSection({ index }) {
   const { t } = useTheme();
   const { hasPermission } = useAuth();
   const [exporting, setExporting] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
 
-  const formatCSV = (data, headers) => {
-    const csvHeaders = headers.join(',');
-    const csvRows = data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        if (value === null || value === undefined) return '';
-        const stringValue = String(value);
-        return stringValue.includes(',') || stringValue.includes('"') 
-          ? `"${stringValue.replace(/"/g, '""')}"` 
-          : stringValue;
-      }).join(',')
-    );
-    return [csvHeaders, ...csvRows].join('\n');
-  };
-
-  const downloadCSV = (csvContent, filename) => {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleExport = async (page) => {
-    setExporting(page);
+  // Fetched only when asked for, and complete (every transaction, not just what the app has loaded)
+  const handleExport = async (key, label) => {
+    setExporting(key);
     try {
-      let csvContent, filename;
-
-      if (page === 'portfolio') {
-        // Portfolio: accounts + positions
-        const accountsHeaders = ['name', 'type', 'baseCurrency', 'initialInvestment', 'totalDeposits', 'totalWithdrawals', 'totalFees', 'notes'];
-        const positionsHeaders = ['accountId', 'symbol', 'assetType', 'quantity', 'averageBuyPrice', 'currentPrice', 'currency', 'notes'];
-        const accountsCsv = formatCSV(accounts || [], accountsHeaders);
-        const positionsCsv = formatCSV(positions || [], positionsHeaders);
-        csvContent = `ACCOUNTS\n${accountsCsv}\n\nPOSITIONS\n${positionsCsv}`;
-        filename = `portfolio_export_${new Date().toISOString().split('T')[0]}.csv`;
-      } else if (page === 'expenses') {
-        // Expenses: transactions + budgets + categories + cards
-        const transactionsHeaders = ['date', 'type', 'category', 'description', 'amount', 'currency', 'paymentMethod', 'relatedAccountId'];
-        const budgetsHeaders = ['category', 'monthlyLimit', 'alertThreshold', 'currency', 'year', 'month'];
-        const categoriesHeaders = ['name', 'color', 'icon', 'type'];
-        const cardsHeaders = ['name', 'type', 'lastFourDigits', 'bank', 'color', 'isActive'];
-        const transactionsCsv = formatCSV(transactions || [], transactionsHeaders);
-        const budgetsCsv = formatCSV(budgets || [], budgetsHeaders);
-        const categoriesCsv = formatCSV(categories || [], categoriesHeaders);
-        const cardsCsv = formatCSV(cards || [], cardsHeaders);
-        csvContent = `TRANSACTIONS\n${transactionsCsv}\n\nBUDGETS\n${budgetsCsv}\n\nCATEGORIES\n${categoriesCsv}\n\nCARDS\n${cardsCsv}`;
-        filename = `expenses_export_${new Date().toISOString().split('T')[0]}.csv`;
-      } else if (page === 'notes') {
-        // Notes: notes
-        const notesHeaders = ['title', 'content', 'color', 'tags', 'isPinned', 'created_date', 'updated_date'];
-        const notesData = (notes || []).map(note => ({
-          ...note,
-          tags: Array.isArray(note.tags) ? note.tags.join(';') : note.tags || ''
-        }));
-        csvContent = formatCSV(notesData, notesHeaders);
-        filename = `notes_export_${new Date().toISOString().split('T')[0]}.csv`;
-      }
-
-      downloadCSV(csvContent, filename);
-      const pageName = page === 'portfolio' ? t('portfolio') : page === 'expenses' ? t('expenses') : t('notes');
-      toast.success(`${pageName} ${t('exportedSuccessfully')}!`);
+      const { csv, filename, count } = await DATASETS[key].build();
+      downloadCSV(csv, filename);
+      toast.success(t('setExported').replace('{name}', label).replace('{count}', count));
     } catch (error) {
       console.error('Export error:', error);
       toast.error(t('exportFailed'));
@@ -88,18 +30,11 @@ export default function ImportExportSection({ accounts, positions, transactions,
     }
   };
 
-
   const datasets = [
-    PORTFOLIO_ENABLED && {
-      key: 'portfolio', label: t('portfolio'), icon: PieChart,
-      count: (accounts?.length || 0) + (positions?.length || 0),
-    },
-    {
-      key: 'expenses', label: t('expenses'), icon: Receipt,
-      count: (transactions?.length || 0) + (budgets?.length || 0) + (categories?.length || 0) + (cards?.length || 0),
-    },
-    { key: 'notes', label: t('notes'), icon: StickyNote, count: notes?.length || 0 },
-  ].filter(Boolean);
+    PORTFOLIO_ENABLED && { key: 'portfolio', label: t('portfolio'), icon: PieChart, description: t('setExportPortfolioDesc') },
+    { key: 'expenses', label: t('expenses'), icon: Receipt, description: t('setExportExpensesDesc') },
+    { key: 'notes', label: t('notes'), icon: StickyNote, description: t('setExportNotesDesc') },
+  ].filter((d) => d && (!DATASETS[d.key].permission || hasPermission(DATASETS[d.key].permission)));
 
   return (
     <Section id="data" index={index} icon={Database} title={t('setNavData')} description={t('setDataDesc')}>
@@ -118,15 +53,15 @@ export default function ImportExportSection({ accounts, positions, transactions,
       )}
       <StatementImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <Group>
-        {datasets.map(({ key, label, icon: Icon, count }) => (
+        {datasets.map(({ key, label, icon: Icon, description }) => (
           <Row
             key={key}
             label={<span className="flex items-center gap-2"><Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{label}</span>}
-            description={count ? <><span className="tabular-nums">{count}</span> {t('setItems')}</> : t('setNothingToExport')}
+            description={description}
           >
             <Button
-              onClick={() => handleExport(key)}
-              disabled={!!exporting || !count}
+              onClick={() => handleExport(key, label)}
+              disabled={!!exporting}
               variant="secondary"
               aria-label={`${t('setDownloadCsv')}: ${label}`}
               className="h-11 rounded-xl sm:h-9"

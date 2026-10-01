@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { useAccounts, useCategories, useMoney, usePlans, workspaceKey } from '@/hooks/useWorkspaceData';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
-import { useTransactions } from '@/lib/offline/txOutbox';
+import { useLinkedTransactions } from '@/lib/offline/txOutbox';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import PlanDialog from '@/components/plans/PlanDialog';
 import PlanItemDialog from '@/components/plans/PlanItemDialog';
@@ -48,8 +48,8 @@ function Plans() {
   const workspaceId = useWorkspaceId();
   const plansKey = useMemo(() => workspaceKey('plans', workspaceId), [workspaceId]);
   const { data: plans = [], isLoading } = usePlans();
-  // Same cache as the Expenses page, with changes still waiting on this device drawn in
-  const { data: transactions = [] } = useTransactions();
+  // Every expense recorded for a plan, whenever it was paid, with changes waiting on this device drawn in
+  const { data: transactions = [] } = useLinkedTransactions('planId');
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
 

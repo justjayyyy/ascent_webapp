@@ -20,7 +20,7 @@ import { useChartTokens } from '@/components/charts/EChart';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
 import { groupBigPurchases } from '@/components/expenses/BigPurchases';
-import { useTransactions } from '@/lib/offline/txOutbox';
+import { useTransactions, useLinkedTransactions } from '@/lib/offline/txOutbox';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import { localDay } from '@/components/insights/useInsights';
 import { localeOf, moneyIn, formatDay } from '@/components/plans/PlanParts';
@@ -59,7 +59,9 @@ function Commitments() {
   const workspaceId = useWorkspaceId();
   const key = useMemo(() => workspaceKey('commitments', workspaceId), [workspaceId]);
   const { data: commitments = [], isLoading } = useCommitments();
+  // This month's payments (recent window) and every part of big purchases still being paid off
   const { data: transactions = [] } = useTransactions();
+  const { data: installmentRows = [] } = useLinkedTransactions('installmentGroupId');
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
 
@@ -88,8 +90,8 @@ function Commitments() {
 
   // Installment purchases from Expenses are commitments too: shown here, managed there
   const installments = useMemo(
-    () => groupBigPurchases(transactions).filter((g) => g.count > 1 && g.remaining > 0.5),
-    [transactions]
+    () => groupBigPurchases(installmentRows).filter((g) => g.count > 1 && g.remaining > 0.5),
+    [installmentRows]
   );
 
   const current = openId ? rows.find((r) => r.c.id === openId) : null;

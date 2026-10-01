@@ -262,3 +262,29 @@ test('shared-only entities: members see their own rows and shared ones, the owne
   await call(N, 'GET', '', undefined, { checkSharing: true });
   assert.deepEqual(N.calls.find[0], { workspaceId: 'ws1' });
 });
+
+test('date ranges apply to the entity date field, inclusive, and only well-formed dates', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = model();
+  await call(M, 'GET', 'from=2025-08-01&to=2025-09-30', undefined, { dateField: 'date' });
+  assert.deepEqual(M.calls.find[0], { workspaceId: 'ws1', date: { $gte: '2025-08-01', $lte: '2025-09-30￿' } });
+  await call(M, 'GET', 'from=2025-08-01', undefined, { dateField: 'date' });
+  assert.deepEqual(M.calls.find[1], { workspaceId: 'ws1', date: { $gte: '2025-08-01' } });
+  for (const q of ['from=yesterday', 'to=2025-13', 'from[$gt]=', 'from=2025-08-01T00:00']) {
+    assert.equal((await call(model(), 'GET', q, undefined, { dateField: 'date' })).code, 400, q);
+  }
+  assert.equal((await call(model(), 'GET', 'from=2025-08-01')).code, 400, 'entities without a date field refuse ranges');
+});
+
+test('has=<field> lists rows where a real field is set, regardless of date', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = model();
+  M.schema = { path: (k) => (PATHS.has(k) || k === 'split' ? { instance: k === 'split' ? 'Embedded' : 'String' } : undefined) };
+  await call(M, 'GET', 'has=category');
+  assert.deepEqual(M.calls.find[0], { workspaceId: 'ws1', category: { $exists: true, $nin: [null, ''] } });
+  await call(M, 'GET', 'has=split'); // a sub-document cannot be compared with ''
+  assert.deepEqual(M.calls.find[1], { workspaceId: 'ws1', split: { $exists: true, $ne: null } });
+  for (const q of ['has=workspaceId', 'has=nope', 'has=$where', 'has=a.b', 'has[$ne]=1']) {
+    assert.equal((await call(model(), 'GET', q)).code, 400, q);
+  }
+});

@@ -6,7 +6,7 @@ import { useAccounts, useBudgets, useCards, useCategories, usePlans } from '@/ho
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
 import { parseISO, getYear, getMonth } from 'date-fns';
-import { useTransactions } from '@/lib/offline/txOutbox';
+import { useTransactions, useLinkedTransactions, useOldestTransactionDate, mergeRows } from '@/lib/offline/txOutbox';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import AddTransactionDialog from './AddTransactionDialog';
 import BudgetManager from './BudgetManager';
@@ -55,9 +55,13 @@ function TransactionsPage({ kind }) {
   const deleteTransactions = useDeleteTransactions();
 
 
-  const { data: allTransactions = [], isLoading } = useTransactions();
+  // The selected year (and the usual recent history); every part of big purchases, whenever it falls
+  const { data: allTransactions = [], isLoading } = useTransactions({ from: `${selectedYear}-01-01` });
+  const { data: installments = [] } = useLinkedTransactions('installmentGroupId', { enabled: !isIncome });
+  const oldestDate = useOldestTransactionDate();
 
   const transactions = useMemo(() => allTransactions.filter((x) => x.type === kind), [allTransactions, kind]);
+  const bigPurchaseRows = useMemo(() => mergeRows(installments, transactions), [installments, transactions]);
 
   const { data: cards = [] } = useCards();
   const { data: accounts = [] } = useAccounts();
@@ -126,8 +130,8 @@ function TransactionsPage({ kind }) {
 
   const siblings = useMemo(() => {
     if (!toDelete?.installmentGroupId) return [];
-    return allTransactions.filter((x) => x.installmentGroupId === toDelete.installmentGroupId);
-  }, [toDelete, allTransactions]);
+    return mergeRows(installments, allTransactions).filter((x) => x.installmentGroupId === toDelete.installmentGroupId);
+  }, [toDelete, allTransactions, installments]);
 
   const handleDuplicateTransaction = useCallback((transaction) => {
     // A copy dated today; ids, timestamps and installment bookkeeping stay with the original
@@ -217,6 +221,7 @@ function TransactionsPage({ kind }) {
         <div className="flex-shrink-0">
           <PeriodSelector
             transactions={transactions}
+            oldestDate={oldestDate}
             selectedYear={selectedYear}
             selectedMonths={selectedMonths}
             onYearChange={setSelectedYear}
@@ -228,7 +233,7 @@ function TransactionsPage({ kind }) {
             <ExpenseMonthView
               kind={kind}
               transactions={selectedPeriodTransactions}
-              allTransactions={transactions}
+              allTransactions={bigPurchaseRows}
               counterpart={counterpartTotal}
               budgets={budgets}
               cards={cards}

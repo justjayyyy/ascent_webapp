@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ascent } from '@/api/client';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -35,13 +35,6 @@ const CURRENCIES = [
   { value: 'GBP', label: '£ GBP' },
   { value: 'ILS', label: '₪ ILS' },
 ];
-
-const listQuery = (key, userId, fn) => ({
-  queryKey: [key, userId],
-  queryFn: fn,
-  enabled: !!userId,
-  staleTime: 5 * 60 * 1000,
-});
 
 export default function Settings() {
   const { user: themeUser, theme, setPalette, t, loading: themeLoading, saveUserPrefs, refreshUser } = useTheme();
@@ -84,14 +77,6 @@ export default function Settings() {
   });
   const saveUser = updateUserMutation.mutate;
 
-  const userId = user?.id;
-  const { data: accounts = [] } = useQuery(listQuery('accounts', userId, () => ascent.entities.Account.list()));
-  const { data: positions = [] } = useQuery(listQuery('positions', userId, () => ascent.entities.Position.list('-created_date', 1000)));
-  const { data: transactions = [] } = useQuery(listQuery('transactions', userId, () => ascent.entities.ExpenseTransaction.list('-date', 1000)));
-  const { data: notes = [] } = useQuery(listQuery('notes', userId, () => ascent.entities.Note.list()));
-  const { data: budgets = [] } = useQuery(listQuery('budgets', userId, () => ascent.entities.Budget.list('-created_date')));
-  const { data: categories = [] } = useQuery(listQuery('categories', userId, () => ascent.entities.Category.list('-created_date')));
-  const { data: cards = [] } = useQuery(listQuery('cards', userId, () => ascent.entities.Card.list()));
 
   const updateWorkspaceMutation = useMutation({
     mutationFn: async (name) => {
@@ -370,16 +355,7 @@ export default function Settings() {
 
           {/* Data */}
           {show.data && (
-            <ImportExportSection
-              index={order++}
-              accounts={accounts}
-              positions={positions}
-              transactions={transactions}
-              notes={notes}
-              budgets={budgets}
-              categories={categories}
-              cards={cards}
-            />
+            <ImportExportSection index={order++} />
           )}
 
           {show.security && <SecuritySection index={order++} />}

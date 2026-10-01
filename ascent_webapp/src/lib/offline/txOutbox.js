@@ -6,7 +6,8 @@ import { queryClientInstance } from '@/lib/query-client';
 import { setPlanItem } from '@/components/expenses/planLink';
 import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
 import { workspaceKey } from '@/hooks/useWorkspaceData';
-import { enqueue, applyOutbox, opsForWorkspace, isLocalId, localIdOf, isTransientError, pendingCount, failedCount } from './outboxModel';
+export { mergeRows } from './outboxModel';
+import { enqueue, applyOutbox, opsForWorkspace, inView, windowStart, earliestDay, isLocalId, localIdOf, isTransientError, pendingCount, failedCount } from './outboxModel';
 import { isOnline } from './network';
 
 // Offline-first writes for transactions. Every add, edit and delete goes through this queue: it is
@@ -15,8 +16,8 @@ import { isOnline } from './network';
 // it waits and goes out when the phone is back online. See outboxModel.js for the folding rules.
 
 const REQUEST = { timeout: 15000, retries: 0 };
-// The newest rows of the household; older history is not loaded into the app
-export const TRANSACTION_LIMIT = 2000;
+// A safety cap per view (the server allows no more); a view is a date window or one kind of link
+const TRANSACTION_LIMIT = 10000;
 const BACKOFF = [3000, 10000, 30000, 60000, 180000];
 const Tx = () => ascent.entities.ExpenseTransaction;
 
@@ -126,17 +127,26 @@ class TxOutbox {
   /** Put what the server answered into the cached list right away, so nothing blinks while it refetches. */
   absorb(result) {
     if (!result.workspaceId) return;
-    queryClientInstance.setQueryData(workspaceKey('transactions', result.workspaceId), (list) => {
-      if (!Array.isArray(list)) return list;
-      let next = list;
-      if (result.created?.length) {
-        const ids = new Set(result.created.map((r) => r.id));
-        next = [...result.created, ...next.filter((r) => !ids.has(r.id))];
-      }
-      if (result.updated?.id) next = next.map((r) => (r.id === result.updated.id ? result.updated : r));
-      if (result.deleted) next = next.filter((r) => r.id !== result.deleted);
-      return next;
-    });
+    // Every loaded view of this workspace's transactions, each taking only the rows it shows
+    const views = queryClientInstance.getQueryCache().findAll({ queryKey: workspaceKey('transactions', result.workspaceId) });
+    for (const { queryKey } of views) {
+      const view = queryKey[2] || {};
+      queryClientInstance.setQueryData(queryKey, (list) => {
+        if (!Array.isArray(list)) return list;
+        let next = list;
+        if (result.created?.length) {
+          const ids = new Set(result.created.map((r) => r.id));
+          next = [...result.created.filter((r) => inView(r, view)), ...next.filter((r) => !ids.has(r.id))];
+        }
+        if (result.updated?.id) {
+          next = next
+            .map((r) => (r.id === result.updated.id ? result.updated : r))
+            .filter((r) => r.id !== result.updated.id || inView(r, view));
+        }
+        if (result.deleted) next = next.filter((r) => r.id !== result.deleted);
+        return next;
+      });
+    }
   }
 
   flush() {
@@ -245,27 +255,62 @@ export function useOutbox() {
   };
 }
 
-/**
- * The household's transactions with changes still waiting on this device drawn in. Shared by the
- * Dashboard, Expenses, Income and Plans pages (one cache entry, refreshed every 30 s while open).
- */
-export function useTransactions({ enabled = true } = {}) {
+/** One view of the household's transactions, with changes still waiting on this device drawn in. */
+function useTransactionView(view, enabled, { live }) {
   const { user } = useAuth();
   const userId = user?.id || user?._id;
   const workspaceId = useWorkspaceId();
   const query = useQuery({
-    queryKey: workspaceKey('transactions', workspaceId),
-    queryFn: () => ascent.entities.ExpenseTransaction.list('-date', TRANSACTION_LIMIT, { headers: { 'x-workspace-id': workspaceId } }),
+    queryKey: [...workspaceKey('transactions', workspaceId), view],
+    queryFn: () => ascent.entities.ExpenseTransaction.filter(view, '-date', TRANSACTION_LIMIT, { headers: { 'x-workspace-id': workspaceId } }),
     enabled: !!userId && !!workspaceId && enabled,
+    // A longer window keeps showing the shorter one while it loads, never another workspace's rows
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === workspaceId ? previous : undefined),
     staleTime: 3 * 60 * 1000,
-    // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return and while open
+    // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return, and the main
+    // window also while open
     refetchOnWindowFocus: 'always',
-    refetchInterval: 30 * 1000,
+    refetchInterval: live ? 30 * 1000 : false,
   });
   const { ops, idMap } = useOutboxState(userId);
   // Only this workspace's waiting changes belong in this workspace's list
   const here = useMemo(() => opsForWorkspace(ops, workspaceId), [ops, workspaceId]);
-  const data = useMemo(() => applyOutbox(query.data || [], here, idMap), [query.data, here, idMap]);
+  const data = useMemo(() => applyOutbox(query.data || [], here, idMap, (row) => inView(row, view)), [query.data, here, idMap, view]);
   // Offline with nothing cached yet: the query is paused, so show the empty list instead of a spinner
   return { ...query, data, isLoading: query.isPending && query.fetchStatus !== 'paused' };
+}
+
+/**
+ * The household's transactions from `from` (YYYY-MM-DD) on, or from the default window
+ * (HISTORY_MONTHS back) when that is earlier. Future rows (installments, recurring) are included.
+ * Refreshed every 30 s while open.
+ */
+export function useTransactions({ from, enabled = true } = {}) {
+  const start = earliestDay(from, windowStart());
+  const view = useMemo(() => ({ from: start }), [start]);
+  return useTransactionView(view, enabled, { live: true });
+}
+
+/**
+ * Every transaction where `field` is set, whatever its date: 'planId', 'commitmentId',
+ * 'installmentGroupId' (all parts of big purchases) or 'split' (shared expenses, for who owes whom).
+ */
+export function useLinkedTransactions(field, { enabled = true } = {}) {
+  const view = useMemo(() => ({ has: field }), [field]);
+  return useTransactionView(view, enabled, { live: false });
+}
+
+/** The date of the household's oldest transaction (YYYY-MM-DD), so screens can offer every year there is. */
+export function useOldestTransactionDate() {
+  const workspaceId = useWorkspaceId();
+  const query = useQuery({
+    queryKey: ['transactions-oldest', workspaceId],
+    queryFn: async () => {
+      const [oldest] = await ascent.entities.ExpenseTransaction.list('date', 1, { headers: { 'x-workspace-id': workspaceId } });
+      return oldest?.date ? String(oldest.date).slice(0, 10) : null;
+    },
+    enabled: !!workspaceId,
+    staleTime: 60 * 60 * 1000,
+  });
+  return query.data ?? null;
 }

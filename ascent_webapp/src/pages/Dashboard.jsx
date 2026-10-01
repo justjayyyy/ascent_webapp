@@ -17,7 +17,7 @@ import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
 import HouseholdBalanceCard from '@/components/insights/HouseholdBalanceCard';
 import CommitmentsCard from '@/components/insights/CommitmentsCard';
 import AssistantBar from '@/components/insights/AssistantBar';
-import { useTransactions } from '@/lib/offline/txOutbox';
+import { useTransactions, useLinkedTransactions } from '@/lib/offline/txOutbox';
 import RecapStories from '@/components/recap/RecapStories';
 import { RecapRingButton, RecapBanner, useRecapSeen } from '@/components/recap/RecapEntry';
 import { buildRecap, recapToOffer, monthKeyOf } from '@/lib/recap';
@@ -60,13 +60,17 @@ export default function Dashboard() {
   const userCurrency = user?.currency || 'ILS';
   const blur = !!user?.blurValues;
 
-  // Same cache as the Expenses page, with changes still waiting on this device drawn in
-  const { data: transactions = [], isLoading } = useTransactions();
-
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  // The selected month and the six before it (trend chart, comparisons, forecast baseline), with changes
+  // still waiting on this device drawn in; and every shared expense, for who owes whom
+  const { data: transactions = [], isLoading } = useTransactions({
+    from: `${monthKey(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 6, 1))}-01`,
+  });
+  const { data: splitTransactions = [] } = useLinkedTransactions('split');
 
   const { amountOf: toUserCurrency, convert: convertOrNull } = useMoney(userCurrency);
 
@@ -89,13 +93,17 @@ export default function Dashboard() {
       _day: parseInt(String(tx.date).slice(8, 10), 10),
       _amount: toUserCurrency(tx),
     })), [transactions, toUserCurrency]);
+  const splitRows = useMemo(
+    () => splitTransactions.map((tx) => ({ ...tx, _amount: toUserCurrency(tx) })),
+    [splitTransactions, toUserCurrency]
+  );
 
   // Budgets and plans keep their own currency; everything on this page is shown in the user's
   // (shown as is until rates arrive, rather than as zero)
   const convert = useCallback((amount, from) => (amount ? convertOrNull(amount, from) ?? amount : 0), [convertOrNull]);
 
   const { isShared, members } = useHousehold();
-  const { forecast, subscriptions, balances, commitments } = useInsights({ rows: normalized, selectedMonth, convert });
+  const { forecast, subscriptions, balances, commitments } = useInsights({ rows: normalized, splitRows, selectedMonth, convert });
   const showForecast = forecast.phase === 'current';
 
   const selectedKey = monthKey(selectedMonth);

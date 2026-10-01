@@ -90,3 +90,22 @@ test('each workspace only sees the changes queued in it (older ops without a wor
   assert.deepEqual(opsForWorkspace([here, there, legacy], 'ws1').map((o) => o.id), [here.id, legacy.id]);
   assert.equal(applyOutbox([], opsForWorkspace([here, there], 'ws2')).length, 1);
 });
+
+test('views: the default window, the earliest day, and which rows belong', async () => {
+  const { windowStart, earliestDay, inView, mergeRows, HISTORY_MONTHS } = await import('./outboxModel.js');
+  assert.equal(HISTORY_MONTHS, 14);
+  assert.equal(windowStart(new Date(2026, 9, 15)), '2025-08-01');
+  assert.equal(windowStart(new Date(2026, 0, 31), 1), '2025-12-01');
+  assert.equal(earliestDay('2026-01-01', undefined, '2024-05-01'), '2024-05-01');
+  assert.equal(inView({ date: '2026-01-05' }, { from: '2026-01-01' }), true);
+  assert.equal(inView({ date: '2025-12-31' }, { from: '2026-01-01' }), false);
+  assert.equal(inView({ planId: 'p1' }, { has: 'planId' }), true);
+  assert.equal(inView({ planId: null }, { has: 'planId' }), false);
+  assert.deepEqual(mergeRows([{ id: 1, v: 'a' }], [{ id: 1, v: 'b' }, { id: 2 }]).map((r) => r.v ?? r.id), ['a', 2]);
+});
+
+test('a queued add only shows in the views it belongs to', () => {
+  const add = createOp({ rows: [{ ...coffee, date: '2026-10-01' }], uuid: 'aaaaaaaa-1', workspaceId: ws });
+  assert.equal(applyOutbox([], [add], {}, (r) => r.date >= '2026-01-01').length, 1);
+  assert.equal(applyOutbox([], [add], {}, (r) => !!r.planId).length, 0);
+});

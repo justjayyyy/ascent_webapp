@@ -7,7 +7,7 @@ import { getYear, parseISO } from 'date-fns';
 const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const FULL_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 
-function PeriodSelector({ transactions = [], selectedYear, selectedMonths = [], onYearChange, onMonthChange }) {
+function PeriodSelector({ transactions = [], oldestDate = null, selectedYear, selectedMonths = [], onYearChange, onMonthChange }) {
   const { t } = useTheme();
   const stripRef = useRef(null);
   const now = new Date();
@@ -15,11 +15,15 @@ function PeriodSelector({ transactions = [], selectedYear, selectedMonths = [], 
   const currentMonth = now.getMonth() + 1;
   const yearNum = parseInt(selectedYear);
 
+  // Every year from the household's first transaction (only recent history is loaded, so the loaded
+  // rows alone would hide older years) to the last one with rows (installments can run ahead)
   const years = useMemo(() => {
-    const set = new Set([currentYear, yearNum]);
-    transactions.forEach((tx) => tx.date && set.add(getYear(parseISO(tx.date))));
-    return Array.from(set).sort((a, b) => a - b);
-  }, [transactions, currentYear, yearNum]);
+    const known = [currentYear, yearNum, ...transactions.filter((tx) => tx.date).map((tx) => getYear(parseISO(tx.date)))];
+    if (oldestDate) known.push(Number(oldestDate.slice(0, 4)));
+    const first = Math.min(...known);
+    const last = Math.max(...known);
+    return Array.from({ length: Math.min(last - first, 100) + 1 }, (_, i) => first + i);
+  }, [transactions, oldestDate, currentYear, yearNum]);
 
   const yearIdx = years.indexOf(yearNum);
   const canPrev = yearIdx > 0;

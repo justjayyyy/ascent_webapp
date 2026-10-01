@@ -161,3 +161,17 @@ test('signing out forgets every queue on the device', async () => {
   await clearOutboxes();
   expect([...idb.keys()]).toEqual(['ascent:rq-cache']);
 });
+
+test('a synced add lands in every loaded view it belongs to, and only those', async () => {
+  const box = freshBox();
+  queryClientInstance.setQueryData(['transactions', 'ws1', { from: '2026-01-01' }], []);
+  queryClientInstance.setQueryData(['transactions', 'ws1', { from: '2026-11-01' }], []);
+  queryClientInstance.setQueryData(['transactions', 'ws1', { has: 'planId' }], []);
+  queryClientInstance.setQueryData(['transactions', 'ws2', { from: '2026-01-01' }], []);
+  await box.submit(createOp({ rows: [coffee], uuid: 'llllllll-12', workspaceId: 'ws1' }));
+  const ids = (view, w = 'ws1') => (queryClientInstance.getQueryData(['transactions', w, view]) || []).map((r) => r.id);
+  expect(ids({ from: '2026-01-01' })).toEqual(['srv-1']);
+  expect(ids({ from: '2026-11-01' })).toEqual([]); // dated before that window
+  expect(ids({ has: 'planId' })).toEqual([]); // not for a plan
+  expect(ids({ from: '2026-01-01' }, 'ws2')).toEqual([]); // another workspace
+});
