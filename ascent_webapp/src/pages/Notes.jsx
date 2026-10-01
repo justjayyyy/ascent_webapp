@@ -658,6 +658,7 @@ function Notes() {
           type="file"
           accept="image/*"
           multiple
+          aria-label={t('ntNewImageNote')}
           hidden
           onChange={(e) => { if (e.target.files?.length) newImageNote(e.target.files); e.target.value = ''; }}
         />

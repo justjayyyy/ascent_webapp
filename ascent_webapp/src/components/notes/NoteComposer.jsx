@@ -109,6 +109,8 @@ export default function NoteComposer({ t, labels, defaultTag, onCreate, onImage,
                   type="file"
                   accept="image/*"
                   multiple
+                  aria-label={t('ntNewImageNote')}
+                  tabIndex={-1}
                   className="hidden"
                   onChange={(e) => { if (e.target.files?.length) onImage(e.target.files); e.target.value = ''; }}
                 />

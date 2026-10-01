@@ -1,6 +1,9 @@
 // Strings for the app shell (routing, access). Merged into translations.js like the other files.
 export const appTranslations = {
   en: {
+    a11yPrevYear: 'Previous year',
+    a11yNextYear: 'Next year',
+    a11yBudgetUsed: '{category}: {percent}% of the budget used',
     noAccessAnyPage: 'You do not have access to any pages in this workspace. Ask the workspace owner for access.',
     notFoundTitle: 'Page not found',
     notFoundBody: 'There is no page at',
@@ -23,6 +26,9 @@ export const appTranslations = {
     txRateUnavailable: 'No exchange rate right now. The amount is saved in its own currency and converted later.',
   },
   he: {
+    a11yPrevYear: 'השנה הקודמת',
+    a11yNextYear: 'השנה הבאה',
+    a11yBudgetUsed: '{category}: נוצלו {percent}% מהתקציב',
     noAccessAnyPage: 'אין לך גישה לאף עמוד בסביבת העבודה הזו. בקשו גישה מבעלי סביבת העבודה.',
     notFoundTitle: 'הדף לא נמצא',
     notFoundBody: 'אין דף בכתובת',
@@ -45,6 +51,9 @@ export const appTranslations = {
     txRateUnavailable: 'אין כרגע שער חליפין. הסכום נשמר במטבע שלו ויומר מאוחר יותר.',
   },
   ru: {
+    a11yPrevYear: 'Предыдущий год',
+    a11yNextYear: 'Следующий год',
+    a11yBudgetUsed: '{category}: использовано {percent}% бюджета',
     noAccessAnyPage: 'У вас нет доступа ни к одной странице этого рабочего пространства. Попросите доступ у владельца.',
     notFoundTitle: 'Страница не найдена',
     notFoundBody: 'Нет страницы по адресу',

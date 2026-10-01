@@ -58,12 +58,12 @@ function PeriodSelector({ transactions = [], oldestDate = null, selectedYear, se
   return (
     <div className="flex items-center gap-1">
       <div className="flex shrink-0 items-center">
-        <button type="button" className={arrow} disabled={!canPrev} onClick={() => changeYear(years[yearIdx - 1])} aria-label={String(years[yearIdx - 1] ?? '')}>
-          <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
+        <button type="button" className={arrow} disabled={!canPrev} onClick={() => changeYear(years[yearIdx - 1])} aria-label={t('a11yPrevYear')}>
+          <ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden="true" />
         </button>
         <span className="min-w-[3.25rem] text-center text-base font-semibold tabular-nums text-foreground">{selectedYear}</span>
-        <button type="button" className={arrow} disabled={!canNext} onClick={() => changeYear(years[yearIdx + 1])} aria-label={String(years[yearIdx + 1] ?? '')}>
-          <ChevronRight className="h-5 w-5 rtl:rotate-180" />
+        <button type="button" className={arrow} disabled={!canNext} onClick={() => changeYear(years[yearIdx + 1])} aria-label={t('a11yNextYear')}>
+          <ChevronRight className="h-5 w-5 rtl:rotate-180" aria-hidden="true" />
         </button>
       </div>
 

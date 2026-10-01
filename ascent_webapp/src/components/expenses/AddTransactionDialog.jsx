@@ -421,7 +421,7 @@ export default function AddTransactionDialog({
                   });
                 }}
               >
-                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger id="type" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -436,7 +436,7 @@ export default function AddTransactionDialog({
             <div className="space-y-1 sm:space-y-2">
               <Label htmlFor="currency" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('currency')} *</Label>
               <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger id="currency" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -452,14 +452,14 @@ export default function AddTransactionDialog({
             </div>
 
             <div className="space-y-1 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('paymentMethod')} ({t('optional')})</Label>
+              <Label htmlFor="tx-payment-method" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('paymentMethod')} ({t('optional')})</Label>
               <Select
                 value={formData.paymentMethod}
                 onValueChange={(value) => {
                   setFormData({ ...formData, paymentMethod: value, cardId: value === 'Card' ? formData.cardId : '' });
                 }}
               >
-                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger id="tx-payment-method" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue placeholder={t('selectPaymentMethod')} />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -568,12 +568,12 @@ export default function AddTransactionDialog({
           {/* Part of a plan (a trip, a wedding): counts towards that plan's budget */}
           {formData.type === 'Expense' && activePlans.length > 0 && (
             <div className="space-y-1 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('partOfPlan')} ({t('optional')})</Label>
+              <Label htmlFor="tx-plan" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('partOfPlan')} ({t('optional')})</Label>
               <Select
                 value={formData.planId || 'none'}
                 onValueChange={(value) => setFormData({ ...formData, planId: value === 'none' ? '' : value, planItemId: value === formData.planId ? formData.planItemId : '' })}
               >
-                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger id="tx-plan" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -664,12 +664,12 @@ export default function AddTransactionDialog({
           {formData.paymentMethod === 'Card' && (
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div className="space-y-1 sm:space-y-2">
-                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('selectCard')}</Label>
+                <Label htmlFor="tx-card" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('selectCard')}</Label>
                 <Select
                   value={formData.cardId}
                   onValueChange={(value) => setFormData({ ...formData, cardId: value, paymentMethod: 'Card' })}
                 >
-                  <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                  <SelectTrigger id="tx-card" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                     <SelectValue placeholder={t('selectACard')} />
                   </SelectTrigger>
                   <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -701,7 +701,7 @@ export default function AddTransactionDialog({
                   value={formData.relatedAccountId}
                   onValueChange={(value) => setFormData({ ...formData, relatedAccountId: value })}
                 >
-                  <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                  <SelectTrigger id="relatedAccount" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                     <SelectValue placeholder={t('selectAccountOptional')} />
                   </SelectTrigger>
                   <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -727,7 +727,7 @@ export default function AddTransactionDialog({
                 value={formData.relatedAccountId}
                 onValueChange={(value) => setFormData({ ...formData, relatedAccountId: value })}
               >
-                <SelectTrigger className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger id="relatedAccount" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue placeholder={t('selectAccountOptional')} />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>

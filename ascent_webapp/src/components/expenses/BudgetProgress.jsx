@@ -134,7 +134,8 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                   <BlurValue blur={user?.blurValues}>{formatCurrency(budget.remaining, userCurrency)}</BlurValue>
                 </span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(budget.displayPercentage)} aria-valuemin={0} aria-valuemax={100}>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(budget.displayPercentage)} aria-valuemin={0} aria-valuemax={100}
+                aria-label={t('a11yBudgetUsed').replace('{category}', translateCategory(budget.category, language)).replace('{percent}', Math.round(budget.displayPercentage))}>
                 <motion.div className={cn("h-full rounded-full", tone)} initial={{ width: 0 }} animate={{ width: `${budget.percentage}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
               </div>
               <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
