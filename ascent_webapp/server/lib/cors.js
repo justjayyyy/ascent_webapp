@@ -27,7 +27,8 @@ export function isAllowedOrigin(origin, { host, env = process.env } = {}) {
   const o = trim(origin);
   if (LOCAL.test(o) || OURS.test(o) || configuredOrigins(env).includes(o)) return true;
   try {
-    return !!host && new URL(o).host === host;
+    const url = new URL(o);
+    return !!host && url.protocol === 'https:' && url.host === host;
   } catch {
     return false;
   }

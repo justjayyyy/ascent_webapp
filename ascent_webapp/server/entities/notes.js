@@ -17,6 +17,16 @@ const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 
 const sameId = (a, b) => a && b && a.toString() === b.toString();
 
+// The stored bytes, exactly. A lean read gives a BSON Binary (its .buffer is the data); a Node Buffer
+// must be used as it is, because its .buffer is the whole shared memory pool it was cut from.
+export function fileBytes(data) {
+  if (Buffer.isBuffer(data)) return data;
+  const exactly = (view) => Buffer.from(view.buffer, view.byteOffset, view.byteLength);
+  if (ArrayBuffer.isView(data)) return exactly(data);
+  if (ArrayBuffer.isView(data?.buffer)) return exactly(data.buffer); // BSON Binary
+  return Buffer.from(data?.buffer ?? data ?? []);
+}
+
 // What the caller may do with a note:
 //   'owner' created it, 'edit' can change its content, 'view' can only read, null: no access
 function accessFor(note, user, member) {
@@ -127,11 +137,7 @@ export default async function handler(req, res) {
     const user = await authMiddleware(req, res);
     if (!user) return;
 
-    try {
-      await connectDB();
-    } catch (dbError) {
-      return serverError(res, dbError);
-    }
+    await connectDB();
 
     const workspace = req.workspace;
     if (!workspace) return error(res, 'Workspace context required', 400);
@@ -159,7 +165,7 @@ export default async function handler(req, res) {
         if (!file) return notFound(res, 'File not found');
         return success(res, {
           id: file._id.toString(), name: file.name, type: file.type, size: file.size,
-          data: Buffer.from(file.data.buffer ?? file.data).toString('base64')
+          data: fileBytes(file.data).toString('base64')
         });
       }
 
@@ -286,8 +292,14 @@ export default async function handler(req, res) {
         const wantsContent = ['title', 'content', 'type', 'items', 'tags', 'color']
           .some(k => body[k] !== undefined);
 
+        // Every check comes before the first write, so a refused request changes nothing
+        const wantsOwnerOnly = body.isShared !== undefined || body.collaborators !== undefined || body.trashed !== undefined;
+        if (wantsOwnerOnly && !isOwner) return error(res, 'Only the note owner can do that', 403);
+        if (wantsContent && !canEditContent) return error(res, 'You can only view this note', 403);
+        const reminderAt = body.reminder ? new Date(body.reminder) : null;
+        if (reminderAt && Number.isNaN(reminderAt.getTime())) return error(res, 'Invalid reminder time', 400);
+
         if (wantsContent) {
-          if (!canEditContent) return error(res, 'You can only view this note', 403);
           Object.assign(set, contentPatch(body));
           set.updatedByEmail = user.email;
         }
@@ -308,11 +320,9 @@ export default async function handler(req, res) {
         // Reminders are personal too. $pull and $push can't share one update on the same
         // field, so the old reminder is cleared first.
         if (body.reminder !== undefined) {
-          const at = body.reminder ? new Date(body.reminder) : null;
-          if (at && Number.isNaN(at.getTime())) return error(res, 'Invalid reminder time', 400);
           await Note.updateOne({ _id: id }, { $pull: { reminders: { userId: uid } } });
           const repeat = REPEATS.includes(body.reminderRepeat) ? body.reminderRepeat : 'none';
-          if (at) update.$push = { ...(update.$push || {}), reminders: { userId: uid, at, repeat } };
+          if (reminderAt) update.$push = { ...(update.$push || {}), reminders: { userId: uid, at: reminderAt, repeat } };
           else if (!Object.keys(set).length && !Object.keys(update).length) {
             const cleared = await Note.findById(id).lean();
             return success(res, present(cleared, user, member));
@@ -320,8 +330,7 @@ export default async function handler(req, res) {
         }
 
         // Sharing and trash belong to the creator
-        if (body.isShared !== undefined || body.collaborators !== undefined || body.trashed !== undefined) {
-          if (!isOwner) return error(res, 'Only the note owner can do that', 403);
+        if (wantsOwnerOnly) {
           if (body.isShared !== undefined) set.isShared = !!body.isShared;
           if (body.collaborators !== undefined) {
             const collaborators = buildCollaborators(body.collaborators, workspace, user);

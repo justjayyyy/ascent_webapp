@@ -80,3 +80,36 @@ test('statement import, smart help and settlements require a login', async () =>
   assert.equal((await send('/api/assist?action=ask', { body: JSON.stringify({ question: 'x' }) })).code, 401);
   assert.equal((await send('/api/entities/settlements', { method: 'GET' })).code, 401);
 });
+
+test('every data entity is mounted and requires a login', async () => {
+  for (const entity of ['transactions', 'categories', 'budgets', 'cards', 'plans', 'commitments', 'settlements', 'notes', 'accounts', 'goals']) {
+    assert.equal((await send(`/api/entities/${entity}`, { method: 'GET' })).code, 401, entity);
+  }
+});
+
+test('removed endpoints are gone: no open email relay, no database probe', async () => {
+  assert.equal((await send('/api/integrations/send-email', { body: JSON.stringify({ to: 'x@y.z', subject: 's' }) })).code, 404);
+  assert.equal((await send('/api/integrations/upload-file', { body: '{}' })).code, 404);
+  assert.equal((await send('/api/test-db', { method: 'GET' })).code, 404);
+  const unknown = await send('/api/nothing-here', { method: 'GET' });
+  assert.deepEqual([unknown.code, unknown.json.success], [404, false]);
+});
+
+test('CORS answers our origins and stays silent for others', async () => {
+  const preflight = (origin) => fetch(`${base}/api/auth/me`, { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'GET' } });
+  const ours = await preflight('https://ascentwebapp.vercel.app');
+  assert.equal(ours.headers.get('access-control-allow-origin'), 'https://ascentwebapp.vercel.app');
+  const theirs = await preflight('https://evil-localhost.com');
+  assert.equal(theirs.headers.get('access-control-allow-origin'), null);
+});
+
+test('responses carry security headers and do not advertise the framework', async () => {
+  const r = await fetch(`${base}/api/health`);
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(r.headers.get('x-powered-by'), null);
+});
+
+test('a forged Google sign-in (identity in the body, no ID token) is refused', async () => {
+  const r = await send('/api/auth/google', { body: JSON.stringify({ accessToken: 'x', userInfo: { email: 'victim@x.test' } }) });
+  assert.equal(r.code, 400);
+});
