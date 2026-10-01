@@ -281,18 +281,31 @@ export const isOverdue = (iso) => !!iso && new Date(iso).getTime() <= Date.now()
 
 export const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 
+// `start` moved `months` months on, keeping its day of the month where that month has it and
+// using the month's last day where it does not (the 31st, 29 February). Never drifts: always counted
+// from the original date, so a reminder on the 31st is back on the 31st in months that have one.
+function addMonthsClamped(start, months) {
+  const d = new Date(start);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d;
+}
+
 /** The next time a repeating reminder is due after `after` (default now), or null. */
 export function nextOccurrence(iso, repeat, after = Date.now()) {
   if (!iso || !repeat || repeat === 'none') return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  for (let i = 0; d.getTime() <= after && i < 5000; i += 1) {
-    if (repeat === 'daily') d.setDate(d.getDate() + 1);
-    else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
-    else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
-    else if (repeat === 'yearly') d.setFullYear(d.getFullYear() + 1);
-    else return null;
-  }
+  const start = new Date(iso);
+  if (Number.isNaN(start.getTime())) return null;
+  const step = { daily: (n) => { const d = new Date(start); d.setDate(d.getDate() + n); return d; },
+    weekly: (n) => { const d = new Date(start); d.setDate(d.getDate() + 7 * n); return d; },
+    monthly: (n) => addMonthsClamped(start, n),
+    yearly: (n) => addMonthsClamped(start, 12 * n) }[repeat];
+  if (!step) return null;
+  let d = start;
+  for (let n = 1; d.getTime() <= after && n < 5000; n += 1) d = step(n);
   return d.toISOString();
 }
 

@@ -16,9 +16,13 @@
     "seed:test-data": "node --env-file=.env server/scripts/seed-test-data.mjs",
     "create:demo": "node --env-file=.env server/scripts/create-demo-account.mjs",
     "test:email": "node --env-file=.env server/scripts/test-email.mjs",
-    "test:server": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\" \"src/lib/**/*.test.mjs\"",
+    "test:server": "npm run test:node",
     "ensure:indexes": "node --env-file=.env server/scripts/ensure-indexes.mjs",
-    "backfill:ingest": "node --env-file=.env server/scripts/backfill-ingest-fields.mjs"
+    "backfill:ingest": "node --env-file=.env server/scripts/backfill-ingest-fields.mjs",
+    "test:node": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\" \"src/lib/**/*.test.mjs\"",
+    "test:web": "vitest run",
+    "test": "npm run test:node && npm run test:web",
+    "check": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.130.0",

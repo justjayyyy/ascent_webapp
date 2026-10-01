@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createOp, updateOp, deleteOp, enqueue, applyOutbox, localIdOf, isTransientError, pendingCount } from './outboxModel.js';
+import { createOp, updateOp, deleteOp, enqueue, applyOutbox, opsForWorkspace, localIdOf, isTransientError, pendingCount } from './outboxModel.js';
 
 const ws = 'ws1';
 const coffee = { type: 'Expense', amount: 18, category: 'food', date: '2026-10-01', description: 'Coffee' };
@@ -81,4 +81,12 @@ test('only lost connections and server trouble are worth retrying', () => {
   assert.equal(isTransientError({ status: 429 }), true);
   assert.equal(isTransientError({ status: 400 }), false);
   assert.equal(isTransientError({ status: 403 }), false);
+});
+
+test('each workspace only sees the changes queued in it (older ops without a workspace show everywhere)', () => {
+  const here = createOp({ rows: [coffee], uuid: 'aaaaaaaa-1', workspaceId: 'ws1' });
+  const there = createOp({ rows: [coffee], uuid: 'bbbbbbbb-2', workspaceId: 'ws2' });
+  const legacy = { ...createOp({ rows: [coffee], uuid: 'cccccccc-3' }), workspaceId: undefined };
+  assert.deepEqual(opsForWorkspace([here, there, legacy], 'ws1').map((o) => o.id), [here.id, legacy.id]);
+  assert.equal(applyOutbox([], opsForWorkspace([here, there], 'ws2')).length, 1);
 });
