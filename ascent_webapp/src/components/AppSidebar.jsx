@@ -123,10 +123,12 @@ export default function AppSidebar({
         aria-label={label}
         aria-pressed={pressed}
         className={cn(
-          'grid h-9 place-items-center rounded-lg text-muted-foreground transition-colors',
-          'hover:bg-foreground/[0.07] hover:text-foreground', focusRing,
+          'grid h-9 place-items-center rounded-lg transition-colors', focusRing,
           collapsed ? 'w-9' : 'flex-1',
-          pressed && 'text-primary',
+          // Phones keep :hover on the last thing tapped, so the "on" state must win over the hover style
+          pressed
+            ? 'bg-primary/15 text-primary'
+            : 'text-muted-foreground hover:bg-foreground/[0.07] hover:text-foreground',
         )}
       >
         <Icon className="h-[18px] w-[18px]" />
