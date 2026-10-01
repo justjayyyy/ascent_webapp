@@ -14,3 +14,11 @@ if (!window.matchMedia) {
     addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false,
   });
 }
+
+// Browser APIs jsdom does not have; the app only needs them to exist
+class NoopObserver { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } }
+globalThis.ResizeObserver ??= NoopObserver;
+globalThis.IntersectionObserver ??= NoopObserver;
+window.scrollTo = () => {};
+Element.prototype.scrollIntoView ??= function scrollIntoView() {};
+Element.prototype.scrollTo ??= function scrollTo() {};
