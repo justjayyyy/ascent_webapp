@@ -67,6 +67,13 @@ export default function AcceptInvitation() {
       if (!data.token) throw new Error('No token received from server');
       localStorage.setItem('ascent_access_token', data.token);
       localStorage.removeItem('ascent_current_workspace_id');
+      // Signing in alone only creates her own workspace: actually join the one she was invited to.
+      try {
+        await ascent.workspaces.acceptInvitation(token);
+      } catch (acceptError) {
+        if (acceptError?.status !== 409) throw acceptError; // already a member: just open it
+      }
+      localStorage.setItem('ascent_current_workspace_id', invitation.workspaceId);
       toast.success(fmt(t('wsJoined'), { workspace: invitation.workspaceName }));
       setTimeout(() => { window.location.href = '/'; }, 100);
     } catch (error) {

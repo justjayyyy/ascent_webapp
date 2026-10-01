@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Copy, KeyRound, LogOut, MoreHorizontal, QrCode, Send, Trash2, UserPlus, Users } from 'lucide-react';
+import { Copy, Home, KeyRound, LogOut, MoreHorizontal, QrCode, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ascent } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -103,7 +103,7 @@ function MemberRow({ member, isSelf, canManage, t, language, onEdit, onResend, o
 
 export default function MembersSection() {
   const { t, language } = useTheme();
-  const { currentWorkspace, currentMember, isWorkspaceOwner, refreshWorkspaces } = useAuth();
+  const { user, workspaces, currentWorkspace, currentMember, isWorkspaceOwner, refreshWorkspaces } = useAuth();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [removing, setRemoving] = useState(null);
@@ -172,6 +172,20 @@ export default function MembersSection() {
     onError: fail,
   });
 
+  const openOwn = useMutation({
+    mutationFn: async () => {
+      const myId = user?.id || user?._id;
+      let own = workspaces.find((w) => String(w.ownerId) === String(myId));
+      if (!own) own = await ascent.workspaces.create({ name: t('wsMyWorkspaceName') });
+      return own;
+    },
+    onSuccess: (own) => {
+      localStorage.setItem('ascent_current_workspace_id', own.id || own._id);
+      window.location.assign('/');
+    },
+    onError: fail,
+  });
+
   const canGrantAdmin = isWorkspaceOwner;
   const rowProps = { t, language, onEdit: setEditing, onResend: resend.mutate, onRemove: setRemoving, onQr: setQrFor };
 
@@ -229,7 +243,11 @@ export default function MembersSection() {
       {!iManage && <p className="px-4 py-3 text-sm text-muted-foreground text-pretty sm:px-5">{t('wsReadOnlyHint')}</p>}
 
       {!isWorkspaceOwner && currentMember && (
-        <div className="px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap gap-2 px-4 py-3 sm:px-5">
+          <Button variant="secondary" disabled={openOwn.isPending} onClick={() => openOwn.mutate()} className="h-11 rounded-xl sm:h-9">
+            <Home className="me-1.5 h-4 w-4" aria-hidden="true" />
+            {t('wsOpenOwn')}
+          </Button>
           <Button
             variant="outline"
             onClick={() => setLeaving(true)}
