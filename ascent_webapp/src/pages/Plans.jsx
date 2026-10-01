@@ -5,6 +5,7 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { ChevronDown, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { applyEntryChange, restoreEntry } from '@/lib/listEntries';
 import { ascent } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -116,6 +117,18 @@ function Plans() {
     }
   }, [queryClient, plansKey, t]);
 
+  // Items change one at a time on the server, so two people editing the same plan keep both changes
+  const changeItem = useCallback(async (id, change) => {
+    queryClient.setQueryData(plansKey, (list = []) => list.map((p) => (p.id === id ? { ...p, items: applyEntryChange(p.items, change) } : p)));
+    try {
+      await ascent.entities.Plan.changeEntry(id, 'items', change);
+    } catch {
+      toast.error(t('failedToSavePlan'));
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+    }
+  }, [queryClient, plansKey, t]);
+
   const savePlan = useCallback(async (data) => {
     setSavingPlan(true);
     try {
@@ -135,7 +148,7 @@ function Plans() {
     } finally {
       setSavingPlan(false);
     }
-  }, [planDialog, updatePlan, queryClient, plansKey, openPlan, t, user?.email]);
+  }, [planDialog, updatePlan, queryClient, plansKey, openPlan, t]);
 
   const deletePlan = useCallback(async () => {
     if (!plan) return;
@@ -154,28 +167,26 @@ function Plans() {
 
   const saveItem = useCallback((item) => {
     if (!plan) return;
-    const items = plan.items || [];
-    const exists = items.some((i) => i.id === item.id);
-    updatePlan(plan.id, { items: exists ? items.map((i) => (i.id === item.id ? item : i)) : [...items, item] });
+    changeItem(plan.id, { op: 'put', item });
     setItemDialog(null);
-  }, [plan, updatePlan]);
+  }, [plan, changeItem]);
 
   const deleteItem = useCallback((item) => {
     if (!plan) return;
-    const items = plan.items || [];
-    updatePlan(plan.id, { items: items.filter((i) => i.id !== item.id) });
+    const undo = restoreEntry(plan.items || [], item);
+    changeItem(plan.id, { op: 'remove', id: item.id });
     setItemDialog(null);
     toast(t('planItemDeleted'), {
-      action: { label: t('ntUndo'), onClick: () => updatePlan(plan.id, { items }) },
+      action: { label: t('ntUndo'), onClick: () => changeItem(plan.id, undo) },
     });
-  }, [plan, updatePlan, t]);
+  }, [plan, changeItem, t]);
 
   const toggleItem = useCallback((item) => {
     if (!plan) return;
     const status = item.status === 'booked' ? 'planned' : 'booked';
     if (navigator.vibrate) navigator.vibrate(8);
-    updatePlan(plan.id, { items: (plan.items || []).map((i) => (i.id === item.id ? { ...i, status } : i)) });
-  }, [plan, updatePlan]);
+    changeItem(plan.id, { op: 'patch', id: item.id, changes: { status } });
+  }, [plan, changeItem]);
 
   // Paying a cost records a real expense (it shows up in Expenses and budgets) and ticks the item off
   const payItem = useCallback((item) => {

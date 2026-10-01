@@ -170,6 +170,8 @@ export function createEntity(path) {
     bulkCreate: (items, opts) => request(base, json('POST', items, opts)),
     update: (id, data, opts) => request(`${base}?id=${enc(id)}`, json('PUT', data, opts)),
     delete: (id, opts) => request(`${base}?id=${enc(id)}`, { ...opts, method: 'DELETE' }),
+    // One entry of a list field (plan items, loan payments); see src/lib/listEntries.js
+    changeEntry: (id, list, change, opts) => request(`${base}?id=${enc(id)}&list=${enc(list)}`, json('PATCH', change, opts)),
   };
 }
 

@@ -10,12 +10,12 @@ vi.mock('idb-keyval', () => ({
   keys: async () => [...idb.keys()],
 }));
 
-const api = vi.hoisted(() => ({ create: vi.fn(), bulkCreate: vi.fn(), update: vi.fn(), remove: vi.fn(), planGet: vi.fn(), planUpdate: vi.fn() }));
+const api = vi.hoisted(() => ({ create: vi.fn(), bulkCreate: vi.fn(), update: vi.fn(), remove: vi.fn(), planChange: vi.fn() }));
 vi.mock('@/api/client', () => ({
   ascent: {
     entities: {
       ExpenseTransaction: { create: api.create, bulkCreate: api.bulkCreate, update: api.update, delete: api.remove, list: vi.fn() },
-      Plan: { get: api.planGet, update: api.planUpdate },
+      Plan: { changeEntry: api.planChange },
     },
   },
 }));
@@ -64,10 +64,12 @@ describe('with a connection', () => {
 
   test('paying a plan item marks it paid, in the same workspace', async () => {
     const box = freshBox();
-    api.planGet.mockResolvedValue({ id: 'p1', items: [{ id: 'i1', status: 'planned' }] });
+    api.planChange.mockResolvedValue({ id: 'p1' });
     await box.submit(createOp({ rows: [coffee], uuid: 'cccccccc-3', workspaceId: 'ws1', plan: { planId: 'p1', itemId: 'i1' } }));
-    expect(api.planGet.mock.calls[0][1].headers['x-workspace-id']).toBe('ws1');
-    expect(api.planUpdate.mock.calls[0][1].items[0]).toMatchObject({ status: 'paid', transactionId: 'srv-1' });
+    const [planId, list, change, opts] = api.planChange.mock.calls[0];
+    expect([planId, list]).toEqual(['p1', 'items']);
+    expect(change).toEqual({ op: 'patch', id: 'i1', changes: { status: 'paid', transactionId: 'srv-1' } });
+    expect(opts.headers['x-workspace-id']).toBe('ws1');
   });
 
   test('deleting a row someone else already deleted counts as done', async () => {

@@ -86,6 +86,36 @@ const memberEmails = (workspace, user) => [
 ];
 const strangerIn = (row, people, allowed) => peopleIn(row, people).some((e) => typeof e !== 'string' || !allowed.has(e));
 
+// One entry of a list field (plan items, loan payments), changed on its own so two people editing the
+// same list at once do not overwrite each other. Entries are keyed by their string `id`.
+const ENTRY_KEY = /^[A-Za-z_]\w{0,40}$/;
+const plainEntry = (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).every((k) => ENTRY_KEY.test(k));
+export async function changeListEntry(Model, filter, field, body) {
+  const { op, id, item, changes, at } = body || {};
+  const opts = { runValidators: true };
+  const key = `${field}.id`;
+  if (op === 'put') {
+    if (!plainEntry(item) || typeof item.id !== 'string' || !item.id) return 'bad';
+    const replace = () => Model.updateOne({ ...filter, [key]: item.id }, { $set: { [`${field}.$`]: item } }, opts);
+    let r = await replace();
+    if (r.matchedCount) return 'ok';
+    const entry = Number.isInteger(at) && at >= 0 ? { $each: [item], $position: at } : item;
+    r = await Model.updateOne({ ...filter, [key]: { $ne: item.id } }, { $push: { [field]: entry } }, opts);
+    if (r.matchedCount) return 'ok';
+    return (await replace()).matchedCount ? 'ok' : 'missing'; // someone else added the same id meanwhile
+  }
+  if (typeof id !== 'string' || !id) return 'bad';
+  if (op === 'patch') {
+    if (!plainEntry(changes) || 'id' in changes || !Object.keys(changes).length) return 'bad';
+    const set = Object.fromEntries(Object.entries(changes).map(([k, v]) => [`${field}.$.${k}`, v]));
+    return (await Model.updateOne({ ...filter, [key]: id }, { $set: set }, opts)).matchedCount ? 'ok' : 'missing';
+  }
+  if (op === 'remove') {
+    return (await Model.updateOne(filter, { $pull: { [field]: { id } } })).matchedCount ? 'ok' : 'missing';
+  }
+  return 'bad';
+}
+
 const isDuplicate = (err) => err?.code === 11000 || err?.writeErrors?.some?.((e) => e.code === 11000 || e.err?.code === 11000);
 
 /** A plain object with a string `id`, from a document or a lean row. */
@@ -113,9 +143,11 @@ function clientFault(res, err) {
  * options.people: fields that name people by email, as { field: (value) => emails }. Each must be a member
  *   of the workspace, so nobody can pin money on an outsider; on edits, people already on the row stay allowed
  *   (someone who has since left).
+ * options.lists: array fields whose entries can be changed one at a time with PATCH ?id=&list=<field> and a body
+ *   { op: 'put', item, at? } (add or replace by item.id), { op: 'patch', id, changes } or { op: 'remove', id }
  */
 export function createEntityHandler(Model, options = {}) {
-  const { checkSharing = false, permission = null, dateField = null, people = null } = options;
+  const { checkSharing = false, permission = null, dateField = null, people = null, lists = [] } = options;
   const authored = !!Model.schema?.path?.('created_by');
   const entityName = Model.modelName || 'Entity';
 
@@ -220,6 +252,14 @@ export function createEntityHandler(Model, options = {}) {
         case 'PUT':
         case 'PATCH': {
           if (!id) return error(res, 'ID is required for update. Provide ?id=... in URL', 400);
+          if (req.query.list !== undefined) {
+            if (method !== 'PATCH' || !lists.includes(req.query.list)) return error(res, 'Unknown list', 400);
+            const outcome = await changeListEntry(Model, { _id: id, ...scope }, req.query.list, req.body);
+            if (outcome === 'bad') return error(res, 'Invalid list change', 400);
+            if (outcome === 'missing') return notFound(res, 'Item not found');
+            const item = await Model.findOne({ _id: id, ...scope }).lean();
+            return item ? success(res, toPlain(item)) : notFound(res, 'Item not found');
+          }
           const changes = clientWritable(Model, req.body);
           if (Object.keys(changes).length === 0) return error(res, 'Update data is required in request body', 400);
           if (people && peopleIn(changes, people).length) {

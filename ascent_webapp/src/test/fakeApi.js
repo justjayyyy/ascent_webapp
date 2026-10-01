@@ -1,5 +1,6 @@
 // An in-memory stand-in for the Ascent API at the fetch level, so tests run the real client, auth,
 // hooks and offline queue. Seed it with rows; it answers like the server (envelope, filters).
+import { applyEntryChange } from '@/lib/listEntries';
 
 const today = new Date();
 const day = (offset = 0) => {
@@ -99,6 +100,11 @@ export function fakeFetch(data) {
       }
       const row = rows.find((r) => r.id === q.id);
       if (!row) return fail(404, 'Item not found');
+      if (method === 'PATCH' && q.list) {
+        if (body.op === 'patch' && !(row[q.list] || []).some((e) => e.id === body.id)) return fail(404, 'Item not found');
+        row[q.list] = applyEntryChange(row[q.list], body);
+        return ok(row);
+      }
       if (method === 'PUT' || method === 'PATCH') {
         Object.assign(row, body);
         return ok(row);
@@ -110,5 +116,5 @@ export function fakeFetch(data) {
     }
     return method === 'GET' ? ok([]) : fail(404, 'Not found');
   };
-  return { fetchImpl, calls };
+  return { fetchImpl, calls, data };
 }

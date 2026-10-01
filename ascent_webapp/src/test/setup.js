@@ -22,3 +22,4 @@ globalThis.IntersectionObserver ??= NoopObserver;
 window.scrollTo = () => {};
 Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 Element.prototype.scrollTo ??= function scrollTo() {};
+Element.prototype.scrollBy ??= function scrollBy() {};

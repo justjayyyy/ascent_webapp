@@ -366,3 +366,79 @@ test('an edit may keep someone who has left, but not name a new outsider', async
   const gone = authoredModel(null);
   assert.equal((await call(gone, 'PUT', `id=${ID}`, { paidBy: 'sam@example.com' }, opts)).code, 404);
 });
+
+/* ------------------------------------------------------------ one list entry at a time */
+
+function listModel(matched = () => 1) {
+  const M = model();
+  M.updates = [];
+  M.updateOne = async (q, u, o) => { M.updates.push({ q: structuredClone(q), u: structuredClone(u), o }); return { matchedCount: matched(M.updates.length, q, u) }; };
+  M.findOne = () => ({ lean: async () => ({ _id: ID, items: [] }) });
+  return M;
+}
+const LIST = { lists: ['items'] };
+
+test('a list entry is replaced in place when it exists, scoped to the workspace', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = listModel();
+  const r = await call(M, 'PATCH', `id=${ID}&list=items`, { op: 'put', item: { id: 'a', name: 'Hotel', amount: 5 } }, LIST);
+  assert.equal(r.code, 200);
+  assert.deepEqual(M.updates, [{
+    q: { _id: ID, workspaceId: 'ws1', 'items.id': 'a' },
+    u: { $set: { 'items.$': { id: 'a', name: 'Hotel', amount: 5 } } },
+    o: { runValidators: true },
+  }]);
+});
+
+test('a new list entry is pushed only if no entry has its id, at a position when given', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = listModel((n) => (n === 1 ? 0 : 1));
+  await call(M, 'PATCH', `id=${ID}&list=items`, { op: 'put', item: { id: 'b' }, at: 2 }, LIST);
+  assert.deepEqual(M.updates[1].q, { _id: ID, workspaceId: 'ws1', 'items.id': { $ne: 'b' } });
+  assert.deepEqual(M.updates[1].u, { $push: { items: { $each: [{ id: 'b' }], $position: 2 } } });
+  const plain = listModel((n) => (n === 1 ? 0 : 1));
+  await call(plain, 'PATCH', `id=${ID}&list=items`, { op: 'put', item: { id: 'b' } }, LIST);
+  assert.deepEqual(plain.updates[1].u, { $push: { items: { id: 'b' } } });
+});
+
+test('patching an entry sets only the named fields; removing pulls it by id', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = listModel();
+  await call(M, 'PATCH', `id=${ID}&list=items`, { op: 'patch', id: 'a', changes: { status: 'paid', transactionId: 't1' } }, LIST);
+  assert.deepEqual(M.updates[0].u, { $set: { 'items.$.status': 'paid', 'items.$.transactionId': 't1' } });
+  await call(M, 'PATCH', `id=${ID}&list=items`, { op: 'remove', id: 'a' }, LIST);
+  assert.deepEqual(M.updates[1], { q: { _id: ID, workspaceId: 'ws1' }, u: { $pull: { items: { id: 'a' } } }, o: undefined });
+});
+
+test('list changes refuse unknown lists, operators, odd keys and changing the id', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const bad = [
+    ['list=payments', { op: 'remove', id: 'a' }],
+    ['list=items', { op: 'drop', id: 'a' }],
+    ['list=items', { op: 'put', item: { name: 'x' } }],
+    ['list=items', { op: 'put', item: { id: 'a', $where: 1 } }],
+    ['list=items', { op: 'put', item: { id: 'a', 'x.y': 1 } }],
+    ['list=items', { op: 'patch', id: 'a', changes: { id: 'b' } }],
+    ['list=items', { op: 'patch', id: 'a', changes: {} }],
+    ['list=items', { op: 'patch', id: { $ne: 1 }, changes: { status: 'paid' } }],
+    ['list=items', { op: 'remove' }],
+  ];
+  for (const [q, body] of bad) {
+    const M = listModel();
+    assert.equal((await call(M, 'PATCH', `id=${ID}&${q}`, body, LIST)).code, 400, JSON.stringify(body));
+    assert.equal(M.updates.length, 0);
+  }
+  const M = listModel();
+  assert.equal((await call(M, 'PUT', `id=${ID}&list=items`, { op: 'remove', id: 'a' }, LIST)).code, 400);
+});
+
+test('a list change on a missing row or entry is not found, and viewers cannot make one', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = listModel(() => 0);
+  assert.equal((await call(M, 'PATCH', `id=${ID}&list=items`, { op: 'patch', id: 'a', changes: { status: 'paid' } }, LIST)).code, 404);
+  assert.equal((await call(M, 'PATCH', `id=${ID}&list=items`, { op: 'put', item: { id: 'a' } }, LIST)).code, 404);
+  ctx = { workspace: WS, member: VIEWER };
+  const V = listModel();
+  assert.equal((await call(V, 'PATCH', `id=${ID}&list=items`, { op: 'remove', id: 'a' }, { ...LIST, permission: PERM })).code, 403);
+  assert.equal(V.updates.length, 0);
+});

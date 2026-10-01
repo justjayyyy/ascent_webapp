@@ -53,6 +53,7 @@ const PAGES = {
   '/Expenses': () => screen.findAllByText('Shufersal'),
   '/Income': () => screen.findAllByText('Salary'),
   '/Plans': () => screen.findAllByText('Rome'),
+  '/Plans?plan=p1': () => screen.findAllByText('Hotel'),
   '/Commitments': () => screen.findAllByText('Car loan'),
   '/Notes': () => screen.findAllByText('milk'),
   '/Settings': () => screen.findAllByDisplayValue('Dana'),
@@ -111,3 +112,20 @@ test('a page someone may not open sends them to one they can', async () => {
   await waitFor(() => expect(window.location.pathname).toBe('/Notes'));
   expect(await screen.findAllByText('milk')).not.toHaveLength(0);
 });
+
+test('ticking a plan item changes only that item, keeping what someone else added meanwhile', async () => {
+  const user = userEvent.setup();
+  openApp('/Plans?plan=p1', 'en');
+  await screen.findAllByText('Hotel');
+  // another member adds a cost after this screen loaded
+  api.data.entities.plans[0].items.push({ id: 'i3', name: 'Museum', amount: 40, status: 'planned' });
+  const hotel = screen.getByRole('button', { name: `${translations.en.planStatus_planned} · ${translations.en.markBooked}` });
+  await user.click(hotel);
+  await waitFor(() => expect(api.calls.some((c) => c.method === 'PATCH')).toBe(true));
+  const patch = api.calls.find((c) => c.method === 'PATCH');
+  expect(patch.query).toMatchObject({ id: 'p1', list: 'items' });
+  expect(patch.body).toEqual({ op: 'patch', id: 'i2', changes: { status: 'booked' } });
+  expect(api.calls.some((c) => c.method === 'PUT' && c.path === '/api/entities/plans')).toBe(false);
+  expect(api.data.entities.plans[0].items.map((i) => [i.id, i.status])).toEqual([['i1', 'paid'], ['i2', 'booked'], ['i3', 'planned']]);
+  expect(await screen.findAllByText('Museum')).not.toHaveLength(0);
+}, 20000);

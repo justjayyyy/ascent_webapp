@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { ChevronDown, CreditCard, HandCoins, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { applyEntryChange, restoreEntry } from '@/lib/listEntries';
 import { ascent } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -134,6 +135,18 @@ function Commitments() {
     }
   }, [queryClient, key, t]);
 
+  // Payments change one at a time on the server, so two people recording at once keep both
+  const changePayment = useCallback(async (id, change) => {
+    queryClient.setQueryData(key, (list = []) => list.map((c) => (c.id === id ? { ...c, payments: applyEntryChange(c.payments, change) } : c)));
+    try {
+      await ascent.entities.Commitment.changeEntry(id, 'payments', change);
+    } catch {
+      toast.error(t('cmSaveFailed'));
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ['commitments'] });
+    }
+  }, [queryClient, key, t]);
+
   const saveCommitment = useCallback(async (data) => {
     setSaving(true);
     try {
@@ -153,7 +166,7 @@ function Commitments() {
     } finally {
       setSaving(false);
     }
-  }, [dialog, update, queryClient, key, openOne, t, user?.email]);
+  }, [dialog, update, queryClient, key, openOne, t]);
 
   const remove = useCallback(async () => {
     if (!current) return;
@@ -199,7 +212,7 @@ function Commitments() {
     if (!current) return;
     const { c } = current;
     setPaymentDialog(null);
-    update(c.id, { payments: [...(c.payments || []), { ...payment, recordedAsExpense: alsoExpense }] });
+    changePayment(c.id, { op: 'put', item: { ...payment, recordedAsExpense: alsoExpense } });
     toast.success(t('cmPaymentAdded'));
     if (alsoExpense) {
       await save({
@@ -215,15 +228,15 @@ function Commitments() {
         commitmentPaymentId: payment.id,
       }, null);
     }
-  }, [current, update, save, categoryFor, userCurrency, t]);
+  }, [current, changePayment, save, categoryFor, userCurrency, t]);
 
   const removePayment = useCallback((payment) => {
     if (!current) return;
     const { c } = current;
-    const before = c.payments || [];
-    update(c.id, { payments: before.filter((p) => p.id !== payment.id) });
-    toast(t('cmPaymentRemoved'), { action: { label: t('ntUndo'), onClick: () => update(c.id, { payments: before }) } });
-  }, [current, update, t]);
+    const undo = restoreEntry(c.payments || [], payment);
+    changePayment(c.id, { op: 'remove', id: payment.id });
+    toast(t('cmPaymentRemoved'), { action: { label: t('ntUndo'), onClick: () => changePayment(c.id, undo) } });
+  }, [current, changePayment, t]);
 
   const money = moneyIn(loc, userCurrency);
   const colors = tokens?.series || ['hsl(var(--primary))'];
