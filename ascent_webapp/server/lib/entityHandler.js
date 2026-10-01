@@ -30,6 +30,20 @@ function safeFilters(Model, filters) {
 const safeBody = (body) =>
   Object.fromEntries(Object.entries(body).filter(([k]) => !NEVER_WRITE.has(k) && !k.startsWith('$')));
 
+// Rows queued on a device while offline carry an "app:<uuid>" dedupeKey, so a retried upload finds the
+// row the first attempt already stored instead of adding it twice. Other keys belong to automation
+// (Wallet, SMS, statements) and a client may not set them.
+const APP_KEY = /^app:[\w-]{8,100}(:\d{1,4})?$/; // ":n" numbers the rows of one queued batch
+function appKeyed(Model, item) {
+  if (!Model.schema?.path?.('dedupeKey') || !item || typeof item !== 'object') return item;
+  if (item.dedupeKey === undefined) return item;
+  if (typeof item.dedupeKey === 'string' && APP_KEY.test(item.dedupeKey)) return item;
+  const { dedupeKey, ...rest } = item;
+  return rest;
+}
+const isDuplicate = (err) => err?.code === 11000 || err?.writeErrors?.some?.((e) => e.code === 11000 || e.err?.code === 11000);
+const withId = (doc) => (doc && !doc.id && doc._id ? { ...doc, id: doc._id.toString() } : doc);
+
 // Generic CRUD handler for entities
 // options.permission: { read, write } member permission names (see the Workspace model), e.g. { read: 'viewExpenses', write: 'editExpenses' }
 export function createEntityHandler(Model, options = {}) {
@@ -168,18 +182,33 @@ export function createEntityHandler(Model, options = {}) {
           // Check for bulk create
           if (Array.isArray(req.body)) {
             const itemsToCreate = req.body.map(item => ({
-              ...item,
+              ...appKeyed(Model, item),
               workspaceId: req.workspace._id,
               createdBy: user._id
             }));
+            const toJson = (item) => {
+              const itemObj = item.toJSON ? item.toJSON() : item;
+              if (!itemObj.id && itemObj._id) itemObj.id = itemObj._id.toString();
+              return itemObj;
+            };
             try {
               const items = await Model.insertMany(itemsToCreate);
-              return success(res, items.map(item => {
-                const itemObj = item.toJSON ? item.toJSON() : item;
-                if (!itemObj.id && itemObj._id) itemObj.id = itemObj._id.toString();
-                return itemObj;
-              }), 201);
+              return success(res, items.map(toJson), 201);
             } catch (createError) {
+              // A retried offline upload: return what is already stored and add only what is missing
+              const keys = itemsToCreate.map((i) => i.dedupeKey).filter((k) => typeof k === 'string');
+              if (isDuplicate(createError) && keys.length === itemsToCreate.length) {
+                try {
+                  const stored = await Model.find({ workspaceId: req.workspace._id, dedupeKey: { $in: keys } }).lean();
+                  const have = new Set(stored.map((d) => d.dedupeKey));
+                  const missing = itemsToCreate.filter((i) => !have.has(i.dedupeKey));
+                  const added = missing.length ? await Model.insertMany(missing) : [];
+                  const byKey = new Map([...stored.map(withId), ...added.map(toJson)].map((d) => [d.dedupeKey, d]));
+                  return success(res, keys.map((k) => byKey.get(k)).filter(Boolean), 200);
+                } catch (retryError) {
+                  return serverError(res, retryError);
+                }
+              }
               if (createError.name === 'ValidationError') {
                 const validationErrors = Object.values(createError.errors || {}).map(err => err.message).join(', ');
                 return error(res, `Validation error: ${validationErrors}`, 400);
@@ -190,7 +219,7 @@ export function createEntityHandler(Model, options = {}) {
 
           // Single create
           const itemData = {
-            ...req.body,
+            ...appKeyed(Model, req.body),
             workspaceId: req.workspace._id,
             createdBy: user._id
           };
@@ -215,6 +244,11 @@ export function createEntityHandler(Model, options = {}) {
             
             return success(res, itemJson, 201);
           } catch (createError) {
+            // A retried offline upload whose first attempt got through: answer with that row
+            if (isDuplicate(createError) && typeof itemData.dedupeKey === 'string') {
+              const stored = await Model.findOne({ workspaceId: req.workspace._id, dedupeKey: itemData.dedupeKey }).lean();
+              if (stored) return success(res, withId(stored), 200);
+            }
             if (createError.name === 'ValidationError') {
               const validationErrors = Object.values(createError.errors || {}).map(err => err.message).join(', ');
               return error(res, `Validation error: ${validationErrors}`, 400);

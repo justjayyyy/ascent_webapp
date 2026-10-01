@@ -1,8 +1,10 @@
 import './App.css'
 import React, { Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { queryClientInstance } from '@/lib/query-client'
+import { persistOptions } from '@/lib/offline/persist'
+import AppSplash from '@/components/AppSplash'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
@@ -76,13 +78,9 @@ const PermissionGuard = ({ pageName, children }) => {
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking auth
+  // First sign-in check on a device with no saved session (a saved one opens the app at once)
   if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-      </div>
-    );
+    return <AppSplash />;
   }
 
   // Handle authentication errors
@@ -149,7 +147,12 @@ function App() {
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
+      <PersistQueryClientProvider
+        client={queryClientInstance}
+        persistOptions={persistOptions}
+        // Restored numbers show at once; refresh everything on screen behind them
+        onSuccess={() => queryClientInstance.invalidateQueries()}
+      >
         <ThemeProvider>
           <Router>
             <Routes>
@@ -186,7 +189,7 @@ function App() {
           <Analytics />
           <SpeedInsights />
         </ThemeProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </AuthProvider>
   )
 }

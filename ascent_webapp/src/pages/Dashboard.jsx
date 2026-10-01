@@ -1,10 +1,8 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import NumberFlow from '@number-flow/react';
 import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
-import { ascent } from '@/api/client';
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
 import BlurValue from '@/components/BlurValue';
 import { useTheme } from '@/components/ThemeProvider';
@@ -18,6 +16,10 @@ import SafeToSpendCard from '@/components/insights/SafeToSpendCard';
 import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
 import HouseholdBalanceCard from '@/components/insights/HouseholdBalanceCard';
 import AssistantBar from '@/components/insights/AssistantBar';
+import { useTransactions } from '@/lib/offline/txOutbox';
+import RecapStories from '@/components/recap/RecapStories';
+import { RecapRingButton, RecapBanner, useRecapSeen } from '@/components/recap/RecapEntry';
+import { buildRecap, recapToOffer, monthKeyOf } from '@/lib/recap';
 
 const MAX_CATEGORY_SLICES = 6;
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -57,21 +59,9 @@ export default function Dashboard() {
   const tokens = useChartTokens();
   const userCurrency = user?.currency || 'ILS';
   const blur = !!user?.blurValues;
-  const userId = user?.id || user?._id;
-  const userEmail = user?.email;
 
-  // Same query key as the Expenses page so the cache is shared
-  const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['transactions', userId],
-    queryFn: async () => {
-      if (!userEmail) return [];
-      return await ascent.entities.ExpenseTransaction.list('-date', 1000);
-    },
-    enabled: !!userEmail,
-    staleTime: 3 * 60 * 1000,
-    refetchOnWindowFocus: 'always',
-    refetchInterval: 30 * 1000,
-  });
+  // Same cache as the Expenses page, with changes still waiting on this device drawn in
+  const { data: transactions = [], isLoading } = useTransactions();
 
   useEffect(() => {
     if (userCurrency) fetchExchangeRates(userCurrency);
@@ -116,7 +106,7 @@ export default function Dashboard() {
     return convertCurrency(amount, from, userCurrency, rates);
   }, [userCurrency, rates, convertCurrency]);
 
-  const { isShared } = useHousehold();
+  const { isShared, members } = useHousehold();
   const { forecast, subscriptions, balances } = useInsights({ rows: normalized, selectedMonth, convert });
   const showForecast = forecast.phase === 'current';
 
@@ -181,6 +171,31 @@ export default function Dashboard() {
   }, [monthTx, selectedMonth]);
 
   const recent = useMemo(() => [...monthTx].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 6), [monthTx]);
+
+  // ---- Monthly Recap ----
+  // The header button plays the month on screen; in the first week of a month a card offers last
+  // month's; the home-screen shortcut (?recap=1) opens the last finished month.
+  const { seen: recapSeen, markSeen: markRecapSeen } = useRecapSeen();
+  const [recapMonth, setRecapMonth] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const offered = useMemo(() => recapToOffer(new Date()), []);
+  const offeredRecap = useMemo(
+    () => (offered ? buildRecap({ rows: normalized, month: offered }) : null),
+    [offered, normalized]
+  );
+  const showRecapBanner = !!offeredRecap && !offeredRecap.isEmpty && !recapSeen.has(offeredRecap.key);
+  const openRecap = useCallback((month) => {
+    markRecapSeen(monthKeyOf(month));
+    setRecapMonth(month);
+  }, [markRecapSeen]);
+  useEffect(() => {
+    if (params.get('recap') !== '1') return;
+    const now = new Date();
+    openRecap(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    params.delete('recap');
+    setParams(params, { replace: true });
+  }, [params, setParams, openRecap]);
+  const selectedRecapFresh = monthKeyOf(selectedMonth) < monthKeyOf(new Date()) && !recapSeen.has(monthKeyOf(selectedMonth));
 
   const shiftMonth = (delta) => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   const hasData = monthTx.length > 0;
@@ -314,6 +329,8 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('dashboard')}</h1>
             <p className={cn('mt-1 text-sm', muted)}>{t('dashSubtitle')}</p>
           </div>
+          <div className="flex items-center gap-2">
+          <RecapRingButton onOpen={() => openRecap(selectedMonth)} fresh={selectedRecapFresh && hasData} label={t('rcButton')} />
           <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/70 p-1 backdrop-blur-xl">
             <button type="button" aria-label={t('dashPrevMonth')} onClick={() => shiftMonth(-1)}
               className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-foreground/10 active:scale-95 sm:h-9 sm:w-9">
@@ -325,7 +342,20 @@ export default function Dashboard() {
               <NextIcon className="h-4 w-4" />
             </button>
           </div>
+          </div>
         </motion.header>
+
+        {showRecapBanner && (
+          <RecapBanner
+            monthName={new Intl.DateTimeFormat(locale, { month: 'long' }).format(offered)}
+            recap={offeredRecap}
+            onOpen={() => openRecap(offered)}
+            onDismiss={() => markRecapSeen(offeredRecap.key)}
+            t={t}
+            fmt={fmtMoney}
+            blur={blur}
+          />
+        )}
 
         <AssistantBar />
 
@@ -438,6 +468,19 @@ export default function Dashboard() {
           </Tile>
         </div>
       </div>
+
+      <RecapStories
+        open={!!recapMonth}
+        onClose={() => setRecapMonth(null)}
+        month={recapMonth || selectedMonth}
+        rows={normalized}
+        members={isShared ? members : []}
+        t={t}
+        language={language}
+        isRTL={isRTL}
+        currency={userCurrency}
+        blur={blur}
+      />
     </div>
   );
 }

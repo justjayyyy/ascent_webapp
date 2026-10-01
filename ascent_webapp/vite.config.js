@@ -27,25 +27,35 @@ export default defineConfig({
         // Long-press the installed icon for quick actions
         shortcuts: [
           {
+            name: 'Add expense',
+            short_name: 'Expense',
+            description: 'Log a purchase',
+            url: '/Expenses?new=1',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Add income',
+            short_name: 'Income',
+            url: '/Income?new=1',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Monthly recap',
+            short_name: 'Recap',
+            description: 'Your month in money',
+            url: '/Dashboard?recap=1',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
             name: 'New note',
-            short_name: 'New note',
+            short_name: 'Note',
             description: 'Jot something down',
             url: '/Notes?new=1',
             icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
           },
-          {
-            name: 'New checklist',
-            short_name: 'Checklist',
-            url: '/Notes?new=1&type=checklist',
-            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
-          },
-          {
-            name: 'Notes',
-            short_name: 'Notes',
-            url: '/Notes',
-            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
-          },
         ],
+        // Opening a shortcut or link while the app is already running reuses that window
+        launch_handler: { client_mode: ['navigate-existing', 'auto'] },
         // Appear in the system share sheet: share text or a link into a new note
         share_target: {
           action: '/Notes',

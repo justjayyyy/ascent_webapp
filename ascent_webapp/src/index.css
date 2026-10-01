@@ -624,13 +624,10 @@ button:focus-visible {
 /* Figures line up in columns and don't jitter as values update */
 table, .tabular { font-variant-numeric: tabular-nums; }
 
-/* Phones: dialogs hang from just below the fixed app header (64px + the status-bar /
-   notch inset) instead of floating in the middle of the screen, so nothing sits under
-   the header, the Dynamic Island or the home indicator, and the keyboard never pushes
-   the top of a form off-screen. Zero extra offsets on desktop and in a browser tab. */
+/* Phones: the few dialogs that are not sheets (calendar, image viewer) hang from just below the
+   island instead of floating mid-screen, clear of the Dynamic Island and the home indicator. */
 @media (max-width: 767px) {
-  [role="dialog"].fixed.top-\[50\%\],
-  [role="alertdialog"].fixed.top-\[50\%\] {
+  [role="dialog"]:not([data-sheet]).fixed.top-\[50\%\] {
     top: calc(var(--header-total) + var(--safe-top) + 0.5rem);
     max-height: calc(100dvh - var(--header-total) - var(--safe-top) - env(safe-area-inset-bottom) - 1rem);
     transform: translateX(-50%);
@@ -639,6 +636,102 @@ table, .tabular { font-variant-numeric: tabular-nums; }
     animation-name: none;
   }
 }
+
+/* ---- Phones: every other dialog is a bottom sheet ----
+   It rises from the bottom edge, rides on top of the keyboard (--kb, lib/viewport.js), never grows
+   past the visible screen, and can be dragged down to close (ui/useSheetDrag.js). The attribute
+   selectors outrank the Tailwind classes each dialog brings for its desktop shape. */
+@media (max-width: 767px) {
+  [data-sheet][role="dialog"],
+  [data-sheet][role="alertdialog"] {
+    top: auto;
+    bottom: var(--kb, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(var(--vvh, 100dvh) - var(--safe-top) - 0.75rem);
+    --tw-translate-x: 0 !important;
+    --tw-translate-y: 0 !important;
+    translate: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 1.75rem 1.75rem 0 0;
+    border-width: 1px 0 0;
+    padding: 1.75rem 1.25rem calc(env(safe-area-inset-bottom) + 1.25rem);
+    box-shadow: 0 -18px 50px -20px hsl(0 0% 0% / 0.65), inset 0 1px 0 0 hsl(var(--foreground) / 0.06);
+    animation: sheet-in 0.46s cubic-bezier(0.32, 0.72, 0, 1) backwards !important;
+    transition: bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  [data-sheet][role="dialog"][data-state="closed"],
+  [data-sheet][role="alertdialog"][data-state="closed"] {
+    animation: sheet-out 0.26s cubic-bezier(0.32, 0.72, 0, 1) forwards !important;
+  }
+  /* While the keyboard is up the sheet's bottom edge is the keyboard, not the home indicator */
+  html[data-keyboard] [data-sheet][role="dialog"],
+  html[data-keyboard] [data-sheet][role="alertdialog"] {
+    padding-bottom: 1rem;
+  }
+  [data-sheet] .sheet-handle {
+    position: absolute;
+    top: 0.5rem;
+    left: 50%;
+    width: 2.5rem;
+    height: 0.3125rem;
+    margin-left: -1.25rem;
+    border-radius: 9999px;
+    background: hsl(var(--foreground) / 0.22);
+  }
+  [data-sheet] .dialog-close {
+    top: 0.875rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: hsl(var(--foreground) / 0.06);
+    opacity: 1;
+  }
+  /* A sheet's primary actions span the width, the way a phone app lays them out */
+  [data-sheet][role="alertdialog"] button { min-height: 2.75rem; }
+}
+@media (min-width: 768px) {
+  .sheet-handle { display: none; }
+  .dialog-close { width: 1.75rem; height: 1.75rem; }
+}
+@keyframes sheet-in { from { transform: translateY(100%); } }
+@keyframes sheet-out { to { transform: translateY(100%); } }
+
+/* ---- The phone dock ----
+   --dock-bottom: where the dock floats (a little into the home-indicator area, like a native
+   floating tab bar); --dock-space: what the page keeps free below its content. */
+:root {
+  --dock-bottom: max(0.625rem, calc(env(safe-area-inset-bottom) - 0.75rem));
+  --dock-space: calc(4rem + var(--dock-bottom) + 1rem);
+}
+@media (min-width: 768px) { :root { --dock-space: 0px; } }
+.mobile-dock { transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s; }
+html[data-keyboard] .mobile-dock,
+html[data-dock-hidden] .mobile-dock { transform: translateY(calc(100% + var(--dock-bottom) + 1rem)); opacity: 0; pointer-events: none; }
+
+@keyframes splash-sweep {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(330%); }
+}
+[dir="rtl"] [class*="splash-sweep"] { animation-direction: reverse; }
+
+/* Loading placeholders shimmer instead of blinking */
+.skeleton-shimmer {
+  background: linear-gradient(100deg, hsl(var(--foreground) / 0.05) 30%, hsl(var(--foreground) / 0.1) 50%, hsl(var(--foreground) / 0.05) 70%);
+  background-size: 250% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-shimmer { animation: none; } }
+
+/* Browser surfaces in the palette: text selection and the caret */
+::selection { background: hsl(var(--primary) / 0.3); color: inherit; }
+input, textarea, [contenteditable] { caret-color: hsl(var(--primary)); }
+
+/* Taps are taps: no double-tap zoom delay on controls */
+a, button, [role="button"], input, select, label, summary { touch-action: manipulation; }
 
 /* Stop iOS from inflating text in landscape and from flashing a grey tap box */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -694,3 +787,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Sticky page bars sit under the phone header, and follow it when it slides away */
 :root { --header-bar: 3.5rem; --header-hide: calc(var(--header-bar) + 1.25rem); --header-total: calc(var(--header-bar) + 1.5rem); --sticky-top: calc(var(--header-total) + var(--safe-top)); }
 @media (min-width: 768px) { :root { --sticky-top: 0px; } }
+
+/* Face ID lock: while the app is in the background its figures are blurred, so the app switcher's
+   snapshot shows nothing private (components/security/AppLock.jsx) */
+html[data-privacy-curtain] #root { filter: blur(24px); }

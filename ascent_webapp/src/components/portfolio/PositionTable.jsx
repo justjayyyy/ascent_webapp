@@ -239,14 +239,6 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
     return 0;
   }), [aggregatedPositions, dayTrades]);
 
-  if (combinedItems.length === 0) {
-    return (
-      <div className={cn("text-center py-12 rounded-lg border", colors.bgTertiary, colors.border)}>
-        <p className={colors.textTertiary}>{t('noPositionsYet')}</p>
-      </div>
-    );
-  }
-
   // Confirm delete handler
   const confirmDelete = useCallback(() => {
     if (deleteConfirmDialog.isDayTrade) {
@@ -258,6 +250,15 @@ function PositionTable({ positions, dayTrades = [], onEdit, onDelete, onSell, on
     }
     setDeleteConfirmDialog({ open: false, item: null, isDayTrade: false, isAggregated: false });
   }, [deleteConfirmDialog, onDelete, onDeleteDayTrade]);
+
+  // After every hook: React needs the same hooks on every render
+  if (combinedItems.length === 0) {
+    return (
+      <div className={cn("text-center py-12 rounded-lg border", colors.bgTertiary, colors.border)}>
+        <p className={colors.textTertiary}>{t('noPositionsYet')}</p>
+      </div>
+    );
+  }
 
   // Mobile card component for positions
   const MobilePositionCard = ({ item }) => {

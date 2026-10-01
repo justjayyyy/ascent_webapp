@@ -12,8 +12,9 @@ export default async function handler(req, res) {
     if (!user) return; // Response already sent by middleware
     
     if (req.method === 'GET') {
-      // user is already a lean document (plain object), no need for toJSON()
-      return success(res, user);
+      // user is a lean document, so toJSON() never ran: drop the secrets here
+      const { password, shortcutTokenHash, passkeys, ...safe } = user;
+      return success(res, { ...safe, passkeyCount: Array.isArray(passkeys) ? passkeys.length : 0 });
     }
     
     if (req.method === 'PUT' || req.method === 'PATCH') {

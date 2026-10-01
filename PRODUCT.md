@@ -23,6 +23,10 @@ Installable PWA (React, Vite, Tailwind, Radix UI) with a Node/Vercel serverless 
 
 ## Capabilities and Constraints
 - Areas: Dashboard (safe to spend this month, month-end forecast, budget pace, subscriptions, who owes whom), Expenses (transactions, categories, budgets, cards, recurring, big purchases paid in installments), Income (its own page), Plans (big upcoming events such as a trip or a wedding, with dated costs paid over months), Portfolio (accounts, positions, sell/day-trade history), Notes (Keep-style: lists, labels, colours, reminders, multi-select, dictation), Calendar, Settings (profile, household options, shared users, Apple Pay and SMS capture, statement import, export). Expenses can record who paid and be split between members, with a settle-up balance.
+- Phones: a floating bottom dock (Dashboard, Expenses, +, Plans, Notes; the + adds to the page on screen, long press for more), dialogs as bottom sheets that swipe down to close, pull to refresh, and haptics. Income, Settings and the calendar stay in the menu.
+- Offline: the app opens on the last data it saw (cached session and query cache in IndexedDB); adding, editing and deleting transactions works without a connection and syncs in order later, idempotently (`app:` dedupe keys).
+- Security: Face ID / fingerprint lock per device instead of the idle sign-out, and passkey sign-in (WebAuthn via SimpleWebAuthn); unlock works offline on the device.
+- Monthly Recap: the month as full-screen stories (where it went, biggest purchase, weekday rhythm, quiet days, who paid) with a shareable image card that shows only percentages when values are blurred.
 - Roles: an owner plus invited users with per-area permissions (for example view expenses).
 - Every UI string must exist in English, Hebrew and Russian; layout must work in RTL.
 - Portfolio and account-detail pages are hidden in this build (see `src/lib/features.js`); investment features return later. Whether Ascent becomes a public, billed product is undecided.

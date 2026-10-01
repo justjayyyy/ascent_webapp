@@ -113,3 +113,61 @@ test('owners, admins and editors with the permission can write; members without 
   ctx = { workspace: WS, member: { role: 'viewer', permissions: { viewExpenses: false } } };
   assert.equal((await call(model(), 'GET', '', undefined, { permission: PERM })).code, 403);
 });
+
+// A model with a unique (workspaceId, dedupeKey) index, like ExpenseTransaction
+function keyedModel() {
+  const rows = [];
+  const dup = () => Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+  const lean = (v) => ({ lean: async () => v });
+  return {
+    rows, modelName: 'Tx', schema: { path: (k) => PATHS.has(k) || k === 'dedupeKey' },
+    async create(d) {
+      if (d.dedupeKey && rows.some((r) => r.dedupeKey === d.dedupeKey)) throw dup();
+      const row = { ...d, _id: `id${rows.length}` };
+      rows.push(row);
+      return { toJSON: () => ({ ...row }) };
+    },
+    async insertMany(list) {
+      const out = [];
+      for (const d of list) {
+        if (d.dedupeKey && rows.some((r) => r.dedupeKey === d.dedupeKey)) throw dup();
+        const row = { ...d, _id: `id${rows.length}` };
+        rows.push(row);
+        out.push({ toJSON: () => ({ ...row }) });
+      }
+      return out;
+    },
+    findOne: (q) => lean(rows.find((r) => r.dedupeKey === q.dedupeKey && r.workspaceId === q.workspaceId) || null),
+    find: (q) => lean(rows.filter((r) => q.dedupeKey.$in.includes(r.dedupeKey) && r.workspaceId === q.workspaceId)),
+  };
+}
+
+test('a retried offline upload returns the stored row instead of adding a second one', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = keyedModel();
+  const body = { amount: 18, category: 'food', dedupeKey: 'app:4f1c2a9e-0000-4000-8000-000000000001' };
+  const first = await call(M, 'POST', '', body);
+  const retry = await call(M, 'POST', '', body);
+  assert.equal(first.code, 201);
+  assert.equal(retry.code, 200);
+  assert.equal(M.rows.length, 1);
+  assert.equal(retry.body.data.id, first.body.data._id);
+});
+
+test('a retried offline batch fills in only the rows that are missing', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = keyedModel();
+  const key = (i) => `app:4f1c2a9e-0000-4000-8000-00000000000${i}:${i}`;
+  await call(M, 'POST', '', [{ amount: 1, dedupeKey: key(1) }]);
+  const r = await call(M, 'POST', '', [1, 2, 3].map((i) => ({ amount: i, dedupeKey: key(i) })));
+  assert.equal(r.code, 200);
+  assert.equal(M.rows.length, 3);
+  assert.deepEqual(r.body.data.map((d) => d.amount), [1, 2, 3]);
+});
+
+test('clients cannot set automation dedupe keys', async () => {
+  ctx = { workspace: WS, member: OWNER };
+  const M = keyedModel();
+  await call(M, 'POST', '', { amount: 1, dedupeKey: 'wallet:abc123' });
+  assert.equal(M.rows[0].dedupeKey, undefined);
+});

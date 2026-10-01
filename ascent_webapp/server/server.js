@@ -163,6 +163,12 @@ app.post('/api/auth/google', wrapHandler('./auth/google.js'));
 app.get('/api/auth/me', wrapHandler('./auth/me.js'));
 app.put('/api/auth/me', wrapHandler('./auth/me.js'));
 app.patch('/api/auth/me', wrapHandler('./auth/me.js'));
+// Passkeys: Face ID / fingerprint sign-in and app unlock
+const passkeyHandler = wrapHandler('./auth/passkey.js');
+app.get('/api/auth/passkey', passkeyHandler);
+app.post('/api/auth/passkey', passkeyHandler);
+app.put('/api/auth/passkey', passkeyHandler);
+app.delete('/api/auth/passkey', passkeyHandler);
 app.options('/api/auth/*', (req, res) => res.sendStatus(200));
 
 // Workspace routes

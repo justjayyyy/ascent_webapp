@@ -1,81 +1,107 @@
 import { useCallback, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ascent } from '@/api/client';
 import { useTheme } from '@/components/ThemeProvider';
+import { useAuth } from '@/lib/AuthContext';
+import { getOutbox } from '@/lib/offline/txOutbox';
+import { createOp, updateOp, deleteOp } from '@/lib/offline/outboxModel';
+import { uuid } from '@/lib/offline/network';
+import { haptic } from '@/lib/haptics';
 import { STRIP, expandTransaction } from './transactionRows';
 
-async function setPlanItem(planId, itemId, changes) {
-  if (!planId || !itemId) return;
-  const plan = await ascent.entities.Plan.get(planId);
-  if (!plan?.items?.some((i) => i.id === itemId)) return;
-  await ascent.entities.Plan.update(planId, {
-    items: plan.items.map((i) => (i.id === itemId ? { ...i, ...changes } : i)),
-  });
+// Saves and deletes go through the offline queue (lib/offline/txOutbox.js): the change shows at once,
+// syncs within the same tap when there is signal, and waits on the device when there is none.
+
+const workspaceId = () => {
+  try { return localStorage.getItem('ascent_current_workspace_id'); } catch { return null; }
+};
+
+function useBox() {
+  const { user } = useAuth();
+  return getOutbox(user?.id || user?._id);
 }
 
 /** Create or update a transaction, including recurring runs, installments and plan payments. */
 export function useSaveTransaction() {
-  const queryClient = useQueryClient();
+  const box = useBox();
   const { t } = useTheme();
   const [saving, setSaving] = useState(false);
 
   const save = useCallback(async (data, existing) => {
+    if (!box) return false;
     setSaving(true);
+    const isEdit = !!(existing && existing.id);
     try {
-      const isEdit = !!(existing && existing.id);
+      let op;
+      let doneKey;
       if (isEdit) {
         const payload = { ...data };
         STRIP.forEach((k) => delete payload[k]);
         delete payload.installmentCount;
         // Saving an automatically added payment after looking at it counts as reviewing it
         if (existing.status === 'pending') payload.status = 'confirmed';
-        await ascent.entities.ExpenseTransaction.update(existing.id, payload);
-        toast.success(t('transactionUpdatedSuccessfully'));
+        op = updateOp({ uuid: uuid(), workspaceId: workspaceId(), txId: existing.id, data: payload });
+        doneKey = 'transactionUpdatedSuccessfully';
       } else {
         const rows = expandTransaction(data);
-        if (rows.length > 1) {
-          await ascent.entities.ExpenseTransaction.bulkCreate(rows);
-          const key = rows[0].installmentGroupId ? 'installmentsCreated' : 'recurringTransactionsCreated';
-          toast.success(t(key).replace('{count}', rows.length));
-        } else {
-          const created = await ascent.entities.ExpenseTransaction.create(rows[0]);
-          if (rows[0].planId && rows[0].planItemId) {
-            await setPlanItem(rows[0].planId, rows[0].planItemId, { status: 'paid', transactionId: created?.id || created?._id || null });
-          }
-          toast.success(t('transactionAddedSuccessfully'));
-        }
+        const first = rows[0];
+        const plan = rows.length === 1 && first.planId && first.planItemId ? { planId: first.planId, itemId: first.planItemId } : null;
+        op = createOp({ rows, uuid: uuid(), workspaceId: workspaceId(), plan });
+        doneKey = rows.length > 1 ? (first.installmentGroupId ? 'installmentsCreated' : 'recurringTransactionsCreated') : 'transactionAddedSuccessfully';
+        if (rows.length > 1) doneKey = { key: doneKey, count: rows.length };
       }
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      if (data.planId || existing?.planId) queryClient.invalidateQueries({ queryKey: ['plans'] });
+      const outcome = await box.submit(op);
+      haptic('success');
+      if (outcome === 'queued') toast(t('offSavedOnDevice'), { description: t('offSavedOnDeviceHint') });
+      else if (typeof doneKey === 'object') toast.success(t(doneKey.key).replace('{count}', doneKey.count));
+      else toast.success(t(doneKey));
       return true;
     } catch {
-      toast.error(existing?.id ? t('failedToUpdateTransaction') : t('failedToAddTransaction'));
+      haptic('error');
+      toast.error(isEdit ? t('failedToUpdateTransaction') : t('failedToAddTransaction'));
       return false;
     } finally {
       setSaving(false);
     }
-  }, [queryClient, t]);
+  }, [box, t]);
 
   return { save, saving };
 }
 
+/** Mark an automatically added payment as reviewed. */
+export function useConfirmTransaction() {
+  const box = useBox();
+  const { t } = useTheme();
+  return useCallback(async (tx) => {
+    if (!box) return;
+    try {
+      const outcome = await box.submit(updateOp({ uuid: uuid(), workspaceId: workspaceId(), txId: tx.id, data: { status: 'confirmed' } }));
+      toast.success(outcome === 'queued' ? t('offSavedOnDevice') : t('transactionConfirmed'));
+    } catch {
+      toast.error(t('failedToConfirm'));
+    }
+  }, [box, t]);
+}
+
 /** Delete one transaction, or every installment of a big purchase. Paid plan items go back to planned. */
 export function useDeleteTransactions() {
-  const queryClient = useQueryClient();
+  const box = useBox();
   const { t } = useTheme();
 
   return useCallback(async (list) => {
+    if (!box) return;
     try {
-      await Promise.all(list.map((tx) => ascent.entities.ExpenseTransaction.delete(tx.id)));
-      const linked = list.filter((tx) => tx.planId && tx.planItemId);
-      await Promise.all(linked.map((tx) => setPlanItem(tx.planId, tx.planItemId, { status: 'planned', transactionId: null }).catch(() => {})));
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      if (linked.length || list.some((tx) => tx.planId)) queryClient.invalidateQueries({ queryKey: ['plans'] });
-      toast.success(list.length > 1 ? t('installmentsDeleted').replace('{count}', list.length) : t('transactionDeletedSuccessfully'));
+      const outcomes = await Promise.all(list.map((tx) => box.submit(deleteOp({
+        uuid: uuid(),
+        workspaceId: workspaceId(),
+        txId: tx.id,
+        plan: tx.planId && tx.planItemId ? { planId: tx.planId, itemId: tx.planItemId } : null,
+      }))));
+      haptic('success');
+      if (outcomes.includes('queued')) toast(t('offDeletedOnDevice'));
+      else toast.success(list.length > 1 ? t('installmentsDeleted').replace('{count}', list.length) : t('transactionDeletedSuccessfully'));
     } catch {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      haptic('error');
       toast.error(t('failedToDeleteTransaction'));
     }
-  }, [queryClient, t]);
+  }, [box, t]);
 }

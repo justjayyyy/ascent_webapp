@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, TrendingDown, Wallet, Building2, Coins, PiggyBank, Briefcase, Edit, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ascent } from '@/api/client';
 import BlurValue from '../BlurValue';
 import { useTheme } from '../ThemeProvider';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';

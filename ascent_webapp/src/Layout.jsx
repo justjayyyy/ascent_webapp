@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { PieChart, Receipt, StickyNote, HandCoins, Milestone } from 'lucide-react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { motion, useReducedMotion } from 'motion/react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
@@ -11,16 +14,58 @@ import InvitationsBanner from '@/components/workspace/InvitationsBanner';
 import WelcomeDialog from './components/WelcomeDialog';
 import InstallHint from './components/InstallHint';
 import MobileIsland from '@/components/MobileIsland';
+import MobileDock from '@/components/shell/MobileDock';
+import PullToRefresh from '@/components/shell/PullToRefresh';
+import SyncStatus from '@/components/shell/SyncStatus';
+import { QuickActionsProvider } from '@/components/shell/QuickActions';
+import { AppLockProvider, useAppLock } from '@/components/security/AppLock';
+import EnableBiometricPrompt from '@/components/security/EnableBiometricPrompt';
+import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
+import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
+import { useOutbox } from '@/lib/offline/txOutbox';
 
 // The calendar is heavy and only needed on demand
 const CalendarModal = lazy(() => import('@/components/GoogleCalendar/CalendarModal'));
 
 const SIDEBAR_KEY = 'ascent.sidebarCollapsed';
+// The dock's four destinations, in order (Income, Settings and the rest stay in the menu)
+const DOCK_PAGES = ['Dashboard', 'Expenses', 'Plans', 'Notes'];
+
+// Each tab keeps its own scroll position, like the tabs of a native app
+const scrollMemory = new Map();
+
+/** Add an expense or income from anywhere (the dock's + on pages without their own add). */
+function QuickAddSheet({ request, onClose }) {
+  const { user } = useAuth();
+  const userId = user?.id || user?._id;
+  const { save, saving } = useSaveTransaction();
+  const enabled = !!userId && !!request;
+  const { data: categories = [] } = useQuery({ queryKey: ['categories', userId], queryFn: () => ascent.entities.Category.list('-created_date'), enabled, staleTime: 5 * 60 * 1000 });
+  const { data: accounts = [] } = useQuery({ queryKey: ['accounts', userId], queryFn: () => ascent.entities.Account.list(), enabled, staleTime: 5 * 60 * 1000 });
+  const { data: plans = [] } = useQuery({ queryKey: ['plans', userId], queryFn: () => ascent.entities.Plan.list('startDate'), enabled, staleTime: 3 * 60 * 1000 });
+  return (
+    <AddTransactionDialog
+      key={request?.nonce}
+      open={!!request}
+      onClose={onClose}
+      onSubmit={async (data) => { if (await save(data)) onClose(); }}
+      isLoading={saving}
+      categories={categories}
+      accounts={accounts}
+      plans={plans}
+      defaultType={request?.type || 'Expense'}
+    />
+  );
+}
 
 function LayoutContent({ children, currentPageName }) {
   const { user, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
   const { hasPermission } = useAuth();
+  const { enabled: lockEnabled } = useAppLock();
+  const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [quickAdd, setQuickAdd] = useState(null); // { type, nonce }
   const [headerHidden, setHeaderHidden] = useState(false);
 
   // Phones: the header bar slides away while scrolling down and returns on scroll up.
@@ -101,8 +146,8 @@ function LayoutContent({ children, currentPageName }) {
   }, [toggleSidebar]);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
 
-  // Session timeout - auto logout after 5 minutes of inactivity
-  useSessionTimeout(!!user, t);
+  // Idle sign-out, unless this device uses the Face ID lock (which locks instead of signing out)
+  useSessionTimeout(!!user && !lockEnabled, t);
   useWorkspaceSync();
 
   // Check for first login welcome message
@@ -113,9 +158,12 @@ function LayoutContent({ children, currentPageName }) {
     }
   }, [user]);
 
+  // Signing out forgets this device's copy of the data, including changes that never synced: say so first
+  const { pending: unsynced } = useOutbox();
   const handleLogout = useCallback(async () => {
+    if (unsynced > 0 && !window.confirm(t('offLogoutWarning').replace('{count}', unsynced))) return;
     await ascent.auth.logout();
-  }, []);
+  }, [unsynced, t]);
 
   const handleThemeChange = useCallback(async (checked) => {
     const newTheme = checked ? 'dark' : 'light';
@@ -171,7 +219,37 @@ function LayoutContent({ children, currentPageName }) {
   const pageTitle = navigation.find((n) => n.page === currentPageName)?.name
     || (currentPageName === 'Settings' ? t('settings') : 'Ascent');
 
+  const dockItems = useMemo(
+    () => DOCK_PAGES.map((page) => navigation.find((n) => n.page === page)).filter(Boolean),
+    [navigation]
+  );
+  const canAddMoney = hasPermission('editExpenses');
+  const canAddNotes = hasPermission('editNotes');
+  const openQuickAdd = useCallback((type) => setQuickAdd({ type, nonce: Date.now() }), []);
+  const quickFallback = useCallback(() => {
+    if (canAddMoney) openQuickAdd('Expense');
+    else if (canAddNotes) navigate('/Notes?new=1');
+  }, [canAddMoney, canAddNotes, openQuickAdd, navigate]);
+  const quickMenu = useMemo(() => [
+    canAddMoney && { id: 'expense', label: t('addExpense'), icon: TrendingDown, run: () => openQuickAdd('Expense') },
+    canAddMoney && { id: 'income', label: t('addIncome'), icon: HandCoins, run: () => openQuickAdd('Income') },
+    canAddMoney && { id: 'plan', label: t('newPlan'), icon: Milestone, run: () => navigate('/Plans?new=1') },
+    canAddNotes && { id: 'note', label: t('ntNewNote'), icon: StickyNote, run: () => navigate('/Notes?new=1') },
+  ].filter(Boolean), [canAddMoney, canAddNotes, openQuickAdd, navigate, t]);
+
+  // Tabs remember where they were scrolled to; a page seen for the first time starts at the top
+  const lastPage = useRef(currentPageName);
+  useLayoutEffect(() => {
+    if (lastPage.current === currentPageName) return;
+    scrollMemory.set(lastPage.current, window.scrollY);
+    lastPage.current = currentPageName;
+    const y = scrollMemory.get(currentPageName) || 0;
+    window.scrollTo(0, 0);
+    if (y) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  }, [currentPageName]);
+
   return (
+    <QuickActionsProvider fallback={quickFallback} fallbackMenu={quickMenu}>
     <div className={cn(
       "min-h-dvh md:flex overflow-x-clip transition-colors bg-background text-foreground"
     )} dir={isRTL ? 'rtl' : 'ltr'}>
@@ -232,11 +310,34 @@ function LayoutContent({ children, currentPageName }) {
           mobileMenuOpen && (isRTL ? "-translate-x-[17rem]" : "translate-x-[17rem]")
         )}
       >
-        <div className="pb-[calc(1rem+env(safe-area-inset-bottom))] safe-area-inset-x md:pb-0 md:px-0">
-          <InvitationsBanner />
-          {children}
+        <div className="pb-[var(--dock-space)] safe-area-inset-x md:pb-0 md:px-0">
+          <PullToRefresh disabled={mobileMenuOpen} label={t('refresh')}>
+            <InvitationsBanner />
+            {/* A new page rises in; the previous one is already gone, so nothing slides over it */}
+            <motion.div
+              key={currentPageName}
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {children}
+            </motion.div>
+          </PullToRefresh>
         </div>
       </main>
+
+      {/* Phones: the floating dock */}
+      <MobileDock
+        items={dockItems}
+        currentPageName={mobileMenuOpen ? null : currentPageName}
+        compact={headerHidden && !mobileMenuOpen}
+        canCreate={canAddMoney || canAddNotes}
+        t={t}
+      />
+
+      <SyncStatus />
+      <QuickAddSheet request={quickAdd} onClose={() => setQuickAdd(null)} />
+      <EnableBiometricPrompt />
 
       {calendarMounted && (
         <Suspense fallback={null}>
@@ -250,9 +351,14 @@ function LayoutContent({ children, currentPageName }) {
         onClose={() => setShowWelcomeDialog(false)}
       />}
     </div>
+    </QuickActionsProvider>
   );
 }
 
 export default function Layout({ children, currentPageName }) {
-  return <LayoutContent children={children} currentPageName={currentPageName} />;
+  return (
+    <AppLockProvider>
+      <LayoutContent currentPageName={currentPageName}>{children}</LayoutContent>
+    </AppLockProvider>
+  );
 }

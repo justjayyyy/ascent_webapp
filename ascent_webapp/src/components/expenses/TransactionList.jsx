@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
-import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag, Users } from 'lucide-react';
+import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag, Users, CloudUpload, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
@@ -212,7 +212,10 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                         </span>
                       </span>
                       <span className="flex shrink-0 flex-col items-end">
-                        <span className={cn("text-[0.9375rem] font-semibold tabular-nums", income ? 'text-success' : 'text-foreground')} dir="ltr">
+                        <span className={cn("inline-flex items-center gap-1.5 text-[0.9375rem] font-semibold tabular-nums", income ? 'text-success' : 'text-foreground')} dir="ltr">
+                          {/* Only on this device so far: waiting for a connection, or refused by the server */}
+                          {tx._sync === 'pending' && <CloudUpload className="h-3.5 w-3.5 text-muted-foreground" aria-label={t('offRowPending')} />}
+                          {tx._sync === 'failed' && <AlertCircle className="h-3.5 w-3.5 text-danger" aria-label={t('offRowFailed')} />}
                           <BlurValue blur={user?.blurValues}>{income ? '+' : '−'}{money(tx.amount, tx.currency)}</BlurValue>
                         </span>
                         {conv !== null && (

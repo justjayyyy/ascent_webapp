@@ -101,6 +101,23 @@ userSchema.add({
   shortcutLastUsedAt: { type: Date, default: null }
 });
 
+// Passkeys (WebAuthn): Face ID / Touch ID / fingerprint sign-in and app unlock. Only public keys are
+// stored; the private half never leaves the person's device or password manager.
+const passkeySchema = new mongoose.Schema({
+  credentialID: { type: String, required: true }, // base64url
+  publicKey: { type: String, required: true }, // base64url COSE key
+  counter: { type: Number, default: 0 },
+  transports: { type: [String], default: undefined },
+  deviceType: { type: String, enum: ['singleDevice', 'multiDevice'], default: 'singleDevice' },
+  backedUp: { type: Boolean, default: false },
+  name: { type: String, default: '', maxlength: 60 },
+  createdAt: { type: Date, default: Date.now },
+  lastUsedAt: { type: Date, default: null }
+});
+
+userSchema.add({ passkeys: { type: [passkeySchema], default: [] } });
+userSchema.index({ 'passkeys.credentialID': 1 }, { unique: true, sparse: true });
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
@@ -125,6 +142,9 @@ userSchema.methods.toJSON = function() {
   delete obj.password;
   delete obj.shortcutTokenHash;
   delete obj.sessionId;
+  // The app only needs to know passkeys exist; details come from /api/auth/passkey?action=list
+  obj.passkeyCount = Array.isArray(obj.passkeys) ? obj.passkeys.length : 0;
+  delete obj.passkeys;
   return obj;
 };
 

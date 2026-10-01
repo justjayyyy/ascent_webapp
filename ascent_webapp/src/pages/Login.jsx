@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ScanFace } from 'lucide-react';
 import { toast } from 'sonner';
 import AscentLogo from '@/components/AscentLogo';
 import { translations } from '@/lib/translations';
@@ -24,7 +24,11 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, register, loginWithGoogle, isAuthenticated } = useAuth();
+  const { login, register, loginWithGoogle, loginWithPasskey, isAuthenticated } = useAuth();
+  const [passkeyReady, setPasskeyReady] = useState(false);
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+  // After a password or Google sign-in, the app offers to turn on the Face ID lock (EnableBiometricPrompt)
+  const offerBiometrics = () => { try { sessionStorage.setItem('ascent_offer_biometric', '1'); } catch { /* storage unavailable */ } };
   const { t } = useTheme();
   // `t` is bound to the pre-login language; the signed-in user's own language is only known from the login result
   const welcomeBack = (user) => translations[user?.language]?.welcomeBack || t('welcomeBack');
@@ -40,6 +44,40 @@ export default function Login() {
     if (reason === 'session_replaced') toast.info(t('sessionReplaced'));
     else if (reason === 'session_expired') toast.info(t('sessionExpired'));
   }, [reason, t]);
+
+  // Passkeys: a "Sign in with Face ID" button, and the browser's own passkey suggestion on the email
+  // field (conditional UI), which signs in with one tap when the person picks their passkey there
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { browserSupportsWebAuthn, browserSupportsWebAuthnAutofill } = await import('@simplewebauthn/browser');
+      if (cancelled || !browserSupportsWebAuthn()) return;
+      setPasskeyReady(true);
+      if (!(await browserSupportsWebAuthnAutofill()) || cancelled) return;
+      try {
+        const result = await loginWithPasskey({ autofill: true });
+        toast.success(welcomeBack(result.user));
+        navigate(redirectUrl);
+      } catch { /* dismissed, or replaced by the button's own request */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePasskey = async () => {
+    setIsPasskeyLoading(true);
+    try {
+      const result = await loginWithPasskey();
+      toast.success(welcomeBack(result.user));
+      navigate(redirectUrl);
+    } catch (error) {
+      if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') toast(t('secCancelled'));
+      else if (error?.data?.error === 'unknown_passkey') toast.error(t('passkeyUnknown'));
+      else toast.error(t('passkeySignInFailed'));
+    } finally {
+      setIsPasskeyLoading(false);
+    }
+  };
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -158,6 +196,7 @@ export default function Login() {
 
             // Login with the user info
             const signedIn = await loginWithGoogle(response.access_token, GOOGLE_CLIENT_ID, userInfo);
+            offerBiometrics();
             toast.success(welcomeBack(signedIn));
             navigate(redirectUrl);
           } catch (error) {
@@ -223,6 +262,7 @@ export default function Login() {
 
     try {
       const signedIn = await loginWithGoogle(response.credential, GOOGLE_CLIENT_ID);
+      offerBiometrics();
       toast.success(welcomeBack(signedIn));
       navigate(redirectUrl);
     } catch (error) {
@@ -239,6 +279,7 @@ export default function Login() {
 
     try {
       const signedIn = await login(loginData.email, loginData.password);
+      offerBiometrics();
       toast.success(welcomeBack(signedIn));
       navigate(redirectUrl);
     } catch (error) {
@@ -292,6 +333,17 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-3 sm:pb-6 px-3 sm:px-6">
+            {passkeyReady && (
+              <button
+                type="button"
+                onClick={handlePasskey}
+                disabled={isPasskeyLoading}
+                className="mb-2 flex h-11 w-full items-center justify-center gap-2.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_8px_24px_-10px_hsl(var(--glow)/0.8)] outline-none transition-transform active:scale-[0.98] disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card sm:mb-3 sm:h-12 sm:text-base"
+              >
+                {isPasskeyLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <ScanFace className="h-5 w-5" aria-hidden="true" />}
+                {t('passkeySignIn')}
+              </button>
+            )}
             {/* Google Sign-In Button - Using ID token flow (simpler, no calendar scopes required) */}
             {GOOGLE_CLIENT_ID && (
               <div className="mb-2 sm:mb-6">
@@ -372,6 +424,7 @@ export default function Login() {
                     <Input
                       id="login-email"
                       type="email"
+                      autoComplete="username webauthn"
                       placeholder="you@example.com"
                       value={loginData.email}
                       onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
@@ -385,6 +438,7 @@ export default function Login() {
                       <Input
                         id="login-password"
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
                         placeholder="••••••••"
                         value={loginData.password}
                         onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
@@ -394,7 +448,8 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-primary hover:text-muted-foreground"
+                        aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                        className="absolute end-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center text-primary hover:text-muted-foreground"
                       >
                         {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                       </button>

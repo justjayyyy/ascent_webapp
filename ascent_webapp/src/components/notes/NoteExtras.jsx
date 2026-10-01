@@ -115,7 +115,7 @@ export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t 
         )}
       </ul>
       <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
-        <DialogContent className="max-w-3xl p-2 sm:p-4">
+        <DialogContent sheet={false} className="max-w-3xl p-2 sm:p-4">
           <DialogTitle className="sr-only">{preview?.name}</DialogTitle>
           {preview && <img src={preview.url} alt={preview.name} className="max-h-[75dvh] w-full rounded-lg object-contain" />}
         </DialogContent>

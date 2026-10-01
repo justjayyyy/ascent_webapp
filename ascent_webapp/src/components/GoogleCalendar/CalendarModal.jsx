@@ -404,6 +404,7 @@ export default function CalendarModal({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        sheet={false}
         onKeyDown={onKeyDown}
         onEscapeKeyDown={(e) => { if (composer) { e.preventDefault(); setComposer(null); } }}
         dir={isRTL ? 'rtl' : 'ltr'}

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from 'motion/react';
 import {
   Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
+  ListChecks, Image as ImageIcon, StickyNote as NoteIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,7 @@ import SelectionBar from '@/components/notes/SelectionBar';
 import EditLabelsDialog from '@/components/notes/EditLabelsDialog';
 import SearchFilters from '@/components/notes/SearchFilters';
 import ShortcutsDialog from '@/components/notes/ShortcutsDialog';
-import MobileNoteBar from '@/components/notes/MobileNoteBar';
+import { usePageCreateAction } from '@/components/shell/QuickActions';
 import { useReminders } from '@/components/notes/useReminders';
 import { buildPeople } from '@/components/notes/NoteParts';
 import {
@@ -96,6 +97,14 @@ function Notes() {
     const id = newNote('text');
     addFiles(id, files);
   }, [newNote, addFiles]);
+
+  // Phones: the dock's + starts a note; a long press offers a list or a photo note
+  const photoInput = useRef(null);
+  usePageCreateAction(canCreate && view !== 'trash' ? () => newNote('text') : null, [
+    { id: 'note', label: t('ntNewNote'), icon: NoteIcon, run: () => newNote('text') },
+    { id: 'list', label: t('ntNewChecklist'), icon: ListChecks, run: () => newNote('checklist') },
+    { id: 'photo', label: t('ntNewImageNote'), icon: ImageIcon, run: () => photoInput.current?.click() },
+  ]);
 
   // ---- entry points: install shortcut (?new=1) and text shared to the app (?share=1) ----
   useEffect(() => {
@@ -218,6 +227,10 @@ function Notes() {
 
   // ---- selection ----
   const selecting = selected.size > 0;
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-dock-hidden', selecting);
+    return () => document.documentElement.removeAttribute('data-dock-hidden');
+  }, [selecting]);
   const selectedNotes = useMemo(() => shown.filter(n => selected.has(n.id)), [shown, selected]);
   const toggleSelect = useCallback((id) => {
     setSelected(prev => {
@@ -629,9 +642,18 @@ function Notes() {
           </div>
         </div>
 
-        {/* Phones: Keep-style bottom bar, swapped for the selection bar while selecting */}
+        <input
+          ref={photoInput}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => { if (e.target.files?.length) newImageNote(e.target.files); e.target.value = ''; }}
+        />
+
+        {/* While selecting, the selection bar takes the dock's place at the bottom */}
         <AnimatePresence>
-          {selecting ? (
+          {selecting && (
             <SelectionBar
               key="selection"
               notes={selectedNotes}
@@ -644,8 +666,6 @@ function Notes() {
               t={t}
               canCreate={canCreate}
             />
-          ) : canCreate && view !== 'trash' && !openNote && (
-            <MobileNoteBar key="bar" onNew={(type) => newNote(type)} onImage={newImageNote} t={t} />
           )}
         </AnimatePresence>
 

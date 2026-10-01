@@ -19,7 +19,9 @@ function removeToken() {
 }
 
 // HTTP request helper with timeout and retry
-async function request(endpoint, options = {}, retryCount = 0) {
+// options.timeout / options.retries override the defaults (offline-capable writes fail fast and queue instead)
+async function request(endpoint, allOptions = {}, retryCount = 0) {
+  const { timeout = REQUEST_TIMEOUT, retries = MAX_RETRIES, ...options } = allOptions;
   const token = getToken();
   
   const headers = {
@@ -38,13 +40,13 @@ async function request(endpoint, options = {}, retryCount = 0) {
   }
 
   const currentWorkspaceId = localStorage.getItem('ascent_current_workspace_id');
-  if (currentWorkspaceId) {
+  if (currentWorkspaceId && !headers['x-workspace-id']) {
     headers['x-workspace-id'] = currentWorkspaceId;
   }
   
   // Create abort controller for timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
   
   try {
     const url = `${API_URL}${endpoint}`;
@@ -134,6 +136,7 @@ async function request(endpoint, options = {}, retryCount = 0) {
     if (err.name === 'AbortError') {
       const error = new Error('Request timed out. Please check if the API server is running.');
       error.status = 408;
+      error.isNetworkError = true;
       throw error;
     }
     
@@ -147,9 +150,9 @@ async function request(endpoint, options = {}, retryCount = 0) {
     
     // Retry on network errors (not on 4xx errors)
     const isRetryable = !err.status || err.status >= 500;
-    if (isRetryable && retryCount < MAX_RETRIES) {
+    if (isRetryable && retryCount < retries) {
       await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
-      return request(endpoint, options, retryCount + 1);
+      return request(endpoint, allOptions, retryCount + 1);
     }
     
     throw err;
@@ -209,6 +212,16 @@ const auth = {
     };
   },
   
+  // Face ID / fingerprint: sign in, or unlock this device's session, with a passkey
+  async passkeyLogin({ autofill = false } = {}) {
+    const { startAuthentication } = await import('@simplewebauthn/browser');
+    const optionsJSON = await request('/auth/passkey?action=login-options', { method: 'POST', body: '{}', retries: 0 });
+    const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
+    const result = await request('/auth/passkey?action=login-verify', { method: 'POST', body: JSON.stringify({ response }), retries: 0 });
+    setToken(result.token);
+    return { ...result, credentialId: response.id };
+  },
+
   async me() {
     try {
       return await request('/auth/me');
@@ -230,6 +243,7 @@ const auth = {
   
   logout(redirectUrl) {
     removeToken();
+    try { localStorage.removeItem('ascent_cached_session'); } catch { /* storage unavailable */ }
     const go = () => {
       if (redirectUrl) {
         window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
@@ -239,7 +253,10 @@ const auth = {
     };
     // Forget the notes kept on this device for offline use (bounded, so sign-out never hangs)
     Promise.race([
-      import('@/components/notes/notesSync').then(m => m.clearNotesStorage()),
+      Promise.all([
+        import('@/components/notes/notesSync').then(m => m.clearNotesStorage()),
+        import('@/lib/offline/deviceData').then(m => m.clearDeviceData()),
+      ]),
       new Promise(resolve => setTimeout(resolve, 800)),
     ]).catch(() => {}).finally(go);
   },
@@ -279,29 +296,34 @@ function createEntity(entityPath) {
       return request(`/entities/${entityPath}?id=${id}&_single=true`);
     },
     
-    async create(data) {
+    // opts: { timeout, retries, headers } for writes that may be replayed from the offline queue
+    async create(data, opts = {}) {
       return request(`/entities/${entityPath}`, {
+        ...opts,
         method: 'POST',
         body: JSON.stringify(data)
       });
     },
     
-    async bulkCreate(items) {
+    async bulkCreate(items, opts = {}) {
       return request(`/entities/${entityPath}`, {
+        ...opts,
         method: 'POST',
         body: JSON.stringify(items)
       });
     },
     
-    async update(id, data) {
+    async update(id, data, opts = {}) {
       return request(`/entities/${entityPath}?id=${id}`, {
+        ...opts,
         method: 'PUT',
         body: JSON.stringify(data)
       });
     },
     
-    async delete(id) {
+    async delete(id, opts = {}) {
       return request(`/entities/${entityPath}?id=${id}`, {
+        ...opts,
         method: 'DELETE'
       });
     }
@@ -504,6 +526,20 @@ const assist = {
   ask: (question) => request('/assist?action=ask', { method: 'POST', body: JSON.stringify({ question, today: localDay() }) }),
 };
 
+// Passkeys registered on this account (Settings > Security)
+const passkeys = {
+  list: () => request('/auth/passkey?action=list'),
+  async register(name) {
+    const { startRegistration } = await import('@simplewebauthn/browser');
+    const optionsJSON = await request('/auth/passkey?action=register-options', { method: 'POST', body: '{}', retries: 0 });
+    const response = await startRegistration({ optionsJSON });
+    const list = await request('/auth/passkey?action=register-verify', { method: 'POST', body: JSON.stringify({ response, name }), retries: 0 });
+    return { list, credentialId: response.id };
+  },
+  rename: (id, name) => request(`/auth/passkey?action=rename&id=${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  remove: (id) => request(`/auth/passkey?action=remove&id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
 // Card statements read on the device: rows are matched against what is already recorded
 const imports = {
   statement: (rows, { review = false } = {}) =>
@@ -536,6 +572,7 @@ const push = {
 // Main client export - maintains same interface as base44 client
 export const ascent = {
   auth,
+  passkeys,
   entities,
   workspaces,
   integrations,

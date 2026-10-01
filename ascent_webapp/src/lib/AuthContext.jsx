@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { ascent, systemPrefs } from '@/api/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { isNetworkError } from '@/lib/offline/network';
+import { markUnlocked } from '@/lib/appLock';
 
 const AuthContext = createContext();
 
@@ -34,6 +36,22 @@ const permissionsOf = (member) => {
 };
 
 const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// The last session this device confirmed (user + workspaces, no secrets). The app opens on it at once,
+// offline included, and checks it with the server in the background.
+const SESSION_CACHE = 'ascent_cached_session';
+const readCachedSession = () => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SESSION_CACHE) || 'null');
+    return cached?.user && Array.isArray(cached.workspaces) ? cached : null;
+  } catch { return null; }
+};
+const writeCachedSession = (user, workspaces) => {
+  try { localStorage.setItem(SESSION_CACHE, JSON.stringify({ user, workspaces, at: Date.now() })); } catch { /* storage full or unavailable */ }
+};
+const clearCachedSession = () => {
+  try { localStorage.removeItem(SESSION_CACHE); } catch { /* storage unavailable */ }
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -89,15 +107,35 @@ export const AuthProvider = ({ children }) => {
         setPermissions(permissionsOf(member));
         if (!member) console.warn('[AuthContext] User is not a member of the active workspace');
       }
+      writeCachedSession(currentUser, activeWs && !wsList.length ? [activeWs] : wsList);
     } catch (wsError) {
+      // No signal: keep the workspaces and permissions this device already knows
+      if (isNetworkError(wsError) && readCachedSession()) return;
       console.error('Failed to load workspaces:', wsError);
       setPermissions(null); // Fallback? Or lock out?
     }
   }, []);
 
+  // Open on the cached session: same state a completed sign-in check would produce
+  const applyCachedSession = useCallback((cached) => {
+    setUser(cached.user);
+    setIsAuthenticated(true);
+    setWorkspaces(cached.workspaces);
+    const storedWsId = localStorage.getItem('ascent_current_workspace_id');
+    const ws = cached.workspaces.find((w) => (w.id || w._id) === storedWsId) || cached.workspaces[0] || null;
+    setCurrentWorkspace(ws);
+    if (ws) setPermissions(permissionsOf(findMe(ws, cached.user)));
+    setIsLoadingAuth(false);
+  }, []);
+
   // silent: background refresh (e.g. after saving a setting) must not flip isLoadingAuth,
   // or App swaps the whole UI for the loading screen and remounts the page.
   const checkUserAuth = useCallback(async (silent = false) => {
+    const cached = readCachedSession();
+    if (!silent && cached) {
+      applyCachedSession(cached);
+      silent = true;
+    }
     try {
       if (!silent) setIsLoadingAuth(true);
       const currentUser = await ascent.auth.me();
@@ -110,7 +148,10 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(false);
     } catch (error) {
       setIsLoadingAuth(false);
+      // No signal (or the server is unreachable): carry on with what this device knows
+      if (isNetworkError(error) && cached) return;
       setIsAuthenticated(false);
+      clearCachedSession();
 
       // If user auth fails, it might be an expired or invalid token
       if (error.status === 401 || error.status === 403) {
@@ -136,7 +177,7 @@ export const AuthProvider = ({ children }) => {
         });
       }
     }
-  }, [isAuthenticated, loadWorkspaces]);
+  }, [isAuthenticated, loadWorkspaces, applyCachedSession]);
 
   const checkAppState = useCallback(async (options) => {
     const silent = options?.silent === true;
@@ -222,6 +263,7 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
+      markUnlocked();
 
       // Load workspaces
       await loadWorkspaces(currentUser);
@@ -280,6 +322,7 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
       setAuthError(null);
+      markUnlocked();
 
       // Load workspaces
       await loadWorkspaces(currentUser);
@@ -297,6 +340,17 @@ export const AuthProvider = ({ children }) => {
       });
       throw error;
     }
+  }, [loadWorkspaces]);
+
+  // Face ID / fingerprint sign-in (and the lock screen's unlock, which keeps this device's session)
+  const loginWithPasskey = useCallback(async ({ autofill = false } = {}) => {
+    const result = await ascent.auth.passkeyLogin({ autofill });
+    markUnlocked();
+    setUser(result.user);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    if (!result.unlocked) await loadWorkspaces(result.user);
+    return result;
   }, [loadWorkspaces]);
 
   const logout = useCallback((shouldRedirect = true) => {
@@ -357,6 +411,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     loginWithGoogle,
+    loginWithPasskey,
     logout,
     navigateToLogin,
     checkAppState
@@ -379,6 +434,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     loginWithGoogle,
+    loginWithPasskey,
     logout,
     navigateToLogin,
     checkAppState

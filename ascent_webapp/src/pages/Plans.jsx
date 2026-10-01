@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
+import { useTransactions } from '@/lib/offline/txOutbox';
+import { usePageCreateAction } from '@/components/shell/QuickActions';
 import PlanDialog from '@/components/plans/PlanDialog';
 import PlanItemDialog from '@/components/plans/PlanItemDialog';
 import PlanDetail from '@/components/plans/PlanDetail';
@@ -53,13 +55,8 @@ function Plans() {
     enabled: !!userId,
     staleTime: 60 * 1000,
   });
-  // Same key and query as the Expenses page, so the cache is shared
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['transactions', userId],
-    queryFn: () => ascent.entities.ExpenseTransaction.list('-date', 1000),
-    enabled: !!userId,
-    staleTime: 3 * 60 * 1000,
-  });
+  // Same cache as the Expenses page, with changes still waiting on this device drawn in
+  const { data: transactions = [] } = useTransactions();
   const { data: categories = [] } = useQuery({
     queryKey: ['categories', userId],
     queryFn: () => ascent.entities.Category.list('-created_date'),
@@ -101,6 +98,17 @@ function Plans() {
   }, [plans]);
 
   const plan = openId ? plans.find((p) => p.id === openId) : null;
+
+  // The dock's +: a new plan from the list, a new cost inside an open plan
+  const createHere = useCallback(() => (plan ? setItemDialog({}) : setPlanDialog({})), [plan]);
+  usePageCreateAction(canEdit ? createHere : null);
+  useEffect(() => {
+    if (params.get('new') !== '1' || !canEdit) return;
+    setPlanDialog({});
+    const next = new URLSearchParams(params);
+    next.delete('new');
+    setParams(next, { replace: true });
+  }, [params, setParams, canEdit]);
 
   // The plan was deleted (here or by someone else) while open
   useEffect(() => {
@@ -319,26 +327,6 @@ function Plans() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Thumb-reach quick add (phones) */}
-      {canEdit && !plan && plans.length > 0 && (
-        <Button
-          onClick={() => setPlanDialog({})}
-          aria-label={t('newPlan')}
-          className="fixed end-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-[0_10px_30px_-8px_hsl(var(--glow)/0.7)] transition-transform active:scale-90 sm:hidden"
-        >
-          <Plus className="!size-6" />
-        </Button>
-      )}
-      {canEdit && plan && (
-        <Button
-          onClick={() => setItemDialog({})}
-          aria-label={t('addPlanItem')}
-          className="fixed end-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 shadow-[0_10px_30px_-8px_hsl(var(--glow)/0.7)] transition-transform active:scale-90 sm:hidden"
-        >
-          <Plus className="!size-6" />
-        </Button>
-      )}
 
       <PlanDialog
         open={!!planDialog}

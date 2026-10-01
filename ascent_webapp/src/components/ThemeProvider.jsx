@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback } from 'react';
-import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
-import { translations, translateCategory } from '../lib/translations';
+import { translations } from '../lib/translations';
 
 export const PALETTES = ['indigo', 'gold', 'graphite', 'ivory', 'burgundy', 'slate', 'twilight'];
 

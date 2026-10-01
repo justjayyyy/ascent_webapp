@@ -1,16 +1,18 @@
-import React, { useState, useMemo, useCallback, useRef, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ascent } from '@/api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Target, Tag, RefreshCw } from 'lucide-react';
-import { motion, useMotionValue, useTransform, animate } from 'motion/react';
+import { Plus, Loader2, Target, Tag } from 'lucide-react';
 import { parseISO, getYear, getMonth } from 'date-fns';
+import { useTransactions } from '@/lib/offline/txOutbox';
+import { usePageCreateAction } from '@/components/shell/QuickActions';
 import AddTransactionDialog from './AddTransactionDialog';
 import BudgetManager from './BudgetManager';
 import CategoryManager from './CategoryManager';
 import ExpenseMonthView from './ExpenseMonthView';
 import PeriodSelector from './PeriodSelector';
-import { useSaveTransaction, useDeleteTransactions } from './useTransactionMutations';
+import { useSaveTransaction, useDeleteTransactions, useConfirmTransaction } from './useTransactionMutations';
 import { useTheme } from '../ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
@@ -54,18 +56,7 @@ function TransactionsPage({ kind }) {
   const userId = useMemo(() => user?.id || user?._id, [user?.id, user?._id]);
   const userEmail = useMemo(() => user?.email, [user?.email]);
 
-  const { data: allTransactions = [], isLoading } = useQuery({
-    queryKey: ['transactions', userId],
-    queryFn: async () => {
-      if (!userEmail) return [];
-      return await ascent.entities.ExpenseTransaction.list('-date', 1000);
-    },
-    enabled: !!userEmail,
-    staleTime: 3 * 60 * 1000,
-    // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return to the app and while it is open
-    refetchOnWindowFocus: 'always',
-    refetchInterval: 30 * 1000,
-  });
+  const { data: allTransactions = [], isLoading } = useTransactions();
 
   const transactions = useMemo(() => allTransactions.filter((x) => x.type === kind), [allTransactions, kind]);
 
@@ -110,14 +101,7 @@ function TransactionsPage({ kind }) {
     [categories, kind]
   );
 
-  const confirmTransactionMutation = useMutation({
-    mutationFn: (tx) => ascent.entities.ExpenseTransaction.update(tx.id, { status: 'confirmed' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      toast.success(t('transactionConfirmed'));
-    },
-    onError: () => toast.error(t('failedToConfirm')),
-  });
+  const confirmTransaction = useConfirmTransaction();
 
   const createBudgetMutation = useMutation({
     mutationFn: (budgetData) => ascent.entities.Budget.create(budgetData),
@@ -150,6 +134,16 @@ function TransactionsPage({ kind }) {
   });
 
   const openNew = useCallback(() => { setEditingTransaction(null); setAddDialogOpen(true); }, []);
+  // The dock's + adds to this page (an expense here, income on the Income page)
+  usePageCreateAction(canEdit ? openNew : null);
+  // Install shortcut / deep link: /Expenses?new=1
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('new') !== '1' || !canEdit) return;
+    openNew();
+    params.delete('new');
+    setParams(params, { replace: true });
+  }, [params, setParams, openNew, canEdit]);
 
   const handleEditTransaction = useCallback((transaction) => {
     setEditingTransaction(transaction);
@@ -205,37 +199,6 @@ function TransactionsPage({ kind }) {
     return `${selectedYear} (${t('all')})`;
   }, [selectedYear, selectedMonths, t]);
 
-  const pullY = useMotionValue(0);
-  const pullRotate = useTransform(pullY, [0, 72], [0, 270]);
-  const pullOpacity = useTransform(pullY, [0, 24, 72], [0, 0.6, 1]);
-  const pullIndicatorY = useTransform(pullY, (v) => v - 40);
-  const pullStart = useRef(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onTouchStart = useCallback((e) => {
-    if (window.scrollY <= 0 && !refreshing) pullStart.current = e.touches[0].clientY;
-  }, [refreshing]);
-
-  const onTouchMove = useCallback((e) => {
-    if (pullStart.current === null) return;
-    const dy = e.touches[0].clientY - pullStart.current;
-    if (dy > 0 && window.scrollY <= 0) pullY.set(Math.min(dy * 0.5, 96));
-    else pullStart.current = null;
-  }, [pullY]);
-
-  const onTouchEnd = useCallback(async () => {
-    if (pullStart.current === null) return;
-    pullStart.current = null;
-    if (pullY.get() >= 72) {
-      setRefreshing(true);
-      if (navigator.vibrate) navigator.vibrate(10);
-      animate(pullY, 56, { duration: 0.2 });
-      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      setRefreshing(false);
-    }
-    animate(pullY, 0, { type: 'spring', stiffness: 400, damping: 36 });
-  }, [pullY, queryClient]);
-
   if (!user) {
     return (
       <div className={cn("flex items-center justify-center min-h-screen", colors.bgPrimary)}>
@@ -247,7 +210,7 @@ function TransactionsPage({ kind }) {
   const addLabel = isIncome ? t('addIncome') : t('addExpense');
 
   return (
-    <div className="relative flex flex-col md:min-h-dvh p-2 pb-24 sm:p-4 sm:pb-24 md:p-8">
+    <div className="relative flex flex-col md:min-h-dvh p-2 pb-6 sm:p-4 sm:pb-8 md:p-8">
       <div aria-hidden className={cn(
         "pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[420px]",
         isIncome
@@ -293,24 +256,6 @@ function TransactionsPage({ kind }) {
         </div>
 
         <div className="relative mt-3 sm:mt-5">
-          <motion.div
-            aria-hidden={!refreshing}
-            style={{ opacity: refreshing ? 1 : pullOpacity, y: pullIndicatorY }}
-            className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center md:hidden"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-popover text-primary shadow-lg">
-              <motion.span style={{ rotate: refreshing ? undefined : pullRotate }} className={cn(refreshing && "animate-spin")}>
-                <RefreshCw className="h-4 w-4" />
-              </motion.span>
-            </span>
-          </motion.div>
-          <motion.div
-            style={{ y: pullY }}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            className="touch-pan-y"
-          >
             <ExpenseMonthView
               kind={kind}
               transactions={selectedPeriodTransactions}
@@ -323,29 +268,14 @@ function TransactionsPage({ kind }) {
               onEdit={handleEditTransaction}
               onDelete={handleDeleteTransaction}
               onDuplicate={handleDuplicateTransaction}
-              onConfirm={confirmTransactionMutation.mutate}
+              onConfirm={confirmTransaction}
               isLoading={isLoading}
               monthLabel={selectedPeriodLabel}
               selectedYear={selectedYear}
               selectedMonths={selectedMonths}
               canEdit={canEdit}
             />
-          </motion.div>
         </div>
-
-        {/* Thumb-reach quick add (phones) */}
-        {canEdit && (
-          <Button
-            onClick={openNew}
-            aria-label={addLabel}
-            className={cn(
-              "fixed end-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 h-14 w-14 rounded-full p-0 transition-transform active:scale-90 sm:hidden",
-              isIncome ? "bg-success text-background hover:bg-success/90 shadow-[0_10px_30px_-8px_hsl(var(--success)/0.6)]" : "shadow-[0_10px_30px_-8px_hsl(var(--glow)/0.7)]"
-            )}
-          >
-            <Plus className="!size-6" />
-          </Button>
-        )}
 
         <AddTransactionDialog
           open={addDialogOpen}

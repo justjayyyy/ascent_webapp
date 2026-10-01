@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
-  Loader2, User, Bell, Palette, Users, CreditCard, Database, LogOut, Search, X, Lock, Mail, SearchX, UserCircle, Smartphone,
+  Loader2, User, Bell, Palette, Users, CreditCard, Database, LogOut, Search, X, Lock, Mail, SearchX, UserCircle, Smartphone, ShieldCheck,
 } from 'lucide-react';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import ImportExportSection from '../components/settings/ImportExportSection';
@@ -15,6 +15,7 @@ import CardManagement from '../components/settings/CardManagement';
 import ApplePaySection from '../components/settings/ApplePaySection';
 import HouseholdSmartSettings from '../components/settings/HouseholdSmartSettings';
 import ThemePicker from '../components/settings/ThemePicker';
+import SecuritySection from '../components/settings/SecuritySection';
 import SettingsNav, { useActiveSection } from '../components/settings/SettingsNav';
 import { Section, Group, Row, Segmented, EditableField } from '../components/settings/SettingsShell';
 import { useTheme } from '../components/ThemeProvider';
@@ -141,6 +142,7 @@ export default function Settings() {
     household: hit(t('setNavHousehold'), t('workspaceName'), t('wsMembers'), t('wsInviteMember')),
     cards: hasPermission('manageCards') && hit(t('setNavCards'), t('paymentCards'), t('addCard')),
     applepay: hasPermission('editExpenses') && hit('Apple Pay', t('apDesc')),
+    security: hit(t('secTitle'), t('secLockLabel').replace('{method}', ''), t('secPasskeys'), 'Face ID', 'passkey'),
     data: hit(t('setNavData'), t('exportData'), t('expenses'), t('notes'), 'csv'),
     account: hit(t('setNavAccount'), t('logout')),
   };
@@ -153,6 +155,7 @@ export default function Settings() {
     { id: 'household', label: t('setNavHousehold'), icon: Users },
     hasPermission('manageCards') && { id: 'cards', label: t('setNavCards'), icon: CreditCard },
     hasPermission('editExpenses') && { id: 'applepay', label: 'Apple Pay', icon: Smartphone },
+    { id: 'security', label: t('secTitle'), icon: ShieldCheck },
     { id: 'data', label: t('setNavData'), icon: Database },
     { id: 'account', label: t('setNavAccount'), icon: User },
   ].filter((i) => i && show[i.id]);
@@ -379,6 +382,8 @@ export default function Settings() {
               cards={cards}
             />
           )}
+
+          {show.security && <SecuritySection index={order++} />}
 
           {/* Account */}
           {show.account && (
