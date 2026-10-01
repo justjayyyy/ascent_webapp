@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ascent, systemPrefs } from '@/api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNetworkError } from '@/lib/offline/network';
@@ -63,6 +63,19 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
+
+  // Preference edits made on this device that the server hasn't confirmed yet ({ field: { value, seq } }).
+  // A /me response that left before the save landed must not bring the old value back.
+  const pendingPrefs = useRef({});
+  const prefsSeq = useRef(0);
+  // Saves go out one at a time, so a quick double tap can't reach the server in the wrong order
+  const prefsQueue = useRef(Promise.resolve());
+
+  const withPendingPrefs = useCallback((u) => {
+    const pending = Object.entries(pendingPrefs.current);
+    if (!u || !pending.length) return u;
+    return { ...u, ...Object.fromEntries(pending.map(([k, p]) => [k, p.value])) };
+  }, []);
 
   // Get queryClient - we'll use it in a child component that has access to QueryClientProvider
   // For now, we'll clear cache in logout via a callback
@@ -138,7 +151,7 @@ export const AuthProvider = ({ children }) => {
     }
     try {
       if (!silent) setIsLoadingAuth(true);
-      const currentUser = await ascent.auth.me();
+      const currentUser = withPendingPrefs(await ascent.auth.me());
       setUser(currentUser);
       setIsAuthenticated(true);
 
@@ -177,7 +190,26 @@ export const AuthProvider = ({ children }) => {
         });
       }
     }
-  }, [isAuthenticated, loadWorkspaces, applyCachedSession]);
+  }, [isAuthenticated, loadWorkspaces, applyCachedSession, withPendingPrefs]);
+
+  // Change the user's own preferences (theme, blurValues, language...): shown at once, kept in the
+  // cached session, then saved. Rejects if the save fails; the caller decides how to recover.
+  const saveUserPrefs = useCallback((updates) => {
+    const seq = ++prefsSeq.current;
+    for (const [k, value] of Object.entries(updates)) pendingPrefs.current[k] = { value, seq };
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+    const cached = readCachedSession();
+    if (cached) writeCachedSession({ ...cached.user, ...updates }, cached.workspaces);
+
+    const save = prefsQueue.current.then(() => ascent.auth.updateMe(updates));
+    prefsQueue.current = save.catch(() => {});
+    return save.finally(() => {
+      // Forget each field unless a newer edit replaced it meanwhile
+      for (const k of Object.keys(updates)) {
+        if (pendingPrefs.current[k]?.seq === seq) delete pendingPrefs.current[k];
+      }
+    });
+  }, []);
 
   const checkAppState = useCallback(async (options) => {
     const silent = options?.silent === true;
@@ -414,7 +446,8 @@ export const AuthProvider = ({ children }) => {
     loginWithPasskey,
     logout,
     navigateToLogin,
-    checkAppState
+    checkAppState,
+    saveUserPrefs
   }), [
     currentMember,
     isWorkspaceOwner,
@@ -437,7 +470,8 @@ export const AuthProvider = ({ children }) => {
     loginWithPasskey,
     logout,
     navigateToLogin,
-    checkAppState
+    checkAppState,
+    saveUserPrefs
   ]);
 
   return (

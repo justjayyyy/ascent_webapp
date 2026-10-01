@@ -44,7 +44,7 @@ const listQuery = (key, userId, fn) => ({
 });
 
 export default function Settings() {
-  const { user: themeUser, theme, setPalette, t, loading: themeLoading, updateUserLocal, refreshUser } = useTheme();
+  const { user: themeUser, theme, setPalette, t, loading: themeLoading, saveUserPrefs, refreshUser } = useTheme();
   const { currentWorkspace, setCurrentWorkspace, currentMember, isWorkspaceOwner: isOwner, hasPermission, refreshWorkspaces, logout } = useAuth();
   const [user, setUser] = useState(null);
   const [query, setQuery] = useState('');
@@ -69,9 +69,8 @@ export default function Settings() {
 
   const updateUserMutation = useMutation({
     mutationFn: async (data) => {
-      updateUserLocal(data); // instant feedback
       setUser((prev) => ({ ...prev, ...data }));
-      return ascent.auth.updateMe(data);
+      return saveUserPrefs(data); // shows at once, then saves
     },
     onSuccess: async () => {
       await refreshUser();

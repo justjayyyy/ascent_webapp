@@ -7,7 +7,7 @@ export const PALETTES = ['indigo', 'gold', 'graphite', 'ivory', 'burgundy', 'sla
 const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
-  const { user, setUser, checkAppState } = useAuth();
+  const { user, setUser, checkAppState, saveUserPrefs } = useAuth();
 
   // Legacy loading state compatibility - though mostly handled by AuthContext now
   const loading = false;
@@ -103,7 +103,8 @@ export function ThemeProvider({ children }) {
     loading,
     refreshUser,
     updateUserLocal,
-  }), [user, setUser, theme, language, isRTL, colors, palette, setPalette, t, loading, refreshUser, updateUserLocal]);
+    saveUserPrefs,
+  }), [user, setUser, theme, language, isRTL, colors, palette, setPalette, t, loading, refreshUser, updateUserLocal, saveUserPrefs]);
 
   return (
     <ThemeContext.Provider value={value}>

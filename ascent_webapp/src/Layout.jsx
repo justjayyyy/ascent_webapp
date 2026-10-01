@@ -56,7 +56,7 @@ function QuickAddSheet({ request, onClose }) {
 }
 
 function LayoutContent({ children, currentPageName }) {
-  const { user, isRTL, colors, t, updateUserLocal, refreshUser } = useTheme();
+  const { user, isRTL, colors, t, saveUserPrefs, refreshUser } = useTheme();
   const { hasPermission } = useAuth();
   const { enabled: lockEnabled } = useAppLock();
   const navigate = useNavigate();
@@ -166,32 +166,26 @@ function LayoutContent({ children, currentPageName }) {
     const newTheme = checked ? 'dark' : 'light';
     if (user) {
       try {
-        // Update locally first for instant feedback
-        updateUserLocal({ theme: newTheme });
-        // Then persist to server
-        await ascent.auth.updateMe({ theme: newTheme });
+        await saveUserPrefs({ theme: newTheme });
       } catch (error) {
         console.error('Failed to update theme');
         // Revert on error by refreshing from server
         await refreshUser();
       }
     }
-  }, [user, updateUserLocal, refreshUser]);
+  }, [user, saveUserPrefs, refreshUser]);
 
   const handleBlurValuesChange = useCallback(async (checked) => {
     if (user) {
       try {
-        // Update locally first for instant feedback
-        updateUserLocal({ blurValues: checked });
-        // Then persist to server
-        await ascent.auth.updateMe({ blurValues: checked });
+        await saveUserPrefs({ blurValues: checked });
       } catch (error) {
         console.error('Failed to update blur values');
         // Revert on error by refreshing from server
         await refreshUser();
       }
     }
-  }, [user, updateUserLocal, refreshUser]);
+  }, [user, saveUserPrefs, refreshUser]);
 
   // const hasPermission = useCallback((permission) => {
   //   // If no permissions object exists, user is owner and has all permissions
