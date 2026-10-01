@@ -15,6 +15,7 @@ import { useInsights } from '@/components/insights/useInsights';
 import SafeToSpendCard from '@/components/insights/SafeToSpendCard';
 import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
 import HouseholdBalanceCard from '@/components/insights/HouseholdBalanceCard';
+import CommitmentsCard from '@/components/insights/CommitmentsCard';
 import AssistantBar from '@/components/insights/AssistantBar';
 import { useTransactions } from '@/lib/offline/txOutbox';
 import RecapStories from '@/components/recap/RecapStories';
@@ -107,7 +108,7 @@ export default function Dashboard() {
   }, [userCurrency, rates, convertCurrency]);
 
   const { isShared, members } = useHousehold();
-  const { forecast, subscriptions, balances } = useInsights({ rows: normalized, selectedMonth, convert });
+  const { forecast, subscriptions, balances, commitments } = useInsights({ rows: normalized, selectedMonth, convert });
   const showForecast = forecast.phase === 'current';
 
   const selectedKey = monthKey(selectedMonth);
@@ -398,6 +399,11 @@ export default function Dashboard() {
               kpis.savingsRate === null ? '—' : <NumberFlow value={kpis.savingsRate / 100} locales={locale} format={{ style: 'percent', maximumFractionDigits: 0 }} trend={0} />,
               PiggyBank, 'text-primary')}
           </div>
+
+          {/* Loans and commitments: what is owed, what leaves each month, when it ends */}
+          <Tile i={3} className="md:col-span-6">
+            <CommitmentsCard commitments={commitments} convert={convert} />
+          </Tile>
 
           {isShared && (
             <Tile i={3} className="md:col-span-3 xl:col-span-2">

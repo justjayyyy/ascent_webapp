@@ -38,7 +38,7 @@ export function payeeKey(tx) {
 export function detectSubscriptions(transactions, today) {
   const groups = new Map();
   for (const tx of transactions) {
-    if (tx.type !== 'Expense' || !tx.date || tx.date > today || tx.installmentGroupId || !(tx.amount > 0)) continue;
+    if (tx.type !== 'Expense' || !tx.date || tx.date > today || tx.installmentGroupId || tx.commitmentId || !(tx.amount > 0)) continue;
     const key = payeeKey(tx);
     if (key.length < 2) continue;
     if (!groups.has(key)) groups.set(key, []);

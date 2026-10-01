@@ -10,7 +10,7 @@ export const PERSIST_BUSTER = 'v1';
 export const PERSIST_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 // Money data, lists and settings the pages open with; nothing that is cheap or per-moment
-const KEEP = new Set(['transactions', 'categories', 'budgets', 'cards', 'accounts', 'plans', 'assist-status', 'settlements', 'workspace-members']);
+const KEEP = new Set(['transactions', 'categories', 'budgets', 'cards', 'accounts', 'plans', 'commitments', 'assist-status', 'settlements', 'workspace-members']);
 
 export const persister = createAsyncStoragePersister({
   storage: {

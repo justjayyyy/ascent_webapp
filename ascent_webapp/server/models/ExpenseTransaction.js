@@ -122,6 +122,17 @@ const expenseTransactionSchema = new mongoose.Schema({
     default: null
   },
 
+  // A payment towards a loan or other commitment (see the Commitment model)
+  commitmentId: {
+    type: String,
+    default: null,
+    index: true
+  },
+  commitmentPaymentId: {
+    type: String,
+    default: null // set for an extra payment, so it is not taken for the month's scheduled one
+  },
+
   // Households: who actually paid (an email, like created_by; empty means whoever added it) and, for
   // money that one person fronts for others, how it is shared. No split means shared money nobody owes back.
   paidBy: {
