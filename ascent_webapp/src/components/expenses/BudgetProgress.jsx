@@ -1,23 +1,16 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import BlurValue from '../BlurValue';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useMoney } from '@/hooks/useWorkspaceData';
 
 function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [] }) {
   const { language, user, t } = useTheme();
-  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
-
-  // Fetch exchange rates on mount
-  useEffect(() => {
-    if (userCurrency) {
-      fetchExchangeRates('USD');
-    }
-  }, [userCurrency, fetchExchangeRates]);
+  const { amountOf, convert } = useMoney(userCurrency);
 
   // Filter budgets by selected period - only show budgets that match the exact year + month(s)
   const filteredBudgets = useMemo(() => {
@@ -77,32 +70,16 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
         spending[t.category] = 0;
       }
 
-      let amountToUse = 0;
-
-      // Use stored converted amount if available
-      if (t.amountInGlobalCurrency !== null && t.amountInGlobalCurrency !== undefined) {
-        amountToUse = t.amountInGlobalCurrency;
-      } else if (t.currency === userCurrency) {
-        // Fallback: use amount directly if currency matches user's currency
-        amountToUse = t.amount;
-      } else if (rates && Object.keys(rates).length > 0) {
-        // Fallback: convert on the fly for older transactions without stored conversion
-        amountToUse = convertCurrency(t.amount, t.currency || 'USD', userCurrency, rates);
-      }
-
-      spending[t.category] += amountToUse;
+      spending[t.category] += amountOf(t);
     });
 
     return spending;
-  }, [transactions, userCurrency, rates, convertCurrency, selectedYear, selectedMonths]);
+  }, [transactions, amountOf, selectedYear, selectedMonths]);
 
   const budgetData = useMemo(() => {
     return filteredBudgets.map(budget => {
       // Convert budget limit to user's currency if needed
-      let budgetLimit = budget.monthlyLimit;
-      if (budget.currency !== userCurrency && rates && Object.keys(rates).length > 0) {
-        budgetLimit = convertCurrency(budget.monthlyLimit, budget.currency, userCurrency, rates);
-      }
+      const budgetLimit = convert(budget.monthlyLimit, budget.currency) ?? budget.monthlyLimit;
 
       const spent = spendingByCategory[budget.category] || 0;
       const percentage = budgetLimit > 0 ? (spent / budgetLimit) * 100 : 0;
@@ -126,7 +103,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       };
     })
       .sort((a, b) => b.displayPercentage - a.displayPercentage);
-  }, [filteredBudgets, spendingByCategory, userCurrency, rates, convertCurrency]);
+  }, [filteredBudgets, spendingByCategory, convert]);
 
   // Don't show the module if there are no budgets for the selected period
   // Debug: Log to help troubleshoot

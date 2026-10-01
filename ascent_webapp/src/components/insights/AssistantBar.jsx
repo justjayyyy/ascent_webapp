@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useAssistStatus, useCategories } from '@/hooks/useWorkspaceData';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sparkles, ArrowUp, Loader2, X, Check, Pencil } from 'lucide-react';
 import { ascent } from '@/api/client';
@@ -24,25 +24,19 @@ function errorKey(err) {
  * a short answer from the household's own numbers. Shown only when the household turned the assistant on.
  */
 export default function AssistantBar() {
-  const { t, user, language } = useTheme();
+  const { t, language } = useTheme();
   const { hasPermission } = useAuth();
   const { money, shortDate, currency } = useMoneyFormat();
   const { save, saving } = useSaveTransaction();
-  const userId = user?.id || user?._id;
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { kind: 'answer', text } | { kind: 'draft', draft } | { kind: 'error', key }
   const [editing, setEditing] = useState(null);
   const inputRef = useRef(null);
 
-  const { data: status } = useQuery({ queryKey: ['assist-status'], queryFn: () => ascent.assist.status(), staleTime: 5 * 60 * 1000 });
+  const { data: status } = useAssistStatus();
   const canEdit = hasPermission('editExpenses');
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories', userId],
-    queryFn: () => ascent.entities.Category.list('-created_date'),
-    enabled: !!userId && canEdit,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: categories = [] } = useCategories({ enabled: canEdit });
 
   if (!status?.ai?.configured || !status?.ai?.enabled || !hasPermission('viewExpenses')) return null;
 
@@ -84,6 +78,7 @@ export default function AssistantBar() {
       amount: d.amount,
       currency: cur,
       amountInGlobalCurrency: cur === currency ? d.amount : null,
+      globalCurrency: cur === currency ? currency : null,
       category: d.category || fallback,
       description: d.description || '',
       date: d.date || localDay(),

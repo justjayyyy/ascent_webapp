@@ -1,8 +1,6 @@
 import 'dotenv/config';
 import nodemailer from 'nodemailer';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
 if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
   console.error('❌ SMTP_USER or SMTP_PASS not found in environment variables');
   process.exit(1);

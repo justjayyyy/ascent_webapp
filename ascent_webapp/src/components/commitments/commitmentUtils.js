@@ -1,5 +1,5 @@
-import { useCallback, useEffect } from 'react';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useCallback } from 'react';
+import { useMoney } from '@/hooks/useWorkspaceData';
 
 // Kinds of commitment, with the expense category their payments usually belong to
 export const COMMITMENT_KINDS = [
@@ -38,12 +38,8 @@ export const monthYear = (date, loc) => (date
   : '');
 
 /** Converts any commitment's money into the viewer's currency. */
+// Until rates arrive (or offline with none cached) an amount is shown as it is rather than as zero.
 export function useToUserCurrency(userCurrency) {
-  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
-  useEffect(() => { if (userCurrency) fetchExchangeRates(userCurrency); }, [userCurrency, fetchExchangeRates]);
-  return useCallback((amount, from) => {
-    if (!amount) return 0;
-    if (!from || from === userCurrency || !rates || !Object.keys(rates).length) return amount;
-    return convertCurrency(amount, from, userCurrency, rates);
-  }, [userCurrency, rates, convertCurrency]);
+  const { convert } = useMoney(userCurrency);
+  return useCallback((amount, from) => (amount ? convert(amount, from) ?? amount : 0), [convert]);
 }

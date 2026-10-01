@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { toast } from 'sonner';
 import { Sparkles, BellRing } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -22,7 +23,7 @@ export default function HouseholdSmartSettings() {
 
   useEffect(() => { setThreshold(settings.largeExpenseAlert ?? ''); }, [settings.largeExpenseAlert]);
 
-  const { data: status } = useQuery({ queryKey: ['assist-status'], queryFn: () => ascent.assist.status(), staleTime: 60 * 1000 });
+  const { data: status } = useAssistStatus();
   const configured = !!status?.ai?.configured;
 
   const save = async (patch) => {

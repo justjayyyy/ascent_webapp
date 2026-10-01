@@ -128,7 +128,7 @@ export function translateCategoryName(nameOrKey, language = 'en') {
   }
   
   // If not a key, check if the name itself matches any translation
-  for (const [key, translations] of Object.entries(categoryTranslations)) {
+  for (const translations of Object.values(categoryTranslations)) {
     if (Object.values(translations).includes(nameOrKey)) {
       return translations[language] || translations.en;
     }

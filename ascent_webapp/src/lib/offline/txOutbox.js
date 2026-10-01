@@ -1,11 +1,12 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { get, set, del } from 'idb-keyval';
+import { get, set, del, keys } from 'idb-keyval';
 import { ascent } from '@/api/client';
 import { queryClientInstance } from '@/lib/query-client';
 import { setPlanItem } from '@/components/expenses/planLink';
-import { useAuth } from '@/lib/AuthContext';
-import { enqueue, applyOutbox, isLocalId, localIdOf, isTransientError, pendingCount, failedCount } from './outboxModel';
+import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
+import { workspaceKey } from '@/hooks/useWorkspaceData';
+import { enqueue, applyOutbox, opsForWorkspace, isLocalId, localIdOf, isTransientError, pendingCount, failedCount } from './outboxModel';
 import { isOnline } from './network';
 
 // Offline-first writes for transactions. Every add, edit and delete goes through this queue: it is
@@ -14,6 +15,8 @@ import { isOnline } from './network';
 // it waits and goes out when the phone is back online. See outboxModel.js for the folding rules.
 
 const REQUEST = { timeout: 15000, retries: 0 };
+// The newest rows of the household; older history is not loaded into the app
+export const TRANSACTION_LIMIT = 2000;
 const BACKOFF = [3000, 10000, 30000, 60000, 180000];
 const Tx = () => ascent.entities.ExpenseTransaction;
 
@@ -103,17 +106,17 @@ class TxOutbox {
         if (mine) idMap[localIdOf(mine)] = row.id || row._id;
       });
       if (op.plan && created[0]) {
-        await setPlanItem(op.plan.planId, op.plan.itemId, { status: 'paid', transactionId: created[0].id || created[0]._id || null }).catch(() => {});
+        await setPlanItem(op.plan.planId, op.plan.itemId, { status: 'paid', transactionId: created[0].id || created[0]._id || null }, opts).catch(() => {});
       }
-      return { created, idMap };
+      return { created, idMap, workspaceId: op.workspaceId };
     }
     const id = this.resolveId(op.txId);
     if (isLocalId(id)) return {}; // its add was refused, so there is nothing on the server to change
     try {
-      if (op.kind === 'update') return { updated: await Tx().update(id, op.data, opts) };
+      if (op.kind === 'update') return { updated: await Tx().update(id, op.data, opts), workspaceId: op.workspaceId };
       await Tx().delete(id, opts);
-      if (op.plan) await setPlanItem(op.plan.planId, op.plan.itemId, { status: 'planned', transactionId: null }).catch(() => {});
-      return { deleted: id };
+      if (op.plan) await setPlanItem(op.plan.planId, op.plan.itemId, { status: 'planned', transactionId: null }, opts).catch(() => {});
+      return { deleted: id, workspaceId: op.workspaceId };
     } catch (err) {
       if (err?.status === 404) return {}; // already gone
       throw err;
@@ -122,8 +125,8 @@ class TxOutbox {
 
   /** Put what the server answered into the cached list right away, so nothing blinks while it refetches. */
   absorb(result) {
-    const key = ['transactions', this.userId];
-    queryClientInstance.setQueryData(key, (list) => {
+    if (!result.workspaceId) return;
+    queryClientInstance.setQueryData(workspaceKey('transactions', result.workspaceId), (list) => {
       if (!Array.isArray(list)) return list;
       let next = list;
       if (result.created?.length) {
@@ -215,7 +218,6 @@ if (typeof window !== 'undefined') {
 /** Forget queued changes on this device (sign-out). */
 export async function clearOutboxes() {
   boxes.clear();
-  const { keys } = await import('idb-keyval');
   const all = await keys().catch(() => []);
   await Promise.all(all.filter((k) => typeof k === 'string' && k.startsWith('ascent:tx:outbox:')).map((k) => del(k).catch(() => {})));
 }
@@ -250,17 +252,20 @@ export function useOutbox() {
 export function useTransactions({ enabled = true } = {}) {
   const { user } = useAuth();
   const userId = user?.id || user?._id;
+  const workspaceId = useWorkspaceId();
   const query = useQuery({
-    queryKey: ['transactions', userId],
-    queryFn: () => ascent.entities.ExpenseTransaction.list('-date', 1000),
-    enabled: !!userId && enabled,
+    queryKey: workspaceKey('transactions', workspaceId),
+    queryFn: () => ascent.entities.ExpenseTransaction.list('-date', TRANSACTION_LIMIT, { headers: { 'x-workspace-id': workspaceId } }),
+    enabled: !!userId && !!workspaceId && enabled,
     staleTime: 3 * 60 * 1000,
     // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return and while open
     refetchOnWindowFocus: 'always',
     refetchInterval: 30 * 1000,
   });
   const { ops, idMap } = useOutboxState(userId);
-  const data = useMemo(() => applyOutbox(query.data || [], ops, idMap), [query.data, ops, idMap]);
+  // Only this workspace's waiting changes belong in this workspace's list
+  const here = useMemo(() => opsForWorkspace(ops, workspaceId), [ops, workspaceId]);
+  const data = useMemo(() => applyOutbox(query.data || [], here, idMap), [query.data, here, idMap]);
   // Offline with nothing cached yet: the query is paused, so show the empty list instead of a spinner
   return { ...query, data, isLoading: query.isPending && query.fetchStatus !== 'paused' };
 }

@@ -107,6 +107,9 @@ export function applyOutbox(serverRows = [], ops = [], idMap = {}) {
   return [...queued, ...stored];
 }
 
+/** The waiting changes made in one workspace (ops queued before workspaces were recorded count everywhere). */
+export const opsForWorkspace = (ops, workspaceId) => ops.filter((o) => !o.workspaceId || !workspaceId || o.workspaceId === workspaceId);
+
 /** How many changes are still waiting (a batch of installments counts once). */
 export const pendingCount = (ops) => ops.filter((o) => !o.error).length;
 export const failedCount = (ops) => ops.filter((o) => o.error).length;

@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useTransform } from 'framer-motion';
+import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useTransform } from 'motion/react';
 import { ArrowLeft, ArrowRight, Loader2, ScanFace } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AscentLogo from '@/components/AscentLogo';

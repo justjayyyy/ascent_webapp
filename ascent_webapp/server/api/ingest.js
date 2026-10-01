@@ -183,6 +183,7 @@ export default async function handler(req, res) {
         currency: ev.currency,
         // Same currency as the user's: nothing to convert. Otherwise left empty; the app converts when it shows or confirms it.
         amountInGlobalCurrency: ev.currency === user.currency ? ev.amount : null,
+        globalCurrency: ev.currency === user.currency ? ev.currency : null,
         category,
         description: ev.merchant,
         merchant: ev.merchant,

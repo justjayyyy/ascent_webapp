@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useId, useState } from 'react';
-import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from 'motion/react';
 import { AlertCircle, ArrowUp, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { passwordStrength } from './useAuthFlow';

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { useHousehold } from '@/hooks/useHousehold';
-import { splitShares } from '../../../shared/balances.js';
+import { splitShares } from '@shared/balances';
 
 const fill = (s, vars) => Object.entries(vars).reduce((out, [k, v]) => out.replace(`{${k}}`, v), s);
 

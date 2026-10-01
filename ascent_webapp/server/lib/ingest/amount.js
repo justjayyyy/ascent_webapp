@@ -48,7 +48,7 @@ const exponentOf = (currency) => (ZERO_DECIMAL.has(currency) ? 0 : THREE_DECIMAL
 // Decimal versus grouping: the later of "." and "," is the decimal; a single separator followed by exactly
 // three digits is grouping ("1,234" -> 1234); currencies without decimals only ever group.
 function toNumber(run, exponent) {
-  const r = run.replace(/['’]/g, '').replace(/[.,]+$/, '');
+  const r = run.replace(/['\u2019]/g, '').replace(/[.,]+$/, '');
   const dots = (r.match(/\./g) || []).length;
   const commas = (r.match(/,/g) || []).length;
   let decimalSep = null;
@@ -88,7 +88,7 @@ export function parseAmount(input, { userCurrency = 'USD' } = {}) {
   const s = stripBidi(input.normalize('NFKC')).trim();
   if (!s) return null;
 
-  const run = s.replace(/[\s   ]/g, '').match(/\d[\d.,'’]*/);
+  const run = s.replace(/[\s\u00A0\u202F\u2009]/g, '').match(/\d[\d.,'\u2019]*/);
   if (!run) return null;
 
   const currency = detectCurrency(s, userCurrency);

@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, Tr
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
 import BlurValue from '@/components/BlurValue';
 import { useTheme } from '@/components/ThemeProvider';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useMoney } from '@/hooks/useWorkspaceData';
 import { translateCategory } from '@/lib/translations';
 import { createPageUrl } from '@/utils';
 import { cn } from '@/lib/utils';
@@ -56,7 +56,6 @@ function Money({ value, locale, currency, blur, className }) {
 
 export default function Dashboard() {
   const { user, t, language, isRTL } = useTheme();
-  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const tokens = useChartTokens();
   const userCurrency = user?.currency || 'ILS';
   const blur = !!user?.blurValues;
@@ -64,21 +63,12 @@ export default function Dashboard() {
   // Same cache as the Expenses page, with changes still waiting on this device drawn in
   const { data: transactions = [], isLoading } = useTransactions();
 
-  useEffect(() => {
-    if (userCurrency) fetchExchangeRates(userCurrency);
-  }, [userCurrency, fetchExchangeRates]);
-
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  const toUserCurrency = useCallback((tx) => {
-    if (tx.amountInGlobalCurrency !== null && tx.amountInGlobalCurrency !== undefined) return tx.amountInGlobalCurrency;
-    if (tx.currency === userCurrency) return tx.amount;
-    if (rates && Object.keys(rates).length > 0) return convertCurrency(tx.amount, tx.currency || 'USD', userCurrency, rates);
-    return 0;
-  }, [userCurrency, rates, convertCurrency]);
+  const { amountOf: toUserCurrency, convert: convertOrNull } = useMoney(userCurrency);
 
   const locale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
   const fmtMoney = useCallback((v) => new Intl.NumberFormat(locale, {
@@ -101,11 +91,8 @@ export default function Dashboard() {
     })), [transactions, toUserCurrency]);
 
   // Budgets and plans keep their own currency; everything on this page is shown in the user's
-  const convert = useCallback((amount, from) => {
-    if (!amount) return 0;
-    if (!from || from === userCurrency || !rates || !Object.keys(rates).length) return amount;
-    return convertCurrency(amount, from, userCurrency, rates);
-  }, [userCurrency, rates, convertCurrency]);
+  // (shown as is until rates arrive, rather than as zero)
+  const convert = useCallback((amount, from) => (amount ? convertOrNull(amount, from) ?? amount : 0), [convertOrNull]);
 
   const { isShared, members } = useHousehold();
   const { forecast, subscriptions, balances, commitments } = useInsights({ rows: normalized, selectedMonth, convert });

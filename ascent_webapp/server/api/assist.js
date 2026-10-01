@@ -13,6 +13,7 @@ import { suggestCategory } from '../lib/categorize.js';
 import { categoryTranslations } from '../lib/categoryTranslations.js';
 import { loadRules, ruleKeyFor } from '../lib/merchantRules.js';
 import { spendingSummary } from '../lib/spendingSummary.js';
+import { amountInCurrency } from '../../shared/money.js';
 import { aiConfigured, parseNote, answerQuestion, AssistantDeclined } from '../lib/assistant.js';
 import Category from '../models/Category.js';
 import Card from '../models/Card.js';
@@ -120,11 +121,11 @@ export default async function handler(req, res) {
     const since = `${year - 1}-${String(month).padStart(2, '0')}-01`;
     const [rows, budgets] = await Promise.all([
       ExpenseTransaction.find({ workspaceId, date: { $gte: since } })
-        .select('type date amount currency amountInGlobalCurrency category description merchant merchantKey isRecurring installmentGroupId isBigPurchase planId')
+        .select('type date amount currency amountInGlobalCurrency globalCurrency category description merchant merchantKey isRecurring installmentGroupId isBigPurchase planId')
         .lean(),
       memberMay(req, user, 'viewBudgets') ? Budget.find({ workspaceId, year, month }).lean() : [],
     ]);
-    const inCurrency = (tx) => (tx.currency === currency ? tx.amount : tx.amountInGlobalCurrency);
+    const inCurrency = (tx) => amountInCurrency(tx, currency, null);
     const language = ['he', 'ru'].includes(user.language) ? user.language : 'en';
     const summary = spendingSummary({
       transactions: rows.map((tx) => ({ ...tx, amount: inCurrency(tx) })).filter((tx) => typeof tx.amount === 'number'),

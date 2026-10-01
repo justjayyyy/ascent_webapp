@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ascent } from '@/api/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAccounts, useBudgets, useCards, useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
 import { parseISO, getYear, getMonth } from 'date-fns';
@@ -53,48 +54,16 @@ function TransactionsPage({ kind }) {
   const { save, saving } = useSaveTransaction();
   const deleteTransactions = useDeleteTransactions();
 
-  const userId = useMemo(() => user?.id || user?._id, [user?.id, user?._id]);
-  const userEmail = useMemo(() => user?.email, [user?.email]);
 
   const { data: allTransactions = [], isLoading } = useTransactions();
 
   const transactions = useMemo(() => allTransactions.filter((x) => x.type === kind), [allTransactions, kind]);
 
-  const { data: cards = [] } = useQuery({
-    queryKey: ['cards', userId],
-    queryFn: async () => (userEmail ? ascent.entities.Card.list() : []),
-    enabled: !!userEmail,
-    staleTime: 3 * 60 * 1000,
-  });
-
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', userId],
-    queryFn: async () => (userEmail ? ascent.entities.Account.list() : []),
-    enabled: !!userEmail,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['budgets', userId],
-    queryFn: async () => (userEmail ? ascent.entities.Budget.list('-created_date') : []),
-    enabled: !!userEmail && !isIncome,
-    staleTime: 3 * 60 * 1000,
-  });
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories', userId],
-    // list() triggers default category creation on first access
-    queryFn: async () => (userEmail ? ascent.entities.Category.list('-created_date') : []),
-    enabled: !!userEmail,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: plans = [] } = useQuery({
-    queryKey: ['plans', userId],
-    queryFn: async () => (userEmail ? ascent.entities.Plan.list('startDate') : []),
-    enabled: !!userEmail && !isIncome,
-    staleTime: 3 * 60 * 1000,
-  });
+  const { data: cards = [] } = useCards();
+  const { data: accounts = [] } = useAccounts();
+  const { data: budgets = [] } = useBudgets({ enabled: canViewBudgets });
+  const { data: categories = [] } = useCategories(); // the first load seeds the default categories
+  const { data: plans = [] } = usePlans({ enabled: !isIncome });
 
   const kindCategories = useMemo(
     () => categories.filter((c) => c.type === kind || c.type === 'Both' || !c.type),

@@ -1,7 +1,7 @@
 import { formatDistanceToNowStrict } from 'date-fns';
 import { enUS, he, ru } from 'date-fns/locale';
 
-export { AREAS, ASSIGNABLE_ROLES, MAX_MEMBERS, buildPermissions, canAssignRole, canManageMember, detectPreset, isManagerRole, isValidEmail, levelOf, presetFor, withLevel } from '../../../shared/workspaceAccess.js';
+export { AREAS, ASSIGNABLE_ROLES, MAX_MEMBERS, buildPermissions, canAssignRole, canManageMember, detectPreset, isManagerRole, isValidEmail, levelOf, presetFor, withLevel } from '@shared/workspaceAccess';
 
 const LOCALES = { en: enUS, he, ru };
 

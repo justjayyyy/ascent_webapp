@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
 import BlurValue from '../BlurValue';
 import { moneyIn, formatDay, countdown } from '../plans/PlanParts';
-import { balanceByMonth, monthsBetween } from '../../../shared/commitments.js';
+import { balanceByMonth, monthsBetween } from '@shared/commitments';
 import { commitmentEmoji, durationText, monthYear } from './commitmentUtils';
 
 const EASE = [0.22, 1, 0.36, 1];

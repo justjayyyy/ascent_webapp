@@ -1,12 +1,11 @@
 import { useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ascent } from '@/api/client';
+import { useBudgets, useCommitments, usePlans, useSettlements } from '@/hooks/useWorkspaceData';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
-import { monthForecast, baselineDaily } from '../../../shared/forecast.js';
-import { detectSubscriptions } from '../../../shared/subscriptions.js';
-import { householdBalances } from '../../../shared/balances.js';
-import { duesBetween } from '../../../shared/commitments.js';
+import { monthForecast, baselineDaily } from '@shared/forecast';
+import { detectSubscriptions } from '@shared/subscriptions';
+import { householdBalances } from '@shared/balances';
+import { duesBetween } from '@shared/commitments';
 
 const pad = (n) => String(n).padStart(2, '0');
 export const localDay = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -33,36 +32,13 @@ export function useMoneyFormat() {
  * `rows` carry `_amount` (the viewer's currency); `convert(amount, from)` handles budgets and plans.
  */
 export function useInsights({ rows, selectedMonth, convert }) {
-  const { user } = useTheme();
   const { hasPermission } = useAuth();
-  const userId = user?.id || user?._id;
-  const enabled = !!user?.email;
   const canBudgets = hasPermission('viewBudgets');
 
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['budgets', userId],
-    queryFn: () => ascent.entities.Budget.list('-created_date'),
-    enabled: enabled && canBudgets,
-    staleTime: 3 * 60 * 1000,
-  });
-  const { data: plans = [] } = useQuery({
-    queryKey: ['plans', userId],
-    queryFn: () => ascent.entities.Plan.list('startDate'),
-    enabled,
-    staleTime: 3 * 60 * 1000,
-  });
-  const { data: commitments = [] } = useQuery({
-    queryKey: ['commitments', userId],
-    queryFn: () => ascent.entities.Commitment.list('-created_date'),
-    enabled,
-    staleTime: 3 * 60 * 1000,
-  });
-  const { data: settlements = [] } = useQuery({
-    queryKey: ['settlements', userId],
-    queryFn: () => ascent.entities.Settlement.list('-date'),
-    enabled,
-    staleTime: 60 * 1000,
-  });
+  const { data: budgets = [] } = useBudgets({ enabled: canBudgets });
+  const { data: plans = [] } = usePlans();
+  const { data: commitments = [] } = useCommitments();
+  const { data: settlements = [] } = useSettlements();
 
   const today = localDay();
   const month = monthOf(selectedMonth);

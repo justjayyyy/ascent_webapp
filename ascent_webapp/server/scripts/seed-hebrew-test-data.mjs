@@ -34,7 +34,7 @@ async function seedHebrewTestData() {
   // Create user with Hebrew language preference
   console.log('👤 Creating Hebrew test user...');
   const hashedPassword = await bcrypt.hash(TEST_USER.password, 10);
-  const userResult = await db.collection('users').insertOne({
+  await db.collection('users').insertOne({
     email: TEST_USER.email,
     password: hashedPassword,
     full_name: TEST_USER.full_name,

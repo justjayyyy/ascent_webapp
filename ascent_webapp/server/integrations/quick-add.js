@@ -110,6 +110,7 @@ async function addFromShortcut(req, res, token) {
     amount: money.amount,
     currency,
     amountInGlobalCurrency: sameCurrency ? money.amount : null,
+    globalCurrency: sameCurrency ? currency : null,
     exchangeRate: sameCurrency ? 1 : null,
     category,
     description: merchant || 'Apple Pay',

@@ -1,118 +1,64 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useTheme } from '@/components/ThemeProvider';
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
+/**
+ * Catches a crash in the page below it and offers a way out. `resetKey` (the page name) clears the
+ * error when the person moves to another page, so one broken screen does not take over the app.
+ */
+class Boundary extends React.Component {
+  state = { error: null, componentStack: null };
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return { error };
   }
 
-  componentDidCatch(error, errorInfo) {
-    this.setState({ errorInfo });
-    // Log error to console in development
-    console.error('ErrorBoundary caught:', error, errorInfo);
+  componentDidCatch(error, info) {
+    this.setState({ componentStack: info?.componentStack || null });
+    console.error('[ErrorBoundary]', error, info?.componentStack);
   }
 
-  handleReload = () => {
-    window.location.reload();
-  };
-
-  handleGoHome = () => {
-    window.location.href = '/';
-  };
-
-  handleRetry = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-  };
+  componentDidUpdate(prev) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null, componentStack: null });
+  }
 
   render() {
-    if (this.state.hasError) {
-      const { fallback } = this.props;
-      
-      if (fallback) {
-        return fallback;
-      }
-
-      return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))]">
-          <Card className="max-w-lg w-full bg-card border-primary/30">
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-danger/20 flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-danger" />
-              </div>
-              <CardTitle className="text-muted-foreground text-xl">
-                Something went wrong
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-primary">
-                We encountered an unexpected error. Please try again or return to the home page.
-              </p>
-              
-              {process.env.NODE_ENV === 'development' && this.state.error && (
-                <details className="text-start bg-background rounded-lg p-3 text-sm">
-                  <summary className="text-danger cursor-pointer mb-2">
-                    Error Details
-                  </summary>
-                  <pre className="text-muted-foreground whitespace-pre-wrap overflow-auto max-h-40">
-                    {this.state.error.toString()}
-                    {this.state.errorInfo?.componentStack}
-                  </pre>
-                </details>
-              )}
-              
-              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <Button
-                  onClick={this.handleRetry}
-                  className="bg-primary hover:bg-primary/80 text-primary-foreground"
-                >
-                  <RefreshCw className="w-4 h-4 me-2" />
-                  Try Again
-                </Button>
-                <Button
-                  onClick={this.handleGoHome}
-                  variant="outline"
-                  className="border-primary text-muted-foreground hover:bg-primary/20"
-                >
-                  <Home className="w-4 h-4 me-2" />
-                  Go Home
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+    const { error, componentStack } = this.state;
+    if (!error) return this.props.children;
+    if (this.props.fallback) return this.props.fallback;
+    const { t } = this.props;
+    return (
+      <div role="alert" className="flex min-h-[60vh] items-center justify-center p-4">
+        <div className="w-full max-w-lg space-y-4 rounded-2xl border border-border bg-card p-6 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-danger/20">
+            <AlertTriangle className="h-8 w-8 text-danger" aria-hidden="true" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground">{t('errTitle')}</h2>
+          <p className="text-muted-foreground">{t('errBody')}</p>
+          {import.meta.env.DEV && (
+            <details className="rounded-lg bg-background p-3 text-start text-sm">
+              <summary className="mb-2 cursor-pointer text-danger">{String(error)}</summary>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-muted-foreground">{componentStack}</pre>
+            </details>
+          )}
+          <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
+            <Button onClick={() => this.setState({ error: null, componentStack: null })}>
+              <RefreshCw className="me-2 h-4 w-4" aria-hidden="true" />
+              {t('errRetry')}
+            </Button>
+            <Button variant="outline" onClick={() => { window.location.href = '/'; }}>
+              <Home className="me-2 h-4 w-4" aria-hidden="true" />
+              {t('errHome')}
+            </Button>
+          </div>
         </div>
-      );
-    }
-
-    return this.props.children;
+      </div>
+    );
   }
 }
 
-// Inline error display for smaller sections
-export function InlineError({ message, onRetry }) {
-  return (
-    <div className="flex flex-col items-center justify-center p-8 text-center">
-      <AlertTriangle className="w-12 h-12 text-danger mb-4" />
-      <p className="text-muted-foreground mb-4">{message || 'Failed to load data'}</p>
-      {onRetry && (
-        <Button
-          onClick={onRetry}
-          size="sm"
-          className="bg-primary hover:bg-primary/80"
-        >
-          <RefreshCw className="w-4 h-4 me-2" />
-          Retry
-        </Button>
-      )}
-    </div>
-  );
+export default function ErrorBoundary(props) {
+  const { t } = useTheme();
+  return <Boundary t={t} {...props} />;
 }
-
-export default ErrorBoundary;
-

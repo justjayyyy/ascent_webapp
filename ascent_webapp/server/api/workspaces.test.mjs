@@ -39,7 +39,7 @@ const chain = (v) => { const c = { select: () => c, sort: () => c, lean: async (
 
 mock.module(at('../middleware/auth.js'), {
   exports: {
-    authMiddleware: async (req) => {
+    authMiddleware: async () => {
       if (!currentUser) return null;
       return currentUser;
     },

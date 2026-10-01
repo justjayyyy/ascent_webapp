@@ -6,11 +6,12 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 
 export const PERSIST_KEY = 'ascent:rq-cache';
 // Bump when the shape of cached data changes, so an old cache is thrown away rather than misread
-export const PERSIST_BUSTER = 'v1';
+// v2: lists are keyed by workspace instead of by user
+export const PERSIST_BUSTER = 'v2';
 export const PERSIST_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 // Money data, lists and settings the pages open with; nothing that is cheap or per-moment
-const KEEP = new Set(['transactions', 'categories', 'budgets', 'cards', 'accounts', 'plans', 'commitments', 'assist-status', 'settlements', 'workspace-members']);
+const KEEP = new Set(['transactions', 'categories', 'budgets', 'cards', 'accounts', 'plans', 'commitments', 'assist-status', 'settlements', 'exchange-rates']);
 
 export const persister = createAsyncStoragePersister({
   storage: {

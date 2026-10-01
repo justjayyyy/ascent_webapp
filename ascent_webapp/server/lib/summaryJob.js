@@ -40,7 +40,7 @@ export async function runSummaryJob(kind, { now = new Date(), send = sendEmail }
       if (!workspace) { result.skipped += 1; continue; }
 
       const rows = await ExpenseTransaction.find({ workspaceId: workspace._id, date: { $gte: period.from, $lte: `${period.to}￿` } })
-        .select('type amount currency amountInGlobalCurrency category date status')
+        .select('type amount currency amountInGlobalCurrency globalCurrency category date status')
         .lean();
       const summary = periodSummary(rows, { ...period, currency: user.currency || 'USD' });
       if (summary.count === 0) { result.skipped += 1; continue; }

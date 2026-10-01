@@ -5,7 +5,8 @@ import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useExchangeRates } from '@/hooks/useWorkspaceData';
+import { amountInCurrency } from '@shared/money';
 import { useHousehold } from '@/hooks/useHousehold';
 import BlurValue from '../BlurValue';
 
@@ -71,17 +72,13 @@ function ActionRow({ icon: Icon, label, onClick, tone }) {
 function TransactionList({ transactions, cards = [], categories = [], plans = {}, onEdit, onDelete, onDuplicate, onConfirm, canEdit = true, emptyTitle }) {
   const { t, language, user } = useTheme();
   const { byEmail, isShared } = useHousehold();
-  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
+  const { rates } = useExchangeRates();
   const loc = localeOf(language);
   const dayLabel = useDayLabel(language, t);
   const [visible, setVisible] = useState(PAGE);
   const [active, setActive] = useState(null);
   const sentinel = useRef(null);
-
-  useEffect(() => {
-    if (userCurrency) fetchExchangeRates('USD');
-  }, [userCurrency, fetchExchangeRates]);
 
   const iconByCategory = useMemo(() => {
     const map = {};
@@ -93,12 +90,11 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
     style: 'currency', currency: currency || userCurrency, minimumFractionDigits: 0, maximumFractionDigits: decimals,
   }).format(value || 0), [loc, userCurrency]);
 
-  const converted = useCallback((tx) => {
-    if (tx.currency === userCurrency) return null;
-    if (tx.amountInGlobalCurrency !== null && tx.amountInGlobalCurrency !== undefined) return tx.amountInGlobalCurrency;
-    if (rates && Object.keys(rates).length > 0) return convertCurrency(tx.amount, tx.currency || 'USD', userCurrency, rates);
-    return null;
-  }, [userCurrency, rates, convertCurrency]);
+  // The value in the person's own currency, shown under amounts recorded in another one
+  const converted = useCallback(
+    (tx) => (!tx.currency || tx.currency === userCurrency ? null : amountInCurrency(tx, userCurrency, rates)),
+    [userCurrency, rates]
+  );
 
   const cardText = useCallback((tx) => {
     if (tx.paymentMethod === 'Card' && tx.cardId) {

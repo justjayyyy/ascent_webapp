@@ -20,15 +20,6 @@ export function useWorkspaceSync() {
   const workspaceId = currentWorkspace?.id || currentWorkspace?._id;
   const isShared = (currentWorkspace?.members || []).filter((m) => m.status === 'accepted').length > 1;
 
-  // Cached lists belong to the previous workspace after a switch, or after being removed from one.
-  const lastWorkspaceId = useRef(workspaceId);
-  useEffect(() => {
-    if (workspaceId && lastWorkspaceId.current && lastWorkspaceId.current !== workspaceId) {
-      queryClient.invalidateQueries();
-    }
-    if (workspaceId) lastWorkspaceId.current = workspaceId;
-  }, [workspaceId, queryClient]);
-
   useEffect(() => {
     if (!signedIn || !workspaceId) return undefined;
     const visible = () => document.visibilityState === 'visible';

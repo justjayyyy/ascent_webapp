@@ -1,5 +1,5 @@
 import React from 'react';
-import { MotionConfig } from 'framer-motion';
+import { MotionConfig } from 'motion/react';
 import { useAuthFlow } from '@/components/auth/useAuthFlow';
 import { GoogleHost } from '@/components/auth/AuthParts';
 import SummitLogin from '@/components/auth/SummitLogin';

@@ -3,6 +3,7 @@
 import { getEmailTemplate } from './email-templates.js';
 import { categoryTranslations } from './categoryTranslations.js';
 import { escapeHtml } from '../../shared/workspaceAccess.js';
+import { amountInCurrency } from '../../shared/money.js';
 
 const COPY = {
   en: {
@@ -46,10 +47,7 @@ export function periodFor(kind, now = new Date()) {
 }
 
 /** A transaction's amount in `currency`, or null when it was recorded in another one with no conversion. */
-export function amountIn(tx, currency) {
-  if (!tx.currency || tx.currency === currency) return Number(tx.amount) || 0;
-  return typeof tx.amountInGlobalCurrency === 'number' ? tx.amountInGlobalCurrency : null;
-}
+export const amountIn = (tx, currency) => amountInCurrency(tx, currency, null);
 
 /**
  * Totals for confirmed transactions dated within [from, to] (inclusive, 'YYYY-MM-DD').

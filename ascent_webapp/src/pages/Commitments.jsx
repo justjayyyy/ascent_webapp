@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { ChevronDown, CreditCard, HandCoins, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,7 +11,8 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useTheme } from '@/components/ThemeProvider';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
+import { useAccounts, useCategories, useCommitments, workspaceKey } from '@/hooks/useWorkspaceData';
 import { cn } from '@/lib/utils';
 import { createPageUrl } from '@/utils';
 import BlurValue from '@/components/BlurValue';
@@ -28,7 +29,7 @@ import PaymentDialog from '@/components/commitments/PaymentDialog';
 import CommitmentDetail from '@/components/commitments/CommitmentDetail';
 import { CommitmentCard, DebtHero, PayoffChart, ThisMonth } from '@/components/commitments/CommitmentParts';
 import { COMMITMENT_KINDS, kindOf, useToUserCurrency } from '@/components/commitments/commitmentUtils';
-import { commitmentStatus, commitmentsSummary, duesBetween } from '../../shared/commitments.js';
+import { commitmentStatus, commitmentsSummary, duesBetween } from '@shared/commitments';
 
 const tile = 'relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 backdrop-blur-xl shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-12px_hsl(0_0%_0%/0.5)]';
 
@@ -41,7 +42,6 @@ function Commitments() {
   const openId = params.get('id');
   const loc = localeOf(language);
   const blur = !!user?.blurValues;
-  const userId = user?.id || user?._id;
   const userCurrency = user?.currency || 'ILS';
   const toUser = useToUserCurrency(userCurrency);
   const tokens = useChartTokens();
@@ -56,26 +56,12 @@ function Commitments() {
   const [saving, setSaving] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
 
-  const key = useMemo(() => ['commitments', userId], [userId]);
-  const { data: commitments = [], isLoading } = useQuery({
-    queryKey: key,
-    queryFn: () => ascent.entities.Commitment.list('-created_date'),
-    enabled: !!userId,
-    staleTime: 60 * 1000,
-  });
+  const workspaceId = useWorkspaceId();
+  const key = useMemo(() => workspaceKey('commitments', workspaceId), [workspaceId]);
+  const { data: commitments = [], isLoading } = useCommitments();
   const { data: transactions = [] } = useTransactions();
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories', userId],
-    queryFn: () => ascent.entities.Category.list('-created_date'),
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-  });
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', userId],
-    queryFn: () => ascent.entities.Account.list(),
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: categories = [] } = useCategories();
+  const { data: accounts = [] } = useAccounts();
 
   const rows = useMemo(() => commitments.map((c) => ({ c, s: commitmentStatus(c, today) })), [commitments, today]);
   const summary = useMemo(() => commitmentsSummary(commitments, today, toUser), [commitments, today, toUser]);
@@ -221,6 +207,7 @@ function Commitments() {
         amount: payment.amount,
         currency: c.currency || userCurrency,
         amountInGlobalCurrency: (c.currency || userCurrency) === userCurrency ? payment.amount : null,
+        globalCurrency: (c.currency || userCurrency) === userCurrency ? userCurrency : null,
         date: payment.date,
         commitmentId: c.id,
         commitmentPaymentId: payment.id,

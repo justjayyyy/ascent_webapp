@@ -6,11 +6,11 @@ import { ascent } from '@/api/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
+import { rememberWorkspace } from '@/lib/session';
 import { translations } from '@/lib/translations';
 import { fmt, roleLabel } from '@/components/workspace/utils';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const API = import.meta.env.VITE_API_URL || '';
 
 const pickLanguage = (userLanguage) => {
   if (translations[userLanguage]) return userLanguage;
@@ -34,10 +34,8 @@ export default function AcceptInvitation() {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch(`${API}/api/invitations/${token}`);
-        const result = await response.json();
-        const data = result.data || result;
-        if (!response.ok || !(data?.invitedEmail || data?.kind === 'link')) throw new Error(result.error || result.message);
+        const data = await ascent.workspaces.invitation(token);
+        if (!(data?.invitedEmail || data?.kind === 'link')) throw new Error('not_an_invitation');
         if (!cancelled) setInvitation(data);
       } catch {
         if (!cancelled) setFailed(true);
@@ -56,24 +54,15 @@ export default function AcceptInvitation() {
     if (!response.credential) return;
     setBusy(true);
     try {
-      const loginResponse = await fetch(`${API}/api/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response.credential, clientId: GOOGLE_CLIENT_ID }),
-      });
-      const json = await loginResponse.json();
-      if (!loginResponse.ok) throw new Error(json.message || 'Login failed');
-      const data = json.data || json;
-      if (!data.token) throw new Error('No token received from server');
-      localStorage.setItem('ascent_access_token', data.token);
-      localStorage.removeItem('ascent_current_workspace_id');
+      await ascent.auth.googleLogin(response.credential);
+      rememberWorkspace(null);
       // Signing in alone only creates her own workspace: actually join the one she was invited to.
       try {
         await ascent.workspaces.acceptInvitation(token);
       } catch (acceptError) {
         if (acceptError?.status !== 409) throw acceptError; // already a member: just open it
       }
-      localStorage.setItem('ascent_current_workspace_id', invitation.workspaceId);
+      rememberWorkspace(invitation.workspaceId);
       toast.success(fmt(t('wsJoined'), { workspace: invitation.workspaceName }));
       setTimeout(() => { window.location.href = '/'; }, 100);
     } catch (error) {
@@ -109,7 +98,7 @@ export default function AcceptInvitation() {
     try {
       if (accept) {
         await ascent.workspaces.acceptInvitation(token);
-        localStorage.setItem('ascent_current_workspace_id', invitation.workspaceId);
+        rememberWorkspace(invitation.workspaceId);
         toast.success(fmt(t('wsJoined'), { workspace: invitation.workspaceName }));
         await refreshWorkspaces();
         window.location.href = '/';

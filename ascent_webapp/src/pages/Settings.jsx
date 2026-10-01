@@ -363,7 +363,7 @@ export default function Settings() {
           )}
 
           {/* Cards */}
-          {show.cards && <CardManagement user={user} index={order++} />}
+          {show.cards && <CardManagement index={order++} />}
 
           {/* Apple Pay */}
           {show.applepay && <ApplePaySection index={order++} />}

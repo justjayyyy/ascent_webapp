@@ -1,135 +1,72 @@
-import './App.css'
-import React, { Suspense } from 'react';
-import { Toaster } from "@/components/ui/toaster"
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { queryClientInstance } from '@/lib/query-client'
-import { persistOptions } from '@/lib/offline/persist'
-import AppSplash from '@/components/AppSplash'
-import EntryTransition from '@/components/EntryTransition'
-import NavigationTracker from '@/lib/NavigationTracker'
-import { pagesConfig } from './pages.config'
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { Toaster as SonnerToaster } from 'sonner';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
+import { queryClientInstance } from '@/lib/query-client';
+import { persistOptions } from '@/lib/offline/persist';
+import AppSplash from '@/components/AppSplash';
+import EntryTransition from '@/components/EntryTransition';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { SkeletonPage } from '@/components/ui/skeleton-card';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import { pagesConfig } from './pages.config';
+import PageNotFound from './lib/PageNotFound';
+import { firstAllowedPage, PAGE_PERMISSIONS } from './lib/pageAccess';
+
 const Login = React.lazy(() => import('./pages/Login'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
 const AcceptInvitation = React.lazy(() => import('./pages/AcceptInvitation'));
-import { Toaster as SonnerToaster } from 'sonner';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import { SkeletonPage } from '@/components/ui/skeleton-card';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const { Pages, Layout, mainPage } = pagesConfig;
-const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : () => <></>;
 
-const LayoutWrapper = React.memo(({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>
-    <ErrorBoundary>
-      <Suspense fallback={<SkeletonPage />}>
-        {children}
-      </Suspense>
+const PageFrame = ({ name, children }) => (
+  <Layout currentPageName={name}>
+    <ErrorBoundary resetKey={name}>
+      <Suspense fallback={<SkeletonPage />}>{children}</Suspense>
     </ErrorBoundary>
   </Layout>
-  : <ErrorBoundary><Suspense fallback={<SkeletonPage />}>{children}</Suspense></ErrorBoundary>);
+);
 
-const PermissionGuard = ({ pageName, children }) => {
-  const { hasPermission, permissions } = useAuth();
+function PermissionGuard({ pageName, children }) {
+  const { hasPermission } = useAuth();
+  const { t } = useTheme();
+  const needed = PAGE_PERMISSIONS[pageName];
+  if (!needed || hasPermission(needed)) return children;
+  const fallback = firstAllowedPage(hasPermission);
+  if (!fallback) return <div className="p-8 text-center text-foreground">{t('noAccessAnyPage')}</div>;
+  return <Navigate to={`/${fallback}`} replace />;
+}
 
-  const navigate = React.useMemo(() => {
-    // Determine the first available page for the user
-    if (!permissions) return 'Dashboard'; // Owner goes to Dashboard
+// A full page load to /login, so the sign-in page starts clean, with this address to come back to
+function GoToLogin() {
+  const { navigateToLogin } = useAuth();
+  useEffect(() => { navigateToLogin(); }, [navigateToLogin]);
+  return <AppSplash />;
+}
 
-    if (permissions.viewExpenses) return 'Dashboard';
-    if (permissions.viewNotes) return 'Notes';
-    if (permissions.viewSettings) return 'Settings';
-
-    return null; // No access
-  }, [permissions]);
-
-  const permissionMap = {
-    'Expenses': 'viewExpenses',
-    'Income': 'viewExpenses',
-    'Plans': 'viewExpenses',
-    'Commitments': 'viewExpenses',
-    // Notes is open to every member; the server only returns notes they can access
-    // 'Settings': 'viewSettings', // Exposed to all authenticated users, internally gated
-    // Dashboard currently only shows expense data, so it follows the expenses permission
-    'Dashboard': 'viewExpenses',
-  };
-
-  const requiredPermission = permissionMap[pageName];
-
-  // If no specific permission required or user has permission, render content
-  if (!requiredPermission || hasPermission(requiredPermission)) {
-    return children;
-  }
-
-  if (!navigate) {
-    return <div className="p-8 text-center text-foreground">You do not have access to any pages. Please contact your workspace owner.</div>;
-  }
-
-  // Redirect to the first available page
-  return <Navigate to={`/${navigate}`} replace />;
-};
-
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
-
+function AuthenticatedApp() {
+  const { isLoadingAuth, isAuthenticated } = useAuth();
   // First sign-in check on a device with no saved session (a saved one opens the app at once)
-  if (isLoadingPublicSettings || isLoadingAuth) {
-    return <AppSplash />;
-  }
+  if (isLoadingAuth) return <AppSplash />;
+  if (!isAuthenticated) return <GoToLogin />;
 
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required' && !isAuthenticated) {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
-  }
-
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
-    navigateToLogin();
-    return null;
-  }
-
-  // Render the main app
+  const page = (name, Page) => (
+    <PermissionGuard pageName={name}>
+      <PageFrame name={name}><Page /></PageFrame>
+    </PermissionGuard>
+  );
   return (
     <Routes>
-      <Route path="/" element={
-        <PermissionGuard pageName={mainPageKey}>
-          <LayoutWrapper currentPageName={mainPageKey}>
-            <MainPage />
-          </LayoutWrapper>
-        </PermissionGuard>
-      } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <PermissionGuard pageName={path}>
-              <LayoutWrapper currentPageName={path}>
-                <Page />
-              </LayoutWrapper>
-            </PermissionGuard>
-          }
-        />
-      ))}
+      <Route path="/" element={page(mainPage, Pages[mainPage])} />
+      {Object.entries(Pages).map(([name, Page]) => <Route key={name} path={`/${name}`} element={page(name, Page)} />)}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
-};
-
+}
 
 // Sonner needs the app's theme (it defaults to light, which clashes with dark mode)
 function AppSonnerToaster() {
@@ -145,8 +82,9 @@ function AppSonnerToaster() {
   );
 }
 
-function App() {
+const lazyPage = (Page, fallback = <SkeletonPage />) => <Suspense fallback={fallback}><Page /></Suspense>;
 
+export default function App() {
   return (
     <AuthProvider>
       <PersistQueryClientProvider
@@ -158,35 +96,13 @@ function App() {
         <ThemeProvider>
           <Router>
             <Routes>
-              <Route path="/login" element={
-                <Suspense fallback={<AppSplash />}>
-                  <Login />
-                </Suspense>
-              } />
-              <Route path="/privacy-policy" element={
-                <Suspense fallback={<SkeletonPage />}>
-                  <PrivacyPolicy />
-                </Suspense>
-              } />
-              <Route path="/terms-of-service" element={
-                <Suspense fallback={<SkeletonPage />}>
-                  <TermsOfService />
-                </Suspense>
-              } />
-              <Route path="/accept-invitation/:token" element={
-                <Suspense fallback={<SkeletonPage />}>
-                  <AcceptInvitation />
-                </Suspense>
-              } />
-              <Route path="/*" element={
-                <>
-                  <NavigationTracker />
-                  <AuthenticatedApp />
-                </>
-              } />
+              <Route path="/login" element={lazyPage(Login, <AppSplash />)} />
+              <Route path="/privacy-policy" element={lazyPage(PrivacyPolicy)} />
+              <Route path="/terms-of-service" element={lazyPage(TermsOfService)} />
+              <Route path="/accept-invitation/:token" element={lazyPage(AcceptInvitation)} />
+              <Route path="/*" element={<AuthenticatedApp />} />
             </Routes>
           </Router>
-          <Toaster />
           <AppSonnerToaster />
           <EntryTransition />
           <Analytics />
@@ -194,7 +110,5 @@ function App() {
         </ThemeProvider>
       </PersistQueryClientProvider>
     </AuthProvider>
-  )
+  );
 }
-
-export default App

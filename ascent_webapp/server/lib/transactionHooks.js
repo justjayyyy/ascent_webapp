@@ -5,6 +5,7 @@
 // Bulk inserts (recurring runs, statement imports) fire neither, on purpose. Nothing here throws.
 import { learnRule, ruleKeyFor } from './merchantRules.js';
 import { notifyUser } from './push.js';
+import { amountInCurrency } from '../../shared/money.js';
 
 const COPY = {
   en: { spent: '{name} spent {amount}', someone: 'Someone' },
@@ -30,8 +31,8 @@ export function largeExpensePush(tx, payerName, language = 'en') {
 
 /** The amount in the alert's currency, or null when it cannot be compared without a rate. */
 export function amountIn(tx, currency) {
-  if (!currency || tx.currency === currency) return tx.amount;
-  return typeof tx.amountInGlobalCurrency === 'number' ? tx.amountInGlobalCurrency : null;
+  if (!currency) return tx.amount;
+  return amountInCurrency(tx, currency, null);
 }
 
 /** Who should hear about a member's expense: accepted members who may see expenses, except the payer. */

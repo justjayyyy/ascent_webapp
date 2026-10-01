@@ -152,7 +152,7 @@ export function useAuthFlow() {
     setGoogleLoading(true);
     enteringRef.current = true;
     try {
-      const signedIn = await loginWithGoogle(response.credential, GOOGLE_CLIENT_ID);
+      const signedIn = await loginWithGoogle(response.credential);
       offerBiometrics();
       enter(signedIn);
     } catch (error) {

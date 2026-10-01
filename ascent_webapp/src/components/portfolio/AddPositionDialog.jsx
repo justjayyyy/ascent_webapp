@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
 
-export default function AddPositionDialog({ open, onClose, onSubmit, onSubmitDayTrade, isLoading, accountCurrency, editPosition = null, editDayTrade = null, cashBalance = null, hasCashPosition = false }) {
+export default function AddPositionDialog({ open, onClose, onSubmit, isLoading, accountCurrency, editPosition = null, cashBalance = null, hasCashPosition = false }) {
   const { colors, t, user } = useTheme();
   const [deductFromCash, setDeductFromCash] = useState(true);
 

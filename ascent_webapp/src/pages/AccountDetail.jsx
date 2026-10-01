@@ -24,7 +24,7 @@ import { useAuth } from '@/lib/AuthContext';
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--primary))', 'hsl(var(--destructive))'];
 
 export default function AccountDetail() {
-  const { colors, theme, t, user: themeUser } = useTheme();
+  const { colors, t, user: themeUser } = useTheme();
   const { hasPermission } = useAuth();
   const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = themeUser?.currency || 'ILS';
@@ -32,7 +32,7 @@ export default function AccountDetail() {
   const [accountId, setAccountId] = useState(null);
   const [addPositionOpen, setAddPositionOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState(null);
-  const [addDayTradeOpen, setAddDayTradeOpen] = useState(false);
+  const [, setAddDayTradeOpen] = useState(false);
   const [editingDayTrade, setEditingDayTrade] = useState(null);
   const [refreshingPrices, setRefreshingPrices] = useState(false);
   const [editAccountOpen, setEditAccountOpen] = useState(false);
@@ -570,10 +570,9 @@ export default function AccountDetail() {
     // Aggregate positions by symbol - include Cash positions grouped by currency
     const aggregated = {};
 
-    accountPositions.forEach((position, index) => {
+    accountPositions.forEach((position) => {
       // Handle positions with missing symbols
       let symbol = position.symbol;
-      const originalSymbol = symbol;
 
       // Handle Cash positions - group by currency
       if (position.assetType === 'Cash') {
@@ -1263,7 +1262,7 @@ export default function AccountDetail() {
                             // Access data from entry - Recharts passes both data and positioning
                             const name = entry.name || entry.dataKey || 'Unknown';
                             const percentage = entry.percentage || entry.rawPercentage || 0;
-                            const { x, y, cx, cy } = entry;
+                            const { x, y, cx } = entry;
 
                             // Only render if we have valid coordinates
                             if (!x || !y || isNaN(x) || isNaN(y)) return null;

@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { ChevronDown, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,9 +12,9 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useTheme } from '@/components/ThemeProvider';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useAccounts, useCategories, useMoney, usePlans, workspaceKey } from '@/hooks/useWorkspaceData';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
 import { useTransactions } from '@/lib/offline/txOutbox';
@@ -34,9 +34,8 @@ function Plans() {
   const openId = params.get('plan');
   const loc = localeOf(language);
   const blur = !!user?.blurValues;
-  const userId = user?.id || user?._id;
   const userCurrency = user?.currency || 'ILS';
-  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
+  const { amountIn } = useMoney(userCurrency);
   const { save, saving: savingTx } = useSaveTransaction();
 
   const [planDialog, setPlanDialog] = useState(null); // { plan?, kind? }
@@ -46,29 +45,13 @@ function Plans() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [showPast, setShowPast] = useState(false);
 
-  useEffect(() => { fetchExchangeRates('USD'); }, [fetchExchangeRates]);
-
-  const plansKey = useMemo(() => ['plans', userId], [userId]);
-  const { data: plans = [], isLoading } = useQuery({
-    queryKey: plansKey,
-    queryFn: () => ascent.entities.Plan.list('startDate'),
-    enabled: !!userId,
-    staleTime: 60 * 1000,
-  });
+  const workspaceId = useWorkspaceId();
+  const plansKey = useMemo(() => workspaceKey('plans', workspaceId), [workspaceId]);
+  const { data: plans = [], isLoading } = usePlans();
   // Same cache as the Expenses page, with changes still waiting on this device drawn in
   const { data: transactions = [] } = useTransactions();
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories', userId],
-    queryFn: () => ascent.entities.Category.list('-created_date'),
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-  });
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', userId],
-    queryFn: () => ascent.entities.Account.list(),
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: categories = [] } = useCategories();
+  const { data: accounts = [] } = useAccounts();
 
   const linkedByPlan = useMemo(() => {
     const map = {};
@@ -78,12 +61,8 @@ function Plans() {
     return map;
   }, [transactions]);
 
-  const toPlanCurrency = useCallback((currency) => (tx) => {
-    if (!tx.currency || tx.currency === currency) return tx.amount || 0;
-    if (currency === userCurrency && tx.amountInGlobalCurrency != null) return tx.amountInGlobalCurrency;
-    if (rates && Object.keys(rates).length) return convertCurrency(tx.amount, tx.currency, currency, rates);
-    return tx.amount || 0;
-  }, [userCurrency, rates, convertCurrency]);
+  // Spending counts in the plan's own currency (as recorded until a rate is available)
+  const toPlanCurrency = useCallback((currency) => (tx) => amountIn(tx, currency) ?? (tx.amount || 0), [amountIn]);
 
   const totalsById = useMemo(() => Object.fromEntries(plans.map((p) => [
     p.id, planTotals(p, linkedByPlan[p.id] || [], toPlanCurrency(p.currency)),

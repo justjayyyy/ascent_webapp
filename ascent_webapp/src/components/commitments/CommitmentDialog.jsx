@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { translateCategory } from '@/lib/translations';
 import { useTheme } from '../ThemeProvider';
 import { localeOf, moneyIn } from '../plans/PlanParts';
-import { buildSchedule, paymentOf } from '../../../shared/commitments.js';
+import { buildSchedule, paymentOf } from '@shared/commitments';
 import { COMMITMENT_KINDS, LENT_KINDS, kindOf, durationText, monthYear } from './commitmentUtils';
 
 const CURRENCIES = ['ILS', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];

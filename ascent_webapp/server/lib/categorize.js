@@ -99,6 +99,7 @@ const norm = (s) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+// eslint-disable-next-line no-control-regex -- an ASCII range check
 const isLatin = (s) => /^[\x00-\x7f]+$/.test(s);
 
 function hasKeyword(text, keyword) {

@@ -10,22 +10,16 @@ export function useSessionTimeout(isAuthenticated, t = (key) => key) {
   const warningTimeoutRef = useRef(null);
   const warningShownRef = useRef(false);
 
-  const logout = useCallback(async () => {
-    try {
-      await ascent.auth.logout();
-      toast.info(t('sessionExpired') || 'Session expired. Please log in again.');
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Force redirect to login even if logout fails
-      localStorage.removeItem('authToken');
-      window.location.href = '/Login';
-    }
+  // auth.logout never throws: it forgets this device's session and data and goes to /login
+  const logout = useCallback(() => {
+    toast.info(t('sessionExpired'));
+    ascent.auth.logout();
   }, [t]);
 
   const showWarning = useCallback(() => {
     if (!warningShownRef.current) {
       warningShownRef.current = true;
-      toast.warning(t('sessionExpiringSoon') || 'Your session will expire in 1 minute due to inactivity.', {
+      toast.warning(t('sessionExpiringSoon'), {
         duration: 10000, // Show for 10 seconds
       });
     }

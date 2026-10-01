@@ -1,336 +1,178 @@
-// Ascent API Client - Replaces base44 client
+import { TOKEN_KEY, WORKSPACE_KEY, SESSION_CACHE_KEY } from '@/lib/storageKeys';
+
+// The Ascent API client. Every call answers with the `data` of `{ success, data }`, or throws an Error
+// carrying `status` (0 = never reached the server), `data` (the error body) and `isNetworkError`.
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-const REQUEST_TIMEOUT = 30000; // 30 seconds
-const MAX_RETRIES = 2;
+const REQUEST_TIMEOUT = 30000;
+// Reads are retried on a dropped connection or server trouble; writes are not, unless the caller makes
+// them safe to repeat (offline queue rows carry dedupe keys) and asks for it.
+const READ_RETRIES = 2;
 
-// Token management
-const TOKEN_KEY = 'ascent_access_token';
 
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+const storage = {
+  get: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
+  set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable */ } },
+  remove: (key) => { try { localStorage.removeItem(key); } catch { /* storage unavailable */ } },
+};
+
+export const getToken = () => storage.get(TOKEN_KEY);
+const setToken = (token) => storage.set(TOKEN_KEY, token);
+const removeToken = () => storage.remove(TOKEN_KEY);
+
+const enc = encodeURIComponent;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function apiError(message, status, extra = {}) {
+  return Object.assign(new Error(message), { status, ...extra });
 }
 
-function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+/** Sends one request. options: { method, body, headers, timeout, retries } */
+export async function request(endpoint, options = {}) {
+  const { timeout = REQUEST_TIMEOUT, retries, method = 'GET', headers: extraHeaders, ...init } = options;
+  const maxRetries = retries ?? (method === 'GET' ? READ_RETRIES : 0);
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await send(endpoint, { ...init, method, extraHeaders, timeout });
+    } catch (err) {
+      const retryable = err.isNetworkError || err.status >= 500;
+      if (!retryable || attempt >= maxRetries) throw err;
+      await wait(1000 * (attempt + 1));
+    }
+  }
 }
 
-function removeToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
-// HTTP request helper with timeout and retry
-// options.timeout / options.retries override the defaults (offline-capable writes fail fast and queue instead)
-async function request(endpoint, allOptions = {}, retryCount = 0) {
-  const { timeout = REQUEST_TIMEOUT, retries = MAX_RETRIES, ...options } = allOptions;
+async function send(endpoint, { method, body, extraHeaders, timeout, ...init }) {
+  const headers = { Accept: 'application/json', ...(body !== undefined && { 'Content-Type': 'application/json' }), ...extraHeaders };
   const token = getToken();
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    ...options.headers
-  };
-  
-  // Ensure Content-Type is set if body exists
-  if (options.body && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const workspaceId = storage.get(WORKSPACE_KEY);
+  if (workspaceId && !headers['x-workspace-id']) headers['x-workspace-id'] = workspaceId;
 
-  const currentWorkspaceId = localStorage.getItem('ascent_current_workspace_id');
-  if (currentWorkspaceId && !headers['x-workspace-id']) {
-    headers['x-workspace-id'] = currentWorkspaceId;
-  }
-  
-  // Create abort controller for timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+  const timer = setTimeout(() => controller.abort(), timeout);
+  let response;
   try {
-    const url = `${API_URL}${endpoint}`;
-    // Only log in development
-    if (import.meta.env.DEV) {
-      console.log(`[API] Making request to: ${url}`, { method: options.method || 'GET', headers });
-    }
-    
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    // Only log in development
-    if (import.meta.env.DEV) {
-      console.log(`[API] Response status: ${response.status} ${response.statusText}`, { url, contentType: response.headers.get('content-type') });
-    }
-    
-    // Handle rate limiting
-    if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After') || 60;
-      const error = new Error('Too many requests. Please try again later.');
-      error.status = 429;
-      error.retryAfter = retryAfter;
-      throw error;
-    }
-    
-    // Check content type before parsing JSON
-    const contentType = response.headers.get('content-type');
-    let data;
-    
-    try {
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        // If not JSON, try to get text for error message
-        const text = await response.text();
-        const error = new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
-        error.status = response.status;
-        error.responseText = text;
-        throw error;
-      }
-    } catch (parseError) {
-      // If JSON parsing fails, provide helpful error
-      if (parseError.responseText) {
-        throw parseError; // Re-throw our custom error
-      }
-      const error = new Error(`Failed to parse server response: ${parseError.message}`);
-      error.status = response.status;
-      error.originalError = parseError;
-      throw error;
-    }
-    
-    // The account was signed in on another device (or the token predates single-session): drop
-    // this device's token and send the user to sign in again.
-    if (response.status === 401 && (data.code === 'SESSION_REPLACED' || data.code === 'SESSION_INVALID')) {
-      removeToken();
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        const reason = data.code === 'SESSION_REPLACED' ? 'session_replaced' : 'session_expired';
-        window.location.href = `/login?reason=${reason}`;
-      }
-    }
-
-    if (!response.ok) {
-      const error = new Error(data.error || `Request failed with status ${response.status}`);
-      error.status = response.status;
-      error.data = data;
-      throw error;
-    }
-    
-    // Ensure data.data exists
-    if (!data || typeof data !== 'object' || !('data' in data)) {
-      console.error('[API] Invalid response format:', { data, expected: 'data.data' });
-      const error = new Error('Invalid server response format');
-      error.status = response.status;
-      error.data = data;
-      throw error;
-    }
-    
-    return data.data;
+    response = await fetch(`${API_URL}${endpoint}`, { ...init, method, body, headers, signal: controller.signal });
   } catch (err) {
-    clearTimeout(timeoutId);
-    
-    // Handle timeout
-    if (err.name === 'AbortError') {
-      const error = new Error('Request timed out. Please check if the API server is running.');
-      error.status = 408;
-      error.isNetworkError = true;
-      throw error;
+    const timedOut = err?.name === 'AbortError';
+    throw apiError(timedOut ? 'The server took too long to answer.' : 'Could not reach the server.', timedOut ? 408 : 0, { isNetworkError: true });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  let data = null;
+  if ((response.headers.get('content-type') || '').includes('application/json')) {
+    data = await response.json().catch(() => null);
+  }
+
+  if (response.status === 401 && (data?.code === 'SESSION_REPLACED' || data?.code === 'SESSION_INVALID')) {
+    // Signed in on another device (or an old token): this device has to sign in again
+    removeToken();
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = `/login?reason=${data.code === 'SESSION_REPLACED' ? 'session_replaced' : 'session_expired'}`;
     }
-    
-    // Handle network errors (connection refused, etc.)
-    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('ERR_CONNECTION_REFUSED'))) {
-      const error = new Error('Cannot connect to server. Please ensure the API server is running on port 3002.');
-      error.status = 0;
-      error.isNetworkError = true;
-      throw error;
-    }
-    
-    // Retry on network errors (not on 4xx errors)
-    const isRetryable = !err.status || err.status >= 500;
-    if (isRetryable && retryCount < retries) {
-      await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
-      return request(endpoint, allOptions, retryCount + 1);
-    }
-    
-    throw err;
+  }
+
+  if (!response.ok) {
+    const message = data?.error || (response.status === 429 ? 'Too many requests. Please try again later.' : `Request failed with status ${response.status}`);
+    throw apiError(message, response.status, { data, retryAfter: data?.retryAfter });
+  }
+  if (!data || typeof data !== 'object' || !('data' in data)) {
+    throw apiError('The server sent an unexpected answer.', response.status, { data });
+  }
+  return data.data;
+}
+
+const json = (method, body, opts = {}) => ({ ...opts, method, body: JSON.stringify(body) });
+
+// Device language and theme, sent on sign-up so new accounts start in the person's own settings
+export function systemPrefs() {
+  try {
+    // A language picked on the sign-in page wins over the device's
+    const lang = (storage.get('ascent_login_lang') || navigator.language || 'en').slice(0, 2).toLowerCase();
+    return {
+      language: ['en', 'he', 'ru'].includes(lang) ? lang : 'en',
+      theme: window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark',
+    };
+  } catch {
+    return {};
   }
 }
 
-// Auth methods
+const signedIn = (result) => {
+  if (!result?.token || !result?.user) throw apiError('The server sent an unexpected answer.', 200, { data: result });
+  setToken(result.token);
+  return { user: result.user, isFirstLogin: result.isFirstLogin === true };
+};
+
+const toLogin = (redirectUrl) => {
+  window.location.href = redirectUrl ? `/login?redirect=${enc(redirectUrl)}` : '/login';
+};
+
 const auth = {
-  async login(email, password) {
-    try {
-      const result = await request('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
-      });
-      if (!result || !result.token) {
-        throw new Error('Invalid response: missing token');
-      }
-      if (!result.user) {
-        throw new Error('Invalid response: missing user data');
-      }
-      setToken(result.token);
-      // Return full result including isFirstLogin flag
-      return {
-        user: result.user,
-        isFirstLogin: result.isFirstLogin || false
-      };
-    } catch (error) {
-      console.error('[Auth] Login error:', error);
-      throw error;
-    }
-  },
-  
-  async register(email, password, full_name) {
-    const result = await request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, full_name, ...systemPrefs() })
-    });
-    setToken(result.token);
-    return result.user;
-  },
-  
-  async googleLogin(credential, clientId, userInfo = null) {
-    // If userInfo is provided, we're using the OAuth2 access token flow
-    const body = userInfo 
-      ? { accessToken: credential, clientId, userInfo, ...systemPrefs() }
-      : { credential, clientId, ...systemPrefs() };
-    
-    const result = await request('/auth/google', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-    setToken(result.token);
-    // Return full result including isFirstLogin flag
-    return {
-      user: result.user,
-      isFirstLogin: result.isFirstLogin || false
-    };
-  },
-  
+  login: async (email, password) => signedIn(await request('/auth/login', json('POST', { email, password }))),
+  register: async (email, password, full_name) =>
+    signedIn(await request('/auth/register', json('POST', { email, password, full_name, ...systemPrefs() }))),
+  // `credential` is the ID token Google Identity Services hands the page
+  googleLogin: async (credential) => signedIn(await request('/auth/google', json('POST', { credential, ...systemPrefs() }))),
+
   // Face ID / fingerprint: sign in, or unlock this device's session, with a passkey
   async passkeyLogin({ autofill = false } = {}) {
     const { startAuthentication } = await import('@simplewebauthn/browser');
-    const optionsJSON = await request('/auth/passkey?action=login-options', { method: 'POST', body: '{}', retries: 0 });
+    const optionsJSON = await request('/auth/passkey?action=login-options', json('POST', {}));
     const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
-    const result = await request('/auth/passkey?action=login-verify', { method: 'POST', body: JSON.stringify({ response }), retries: 0 });
+    const result = await request('/auth/passkey?action=login-verify', json('POST', { response }));
     setToken(result.token);
     return { ...result, credentialId: response.id };
   },
 
-  async me() {
-    try {
-      return await request('/auth/me');
-    } catch (error) {
-      // Don't log 401 errors for /auth/me - they're expected when not authenticated
-      if (error.status !== 401 && error.status !== 403) {
-        console.error('[Auth] Me error:', error);
-      }
-      throw error;
-    }
-  },
-  
-  async updateMe(data) {
-    return request('/auth/me', {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
-  
+  me: () => request('/auth/me'),
+  updateMe: (data) => request('/auth/me', json('PUT', data)),
+
   logout(redirectUrl) {
     removeToken();
-    try { localStorage.removeItem('ascent_cached_session'); } catch { /* storage unavailable */ }
-    const go = () => {
-      if (redirectUrl) {
-        window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
-      } else {
-        window.location.href = '/login';
-      }
-    };
-    // Forget the notes kept on this device for offline use (bounded, so sign-out never hangs)
+    storage.remove(SESSION_CACHE_KEY);
+    // Forget what this device kept for offline use (bounded, so sign-out never hangs)
     Promise.race([
       Promise.all([
-        import('@/components/notes/notesSync').then(m => m.clearNotesStorage()),
-        import('@/lib/offline/deviceData').then(m => m.clearDeviceData()),
+        import('@/components/notes/notesSync').then((m) => m.clearNotesStorage()),
+        import('@/lib/offline/deviceData').then((m) => m.clearDeviceData()),
       ]),
-      new Promise(resolve => setTimeout(resolve, 800)),
-    ]).catch(() => {}).finally(go);
+      wait(800),
+    ]).catch(() => {}).finally(() => toLogin(redirectUrl));
   },
-  
-  redirectToLogin(redirectUrl) {
-    if (redirectUrl) {
-      window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl)}`;
-    } else {
-      window.location.href = '/login';
-    }
-  },
-  
-  isAuthenticated() {
-    return !!getToken();
-  }
+
+  redirectToLogin: toLogin,
+  // The token was refused: drop it without leaving the page
+  forgetToken: removeToken,
+  isAuthenticated: () => !!getToken(),
 };
 
-// Entity factory - creates CRUD operations for any entity
-function createEntity(entityPath) {
-  return {
-    async list(sort = '-created_date', limit = 1000) {
-      const params = new URLSearchParams({ sort, limit: String(limit) });
-      return request(`/entities/${entityPath}?${params}`);
-    },
-    
-    async filter(filters, sort = '-created_date', limit = 1000) {
-      const params = new URLSearchParams({ sort, limit: String(limit) });
-      for (const [key, value] of Object.entries(filters)) {
-        if (value !== undefined && value !== null) {
-          params.append(key, String(value));
-        }
-      }
-      return request(`/entities/${entityPath}?${params}`);
-    },
-    
-    async get(id) {
-      return request(`/entities/${entityPath}?id=${id}&_single=true`);
-    },
-    
-    // opts: { timeout, retries, headers } for writes that may be replayed from the offline queue
-    async create(data, opts = {}) {
-      return request(`/entities/${entityPath}`, {
-        ...opts,
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-    },
-    
-    async bulkCreate(items, opts = {}) {
-      return request(`/entities/${entityPath}`, {
-        ...opts,
-        method: 'POST',
-        body: JSON.stringify(items)
-      });
-    },
-    
-    async update(id, data, opts = {}) {
-      return request(`/entities/${entityPath}?id=${id}`, {
-        ...opts,
-        method: 'PUT',
-        body: JSON.stringify(data)
-      });
-    },
-    
-    async delete(id, opts = {}) {
-      return request(`/entities/${entityPath}?id=${id}`, {
-        ...opts,
-        method: 'DELETE'
-      });
+/**
+ * CRUD for one workspace entity. Every method takes an optional last `opts` ({ headers, timeout, retries }),
+ * e.g. `{ headers: { 'x-workspace-id': id } }` to pin the workspace instead of using the current one.
+ */
+export function createEntity(path) {
+  const base = `/entities/${path}`;
+  const listUrl = (sort, limit, filters = {}) => {
+    const params = new URLSearchParams({ sort, limit: String(limit) });
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== null) params.append(key, String(value));
     }
+    return `${base}?${params}`;
+  };
+  return {
+    list: (sort = '-created_date', limit = 1000, opts) => request(listUrl(sort, limit), opts),
+    filter: (filters, sort = '-created_date', limit = 1000, opts) => request(listUrl(sort, limit, filters), opts),
+    get: (id, opts) => request(`${base}?id=${enc(id)}&_single=true`, opts),
+    create: (data, opts) => request(base, json('POST', data, opts)),
+    bulkCreate: (items, opts) => request(base, json('POST', items, opts)),
+    update: (id, data, opts) => request(`${base}?id=${enc(id)}`, json('PUT', data, opts)),
+    delete: (id, opts) => request(`${base}?id=${enc(id)}`, { ...opts, method: 'DELETE' }),
   };
 }
 
-// Entities
 const entities = {
   Account: createEntity('accounts'),
   Position: createEntity('positions'),
@@ -343,188 +185,60 @@ const entities = {
   Plan: createEntity('plans'),
   DashboardWidget: createEntity('dashboard-widgets'),
   PageLayout: createEntity('page-layouts'),
-  SharedUser: createEntity('shared-users'),
   PortfolioSnapshot: createEntity('snapshots'),
+  PortfolioTransaction: createEntity('portfolio-transactions'),
   Settlement: createEntity('settlements'),
   Commitment: createEntity('commitments'),
   Note: {
     ...createEntity('notes'),
     // Permanently delete everything the caller has in the trash
-    async emptyTrash() {
-      return request('/entities/notes?action=empty-trash', { method: 'DELETE' });
-    },
+    emptyTrash: () => request('/entities/notes?action=empty-trash', { method: 'DELETE' }),
     // File attachments: bytes travel as base64 inside JSON
-    async uploadFile(noteId, file) {
-      return request(`/entities/notes?action=file&id=${noteId}`, {
-        method: 'POST',
-        body: JSON.stringify(file)
-      });
-    },
-    async getFile(noteId, fileId) {
-      return request(`/entities/notes?action=file&id=${noteId}&fileId=${fileId}`);
-    },
-    async deleteFile(noteId, fileId) {
-      return request(`/entities/notes?action=file&id=${noteId}&fileId=${fileId}`, { method: 'DELETE' });
-    }
+    uploadFile: (noteId, file) => request(`/entities/notes?action=file&id=${enc(noteId)}`, json('POST', file)),
+    getFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`),
+    deleteFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`, { method: 'DELETE' }),
   },
-  PortfolioTransaction: createEntity('portfolio-transactions')
 };
 
-// Integrations
 const integrations = {
   Core: {
-    // Get stock quote for single symbol
-    async getStockQuote(symbol, provider = 'finnhub') {
-      return request(`/integrations/stock-quote?symbol=${symbol}&provider=${provider}`);
-    },
-    
-    // Get stock quotes for multiple symbols
-    async getStockQuotes(symbols, provider = 'finnhub') {
-      const symbolsParam = Array.isArray(symbols) ? symbols.join(',') : symbols;
-      return request(`/integrations/stock-quote?symbols=${symbolsParam}&provider=${provider}`);
-    },
-    
-    async SendEmail({ to, subject, body, html }) {
-      return request('/integrations/send-email', {
-        method: 'POST',
-        body: JSON.stringify({ to, subject, body, html })
-      });
-    },
-    
-    async UploadFile(file) {
-      // For file uploads, we need to use FormData
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const token = getToken();
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(`${API_URL}/integrations/upload-file`, {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-      
-      return data.data;
-    },
-    
-    // Placeholder for other integrations - implement as needed
-    async InvokeLLM(params) {
-      console.warn('InvokeLLM not yet implemented');
-      return { text: 'LLM integration not configured' };
-    },
-    
-    async SendSMS(params) {
-      console.warn('SendSMS not yet implemented');
-      return { sent: false, message: 'SMS not configured' };
-    },
-    
-    async GenerateImage(params) {
-      console.warn('GenerateImage not yet implemented');
-      return { url: null, message: 'Image generation not configured' };
-    },
-    
-    async ExtractDataFromUploadedFile(params) {
-      console.warn('ExtractDataFromUploadedFile not yet implemented');
-      return { data: null, message: 'Data extraction not configured' };
-    }
-  }
+    getStockQuote: (symbol, provider = 'finnhub') => request(`/integrations/stock-quote?symbol=${enc(symbol)}&provider=${enc(provider)}`),
+    getStockQuotes: (symbols, provider = 'finnhub') =>
+      request(`/integrations/stock-quote?symbols=${enc([].concat(symbols).join(','))}&provider=${enc(provider)}`),
+  },
 };
 
-// App logs (stub for compatibility)
-const appLogs = {
-  async logUserInApp(pageName) {
-    // Can be implemented to track page views if needed
-  }
-};
-
-// Workspaces API
 const workspaces = {
-  async list() {
-    return request('/workspaces');
-  },
-  async get(id) {
-    return request(`/workspaces?id=${id}`);
-  },
-  async create(data) {
-    return request('/workspaces', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
-  async update(id, data) {
-    return request(`/workspaces?id=${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
-  async delete(id) {
-    return request(`/workspaces?id=${id}`, {
-      method: 'DELETE'
-    });
-  },
-  async invite(id, data) {
-    return request(`/workspaces?id=${id}&action=invite`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
-  async updateMember(workspaceId, memberId, data) {
-    return request(`/workspaces?id=${workspaceId}&action=updateMember&memberId=${memberId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  },
-  async removeMember(workspaceId, memberId) {
-    return request(`/workspaces?id=${workspaceId}&action=removeMember&memberId=${memberId}`, {
-      method: 'DELETE'
-    });
-  },
-  async resendInvite(workspaceId, memberId) {
-    return request(`/workspaces?id=${workspaceId}&action=resend&memberId=${memberId}`, { method: 'POST' });
-  },
-  async leave(workspaceId) {
-    return request(`/workspaces?id=${workspaceId}&action=leave`, { method: 'POST' });
-  },
-  async heartbeat(workspaceId) {
-    return request(`/workspaces?id=${workspaceId}&action=heartbeat`, { method: 'POST' });
-  },
-  async myInvitations() {
-    return request('/workspaces?action=invitations');
-  },
-  async acceptInvitation(token) {
-    return request(`/workspaces?action=accept&token=${token}`, { method: 'POST' });
-  },
-  async declineInvitation(token) {
-    return request(`/workspaces?action=decline&token=${token}`, { method: 'POST' });
-  },
+  list: () => request('/workspaces'),
+  get: (id) => request(`/workspaces?id=${enc(id)}`),
+  create: (data) => request('/workspaces', json('POST', data)),
+  update: (id, data) => request(`/workspaces?id=${enc(id)}`, json('PUT', data)),
+  delete: (id) => request(`/workspaces?id=${enc(id)}`, { method: 'DELETE' }),
+  invite: (id, data) => request(`/workspaces?id=${enc(id)}&action=invite`, json('POST', data)),
+  updateMember: (id, memberId, data) => request(`/workspaces?id=${enc(id)}&action=updateMember&memberId=${enc(memberId)}`, json('PUT', data)),
+  removeMember: (id, memberId) => request(`/workspaces?id=${enc(id)}&action=removeMember&memberId=${enc(memberId)}`, { method: 'DELETE' }),
+  resendInvite: (id, memberId) => request(`/workspaces?id=${enc(id)}&action=resend&memberId=${enc(memberId)}`, { method: 'POST' }),
+  leave: (id) => request(`/workspaces?id=${enc(id)}&action=leave`, { method: 'POST' }),
+  heartbeat: (id) => request(`/workspaces?id=${enc(id)}&action=heartbeat`, { method: 'POST' }),
+  myInvitations: () => request('/workspaces?action=invitations'),
+  acceptInvitation: (token) => request(`/workspaces?action=accept&token=${enc(token)}`, { method: 'POST' }),
+  declineInvitation: (token) => request(`/workspaces?action=decline&token=${enc(token)}`, { method: 'POST' }),
   // Household options: { aiAssistant, largeExpenseAlert, largeExpenseCurrency }
-  async updateSettings(id, settings) {
-    return request(`/workspaces?id=${id}&action=settings`, { method: 'PUT', body: JSON.stringify(settings) });
-  }
+  updateSettings: (id, settings) => request(`/workspaces?id=${enc(id)}&action=settings`, json('PUT', settings)),
+  // Public: the details shown on the invitation page before signing in
+  invitation: (token) => request(`/invitations/${enc(token)}`),
 };
 
-const localDay = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+/** Today on this device, 'YYYY-MM-DD' ("yesterday" means the person's yesterday). */
+export const localDay = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 // Smart help: category suggestions while typing, and the opt-in AI assistant
 const assist = {
   status: () => request('/assist'),
-  suggestCategory: (description, type = 'Expense') =>
-    request('/assist?action=suggest-category', { method: 'POST', body: JSON.stringify({ description, type }) }),
-  parse: (text) => request('/assist?action=parse', { method: 'POST', body: JSON.stringify({ text, today: localDay() }) }),
-  ask: (question) => request('/assist?action=ask', { method: 'POST', body: JSON.stringify({ question, today: localDay() }) }),
+  suggestCategory: (description, type = 'Expense') => request('/assist?action=suggest-category', json('POST', { description, type })),
+  parse: (text) => request('/assist?action=parse', json('POST', { text, today: localDay() })),
+  ask: (question) => request('/assist?action=ask', json('POST', { question, today: localDay() })),
 };
 
 // Passkeys registered on this account (Settings > Security)
@@ -532,75 +246,35 @@ const passkeys = {
   list: () => request('/auth/passkey?action=list'),
   async register(name) {
     const { startRegistration } = await import('@simplewebauthn/browser');
-    const optionsJSON = await request('/auth/passkey?action=register-options', { method: 'POST', body: '{}', retries: 0 });
+    const optionsJSON = await request('/auth/passkey?action=register-options', json('POST', {}));
     const response = await startRegistration({ optionsJSON });
-    const list = await request('/auth/passkey?action=register-verify', { method: 'POST', body: JSON.stringify({ response, name }), retries: 0 });
+    const list = await request('/auth/passkey?action=register-verify', json('POST', { response, name }));
     return { list, credentialId: response.id };
   },
-  rename: (id, name) => request(`/auth/passkey?action=rename&id=${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ name }) }),
-  remove: (id) => request(`/auth/passkey?action=remove&id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  rename: (id, name) => request(`/auth/passkey?action=rename&id=${enc(id)}`, json('PUT', { name })),
+  remove: (id) => request(`/auth/passkey?action=remove&id=${enc(id)}`, { method: 'DELETE' }),
 };
 
 // Card statements read on the device: rows are matched against what is already recorded
 const imports = {
-  statement: (rows, { review = false } = {}) =>
-    request('/import/statement', { method: 'POST', body: JSON.stringify({ rows, review }) }),
+  statement: (rows, { review = false } = {}) => request('/import/statement', json('POST', { rows, review })),
 };
 
-// Apple Pay: a personal key lets an iOS Shortcut add each purchase as a transaction
-const applePay = {
-  status: () => request('/integrations/quick-add'),
-  createKey: () => request('/integrations/quick-add', { method: 'POST' }),
-  revoke: () => request('/integrations/quick-add', { method: 'DELETE' })
-};
-
-// Ingest tokens: per-device credentials for the iPhone Shortcut (Apple Pay taps)
+// Ingest tokens: per-device credentials for the iPhone Shortcut (Apple Pay taps, SMS)
 const ingestTokens = {
   list: () => request('/ingest-tokens'),
-  create: (label) => request('/ingest-tokens', { method: 'POST', body: JSON.stringify({ label }) }),
-  revoke: (id) => request(`/ingest-tokens?id=${id}`, { method: 'DELETE' }),
-  activity: () => request('/ingest-tokens?activity=1')
+  create: (label) => request('/ingest-tokens', json('POST', { label })),
+  revoke: (id) => request(`/ingest-tokens?id=${enc(id)}`, { method: 'DELETE' }),
+  activity: () => request('/ingest-tokens?activity=1'),
 };
 
 // Web Push subscriptions for this user's devices
 const push = {
   config: () => request('/push'),
-  subscribe: (subscription) => request('/push', { method: 'POST', body: JSON.stringify({ subscription }) }),
-  test: () => request('/push', { method: 'POST', body: JSON.stringify({ test: true }) }),
-  unsubscribe: (endpoint) => request(`/push?endpoint=${encodeURIComponent(endpoint)}`, { method: 'DELETE' })
+  subscribe: (subscription) => request('/push', json('POST', { subscription })),
+  test: () => request('/push', json('POST', { test: true })),
+  unsubscribe: (endpoint) => request(`/push?endpoint=${enc(endpoint)}`, { method: 'DELETE' }),
 };
 
-// Main client export - maintains same interface as base44 client
-export const ascent = {
-  auth,
-  passkeys,
-  entities,
-  workspaces,
-  integrations,
-  applePay,
-  ingestTokens,
-  push,
-  assist,
-  imports,
-  appLogs
-};
-
-// For backwards compatibility during migration
-export const api = ascent;
+export const ascent = { auth, passkeys, entities, workspaces, integrations, ingestTokens, push, assist, imports };
 export default ascent;
-
-
-// Device language/theme, sent on sign-up so new accounts start in the user's own settings
-export function systemPrefs() {
-  try {
-    // A language picked on the sign-in page wins over the device's
-    const lang = (localStorage.getItem('ascent_login_lang') || navigator.language || 'en').slice(0, 2).toLowerCase();
-    return {
-      language: ['en', 'he', 'ru'].includes(lang) ? lang : 'en',
-      theme: window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark',
-    };
-  } catch {
-    return {};
-  }
-}
-

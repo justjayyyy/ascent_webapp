@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, memo, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, memo } from 'react';
 import { Loader2, Search, X, ChevronDown, ShoppingBag } from 'lucide-react';
 import NumberFlow from '@number-flow/react';
 import { motion } from 'motion/react';
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useMoney } from '@/hooks/useWorkspaceData';
 import { useHousehold } from '@/hooks/useHousehold';
 
 const CARD_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#14B8A6', '#EF4444', '#6366F1', '#F97316'];
@@ -96,15 +96,11 @@ function ExpenseMonthView({
 }) {
   const isIncome = kind === 'Income';
   const { user, colors, t, language } = useTheme();
-  const { convertCurrency, fetchExchangeRates, rates } = useCurrencyConversion();
   const userCurrency = user?.currency || 'ILS';
+  const { amountOf: toUser } = useMoney(userCurrency);
   const palette = useDonutPalette();
   const numLocale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
   const blur = !!user?.blurValues;
-
-  useEffect(() => {
-    if (userCurrency) fetchExchangeRates('USD');
-  }, [userCurrency, fetchExchangeRates]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -146,13 +142,6 @@ function ExpenseMonthView({
   const money = useCallback((value, currency) => new Intl.NumberFormat(numLocale, {
     style: 'currency', currency: currency || userCurrency, minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(value || 0), [numLocale, userCurrency]);
-
-  const toUser = useCallback((x) => {
-    if (x.amountInGlobalCurrency !== null && x.amountInGlobalCurrency !== undefined) return x.amountInGlobalCurrency;
-    if (x.currency === userCurrency) return x.amount;
-    if (rates && Object.keys(rates).length > 0) return convertCurrency(x.amount, x.currency || 'USD', userCurrency, rates);
-    return 0;
-  }, [userCurrency, rates, convertCurrency]);
 
   const metrics = useMemo(() => {
     let total = 0;

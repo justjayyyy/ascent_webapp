@@ -4080,3 +4080,5 @@ import { mobileTranslations } from './translationsMobile';
 ['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], mobileTranslations[lang]));
 import { commitmentTranslations } from './translationsCommitments';
 ['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], commitmentTranslations[lang]));
+import { appTranslations } from './translationsApp';
+['en', 'he', 'ru'].forEach((lang) => Object.assign(translations[lang], appTranslations[lang]));

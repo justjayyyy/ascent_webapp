@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useAccounts, useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from 'motion/react';
 import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
@@ -33,13 +33,11 @@ const scrollMemory = new Map();
 
 /** Add an expense or income from anywhere (the dock's + on pages without their own add). */
 function QuickAddSheet({ request, onClose }) {
-  const { user } = useAuth();
-  const userId = user?.id || user?._id;
   const { save, saving } = useSaveTransaction();
-  const enabled = !!userId && !!request;
-  const { data: categories = [] } = useQuery({ queryKey: ['categories', userId], queryFn: () => ascent.entities.Category.list('-created_date'), enabled, staleTime: 5 * 60 * 1000 });
-  const { data: accounts = [] } = useQuery({ queryKey: ['accounts', userId], queryFn: () => ascent.entities.Account.list(), enabled, staleTime: 5 * 60 * 1000 });
-  const { data: plans = [] } = useQuery({ queryKey: ['plans', userId], queryFn: () => ascent.entities.Plan.list('startDate'), enabled, staleTime: 3 * 60 * 1000 });
+  const enabled = !!request;
+  const { data: categories = [] } = useCategories({ enabled });
+  const { data: accounts = [] } = useAccounts({ enabled });
+  const { data: plans = [] } = usePlans({ enabled });
   return (
     <AddTransactionDialog
       key={request?.nonce}
@@ -56,7 +54,7 @@ function QuickAddSheet({ request, onClose }) {
 }
 
 function LayoutContent({ children, currentPageName }) {
-  const { user, isRTL, colors, t, saveUserPrefs, refreshUser } = useTheme();
+  const { user, isRTL, t, saveUserPrefs, refreshUser } = useTheme();
   const { hasPermission } = useAuth();
   const { enabled: lockEnabled } = useAppLock();
   const navigate = useNavigate();

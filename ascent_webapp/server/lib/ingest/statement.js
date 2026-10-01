@@ -111,6 +111,7 @@ export function planStatementImport({ rows, scope, userCurrency, existing, seenK
       amount: row.amount,
       currency: row.currency,
       amountInGlobalCurrency: row.currency === userCurrency ? row.amount : null,
+      globalCurrency: row.currency === userCurrency ? userCurrency : null,
       category: categorize({ ...row, type }),
       description: row.description,
       merchant: row.description,

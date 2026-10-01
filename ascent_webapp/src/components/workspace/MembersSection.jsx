@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { rememberWorkspace } from '@/lib/session';
 import { Copy, Home, KeyRound, LogOut, MoreHorizontal, QrCode, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ascent } from '@/api/client';
@@ -166,7 +167,7 @@ export default function MembersSection() {
     mutationFn: () => ascent.workspaces.leave(workspaceId),
     onSuccess: () => {
       toast.success(t('wsLeft'));
-      localStorage.removeItem('ascent_current_workspace_id');
+      rememberWorkspace(null);
       window.location.assign('/');
     },
     onError: fail,
@@ -180,7 +181,7 @@ export default function MembersSection() {
       return own;
     },
     onSuccess: (own) => {
-      localStorage.setItem('ascent_current_workspace_id', own.id || own._id);
+      rememberWorkspace(own.id || own._id);
       window.location.assign('/');
     },
     onError: fail,

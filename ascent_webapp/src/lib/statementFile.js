@@ -11,7 +11,7 @@ const HEADERS = {
 };
 export const FIELDS = Object.keys(HEADERS);
 
-const norm = (v) => String(v ?? '').replace(/[‎‏"'״׳]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+const norm = (v) => String(v ?? '').replace(/[\u200E\u200F"'״׳]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 function decodeText(buffer) {
   try {
@@ -90,7 +90,7 @@ function valid(y, m, d) {
 /** A cell -> a signed number or null: "1,234.50", "₪ 45.90", "12.00-", "(30.00)", "1.234,50 €". */
 export function parseAmount(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  let s = String(value ?? '').replace(/[‎‏\s ]/g, '');
+  let s = String(value ?? '').replace(/[\u200E\u200F\s\u00A0]/g, '');
   if (!s) return null;
   const negative = /^-|-$|^\(.*\)$|^−/.test(s);
   s = s.replace(/[^\d.,]/g, '');

@@ -11,9 +11,8 @@ import { format, addMonths, parseISO, isAfter } from 'date-fns';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
-import { ascent } from '@/api/client';
-import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { useCards, useExchangeRates } from '@/hooks/useWorkspaceData';
+import { conversionFields } from '@shared/money';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import HouseholdFields, { splitIsValid } from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
@@ -53,7 +52,7 @@ export default function AddTransactionDialog({
   plans = [],
 }) {
   const { user, t, language, colors } = useTheme();
-  const { convertCurrency, fetchExchangeRates, rates, isLoading: isLoadingRates } = useCurrencyConversion();
+  const { rates, isLoading: isLoadingRates } = useExchangeRates();
   const userCurrency = user?.currency || 'ILS';
   const startType = defaultType || 'Expense';
   const isEditing = !!(editTransaction && (editTransaction.id || editTransaction._id));
@@ -107,63 +106,16 @@ export default function AddTransactionDialog({
   const dateInputRef = useRef(null);
   const isInitialOpenRef = useRef(true);
 
-  // Fetch exchange rates on mount
-  useEffect(() => {
-    if (userCurrency) {
-      fetchExchangeRates('USD');
-    }
-  }, [userCurrency, fetchExchangeRates]);
+  // What gets stored next to the amount: its value in the person's own currency at today's rate,
+  // or nothing when there is no rate yet (never the unconverted amount)
+  const conversion = useMemo(
+    () => conversionFields(parseFloat(formData.amount) || 0, formData.currency || userCurrency, userCurrency, rates),
+    [formData.amount, formData.currency, userCurrency, rates]
+  );
+  const needsConversion = (formData.currency || userCurrency) !== userCurrency;
 
-  // Calculate converted amount and exchange rate
-  const conversionInfo = useMemo(() => {
-    const amount = parseFloat(formData.amount) || 0;
-    const transactionCurrency = formData.currency || 'USD';
-
-    if (!amount || amount === 0) {
-      return { convertedAmount: 0, exchangeRate: null, needsConversion: false };
-    }
-
-    if (transactionCurrency === userCurrency) {
-      return {
-        convertedAmount: amount,
-        exchangeRate: 1,
-        needsConversion: false
-      };
-    }
-
-    if (!rates || Object.keys(rates).length === 0) {
-      return { convertedAmount: amount, exchangeRate: null, needsConversion: true };
-    }
-
-    const convertedAmount = convertCurrency(amount, transactionCurrency, userCurrency, rates);
-
-    // Calculate exchange rate: how many units of global currency per 1 unit of transaction currency
-    let exchangeRate = null;
-    if (transactionCurrency === 'USD' && rates[userCurrency]) {
-      exchangeRate = rates[userCurrency];
-    } else if (userCurrency === 'USD' && rates[transactionCurrency]) {
-      exchangeRate = 1 / rates[transactionCurrency];
-    } else if (rates[transactionCurrency] && rates[userCurrency]) {
-      // Convert via USD: transactionCurrency -> USD -> userCurrency
-      const rateToUSD = 1 / rates[transactionCurrency];
-      exchangeRate = rateToUSD * rates[userCurrency];
-    }
-
-    return {
-      convertedAmount,
-      exchangeRate,
-      needsConversion: true
-    };
-  }, [formData.amount, formData.currency, userCurrency, rates, convertCurrency]);
-
-  const { data: cards = [] } = useQuery({
-    queryKey: ['cards', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      return await ascent.entities.Card.filter({ created_by: user.email, isActive: true }, '-created_date');
-    },
-    enabled: !!user,
-  });
+  const { data: allCards = [] } = useCards();
+  const cards = useMemo(() => allCards.filter((c) => c.isActive !== false), [allCards]);
 
   useEffect(() => {
     if (editTransaction) {
@@ -289,8 +241,7 @@ export default function AddTransactionDialog({
       ...formData,
       description: formData.description.trim() || translateCategory(formData.category, language),
       amount: parseFloat(formData.amount),
-      amountInGlobalCurrency: conversionInfo.convertedAmount,
-      exchangeRate: conversionInfo.exchangeRate,
+      ...conversion,
       relatedAccountId: formData.relatedAccountId || undefined,
       isBigPurchase: isExpense && formData.isBigPurchase,
       installmentCount: splitting ? installments : 1,
@@ -318,13 +269,6 @@ export default function AddTransactionDialog({
       .replace('{from}', month(first))
       .replace('{to}', month(addMonths(first, installments - 1)));
   })();
-
-  // Filter categories based on transaction type
-  const getFilteredCategories = () => {
-    return categories.filter(cat =>
-      cat.type === formData.type || cat.type === 'Both'
-    );
-  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -360,24 +304,17 @@ export default function AddTransactionDialog({
                 className={cn("h-14 text-3xl font-semibold tabular-nums", colors.bgTertiary, colors.border, colors.textPrimary, errors.amount && 'border-danger')}
               />
               {errors.amount && <p className="text-xs text-danger">{errors.amount}</p>}
-              {conversionInfo.needsConversion && formData.amount && parseFloat(formData.amount) > 0 && (
+              {needsConversion && parseFloat(formData.amount) > 0 && (
                 <p className={cn("text-xs", colors.textTertiary)}>
-                  {isLoadingRates ? (
-                    <span>Loading exchange rate...</span>
-                  ) : (
+                  {conversion.amountInGlobalCurrency !== null ? (
                     <>
-                      ≈ {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: userCurrency,
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(conversionInfo.convertedAmount)}
-                      {conversionInfo.exchangeRate && (
-                        <span className="ms-1">
-                          (1 {formData.currency} = {conversionInfo.exchangeRate.toFixed(4)} {userCurrency})
-                        </span>
-                      )}
+                      ≈ {inCurrency(conversion.amountInGlobalCurrency, userCurrency)}
+                      <span className="ms-1" dir="ltr">
+                        (1 {formData.currency} = {conversion.exchangeRate.toFixed(4)} {userCurrency})
+                      </span>
                     </>
+                  ) : (
+                    <span>{isLoadingRates ? t('txRateLoading') : t('txRateUnavailable')}</span>
                   )}
                 </p>
               )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ascent } from '@/api/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCards } from '@/hooks/useWorkspaceData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,22 +14,14 @@ import { Section, Group } from './SettingsShell';
 
 const EMPTY = { name: '', lastFourDigits: '', type: 'credit', walletName: '' };
 
-export default function CardManagement({ user: propUser, index }) {
+export default function CardManagement({ index }) {
   const { t, user } = useTheme();
   const [isAdding, setIsAdding] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [formData, setFormData] = useState(EMPTY);
   const queryClient = useQueryClient();
 
-  const { data: cards = [] } = useQuery({
-    queryKey: ['cards', propUser?.id || user?.id],
-    queryFn: async () => {
-      const currentUser = propUser || user;
-      if (!currentUser) return [];
-      return await ascent.entities.Card.filter({ created_by: currentUser.email }, '-created_date');
-    },
-    enabled: !!(propUser || user),
-  });
+  const { data: cards = [] } = useCards();
 
   const close = () => {
     setIsAdding(false);

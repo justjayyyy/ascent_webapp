@@ -1,4 +1,4 @@
-import { get, set, del } from 'idb-keyval';
+import { get, set, del, keys } from 'idb-keyval';
 import { ascent } from '@/api/client';
 
 // Offline-first sync for notes.
@@ -159,7 +159,6 @@ export function getNotesSync(scope, queryClient, queryKey) {
 
 /** Forget this device's copy of the notes, e.g. on sign-out. */
 export async function clearNotesStorage() {
-  const { keys } = await import('idb-keyval');
   const all = await safe(() => keys(), []);
   await Promise.all(all
     .filter(k => typeof k === 'string' && k.startsWith('ascent:notes:'))

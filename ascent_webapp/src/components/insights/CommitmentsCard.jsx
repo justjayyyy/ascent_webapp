@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { createPageUrl } from '@/utils';
 import { ProgressRing, BigMoney } from '@/components/commitments/CommitmentParts';
 import { commitmentEmoji, durationText, monthYear } from '@/components/commitments/commitmentUtils';
-import { commitmentStatus, commitmentsSummary, monthsBetween } from '../../../shared/commitments.js';
+import { commitmentStatus, commitmentsSummary, monthsBetween } from '@shared/commitments';
 import { useMoneyFormat, localDay } from './useInsights';
 
 /**
