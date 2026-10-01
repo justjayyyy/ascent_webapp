@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // File attachments for notes. The bytes live here (not on the note) so listing notes stays light.

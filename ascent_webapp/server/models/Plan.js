@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // One cost inside a plan: flights, the venue, a deposit. Money for big events leaves in pieces,

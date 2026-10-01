@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // Long-lived credential for a phone's Shortcut. Scoped to one user and one workspace, can only add pending

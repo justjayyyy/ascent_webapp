@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // One row per request a token makes. It is the rate-limit counter, the "Recent activity" list in Settings and the

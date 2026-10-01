@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 const portfolioSnapshotSchema = new mongoose.Schema({

@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 const pageLayoutSchema = new mongoose.Schema({

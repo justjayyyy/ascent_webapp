@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 import { installTransactionHooks } from '../lib/transactionHooks.js';
 

@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 const itemSchema = new mongoose.Schema({
@@ -34,7 +35,8 @@ const noteSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    default: ''
+    default: '',
+    maxlength: 100000 // the notes handler trims to this too
   },
   // 'text' notes use `content`; 'checklist' notes use `items`
   type: {

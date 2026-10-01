@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // "Payments at this merchant go in this category", learned from what people in the workspace chose.

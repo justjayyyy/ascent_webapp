@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // A payment recorded against a commitment: an extra payment towards a loan (straight to the

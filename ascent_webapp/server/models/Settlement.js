@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // Money one household member paid another to even out split expenses ("settle up").

@@ -1,3 +1,4 @@
+import './limits.js';
 import mongoose from 'mongoose';
 
 // One row per browser/phone that agreed to receive push notifications for a user.
