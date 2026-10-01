@@ -1,0 +1,29 @@
+# Lint, tests (API, shared logic and web app) and the production build on every push and pull request.
+name: Check
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ascent_webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ascent_webapp/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - name: No known vulnerabilities in what ships
+        run: npm audit --omit=dev --audit-level=high
