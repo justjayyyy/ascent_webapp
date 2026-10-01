@@ -12,7 +12,7 @@ import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { useCards, useExchangeRates } from '@/hooks/useWorkspaceData';
-import { conversionFields } from '@shared/money';
+import { conversionFields, keptConversion } from '@shared/money';
 import { PORTFOLIO_ENABLED } from '@/lib/features';
 import HouseholdFields, { splitIsValid } from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
@@ -108,10 +108,12 @@ export default function AddTransactionDialog({
 
   // What gets stored next to the amount: its value in the person's own currency at today's rate,
   // or nothing when there is no rate yet (never the unconverted amount)
-  const conversion = useMemo(
-    () => conversionFields(parseFloat(formData.amount) || 0, formData.currency || userCurrency, userCurrency, rates),
-    [formData.amount, formData.currency, userCurrency, rates]
-  );
+  // An edit that keeps the amount and currency keeps the rate the row was saved with
+  const conversion = useMemo(() => {
+    const amount = parseFloat(formData.amount) || 0;
+    const currency = formData.currency || userCurrency;
+    return (isEditing && keptConversion(editTransaction, amount, currency)) || conversionFields(amount, currency, userCurrency, rates);
+  }, [formData.amount, formData.currency, userCurrency, rates, isEditing, editTransaction]);
   const needsConversion = (formData.currency || userCurrency) !== userCurrency;
 
   const { data: allCards = [] } = useCards();

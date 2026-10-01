@@ -103,6 +103,8 @@ models.MerchantRule ??= { find: () => chain([]), findOne: () => chain(null), upd
 for (const [name, model] of Object.entries(models)) {
   mock.module(at(`../models/${name}.js`), { exports: { default: model } });
 }
+let rates = { USD: 1, ILS: 3.7, EUR: 0.9 }; // what the rate service answers (null: unreachable)
+mock.module(at('../lib/rates.js'), { exports: { getRates: async () => rates } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../lib/rateLimit.js'), {
   exports: {
@@ -304,11 +306,24 @@ test('the request is recorded and the token shows activity', async () => {
   assert.equal(TOKEN_DOC.useCount, 1);
 });
 
-test('a foreign currency keeps its own currency and leaves the conversion to the app', async () => {
+test('a foreign currency keeps its own currency and the conversion at the rate of that moment', async () => {
   await call({ body: payload({ amount: '€12,50' }) });
   assert.equal(db.rows[0].currency, 'EUR');
   assert.equal(db.rows[0].amount, 12.5);
-  assert.equal(db.rows[0].amountInGlobalCurrency, null);
+  assert.equal(db.rows[0].amountInGlobalCurrency, 51.39); // 12.50 EUR / 0.9 * 3.7
+  assert.equal(db.rows[0].globalCurrency, 'ILS');
+});
+
+test('with no rate to be had, a foreign purchase is still added and converted later by the app', async () => {
+  rates = null;
+  try {
+    await call({ body: payload({ amount: '€12,50' }) });
+    assert.equal(db.rows[0].amount, 12.5);
+    assert.equal(db.rows[0].amountInGlobalCurrency, null);
+    assert.equal(db.rows[0].globalCurrency, null);
+  } finally {
+    rates = { USD: 1, ILS: 3.7, EUR: 0.9 };
+  }
 });
 
 test('nothing secret ever comes back', async () => {

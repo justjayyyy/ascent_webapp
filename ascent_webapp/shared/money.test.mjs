@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { convertAmount, amountInCurrency, conversionFields } from './money.js';
+import { convertAmount, amountInCurrency, conversionFields, keptConversion } from './money.js';
 
 const RATES = { USD: 1, ILS: 3.7, EUR: 0.9 };
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≈ ${b}`);
@@ -51,4 +51,14 @@ test('what to store with a new row', () => {
   assert.deepEqual(f, { amountInGlobalCurrency: 37, exchangeRate: 3.7, globalCurrency: 'ILS' });
   assert.deepEqual(conversionFields(10, 'ILS', 'ILS', RATES), { amountInGlobalCurrency: 10, exchangeRate: 1, globalCurrency: 'ILS' });
   assert.deepEqual(conversionFields(10, 'GBP', 'ILS', RATES), { amountInGlobalCurrency: null, exchangeRate: null, globalCurrency: null });
+});
+
+test('an edit that keeps amount and currency keeps the conversion the row was saved with', () => {
+  const saved = { amount: 100, currency: 'EUR', amountInGlobalCurrency: 390, exchangeRate: 3.9, globalCurrency: 'ILS' };
+  assert.deepEqual(keptConversion(saved, 100, 'EUR'), { amountInGlobalCurrency: 390, exchangeRate: 3.9, globalCurrency: 'ILS' });
+  assert.deepEqual(keptConversion(saved, '100', 'EUR'), { amountInGlobalCurrency: 390, exchangeRate: 3.9, globalCurrency: 'ILS' });
+  assert.equal(keptConversion(saved, 120, 'EUR'), null, 'a new amount is converted again');
+  assert.equal(keptConversion(saved, 100, 'USD'), null, 'a new currency is converted again');
+  assert.equal(keptConversion({ ...saved, amountInGlobalCurrency: null }, 100, 'EUR'), null, 'nothing stored: convert now');
+  assert.equal(keptConversion(null, 100, 'EUR'), null);
 });

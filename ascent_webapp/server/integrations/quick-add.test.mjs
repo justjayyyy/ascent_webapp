@@ -33,6 +33,7 @@ mock.module(at('../models/ExpenseTransaction.js'), {
     },
   },
 });
+mock.module(at('../lib/rates.js'), { exports: { getRates: async () => ({ USD: 1, ILS: 3.7, EUR: 0.9 }) } });
 mock.module(at('../lib/merchantRules.js'), { exports: { loadRules: async () => [], ruleKeyFor: () => 'shufersal' } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 let signedIn;
@@ -76,6 +77,13 @@ test('a purchase is added to the key\'s workspace, attributed, with the card mat
   assert.equal(tx.source, 'wallet');
   assert.equal(tx.cardId, 'c1');
   assert.deepEqual([tx.amount, tx.currency, tx.amountInGlobalCurrency, tx.globalCurrency], [42.9, 'ILS', 42.9, 'ILS']);
+});
+
+test('a purchase in another currency is converted at the rate of that moment', async () => {
+  await shortcut({ merchant: 'Cafe', amount: '$10' });
+  const [tx] = db.created;
+  assert.deepEqual([tx.amount, tx.currency, tx.amountInGlobalCurrency, tx.globalCurrency], [10, 'USD', 37, 'ILS']);
+  assert.ok(Math.abs(tx.exchangeRate - 3.7) < 1e-9);
 });
 
 test('an unknown key is refused', async () => {

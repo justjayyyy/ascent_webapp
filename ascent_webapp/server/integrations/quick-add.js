@@ -12,6 +12,8 @@ import Workspace from '../models/Workspace.js';
 import Category from '../models/Category.js';
 import Card from '../models/Card.js';
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
+import { getRates } from '../lib/rates.js';
+import { conversionFields } from '../../shared/money.js';
 
 // Adds an expense from an Apple Pay tap. An iOS Shortcuts "Transaction" automation calls
 // this with the merchant and amount, and the category is worked out here.
@@ -120,9 +122,8 @@ async function addFromShortcut(req, res, token) {
     type: 'Expense',
     amount: money.amount,
     currency,
-    amountInGlobalCurrency: sameCurrency ? money.amount : null,
-    globalCurrency: sameCurrency ? currency : null,
-    exchangeRate: sameCurrency ? 1 : null,
+    // In the person's own currency at the rate of the moment it happened (left empty if no rate is to be had)
+    ...conversionFields(money.amount, currency, user.currency || 'USD', sameCurrency ? null : await getRates()),
     category,
     description: merchant || 'Apple Pay',
     date,

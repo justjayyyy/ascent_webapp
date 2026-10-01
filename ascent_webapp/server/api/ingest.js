@@ -22,6 +22,8 @@ import { dedupeKey, decideMatch, planMerge, WINDOWS } from '../lib/ingest/match.
 import { shiftDate } from '../lib/ingest/time.js';
 import { notifyUser } from '../lib/push.js';
 import { paymentPush } from '../lib/ingest/notify.js';
+import { getRates } from '../lib/rates.js';
+import { conversionFields } from '../../shared/money.js';
 
 const PARSERS = { wallet: parseWalletPayload, sms: parseSmsPayload };
 const RATE = { windowMs: 10 * 60_000, max: 60 };
@@ -181,9 +183,8 @@ export default async function handler(req, res) {
         source: kind,
         amount: ev.amount,
         currency: ev.currency,
-        // Same currency as the user's: nothing to convert. Otherwise left empty; the app converts when it shows or confirms it.
-        amountInGlobalCurrency: ev.currency === user.currency ? ev.amount : null,
-        globalCurrency: ev.currency === user.currency ? ev.currency : null,
+        // In the person's own currency at the rate of the moment it happened (left empty if no rate is to be had)
+        ...conversionFields(ev.amount, ev.currency, user.currency, ev.currency === user.currency ? null : await getRates()),
         category,
         description: ev.merchant,
         merchant: ev.merchant,

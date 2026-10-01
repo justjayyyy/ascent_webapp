@@ -34,6 +34,20 @@ export function amountInCurrency(tx, currency, rates, { legacyCurrency = currenc
   return convertAmount(amount, from, currency, rates);
 }
 
+/**
+ * When an edit leaves a row's amount and currency alone, the conversion it was saved with stays: editing the
+ * description of last spring's hotel must not re-price it at today's rate. null when it should be worked out again.
+ */
+export function keptConversion(previous, amount, currency) {
+  if (!previous || typeof previous.amountInGlobalCurrency !== 'number') return null;
+  if (Number(previous.amount) !== Number(amount) || (previous.currency || null) !== (currency || null)) return null;
+  return {
+    amountInGlobalCurrency: previous.amountInGlobalCurrency,
+    exchangeRate: previous.exchangeRate ?? null,
+    globalCurrency: previous.globalCurrency ?? null,
+  };
+}
+
 /** The fields to save with a transaction recorded in `currency` by someone whose own currency is `userCurrency`. */
 export function conversionFields(amount, currency, userCurrency, rates) {
   if (!userCurrency) return { amountInGlobalCurrency: null, exchangeRate: null, globalCurrency: null };
