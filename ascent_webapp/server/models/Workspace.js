@@ -14,6 +14,8 @@ const memberSchema = new mongoose.Schema({
   },
   inviteKind: { type: String, enum: ['email', 'link'], default: 'email' },
   expiresAt: { type: Date, default: null },
+  // Random secret in the invitation link (lib/invitations.js); only managers are shown it.
+  inviteToken: { type: String, default: null },
   role: { 
     type: String, 
     enum: ['owner', 'admin', 'editor', 'viewer'], 
@@ -67,6 +69,10 @@ const workspaceSchema = new mongoose.Schema({
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }
 });
+
+// Workspaces someone belongs to, and invitation links
+workspaceSchema.index({ 'members.userId': 1 });
+workspaceSchema.index({ 'members.inviteToken': 1 });
 
 // Virtual for id
 workspaceSchema.virtual('id').get(function() {

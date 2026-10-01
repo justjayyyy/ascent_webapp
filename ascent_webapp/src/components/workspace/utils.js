@@ -19,7 +19,7 @@ export const isOnline = (m, now = Date.now()) => !!m.lastSeenAt && now - new Dat
 export const timeAgo = (date, language) =>
   formatDistanceToNowStrict(new Date(date), { locale: LOCALES[language] || enUS });
 
-export const inviteLinkFor = (m) => `${window.location.origin}/accept-invitation/${memberKey(m)}`;
+export const inviteLinkFor = (m) => `${window.location.origin}/accept-invitation/${m.inviteToken || memberKey(m)}`;
 
 const ROLE_KEYS = { owner: 'wsOwner', admin: 'wsAdmin', editor: 'wsEditor', viewer: 'wsViewer', custom: 'wsCustom' };
 export const roleLabel = (t, role) => t(ROLE_KEYS[role] || 'wsViewer');

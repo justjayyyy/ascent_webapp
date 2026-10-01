@@ -3,7 +3,7 @@ import Workspace from '../models/Workspace.js';
 import User from '../models/User.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, notFound, serverError } from '../lib/response.js';
-import { isValidObjectId } from '../lib/validate.js';
+import { findInvitation } from '../lib/invitations.js';
 
 // Public endpoint to get invitation details by token (no auth required)
 export default async function handler(req, res) {
@@ -15,27 +15,9 @@ export default async function handler(req, res) {
 
   try {
     await connectDB();
-    // Support both /api/invitations/:token and /api/invitations?token=...
-    const token = req.params?.token || req.query?.token;
-
-    if (!token || !isValidObjectId(token)) {
-      return error(res, 'Invitation token is required', 400);
-    }
-
-    // Find workspace containing the member invitation
-    const workspace = await Workspace.findOne({ 'members._id': token }).lean();
-
-    if (!workspace) {
-      return notFound(res, 'Invitation not found');
-    }
-
-    // Find the specific member invitation
-    // Note: workspace.members is an array of objects since we used lean()
-    const invitation = workspace.members.find(m => m._id.toString() === token);
-
-    if (!invitation) {
-      return notFound(res, 'Invitation not found');
-    }
+    const found = await findInvitation(Workspace, req.params?.token || req.query?.token, { lean: true });
+    if (!found) return notFound(res, 'Invitation not found');
+    const { workspace, member: invitation } = found;
 
     // Check if invitation is already accepted or rejected
     if (invitation.status !== 'pending') {
@@ -52,7 +34,6 @@ export default async function handler(req, res) {
       kind: isLink ? 'link' : 'email',
       expired,
       expiresAt: invitation.expiresAt || null,
-      id: invitation._id.toString(),
       workspaceId: workspace._id.toString(),
       workspaceName: workspace.name,
       invitedEmail: invitation.email,

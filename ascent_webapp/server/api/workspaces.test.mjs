@@ -21,6 +21,7 @@ const matches = (ws, q) =>
     if (k === 'ownerId') return same(ws.ownerId, v);
     if (k === 'members') return ws.members.some((m) => matchesElem(m, v.$elemMatch));
     if (k === 'members._id') return ws.members.some((m) => same(m._id, v));
+    if (k === 'members.inviteToken') return ws.members.some((m) => m.inviteToken === v);
     throw new Error(`unsupported query key ${k}`);
   });
 
@@ -47,6 +48,8 @@ mock.module(at('../middleware/auth.js'), {
 });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../lib/email-helper.js'), { exports: { sendEmail: async (m) => { sent.push(m); return { sent: true }; } } });
+let wiped; // workspaces whose data was deleted
+mock.module(at('../lib/workspaceData.js'), { exports: { deleteWorkspaceData: async (id) => { wiped.push(String(id)); } } });
 mock.module(at('../lib/email-templates.js'), { exports: { getEmailTemplate: ({ body }) => `<html>${body}</html>` } });
 mock.module(at('../models/User.js'), {
   exports: {
@@ -220,7 +223,7 @@ test('inviting adds a pending member with the role preset and emails a link with
   assert.equal(sent.length, 1);
   assert.ok(!sent[0].html.includes('<b>Home</b>'), 'workspace name is HTML-escaped');
   assert.ok(sent[0].html.includes('&lt;b&gt;Home&lt;/b&gt;'));
-  assert.ok(r.body.data.inviteLink.endsWith(`/accept-invitation/${m._id}`));
+  assert.ok(r.body.data.inviteLink.endsWith(`/accept-invitation/${m.inviteToken}`));
 });
 
 test('duplicate, self and malformed invitations are rejected; declined ones can be re-invited', async () => {
@@ -255,7 +258,7 @@ const invite = async (email = OUTSIDER.email) => {
 test('the invited person accepts with the emailed token and becomes a member', async () => {
   const m = await invite();
   currentUser = OUTSIDER;
-  const r = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  const r = await call('POST', { query: { action: 'accept', token: m.inviteToken } });
   assert.equal(r.code, 200);
   assert.equal(m.status, 'accepted');
   assert.ok(same(m.userId, OUTSIDER._id));
@@ -265,16 +268,16 @@ test('the invited person accepts with the emailed token and becomes a member', a
 test('someone else cannot use an invitation token', async () => {
   const m = await invite();
   currentUser = VIEWER;
-  assert.equal((await call('POST', { query: { action: 'accept', token: String(m._id) } })).code, 404);
+  assert.equal((await call('POST', { query: { action: 'accept', token: m.inviteToken } })).code, 404);
   assert.equal(m.status, 'pending');
 });
 
 test('declining marks the invitation declined', async () => {
   const m = await invite();
   currentUser = OUTSIDER;
-  assert.equal((await call('POST', { query: { action: 'decline', token: String(m._id) } })).code, 200);
+  assert.equal((await call('POST', { query: { action: 'decline', token: m.inviteToken } })).code, 200);
   assert.equal(m.status, 'declined');
-  assert.equal((await call('POST', { query: { action: 'accept', token: String(m._id) } })).code, 400);
+  assert.equal((await call('POST', { query: { action: 'accept', token: m.inviteToken } })).code, 400);
 });
 
 test('in-app invitation list is only for email-verified (Google) accounts', async () => {
@@ -307,11 +310,15 @@ test('resend emails a pending invitation again, and only to managers', async () 
 });
 
 test('only the owner can delete the workspace', async () => {
+  wiped = [];
+  const id = String(ws._id);
   currentUser = ADMIN;
   assert.equal((await call('DELETE', { query: q() })).code, 401);
+  assert.deepEqual(wiped, []);
   currentUser = OWNER;
   assert.equal((await call('DELETE', { query: q() })).code, 200);
   assert.equal(store.length, 0);
+  assert.deepEqual(wiped, [id]);
 });
 
 /* ------------------------------------------------------------ QR / link invites */
@@ -326,7 +333,7 @@ test('a QR invite needs no email and returns a link with an expiry', async () =>
   const res = await createLink();
   assert.equal(res.code, 200);
   const m = linkMember();
-  assert.ok(res.body.data.inviteLink.endsWith(`/accept-invitation/${m._id}`));
+  assert.ok(res.body.data.inviteLink.endsWith(`/accept-invitation/${m.inviteToken}`));
   assert.equal(m.status, 'pending');
   assert.equal(m.email, '');
   assert.ok(m.expiresAt > new Date());
@@ -337,7 +344,7 @@ test('anyone signed in can accept a QR invite, and it binds to their account', a
   await createLink();
   const m = linkMember();
   currentUser = OUTSIDER;
-  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  const res = await call('POST', { query: { action: 'accept', token: m.inviteToken } });
   assert.equal(res.code, 200);
   assert.equal(m.status, 'accepted');
   assert.ok(same(m.userId, OUTSIDER._id));
@@ -349,10 +356,10 @@ test('a QR invite is single use', async () => {
   await createLink();
   const m = linkMember();
   currentUser = OUTSIDER;
-  await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  await call('POST', { query: { action: 'accept', token: m.inviteToken } });
   currentUser = mk('late@x.com');
   users.push(currentUser);
-  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  const res = await call('POST', { query: { action: 'accept', token: m.inviteToken } });
   assert.equal(res.code, 410);
   assert.ok(same(m.userId, OUTSIDER._id));
 });
@@ -362,7 +369,7 @@ test('an expired QR invite is rejected', async () => {
   const m = linkMember();
   m.expiresAt = new Date(Date.now() - 1000);
   currentUser = OUTSIDER;
-  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  const res = await call('POST', { query: { action: 'accept', token: m.inviteToken } });
   assert.equal(res.code, 410);
   assert.equal(m.status, 'pending');
 });
@@ -371,7 +378,7 @@ test('an existing member cannot consume a QR invite', async () => {
   await createLink();
   const m = linkMember();
   currentUser = VIEWER;
-  const res = await call('POST', { query: { action: 'accept', token: String(m._id) } });
+  const res = await call('POST', { query: { action: 'accept', token: m.inviteToken } });
   assert.equal(res.code, 409);
   assert.equal(m.status, 'pending');
 });
@@ -383,4 +390,50 @@ test('QR invites cannot be resent, and a viewer cannot create one', async () => 
   assert.equal(resend.code, 400);
   currentUser = VIEWER;
   assert.equal((await createLink()).code, 403);
+});
+
+/* ------------------------------------------------------------ invitation tokens */
+
+test('every new invitation gets its own random token, and only managers are shown it', async () => {
+  await invite();
+  await createLink();
+  const tokens = ws.members.filter((m) => m.status === 'pending').map((m) => m.inviteToken);
+  assert.equal(tokens.length, 2);
+  assert.ok(tokens.every((t) => /^[A-Za-z0-9_-]{32}$/.test(t)));
+  assert.notEqual(tokens[0], tokens[1]);
+  const shown = (r) => r.body.data.members.filter((m) => m.inviteToken).length;
+  assert.equal(shown(await call('GET', { query: q() })), 2);
+  currentUser = ADMIN;
+  assert.equal(shown(await call('GET', { query: q() })), 2);
+  currentUser = VIEWER;
+  assert.equal(shown(await call('GET', { query: q() })), 0);
+  currentUser = EDITOR;
+  assert.equal(shown(await call('GET', { query: q() })), 0);
+});
+
+test('a QR invitation cannot be used by its member id', async () => {
+  await createLink();
+  const m = linkMember();
+  currentUser = OUTSIDER;
+  assert.equal((await call('POST', { query: { action: 'accept', token: String(m._id) } })).code, 404);
+  assert.equal(m.status, 'pending');
+  assert.equal((await call('POST', { query: { action: 'accept', token: m.inviteToken } })).code, 200);
+});
+
+test('an email invitation made before tokens existed still works by member id, and gets a token on resend', async () => {
+  const old = { _id: oid(), email: OUTSIDER.email, role: 'viewer', status: 'pending', inviteKind: 'email', permissions: {} };
+  ws.members.push(old);
+  const m = ws.members[ws.members.length - 1];
+  const r = await call('POST', { query: q({ action: 'resend', memberId: String(m._id) }) });
+  assert.equal(r.code, 200);
+  assert.match(r.body.data.inviteLink, /\/accept-invitation\/[A-Za-z0-9_-]{32}$/);
+  currentUser = OUTSIDER;
+  assert.equal((await call('POST', { query: { action: 'accept', token: String(m._id) } })).code, 404);
+  assert.equal((await call('POST', { query: { action: 'accept', token: m.inviteToken } })).code, 200);
+});
+
+test('a made-up token is not found', async () => {
+  currentUser = OUTSIDER;
+  assert.equal((await call('POST', { query: { action: 'accept', token: 'x'.repeat(32) } })).code, 404);
+  assert.equal((await call('POST', { query: { action: 'accept', token: 'nope' } })).code, 404);
 });

@@ -6,6 +6,8 @@ import { handleCors } from '../lib/cors.js';
 import { success, error, serverError, unauthorized, notFound, forbidden } from '../lib/response.js';
 import { sendEmail } from '../lib/email-helper.js';
 import { getEmailTemplate } from '../lib/email-templates.js';
+import { deleteWorkspaceData } from '../lib/workspaceData.js';
+import { findInvitation, inviteKeyOf, newInviteToken } from '../lib/invitations.js';
 import {
   ASSIGNABLE_ROLES,
   MAX_MEMBERS,
@@ -55,7 +57,7 @@ const LINK_INVITE_TTL_MS = 48 * 60 * 60 * 1000;
 
 const inviteLinkFor = (req, member) => {
   const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
-  return `${origin}/accept-invitation/${member._id}`;
+  return `${origin}/accept-invitation/${inviteKeyOf(member)}`;
 };
 
 async function sendInvitation({ req, workspace, member, inviter, language }) {
@@ -80,8 +82,10 @@ async function sendInvitation({ req, workspace, member, inviter, language }) {
 }
 
 // Plain workspace with each member's display name and avatar, so the UI can show people rather than emails.
-async function present(workspace) {
+// Invitation tokens are secrets: only owners and admins of the workspace see them.
+async function present(workspace, viewer) {
   const plain = workspace.toObject ? workspace.toObject() : { ...workspace };
+  const seesTokens = !!viewer && (isSame(plain.ownerId, viewer._id) || isManagerRole(findAcceptedMember(plain, viewer._id)?.role));
   const ids = plain.members.map((m) => m.userId).filter(Boolean);
   const users = ids.length ? await User.find({ _id: { $in: ids } }).select('full_name avatar').lean() : [];
   const byId = new Map(users.map((u) => [String(u._id), u]));
@@ -90,7 +94,8 @@ async function present(workspace) {
     const u = byId.get(String(m.userId));
     // Workspaces created before roles existed can have the owner stored as a viewer.
     const role = m.status === 'accepted' && isSame(m.userId, plain.ownerId) ? 'owner' : m.role;
-    return { ...m, role, name: u?.full_name || '', avatar: u?.avatar || null };
+    const { inviteToken, ...rest } = m;
+    return { ...rest, ...(seesTokens && inviteToken ? { inviteToken } : {}), role, name: u?.full_name || '', avatar: u?.avatar || null };
   });
   return plain;
 }
@@ -143,7 +148,7 @@ export default async function handler(req, res) {
           return success(res, workspaces.map((w) => {
             const m = w.members.find((x) => x.email === user.email && x.status === 'pending');
             return {
-              id: String(m._id),
+              id: inviteKeyOf(m),
               workspaceId: String(w._id),
               workspaceName: w.name,
               role: m.role,
@@ -155,10 +160,10 @@ export default async function handler(req, res) {
         if (id) {
           const workspace = await Workspace.findOne({ _id: id, members: memberScope(user) });
           if (!workspace) return notFound(res, 'Workspace not found or access denied');
-          return success(res, await present(workspace));
+          return success(res, await present(workspace, user));
         }
         const workspaces = await Workspace.find({ members: memberScope(user) }).sort('-created_date');
-        return success(res, await Promise.all(workspaces.map(present)));
+        return success(res, await Promise.all(workspaces.map((w) => present(w, user))));
       }
 
       case 'POST': {
@@ -189,6 +194,7 @@ export default async function handler(req, res) {
             invitedBy: user._id,
             invitedAt: new Date(),
             joinedAt: null,
+            inviteToken: newInviteToken(),
           };
 
           let member = email ? workspace.members.find((m) => m.email === email) : null;
@@ -205,7 +211,7 @@ export default async function handler(req, res) {
           if (via === 'link') {
             return success(res, {
               message: 'QR invitation created',
-              workspace: await present(workspace),
+              workspace: await present(workspace, user),
               inviteLink: inviteLinkFor(req, member),
               expiresAt: member.expiresAt,
               memberId: String(member._id),
@@ -214,7 +220,7 @@ export default async function handler(req, res) {
           const sent = await sendInvitation({
             req, workspace, member, inviter: user, language: invitedUser?.language || user.language || 'en',
           });
-          return success(res, { message: sent.emailSent ? 'Invitation sent' : 'Invitation created (Email failed)', workspace: await present(workspace), ...sent });
+          return success(res, { message: sent.emailSent ? 'Invitation sent' : 'Invitation created (Email failed)', workspace: await present(workspace, user), ...sent });
         }
 
         if (action === 'resend') {
@@ -224,6 +230,10 @@ export default async function handler(req, res) {
           if (!member) return notFound(res, 'Invitation not found');
           if (member.status !== 'pending') return error(res, 'This invitation is no longer pending', 400);
           if (member.inviteKind === 'link') return error(res, 'QR invitations have no email to resend', 400);
+          if (!member.inviteToken) {
+            member.inviteToken = newInviteToken();
+            await ctx.workspace.save();
+          }
           const invitedUser = member.userId ? await User.findById(member.userId).select('language').lean() : null;
           const sent = await sendInvitation({
             req, workspace: ctx.workspace, member, inviter: user, language: invitedUser?.language || user.language || 'en',
@@ -232,12 +242,11 @@ export default async function handler(req, res) {
         }
 
         if (action === 'accept' || action === 'decline') {
-          // The member id doubles as the emailed invitation token.
           const token = req.query.token || memberId;
-          if (!token || !/^[a-f\d]{24}$/i.test(token)) return error(res, 'Invitation token required', 400);
-          const workspace = await Workspace.findOne({ 'members._id': token });
-          const member = workspace?.members.find((m) => isSame(m._id, token));
-          if (!member) return notFound(res, 'Invitation not found');
+          if (!token) return error(res, 'Invitation token required', 400);
+          const found = await findInvitation(Workspace, token);
+          if (!found) return notFound(res, 'Invitation not found');
+          const { workspace, member } = found;
 
           if (member.inviteKind === 'link') {
             // Open invitation: whoever holds it can join once, until it expires.
@@ -251,7 +260,7 @@ export default async function handler(req, res) {
               { $set: { 'members.$.status': 'accepted', 'members.$.userId': user._id, 'members.$.email': user.email, 'members.$.joinedAt': new Date() } }
             );
             if (!claimed.modifiedCount) return error(res, 'This invitation is no longer valid', 410);
-            return success(res, await present(await Workspace.findById(workspace._id)));
+            return success(res, await present(await Workspace.findById(workspace._id), user));
           }
 
           if (member.email !== user.email) return notFound(res, 'Invitation not found');
@@ -265,7 +274,7 @@ export default async function handler(req, res) {
             } else if (member.status !== 'accepted') {
               return error(res, 'This invitation is no longer valid', 400);
             }
-            return success(res, await present(workspace));
+            return success(res, await present(workspace, user));
           }
           if (member.status === 'pending') {
             member.status = 'declined';
@@ -310,7 +319,7 @@ export default async function handler(req, res) {
             permissions: buildPermissions('owner'),
           }],
         });
-        return success(res, await present(workspace), 201);
+        return success(res, await present(workspace, user), 201);
       }
 
       case 'PUT': {
@@ -336,7 +345,7 @@ export default async function handler(req, res) {
           target.role = role;
 
           await workspace.save();
-          return success(res, await present(workspace));
+          return success(res, await present(workspace, user));
         }
 
         // Household options: the AI assistant and alerts for large expenses (owners and admins)
@@ -351,7 +360,7 @@ export default async function handler(req, res) {
           }
           workspace.settings = next;
           await workspace.save();
-          return success(res, await present(workspace));
+          return success(res, await present(workspace, user));
         }
 
         if (!actor || actor.role !== 'owner') return forbidden(res, 'Only the owner can rename the workspace');
@@ -359,7 +368,7 @@ export default async function handler(req, res) {
         if (!name) return error(res, 'Workspace name required', 400);
         workspace.name = name.slice(0, 80);
         await workspace.save();
-        return success(res, await present(workspace));
+        return success(res, await present(workspace, user));
       }
 
       case 'DELETE': {
@@ -372,12 +381,13 @@ export default async function handler(req, res) {
           if (!canManageMember(workspace, actor, target)) return forbidden(res, 'You cannot remove this member');
           workspace.members = workspace.members.filter((m) => !isSame(m._id, target._id));
           await workspace.save();
-          return success(res, await present(workspace));
+          return success(res, await present(workspace, user));
         }
 
         if (!id) return error(res, 'Workspace ID required', 400);
         const deleted = await Workspace.findOneAndDelete({ _id: id, ownerId: user._id });
         if (!deleted) return unauthorized(res, 'Not authorized to delete this workspace');
+        await deleteWorkspaceData(deleted._id);
         return success(res, { message: 'Workspace deleted' });
       }
 
