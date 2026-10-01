@@ -46,8 +46,10 @@ function matches(doc, q) {
     return same(doc[k], v) || doc[k] === v;
   });
 }
+let saves = 0;
 function apply(doc, raw) {
   const update = norm(raw);
+  doc.updated_date = new Date(Date.UTC(2026, 0, 1) + (saves += 1) * 1000); // timestamps: every save moves it
   Object.assign(doc, update.$set || {});
   for (const [f, v] of Object.entries(update.$addToSet || {})) if (!(doc[f] ||= []).some((x) => same(x, v))) doc[f].push(v);
   for (const [f, v] of Object.entries(update.$pull || {})) {
@@ -254,4 +256,43 @@ test('file bytes come back exactly, never the memory around them', () => {
   assert.equal(fileBytes({ buffer: sliced }).toString(), 'hi');
   assert.equal(fileBytes(sliced).toString(), 'hi');
   assert.equal(fileBytes(structuredClone(small)).toString(), 'hi'); // a copy that kept the pool around it
+});
+
+test('two people ticking different checklist items at once both keep their tick', async () => {
+  const start = (await call('PUT', { id: shared.id }, { items: [{ id: 'a', text: 'milk' }, { id: 'b', text: 'eggs' }] })).body.data.items;
+  // the editor ticks eggs, based on what they saw
+  as(EDITOR);
+  await call('PUT', { id: shared.id }, { items: [start[0], { ...start[1], done: true }], itemsBase: start });
+  // the owner, still looking at the old list, ticks milk and adds bread
+  as(OWNER);
+  const r = await call('PUT', { id: shared.id }, { items: [{ ...start[0], done: true }, start[1], { id: 'c', text: 'bread' }], itemsBase: start });
+  assert.equal(r.code, 200);
+  assert.deepEqual(r.body.data.items.map((i) => [i.id, i.done]), [['a', true], ['b', true], ['c', false]]);
+});
+
+test('a checklist sent without a base replaces the list, as older apps expect', async () => {
+  await call('PUT', { id: shared.id }, { items: [{ id: 'a', text: 'milk' }, { id: 'b', text: 'eggs', done: true }] });
+  const r = await call('PUT', { id: shared.id }, { items: [{ id: 'z', text: 'only' }] });
+  assert.deepEqual(r.body.data.items.map((i) => i.id), ['z']);
+});
+
+test('a save that loses the race to another one is merged again, not dropped', async () => {
+  const start = (await call('PUT', { id: shared.id }, { items: [{ id: 'a', text: 'milk' }, { id: 'b', text: 'eggs' }] })).body.data.items;
+  const realUpdate = Note.findOneAndUpdate;
+  let raced = false;
+  Note.findOneAndUpdate = (q, update) => {
+    if (!raced && q.updated_date) {
+      raced = true; // someone else ticks eggs just before this write lands
+      const doc = rows.find((d) => same(d._id, shared.id));
+      apply(doc, { $set: { items: [doc.items[0], { ...doc.items[1], done: true }] } });
+    }
+    return realUpdate(q, update);
+  };
+  try {
+    const r = await call('PUT', { id: shared.id }, { items: [{ ...start[0], done: true }, start[1]], itemsBase: start });
+    assert.equal(r.code, 200);
+    assert.deepEqual(r.body.data.items.map((i) => i.done), [true, true]);
+  } finally {
+    Note.findOneAndUpdate = realUpdate;
+  }
 });

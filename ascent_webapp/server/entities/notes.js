@@ -5,6 +5,7 @@ import connectDB from '../lib/mongodb.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, notFound, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { mergeChecklist } from '../lib/checklistMerge.js';
 
 const TRASH_DAYS = 7;
 const MAX_ITEMS = 500;
@@ -344,13 +345,23 @@ export default async function handler(req, res) {
         }
         if (Object.keys(set).length) update.$set = set;
 
-        const updated = await Note.findOneAndUpdate(
-          { _id: id, workspaceId: workspace._id },
-          update,
-          { new: true, runValidators: true }
-        ).lean();
-        if (!updated) return notFound(res, 'Note not found');
-        return success(res, present(updated, user, member));
+        // A checklist edit sent with the list it started from is merged into the list as it is now, so
+        // people ticking different items at once keep both. The write only lands if nobody saved in between.
+        const base = Array.isArray(body.itemsBase) && set.items ? cleanItems(body.itemsBase) : null;
+        let current = note;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const filter = { _id: id, workspaceId: workspace._id };
+          if (base) {
+            set.items = mergeChecklist(base, cleanItems(body.items), cleanItems(current.items || []));
+            filter.updated_date = current.updated_date;
+          }
+          const updated = await Note.findOneAndUpdate(filter, update, { new: true, runValidators: true }).lean();
+          if (updated) return success(res, present(updated, user, member));
+          if (!base) break;
+          current = await Note.findOne({ _id: id, workspaceId: workspace._id }).lean();
+          if (!current) break;
+        }
+        return base && current ? error(res, 'The note changed meanwhile. Try again.', 409) : notFound(res, 'Note not found');
       }
 
       case 'DELETE': {

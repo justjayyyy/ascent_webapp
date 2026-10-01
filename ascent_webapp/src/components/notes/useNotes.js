@@ -100,6 +100,7 @@ export function useNotes() {
       const rev = sync.rev;
       const fetched = await ascent.entities.Note.list('-updated_date', 2000);
       const list = Array.isArray(fetched) ? fetched : [];
+      sync.remember(list);
       // An edit was made while this request was in flight: the response predates it
       if (sync.rev !== rev || sync.pending()) return queryClient.getQueryData(queryKey) ?? list;
       return list;

@@ -8,14 +8,15 @@ import { ascent } from '@/api/client';
 // are sent in order whenever the device is online, so edits made on a plane or in a lift
 // survive a reload and reach the server later. Edits to the same note are coalesced, so a
 // burst of typing is one request. Note ids are created on the client, which makes a
-// retried create idempotent on the server.
+// retried create idempotent on the server. A checklist edit also carries the list it started from
+// (itemsBase), so the server merges it with what others changed meanwhile instead of overwriting.
 
 const safe = async (fn, fallback) => {
   try { return await fn(); } catch { return fallback; }
 };
 
 const isTransient = (e) =>
-  e?.isNetworkError || e?.status === 0 || e?.status === 408 || e?.status === 401 ||
+  e?.isNetworkError || e?.status === 0 || e?.status === 408 || e?.status === 401 || e?.status === 409 ||
   e?.status === 429 || (e?.status >= 500) || !e?.status;
 
 class NotesSync {
@@ -29,6 +30,7 @@ class NotesSync {
     this.rev = 0; // bumps on every local change, so a stale fetch can be told apart
     this.listeners = new Set();
     this.rejected = new Set();
+    this.serverItems = new Map(); // note id -> checklist as the server last sent it
     this.outboxKey = `ascent:notes:outbox:${scope}`;
     this.cacheKey = `ascent:notes:cache:${scope}`;
     this.loaded = safe(() => get(this.outboxKey), []).then((ops) => {
@@ -58,6 +60,17 @@ class NotesSync {
     this.rejectedHandler = fn;
   }
 
+  /** Notes as the server sent them: the checklists later edits are based on. */
+  remember(notes) {
+    for (const n of notes || []) if (n?.id && Array.isArray(n.items)) this.serverItems.set(n.id, n.items);
+  }
+
+  /** The checklist an edit to note `id` starts from: the last one queued for it, else the server's. */
+  itemsBase(id) {
+    const queued = [...this.ops].reverse().find(o => o.id === id && Array.isArray(o.data?.items));
+    return queued ? queued.data.items : this.serverItems.get(id);
+  }
+
   enqueue(op) {
     this.rev += 1;
     // The op currently on the wire can no longer be changed, so newer edits queue behind it
@@ -66,8 +79,16 @@ class NotesSync {
       const create = open.find(o => o.type === 'create' && o.id === op.id);
       const patch = open.find(o => o.type === 'patch' && o.id === op.id);
       if (create) create.data = { ...create.data, ...op.data };
-      else if (patch) patch.data = { ...patch.data, ...op.data };
-      else this.ops.push(op);
+      else if (patch) {
+        // A queued edit keeps the base it started from; one that already replaces the list without a base
+        // (the server's copy was unknown) goes on replacing it, or its first change would be lost
+        const hadItems = Array.isArray(patch.data.items);
+        const base = hadItems ? patch.data.itemsBase : (Array.isArray(op.data.items) ? this.itemsBase(op.id) : undefined);
+        patch.data = { ...patch.data, ...op.data, ...(base ? { itemsBase: base } : {}) };
+      } else {
+        const base = Array.isArray(op.data?.items) ? this.itemsBase(op.id) : undefined;
+        this.ops.push(base ? { ...op, data: { ...op.data, itemsBase: base } } : op);
+      }
     } else if (op.type === 'delete') {
       const neverSent = open.some(o => o.type === 'create' && o.id === op.id) &&
         !(this.inflight && this.inflight.id === op.id);
@@ -95,6 +116,7 @@ class NotesSync {
   }
 
   applyServerNote(saved) {
+    if (saved?.id && Array.isArray(saved.items)) this.serverItems.set(saved.id, saved.items);
     if (!saved?.id || this.pendingFor(saved.id)) return; // a newer local edit is still on its way
     this.queryClient.setQueryData(this.queryKey, (list = []) => {
       const exists = list.some(n => n.id === saved.id);
