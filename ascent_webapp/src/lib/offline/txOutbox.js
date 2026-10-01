@@ -268,9 +268,9 @@ function useTransactionView(view, enabled, { live }) {
     placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === workspaceId ? previous : undefined),
     staleTime: 3 * 60 * 1000,
     // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return, and the main
-    // window also while open
+    // window also once a minute while open (only while the tab is in front)
     refetchOnWindowFocus: 'always',
-    refetchInterval: live ? 30 * 1000 : false,
+    refetchInterval: live ? 60 * 1000 : false,
   });
   const { ops, idMap } = useOutboxState(userId);
   // Only this workspace's waiting changes belong in this workspace's list

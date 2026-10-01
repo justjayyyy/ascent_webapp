@@ -4,7 +4,7 @@ import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 
 const HEARTBEAT_MS = 60 * 1000;
-const MEMBERS_MS = 30 * 1000;
+const MEMBERS_MS = 60 * 1000;
 const DATA_MS = 45 * 1000;
 const MIN_GAP_MS = 5 * 1000;
 
@@ -45,7 +45,8 @@ export function useWorkspaceSync() {
     const syncData = () => {
       if (!isShared || !visible() || Date.now() - lastData < MIN_GAP_MS) return;
       lastData = Date.now();
-      queryClient.invalidateQueries({ refetchType: 'active' });
+      // Transactions refresh on their own timer (txOutbox.js); everything else on screen is refreshed here
+      queryClient.invalidateQueries({ refetchType: 'active', predicate: (q) => q.queryKey[0] !== 'transactions' });
     };
 
     const membersTimer = setInterval(syncMembers, MEMBERS_MS);
