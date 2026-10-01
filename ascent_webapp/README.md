@@ -39,7 +39,7 @@ npm run dev:all        # web app on :5173 and API on :3002
 | `FINNHUB_API_KEY` | portfolio (hidden) | Stock quotes |
 | `API_PROXY_TARGET` | no | Where `npm run dev` proxies `/api` (default `http://localhost:3002`) |
 
-After the first deploy, and whenever indexes change:
+Deploying, environment and post-deploy steps: [DEPLOY.md](DEPLOY.md). After the first deploy, and whenever indexes change:
 
 ```bash
 npm run ensure:indexes
