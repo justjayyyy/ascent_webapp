@@ -4,12 +4,13 @@ import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 
 const HEARTBEAT_MS = 60 * 1000;
-const MEMBERS_MS = 60 * 1000;
-const DATA_MS = 45 * 1000;
-const MIN_GAP_MS = 5 * 1000;
+const PULSE_MS = 4 * 1000;
+const PRESENCE_MS = 30 * 1000; // who's online comes from heartbeats, which don't move the counters
+const MIN_GAP_MS = 1500;
 
-// Keeps a shared workspace feeling live without websockets (the API runs serverless):
-// presence heartbeat, member/permission sync, and a refetch of on-screen data while others are around.
+// Keeps a shared workspace live without websockets (the API runs serverless): a presence heartbeat,
+// and a cheap "pulse" poll of the workspace's change counters. When someone else adds an expense,
+// edits a note, joins or changes permissions, the on-screen data refetches within a few seconds.
 export function useWorkspaceSync() {
   const { user, currentWorkspace, refreshWorkspaces } = useAuth();
   const queryClient = useQueryClient();
@@ -18,7 +19,15 @@ export function useWorkspaceSync() {
 
   const signedIn = !!user;
   const workspaceId = currentWorkspace?.id || currentWorkspace?._id;
-  const isShared = (currentWorkspace?.members || []).filter((m) => m.status === 'accepted').length > 1;
+
+  // Cached lists belong to the previous workspace after a switch, or after being removed from one.
+  const lastWorkspaceId = useRef(workspaceId);
+  useEffect(() => {
+    if (workspaceId && lastWorkspaceId.current && lastWorkspaceId.current !== workspaceId) {
+      queryClient.invalidateQueries();
+    }
+    if (workspaceId) lastWorkspaceId.current = workspaceId;
+  }, [workspaceId, queryClient]);
 
   useEffect(() => {
     if (!signedIn || !workspaceId) return undefined;
@@ -33,36 +42,51 @@ export function useWorkspaceSync() {
 
   useEffect(() => {
     if (!signedIn || !workspaceId) return undefined;
-    let lastMembers = Date.now();
-    let lastData = Date.now();
     const visible = () => document.visibilityState === 'visible';
+    let seen = null; // last { dataRev, updated } this device has caught up with
+    let inFlight = false;
+    let lastCheck = 0;
+    let stopped = false;
 
-    const syncMembers = () => {
-      if (!visible() || Date.now() - lastMembers < MIN_GAP_MS) return;
-      lastMembers = Date.now();
-      refreshRef.current?.();
-    };
-    const syncData = () => {
-      if (!isShared || !visible() || Date.now() - lastData < MIN_GAP_MS) return;
-      lastData = Date.now();
-      // Transactions refresh on their own timer (txOutbox.js); everything else on screen is refreshed here
-      queryClient.invalidateQueries({ refetchType: 'active', predicate: (q) => q.queryKey[0] !== 'transactions' });
+    const check = async () => {
+      if (stopped || inFlight || !visible() || Date.now() - lastCheck < MIN_GAP_MS) return;
+      inFlight = true;
+      lastCheck = Date.now();
+      try {
+        const pulse = await ascent.workspaces.pulse(workspaceId);
+        if (stopped || !pulse) return;
+        if (seen) {
+          if (pulse.updated !== seen.updated) refreshRef.current?.();
+          if (pulse.dataRev !== seen.dataRev) queryClient.invalidateQueries({ refetchType: 'active' });
+        } else {
+          // Back from the background (or first look): catch up once, cheaply
+          refreshRef.current?.();
+        }
+        seen = { dataRev: pulse.dataRev, updated: pulse.updated };
+      } catch {
+        // Offline or removed from the workspace: the members refresh handles removal, polling continues
+      } finally {
+        inFlight = false;
+      }
     };
 
-    const membersTimer = setInterval(syncMembers, MEMBERS_MS);
-    const dataTimer = setInterval(syncData, DATA_MS);
+    check();
+    const timer = setInterval(check, PULSE_MS);
+    const presence = setInterval(() => { if (visible()) refreshRef.current?.(); }, PRESENCE_MS);
     const onWake = () => {
-      if (!visible()) return;
-      syncMembers();
-      if (Date.now() - lastData > MEMBERS_MS) syncData();
+      // The counters only move forward, so one check catches up on anything changed while hidden
+      if (visible()) check();
     };
     document.addEventListener('visibilitychange', onWake);
     window.addEventListener('focus', onWake);
+    window.addEventListener('online', onWake);
     return () => {
-      clearInterval(membersTimer);
-      clearInterval(dataTimer);
+      stopped = true;
+      clearInterval(timer);
+      clearInterval(presence);
       document.removeEventListener('visibilitychange', onWake);
       window.removeEventListener('focus', onWake);
+      window.removeEventListener('online', onWake);
     };
-  }, [signedIn, workspaceId, isShared, queryClient]);
+  }, [signedIn, workspaceId, queryClient]);
 }

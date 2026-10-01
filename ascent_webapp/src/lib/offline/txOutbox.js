@@ -256,7 +256,7 @@ export function useOutbox() {
 }
 
 /** One view of the household's transactions, with changes still waiting on this device drawn in. */
-function useTransactionView(view, enabled, { live }) {
+function useTransactionView(view, enabled) {
   const { user } = useAuth();
   const userId = user?.id || user?._id;
   const workspaceId = useWorkspaceId();
@@ -267,10 +267,9 @@ function useTransactionView(view, enabled, { live }) {
     // A longer window keeps showing the shorter one while it loads, never another workspace's rows
     placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === workspaceId ? previous : undefined),
     staleTime: 3 * 60 * 1000,
-    // Payments can arrive from the phone at any time (Apple Pay taps): refresh on return, and the main
-    // window also once a minute while open (only while the tab is in front)
+    // New rows from other devices (another member, an Apple Pay tap) arrive through the workspace pulse
+    // (useWorkspaceSync), which refetches when anything changed; and on return to the app
     refetchOnWindowFocus: 'always',
-    refetchInterval: live ? 60 * 1000 : false,
   });
   const { ops, idMap } = useOutboxState(userId);
   // Only this workspace's waiting changes belong in this workspace's list
@@ -283,12 +282,11 @@ function useTransactionView(view, enabled, { live }) {
 /**
  * The household's transactions from `from` (YYYY-MM-DD) on, or from the default window
  * (HISTORY_MONTHS back) when that is earlier. Future rows (installments, recurring) are included.
- * Refreshed every 30 s while open.
  */
 export function useTransactions({ from, enabled = true } = {}) {
   const start = earliestDay(from, windowStart());
   const view = useMemo(() => ({ from: start }), [start]);
-  return useTransactionView(view, enabled, { live: true });
+  return useTransactionView(view, enabled);
 }
 
 /**
@@ -297,7 +295,7 @@ export function useTransactions({ from, enabled = true } = {}) {
  */
 export function useLinkedTransactions(field, { enabled = true } = {}) {
   const view = useMemo(() => ({ has: field }), [field]);
-  return useTransactionView(view, enabled, { live: false });
+  return useTransactionView(view, enabled);
 }
 
 /** The date of the household's oldest transaction (YYYY-MM-DD), so screens can offer every year there is. */

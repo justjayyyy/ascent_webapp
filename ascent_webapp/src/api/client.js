@@ -237,6 +237,8 @@ const workspaces = {
   removeMember: (id, memberId) => request(`/workspaces?id=${enc(id)}&action=removeMember&memberId=${enc(memberId)}`, { method: 'DELETE' }),
   resendInvite: (id, memberId) => request(`/workspaces?id=${enc(id)}&action=resend&memberId=${enc(memberId)}`, { method: 'POST' }),
   leave: (id) => request(`/workspaces?id=${enc(id)}&action=leave`, { method: 'POST' }),
+  // { dataRev, updated }: changes whenever anyone edits the workspace's data or its members
+  pulse: (id) => request(`/workspaces?id=${enc(id)}&action=pulse`, { timeout: 8000, retries: 0 }),
   heartbeat: (id) => request(`/workspaces?id=${enc(id)}&action=heartbeat`, { method: 'POST' }),
   myInvitations: () => request('/workspaces?action=invitations'),
   acceptInvitation: (token) => request(`/workspaces?action=accept&token=${enc(token)}`, { method: 'POST' }),

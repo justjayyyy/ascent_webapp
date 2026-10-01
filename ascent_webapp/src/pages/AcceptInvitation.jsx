@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, Mail, ShieldCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { rememberWorkspace } from '@/lib/session';
+import { forgetInvite, forgetJoined, joinedThrough, rememberInvite } from '@/lib/pendingInvite';
 import { translations } from '@/lib/translations';
 import { fmt, roleLabel } from '@/components/workspace/utils';
 
@@ -21,7 +22,7 @@ const pickLanguage = (userLanguage) => {
 export default function AcceptInvitation() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, refreshWorkspaces } = useAuth();
+  const { user, isAuthenticated, logout, refreshWorkspaces, workspaces, switchWorkspace } = useAuth();
   const [invitation, setInvitation] = useState(null);
   const [failed, setFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,11 +49,33 @@ export default function AcceptInvitation() {
 
   const signedIn = isAuthenticated && !!user;
   const isLink = invitation?.kind === 'link';
+
+  // Signed out: keep the invitation through sign-in (or sign-up), which joins it before anything else
+  useEffect(() => {
+    if (invitation && !signedIn && !(invitation.kind === 'link' && invitation.expired)) rememberInvite(token);
+  }, [invitation, signedIn, token]);
+
+  // Back here after signing in, already joined through this invitation: open that workspace
+  const joinedWorkspace = useMemo(() => {
+    const id = signedIn ? joinedThrough(token) : null;
+    return id ? (workspaces || []).find((w) => String(w.id || w._id) === String(id)) || null : null;
+  }, [signedIn, token, workspaces]);
+  const handled = useRef(false); // accepting on this page shows its own confirmation
+  useEffect(() => {
+    if (!joinedWorkspace || handled.current) return;
+    handled.current = true;
+    forgetJoined();
+    switchWorkspace(joinedWorkspace.id || joinedWorkspace._id);
+    toast.success(fmt(t('wsJoined'), { workspace: joinedWorkspace.name }));
+    navigate('/', { replace: true });
+  }, [joinedWorkspace, switchWorkspace, navigate, t]);
   const emailMatches = signedIn && (isLink || user.email?.toLowerCase() === invitation?.invitedEmail?.toLowerCase());
 
   const handleGoogleCallback = async (response) => {
     if (!response.credential) return;
     setBusy(true);
+    handled.current = true;
+    forgetInvite();
     try {
       await ascent.auth.googleLogin(response.credential);
       rememberWorkspace(null);
@@ -95,6 +118,8 @@ export default function AcceptInvitation() {
 
   const respond = async (accept) => {
     setBusy(true);
+    handled.current = true;
+    forgetInvite();
     try {
       if (accept) {
         await ascent.workspaces.acceptInvitation(token);
@@ -122,7 +147,7 @@ export default function AcceptInvitation() {
     </div>
   );
 
-  if (isLoading) {
+  if (isLoading || (joinedWorkspace && !busy)) {
     return shell(
       <CardContent className="p-6 text-center">
         <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" aria-hidden="true" />

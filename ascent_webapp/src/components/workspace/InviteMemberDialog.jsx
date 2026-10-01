@@ -44,7 +44,7 @@ export default function InviteMemberDialog({ open, onOpenChange, workspaceName, 
       const result = await onInvite(isQr
         ? { method: 'link', role: access.role, permissions: access.permissions }
         : { email: value, role: access.role, permissions: access.permissions });
-      if (result?.inviteLink) setSent({ link: result.inviteLink, email: isQr ? '' : value, expiresAt: result.expiresAt, emailSent: !isQr && result.emailSent !== false, qr: isQr });
+      if (result?.inviteLink) setSent({ link: result.inviteLink, email: isQr ? '' : value, expiresAt: result.expiresAt, emailSent: !isQr && result.emailSent !== false, emailError: result.emailError, qr: isQr });
       else onOpenChange(false);
     } catch (err) {
       setError(err?.message || t('wsFailed'));
@@ -66,7 +66,10 @@ export default function InviteMemberDialog({ open, onOpenChange, workspaceName, 
         {!sent.qr && !sent.emailSent && (
           <p className="mb-4 flex items-start gap-2 text-sm text-danger text-pretty">
             <MailWarning className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {t('wsInviteEmailFailed')}
+            <span>
+              {t('wsInviteEmailFailed')}
+              {sent.emailError && <span className="mt-1 block text-xs text-muted-foreground" dir="ltr">{sent.emailError}</span>}
+            </span>
           </p>
         )}
         <InviteShare

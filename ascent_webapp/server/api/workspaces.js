@@ -132,6 +132,13 @@ export default async function handler(req, res) {
 
     switch (method) {
       case 'GET': {
+        // Cheap change check open apps poll: dataRev moves on any data write, updated on member/settings changes.
+        if (action === 'pulse') {
+          if (!id) return error(res, 'Workspace ID required', 400);
+          const ws = await Workspace.findOne({ _id: id, members: memberScope(user) }).select('dataRev updated_date').lean();
+          if (!ws) return notFound(res, 'Workspace not found or access denied');
+          return success(res, { dataRev: ws.dataRev || 0, updated: ws.updated_date });
+        }
         if (action === 'invitations') {
           // Only accounts that proved they own their email see invitations in-app; others use the emailed link.
           if (user.authProvider !== 'google' && user.emailVerified !== true) return success(res, []);

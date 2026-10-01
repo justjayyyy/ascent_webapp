@@ -25,6 +25,17 @@ function initialLanguage() {
   return LANGS.includes(device) ? device : 'he';
 }
 
+// Sign-out passes the full page URL; the router needs a path, and only this app's own pages are allowed
+function toAppPath(redirect) {
+  if (!redirect) return '/Dashboard';
+  try {
+    const url = new URL(redirect, window.location.origin);
+    return url.origin === window.location.origin ? url.pathname + url.search + url.hash : '/Dashboard';
+  } catch {
+    return '/Dashboard';
+  }
+}
+
 /** 0 (empty) to 4, from length and character variety */
 export function passwordStrength(pw) {
   if (!pw) return 0;
@@ -67,7 +78,7 @@ export function useAuthFlow() {
   useLayoutEffect(() => () => setPageLanguage(null), []);
 
   // ---- where to go after signing in ----
-  const rawRedirect = searchParams.get('redirect') || '/Dashboard';
+  const rawRedirect = toAppPath(searchParams.get('redirect'));
   const redirectUrl = PUBLIC_PAGES.some((p) => rawRedirect.endsWith(p)) ? '/Dashboard' : rawRedirect;
 
   const reason = searchParams.get('reason');

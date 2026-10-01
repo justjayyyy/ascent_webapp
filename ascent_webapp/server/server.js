@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { rateLimit } from './lib/rateLimit.js';
 import { isAllowedOrigin } from './lib/cors.js';
+import { trackChanges } from './lib/live.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -31,16 +32,20 @@ app.use((req, res, next) => {
 /**
  * An Express route for a serverless-style handler module, loaded on first use. The import path must be a
  * literal at each call site so Vercel's bundler can see and include it.
+ * `live`: a successful write marks the workspace changed, so other open apps refresh (lib/live.js).
  */
-export function route(load) {
+export function route(load, { live = false } = {}) {
   let handler;
   return async (req, res) => {
+    const settled = live ? trackChanges(req, res) : () => Promise.resolve();
     try {
       handler ??= (await load()).default;
       req.query = { ...req.query, ...req.params };
       await handler(req, res);
+      await settled();
     } catch (err) {
       console.error(`[API] ${req.method} ${req.path}:`, err?.message);
+      await settled();
       if (!res.headersSent) res.status(500).json({ success: false, error: 'Internal server error' });
     }
   };
@@ -54,7 +59,7 @@ const jsonError = (limit) => (req, res, next) =>
   });
 
 // Automation ingest (phone Shortcuts). Registered ahead of the general parser so it gets its own small limit.
-app.post('/api/ingest/:kind', jsonError('8kb'), route(() => import('./api/ingest.js')));
+app.post('/api/ingest/:kind', jsonError('8kb'), route(() => import('./api/ingest.js'), { live: true }));
 app.all('/api/ingest/:kind', (req, res) => res.status(405).json({ success: false, error: 'method_not_allowed' }));
 
 // Note attachments travel as base64 inside JSON, so the general limit is generous
@@ -80,7 +85,7 @@ any('/api/workspaces', route(() => import('./api/workspaces.js')), ['get', 'post
 app.get('/api/invitations/:token', route(() => import('./api/get-invitation.js')));
 any('/api/ingest-tokens', route(() => import('./api/ingest-tokens.js')), ['get', 'post', 'delete']);
 any('/api/push', route(() => import('./api/push.js')), ['get', 'post', 'delete']);
-app.post('/api/import/statement', route(() => import('./api/import-statement.js')));
+app.post('/api/import/statement', route(() => import('./api/import-statement.js'), { live: true }));
 any('/api/assist', route(() => import('./api/assist.js')), ['get', 'post']);
 
 // Workspace data
@@ -102,12 +107,12 @@ const ENTITIES = {
   settlements: () => import('./entities/settlements.js'),
   commitments: () => import('./entities/commitments.js'),
 };
-for (const [name, load] of Object.entries(ENTITIES)) any(`/api/entities/${name}`, route(load));
+for (const [name, load] of Object.entries(ENTITIES)) any(`/api/entities/${name}`, route(load, { live: true }));
 
 // Integrations
 app.get('/api/integrations/stock-quote', route(() => import('./integrations/stock-quote.js')));
 // Apple Pay via the older single-key Shortcut (new setups use /api/ingest with per-device tokens)
-any('/api/integrations/quick-add', route(() => import('./integrations/quick-add.js')), ['get', 'post', 'delete']);
+any('/api/integrations/quick-add', route(() => import('./integrations/quick-add.js'), { live: true }), ['get', 'post', 'delete']);
 any('/api/integrations/google-calendar', route(() => import('./integrations/google-calendar.js')), ['get', 'post', 'put', 'patch', 'delete']);
 
 // Scheduled emails (Vercel Cron)

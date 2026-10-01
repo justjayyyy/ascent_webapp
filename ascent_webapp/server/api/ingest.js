@@ -96,6 +96,7 @@ export default async function handler(req, res) {
     if (!user || !memberCanSubmit(member)) {
       return finish({ outcome: 'forbidden', reason: 'membership', status: 403, code: 'forbidden' });
     }
+    req.liveWorkspaceId = workspace._id; // other members' open apps refresh when a purchase lands
 
     const recent = await IngestEvent.countDocuments({
       tokenId: token._id,

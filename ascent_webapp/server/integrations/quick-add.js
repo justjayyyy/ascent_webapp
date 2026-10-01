@@ -83,6 +83,7 @@ async function addFromShortcut(req, res, token) {
   }
   const currency = String(body.currency || money.currency || user.currency || 'USD').toUpperCase().slice(0, 3);
   const workspaceId = user.shortcutWorkspaceId;
+  req.liveWorkspaceId = workspaceId; // open apps refresh when the purchase lands
 
   // A double-fired automation shouldn't record the purchase twice
   const recent = await ExpenseTransaction.findOne({

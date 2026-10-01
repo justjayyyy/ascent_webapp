@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, use
 import { ascent, systemPrefs } from '@/api/client';
 import { isNetworkError } from '@/lib/offline/network';
 import { markUnlocked } from '@/lib/appLock';
+import { rememberInvite, rememberJoined, takePendingInvite } from '@/lib/pendingInvite';
 import {
   findMember, permissionsOf, hasPermissionIn, sameId, workspaceIdOf, sessionState,
   storedWorkspaceId, rememberWorkspace, readCachedSession, writeCachedSession, clearCachedSession,
@@ -49,6 +50,21 @@ export const AuthProvider = ({ children }) => {
   // The person's workspaces from the server; offline, what this device already knows stays
   const loadWorkspaces = useCallback(async (currentUser) => {
     try {
+      // An invitation opened before signing in is joined first, so it opens instead of an empty workspace
+      const invite = takePendingInvite();
+      if (invite) {
+        try {
+          const joined = await ascent.workspaces.acceptInvitation(invite);
+          const joinedId = workspaceIdOf(joined);
+          if (joinedId) {
+            rememberWorkspace(joinedId);
+            rememberJoined(invite, joinedId);
+          }
+        } catch (inviteError) {
+          // No signal: try again next time. Otherwise it is expired, used, or for another email (its page explains)
+          if (isNetworkError(inviteError)) rememberInvite(invite);
+        }
+      }
       let list = await ascent.workspaces.list();
       // Every account is created with its own workspace; this only repairs one that lost it
       if (!list.length) list = [await ascent.workspaces.create({ name: 'My Workspace' })];

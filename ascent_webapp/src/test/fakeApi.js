@@ -88,6 +88,7 @@ export function fakeFetch(data) {
     if (path === '/workspaces') {
       if (q.action === 'invitations') return ok([]);
       if (q.action === 'heartbeat') return ok({ ok: true });
+      if (q.action === 'pulse') return ok({ dataRev: 0, updated: 'start' });
       return ok(data.workspaces);
     }
     if (path === '/assist') return ok({ ai: { configured: false, enabled: false } });

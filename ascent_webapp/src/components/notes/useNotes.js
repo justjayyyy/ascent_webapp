@@ -88,9 +88,7 @@ export function useNotes() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    // Shared notes change under you, so poll gently while the app is in front
-    refetchInterval: 15000,
-    refetchIntervalInBackground: false,
+    // Shared notes changed by others arrive through the workspace pulse (useWorkspaceSync)
     networkMode: 'always',
     retry: 1,
     queryFn: async () => {
