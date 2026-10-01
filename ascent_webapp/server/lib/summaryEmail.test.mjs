@@ -89,8 +89,9 @@ mock.module(at('../models/Workspace.js'), {
 mock.module(at('../models/ExpenseTransaction.js'), {
   exports: { default: { find: (q) => { db.txQueries.push(q); return chain(db.rows.filter((r) => r.workspaceId === q.workspaceId)); } } },
 });
+mock.module(at('./rates.js'), { exports: { getRates: async () => ({ USD: 1, ILS: 3.7, EUR: 0.9 }) } });
 mock.module(at('./email-helper.js'), { exports: { sendEmail: async () => ({ sent: true }) } });
-const { runSummaryJob, summaryWorkspace, summaryHandler } = await import('./summaryJob.js');
+const { runSummaryJob, summaryWorkspace, summaryHandler, eachLimited } = await import('./summaryJob.js');
 
 test('the job sends to people with activity, skips quiet ones, and reads their own workspace', async () => {
   db.users = [
@@ -134,4 +135,31 @@ test('the cron handler refuses without authorization and reports counts with it'
   await summaryHandler('daily', { authorized: () => true, connect: async () => {} })({ method: 'POST' }, ok);
   assert.equal(ok.code, 200);
   assert.deepEqual(ok.body, { success: true, sent: 0, skipped: 0, failed: 0 });
+});
+
+test('everyone is handled, a few at a time', async () => {
+  let running = 0;
+  let most = 0;
+  const done = [];
+  await eachLimited([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 4, async (n) => {
+    running += 1;
+    most = Math.max(most, running);
+    await new Promise((r) => setTimeout(r, 2));
+    done.push(n);
+    running -= 1;
+  });
+  assert.equal(done.length, 12);
+  assert.equal(most, 4);
+  await eachLimited([], 4, async () => { throw new Error('never'); });
+});
+
+test('a row in another currency saved without a conversion counts at the rate of today', async () => {
+  db.users = [{ _id: 'u1', email: 'a@x.test', currency: 'ILS', defaultWorkspace: 'w1' }];
+  db.workspaces = [{ _id: 'w1', ownerId: 'u1', members: [{ userId: 'u1', status: 'accepted', role: 'owner' }] }];
+  db.rows = [{ workspaceId: 'w1', type: 'Expense', amount: 10, currency: 'USD', amountInGlobalCurrency: null, date: '2026-10-03', category: 'food' }];
+  const sent = [];
+  await runSummaryJob('weekly', { now: NOW, send: async (m) => { sent.push(m); return { sent: true }; } });
+  assert.match(sent[0].body, /37/);
+  const without = await runSummaryJob('weekly', { now: NOW, rates: null, send: async () => ({ sent: true }) });
+  assert.deepEqual(without, { sent: 0, skipped: 1, failed: 0 }, 'no rate: nothing it can count');
 });

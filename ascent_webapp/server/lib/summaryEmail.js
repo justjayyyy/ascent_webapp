@@ -47,13 +47,13 @@ export function periodFor(kind, now = new Date()) {
 }
 
 /** A transaction's amount in `currency`, or null when it was recorded in another one with no conversion. */
-export const amountIn = (tx, currency) => amountInCurrency(tx, currency, null);
+export const amountIn = (tx, currency, rates = null) => amountInCurrency(tx, currency, rates);
 
 /**
  * Totals for confirmed transactions dated within [from, to] (inclusive, 'YYYY-MM-DD').
  * Amounts that cannot be shown in `currency` are counted in `unconverted` instead of being added wrongly.
  */
-export function periodSummary(transactions, { from, to, currency }) {
+export function periodSummary(transactions, { from, to, currency, rates = null }) {
   let expenses = 0;
   let income = 0;
   let count = 0;
@@ -62,7 +62,7 @@ export function periodSummary(transactions, { from, to, currency }) {
   for (const tx of transactions) {
     const date = String(tx.date || '').slice(0, 10);
     if (date < from || date > to || tx.status === 'pending') continue;
-    const amount = amountIn(tx, currency);
+    const amount = amountIn(tx, currency, rates);
     if (amount === null) { unconverted += 1; continue; }
     count += 1;
     if (tx.type === 'Income') income += amount;
