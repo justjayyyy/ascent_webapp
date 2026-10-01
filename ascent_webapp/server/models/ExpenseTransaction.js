@@ -216,6 +216,8 @@ expenseTransactionSchema.index(
   { unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } }
 );
 expenseTransactionSchema.index({ workspaceId: 1, status: 1, date: -1 });
+// The app's date windows (from/to) and the oldest-transaction lookup
+expenseTransactionSchema.index({ workspaceId: 1, date: -1 });
 expenseTransactionSchema.index(
   { workspaceId: 1, amount: 1, occurredAt: -1 },
   { partialFilterExpression: { occurredAt: { $type: 'date' } } }
