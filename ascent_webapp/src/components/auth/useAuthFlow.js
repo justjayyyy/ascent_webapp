@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { setPageLanguage } from '@/lib/documentLanguage';
 import { translations } from '@/lib/translations';
 import { startEntry } from '@/components/EntryTransition';
 
@@ -58,18 +59,10 @@ export function useAuthFlow() {
   }, [lang]);
   const isRTL = lang === 'he';
 
-  // The app sets <html dir/lang> from the signed-in user; put it back when this page goes away
-  const htmlAttrs = useRef(null);
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    if (!htmlAttrs.current) htmlAttrs.current = { lang: root.lang, dir: root.dir };
-    root.lang = lang;
-    root.dir = isRTL ? 'rtl' : 'ltr';
-  }, [lang, isRTL]);
-  useLayoutEffect(() => () => {
-    const root = document.documentElement;
-    if (htmlAttrs.current) { root.lang = htmlAttrs.current.lang; root.dir = htmlAttrs.current.dir; }
-  }, []);
+  // This page reads in its own picker's language; leaving it hands <html lang dir> back to the app,
+  // which by then follows the person who just signed in
+  useLayoutEffect(() => { setPageLanguage(lang); }, [lang]);
+  useLayoutEffect(() => () => setPageLanguage(null), []);
 
   // ---- where to go after signing in ----
   const rawRedirect = searchParams.get('redirect') || '/Dashboard';

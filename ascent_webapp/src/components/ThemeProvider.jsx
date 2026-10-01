@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { translations } from '../lib/translations';
+import { setAppLanguage } from '@/lib/documentLanguage';
 
 export const PALETTES = ['indigo', 'gold', 'graphite', 'ivory', 'burgundy', 'slate', 'twilight'];
 
@@ -31,10 +32,7 @@ export function ThemeProvider({ children }) {
   const isRTL = language === 'he';
 
   // Keep <html lang/dir> in sync with the selected language
-  useEffect(() => {
-    document.documentElement.lang = language;
-    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-  }, [language, isRTL]);
+  useLayoutEffect(() => { setAppLanguage(language); }, [language]);
 
   // Color palette, stored per device. Legacy ?palette=... URL param still works.
   const [palette, setPaletteState] = useState(() => {

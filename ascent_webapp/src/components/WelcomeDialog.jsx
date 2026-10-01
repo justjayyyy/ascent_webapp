@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Sparkles } from 'lucide-react';
 
 export default function WelcomeDialog({ open, onClose }) {
-  const { colors, t, user } = useTheme();
+  const { colors, t } = useTheme();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -18,32 +18,32 @@ export default function WelcomeDialog({ open, onClose }) {
             </div>
           </div>
           <DialogTitle className={cn("text-2xl font-bold text-center", colors.textPrimary)}>
-            {t('welcomeToAscent') || `Welcome to Ascent, ${user?.full_name || user?.email}!`}
+            {t('welcomeToAscent')}
           </DialogTitle>
           <DialogDescription className={cn("text-center text-base mt-2", colors.textSecondary)}>
-            {t('welcomeMessage') || "We're excited to have you on board. Let's help you rise above your financial goals."}
+            {t('welcomeMessage')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-6">
           <div className={cn("p-4 rounded-lg border", colors.bgTertiary, colors.borderLight)}>
             <h3 className={cn("font-semibold mb-2", colors.textPrimary)}>
-              {t('gettingStarted') || '🚀 Getting Started'}
+              {t('gettingStarted')}
             </h3>
             <ul className={cn("space-y-2 text-sm", colors.textSecondary)}>
-              <li>• {t('step1CreateAccount') || 'Create your first investment account'}</li>
-              <li>• {t('step2AddPositions') || 'Add your positions and track performance'}</li>
-              <li>• {t('step3SetGoals') || 'Set financial goals and budgets'}</li>
-              <li>• {t('step4TrackExpenses') || 'Track your income and expenses'}</li>
+              <li>• {t('welcomeStepLog')}</li>
+              <li>• {t('welcomeStepBudgets')}</li>
+              <li>• {t('welcomeStepPlans')}</li>
+              <li>• {t('welcomeStepHousehold')}</li>
             </ul>
           </div>
 
           <div className={cn("p-4 rounded-lg border", colors.bgTertiary, colors.borderLight)}>
             <h3 className={cn("font-semibold mb-2", colors.textPrimary)}>
-              {t('needHelp') || '💡 Need Help?'}
+              {t('needHelp')}
             </h3>
             <p className={cn("text-sm", colors.textSecondary)}>
-              {t('exploreSettings') || 'Visit Settings to customize your preferences, manage notifications, and invite team members to collaborate.'}
+              {t('exploreSettings')}
             </p>
           </div>
         </div>
@@ -53,7 +53,7 @@ export default function WelcomeDialog({ open, onClose }) {
             onClick={onClose}
             className="bg-primary hover:bg-primary/80 text-primary-foreground px-8"
           >
-            {t('letsGetStarted') || "Let's Get Started!"}
+            {t('letsGetStarted')}
           </Button>
         </div>
       </DialogContent>
