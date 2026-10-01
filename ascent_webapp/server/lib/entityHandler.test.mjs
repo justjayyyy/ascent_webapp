@@ -288,3 +288,81 @@ test('has=<field> lists rows where a real field is set, regardless of date', asy
     assert.equal((await call(model(), 'GET', q)).code, 400, q);
   }
 });
+
+/* ------------------------------------------------------------ authorship and people */
+
+const HOUSE = {
+  _id: 'ws1', ownerId: 'u1',
+  members: [
+    { email: 'u@example.com', status: 'accepted', role: 'owner' },
+    { email: 'sam@example.com', status: 'accepted', role: 'editor' },
+    { email: 'pending@example.com', status: 'pending', role: 'viewer' },
+  ],
+};
+const PEOPLE = { paidBy: (v) => [v], split: (v) => (Array.isArray(v?.shares) ? v.shares.map((x) => x?.email) : []) };
+function authoredModel(current = null) {
+  const M = model();
+  const paths = new Set([...PATHS, 'created_by', 'paidBy', 'split']);
+  M.schema = { path: (k) => paths.has(k) };
+  M.findOne = () => ({ lean: async () => current });
+  M.insertMany = async (rows) => { M.calls.create.push(...rows); return rows.map((d) => ({ toJSON: () => ({ ...d, _id: 'n' }) })); };
+  return M;
+}
+
+test('who added a row is the signed-in user, whatever the client sends', async () => {
+  ctx = { workspace: HOUSE, member: OWNER };
+  const M = authoredModel();
+  await call(M, 'POST', '', { amount: 5, created_by: 'sam@example.com' });
+  assert.equal(M.calls.create[0].created_by, 'u@example.com');
+  await call(M, 'POST', '', [{ amount: 1 }, { amount: 2, created_by: 'x@y.z' }]);
+  assert.deepEqual(M.calls.create.slice(1).map((r) => r.created_by), ['u@example.com', 'u@example.com']);
+  await call(M, 'PUT', `id=${ID}`, { amount: 6, created_by: 'sam@example.com' });
+  assert.deepEqual(M.calls.update[0].b, { amount: 6 });
+});
+
+test('models without created_by are not given one', async () => {
+  ctx = { workspace: HOUSE, member: OWNER };
+  const M = model();
+  await call(M, 'POST', '', { amount: 5 });
+  assert.equal('created_by' in M.calls.create[0], false);
+});
+
+test('people on a row must be accepted members of the workspace', async () => {
+  ctx = { workspace: HOUSE, member: OWNER };
+  const opts = { people: PEOPLE };
+  const ok = [
+    { amount: 1, paidBy: 'sam@example.com' },
+    { amount: 1, paidBy: 'SAM@example.com ' },
+    { amount: 1, paidBy: null },
+    { amount: 1, paidBy: '' },
+    { amount: 1, split: { mode: 'equal', shares: [{ email: 'u@example.com' }, { email: 'sam@example.com' }] } },
+  ];
+  for (const body of ok) assert.equal((await call(authoredModel(), 'POST', '', body, opts)).code, 201, JSON.stringify(body));
+  const bad = [
+    { amount: 1, paidBy: 'stranger@example.com' },
+    { amount: 1, paidBy: 'pending@example.com' },
+    { amount: 1, paidBy: { $ne: null } },
+    { amount: 1, split: { mode: 'equal', shares: [{ email: 'u@example.com' }, { email: 'stranger@example.com' }] } },
+    { amount: 1, split: { mode: 'equal', shares: [{}] } },
+  ];
+  for (const body of bad) {
+    const M = authoredModel();
+    assert.equal((await call(M, 'POST', '', body, opts)).code, 400, JSON.stringify(body));
+    assert.equal(M.calls.create.length, 0);
+  }
+  const M = authoredModel();
+  assert.equal((await call(M, 'POST', '', [{ amount: 1 }, { amount: 2, paidBy: 'stranger@example.com' }], opts)).code, 400);
+  assert.equal(M.calls.create.length, 0);
+});
+
+test('an edit may keep someone who has left, but not name a new outsider', async () => {
+  ctx = { workspace: HOUSE, member: OWNER };
+  const opts = { people: PEOPLE };
+  const M = authoredModel({ _id: ID, paidBy: 'left@example.com' });
+  assert.equal((await call(M, 'PUT', `id=${ID}`, { amount: 2, paidBy: 'left@example.com' }, opts)).code, 200);
+  assert.equal((await call(M, 'PUT', `id=${ID}`, { paidBy: 'sam@example.com' }, opts)).code, 200);
+  assert.equal((await call(M, 'PUT', `id=${ID}`, { paidBy: 'other@example.com' }, opts)).code, 400);
+  assert.equal(M.calls.update.length, 2);
+  const gone = authoredModel(null);
+  assert.equal((await call(gone, 'PUT', `id=${ID}`, { paidBy: 'sam@example.com' }, opts)).code, 404);
+});

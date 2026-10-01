@@ -1,5 +1,9 @@
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import { createEntityHandler } from '../lib/entityHandler.js';
 
-export default createEntityHandler(ExpenseTransaction, { permission: { read: 'viewExpenses', write: 'editExpenses' }, dateField: 'date' });
+export default createEntityHandler(ExpenseTransaction, {
+  permission: { read: 'viewExpenses', write: 'editExpenses' },
+  dateField: 'date',
+  people: { paidBy: (v) => [v], split: (v) => (Array.isArray(v?.shares) ? v.shares.map((x) => x?.email) : []) },
+});
 

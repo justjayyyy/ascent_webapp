@@ -92,7 +92,7 @@ export function fakeFetch(data) {
         return ok(list.slice(0, Number(q.limit) || 1000));
       }
       if (method === 'POST') {
-        const make = (r, i) => ({ ...r, id: `new${rows.length + i}`, _id: `new${rows.length + i}` });
+        const make = (r, i) => ({ ...r, created_by: data.me.email, id: `new${rows.length + i}`, _id: `new${rows.length + i}` }); // the server stamps the author
         const created = Array.isArray(body) ? body.map(make) : make(body, 0);
         rows.push(...[].concat(created));
         return ok(created, 201);

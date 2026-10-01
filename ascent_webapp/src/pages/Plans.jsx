@@ -123,7 +123,7 @@ function Plans() {
         await updatePlan(planDialog.plan.id, data);
         toast.success(t('planSaved'));
       } else {
-        const created = await ascent.entities.Plan.create({ ...data, created_by: user?.email });
+        const created = await ascent.entities.Plan.create(data);
         queryClient.setQueryData(plansKey, (list = []) => [...list, created]);
         queryClient.invalidateQueries({ queryKey: ['plans'] });
         toast.success(t('planCreated'));

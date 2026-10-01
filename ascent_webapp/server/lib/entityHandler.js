@@ -6,7 +6,8 @@ import { isValidObjectId } from './validate.js';
 
 const NEVER_FILTER = new Set(['workspaceId', 'createdBy', '_id', 'sort', 'limit', '_single', 'path', 'from', 'to', 'has']);
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const NEVER_WRITE = new Set(['workspaceId', 'createdBy', '_id', 'id']);
+// Who added a row is the signed-in user, never what the client says (created_by is their email)
+const NEVER_WRITE = new Set(['workspaceId', 'createdBy', 'created_by', '_id', 'id']);
 const DEFAULT_LIMIT = 1000;
 const MAX_LIMIT = 10000;
 
@@ -70,6 +71,21 @@ function clientWritable(Model, item) {
   return out;
 }
 
+// Emails named in a row's people fields (options.people: field -> emails in its value)
+function peopleIn(row, people) {
+  const out = [];
+  for (const [field, emailsOf] of Object.entries(people)) {
+    if (row && row[field] != null) out.push(...emailsOf(row[field]));
+  }
+  return out.filter((e) => typeof e !== 'string' || e.trim()).map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : e));
+}
+// The caller counts too, for workspaces whose owner row predates stored emails
+const memberEmails = (workspace, user) => [
+  ...(workspace.members || []).filter((m) => m.status === 'accepted' && m.email).map((m) => m.email.toLowerCase()),
+  String(user.email || '').toLowerCase(),
+];
+const strangerIn = (row, people, allowed) => peopleIn(row, people).some((e) => typeof e !== 'string' || !allowed.has(e));
+
 const isDuplicate = (err) => err?.code === 11000 || err?.writeErrors?.some?.((e) => e.code === 11000 || e.err?.code === 11000);
 
 /** A plain object with a string `id`, from a document or a lean row. */
@@ -94,9 +110,13 @@ function clientFault(res, err) {
  * options.permission: { read, write } member permission names (see the Workspace model), e.g. { read: 'viewExpenses', write: 'editExpenses' }
  * options.checkSharing: members other than the owner only see rows they created or that are marked isShared
  * options.dateField: the YYYY-MM-DD field that `from` / `to` list filters apply to
+ * options.people: fields that name people by email, as { field: (value) => emails }. Each must be a member
+ *   of the workspace, so nobody can pin money on an outsider; on edits, people already on the row stay allowed
+ *   (someone who has since left).
  */
 export function createEntityHandler(Model, options = {}) {
-  const { checkSharing = false, permission = null, dateField = null } = options;
+  const { checkSharing = false, permission = null, dateField = null, people = null } = options;
+  const authored = !!Model.schema?.path?.('created_by');
   const entityName = Model.modelName || 'Entity';
 
   return async function handler(req, res) {
@@ -151,7 +171,18 @@ export function createEntityHandler(Model, options = {}) {
           if (!body || typeof body !== 'object' || (isBatch ? body.length === 0 : Object.keys(body).length === 0)) {
             return error(res, 'Request body is required', 400);
           }
-          const stamp = (item) => ({ ...clientWritable(Model, item), workspaceId: req.workspace._id, createdBy: user._id });
+          const stamp = (item) => ({
+            ...clientWritable(Model, item),
+            workspaceId: req.workspace._id,
+            createdBy: user._id,
+            ...(authored ? { created_by: user.email } : {}),
+          });
+          if (people) {
+            const allowed = new Set(memberEmails(req.workspace, user));
+            if ((isBatch ? body : [body]).some((item) => strangerIn(item, people, allowed))) {
+              return error(res, 'Only members of this workspace can be named on a row', 400);
+            }
+          }
 
           if (isBatch) {
             const rows = body.map(stamp);
@@ -191,6 +222,12 @@ export function createEntityHandler(Model, options = {}) {
           if (!id) return error(res, 'ID is required for update. Provide ?id=... in URL', 400);
           const changes = clientWritable(Model, req.body);
           if (Object.keys(changes).length === 0) return error(res, 'Update data is required in request body', 400);
+          if (people && peopleIn(changes, people).length) {
+            const current = await Model.findOne({ _id: id, ...scope }).lean();
+            if (!current) return notFound(res, 'Item not found');
+            const allowed = new Set([...memberEmails(req.workspace, user), ...peopleIn(current, people)]);
+            if (strangerIn(changes, people, allowed)) return error(res, 'Only members of this workspace can be named on a row', 400);
+          }
           const item = await Model.findOneAndUpdate({ _id: id, ...scope }, changes, { new: true, runValidators: true }).lean();
           // Same answer whether the row is missing or belongs to someone else: no probing other workspaces
           return item ? success(res, toPlain(item)) : notFound(res, 'Item not found');

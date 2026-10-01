@@ -141,7 +141,7 @@ function Commitments() {
         await update(dialog.commitment.id, data);
         toast.success(t('cmSaved'));
       } else {
-        const created = await ascent.entities.Commitment.create({ ...data, payments: [], status: 'active', created_by: user?.email });
+        const created = await ascent.entities.Commitment.create({ ...data, payments: [], status: 'active' });
         queryClient.setQueryData(key, (list = []) => [created, ...list]);
         queryClient.invalidateQueries({ queryKey: ['commitments'] });
         toast.success(t('cmCreated'));
