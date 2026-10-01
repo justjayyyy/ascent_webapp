@@ -5,6 +5,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClientInstance } from '@/lib/query-client'
 import { persistOptions } from '@/lib/offline/persist'
 import AppSplash from '@/components/AppSplash'
+import EntryTransition from '@/components/EntryTransition'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
@@ -158,7 +159,7 @@ function App() {
           <Router>
             <Routes>
               <Route path="/login" element={
-                <Suspense fallback={<SkeletonPage />}>
+                <Suspense fallback={<AppSplash />}>
                   <Login />
                 </Suspense>
               } />
@@ -187,6 +188,7 @@ function App() {
           </Router>
           <Toaster />
           <AppSonnerToaster />
+          <EntryTransition />
           <Analytics />
           <SpeedInsights />
         </ThemeProvider>

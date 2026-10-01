@@ -1,0 +1,37 @@
+/* Ridgeline sign-in: mountain layers tinted from the palette. Far ridges sit in haze, near ones are
+   the deepest; in the light theme the haze is pale and the near ridges carry the colour. */
+.ridge-scene {
+  --ridge-1: color-mix(in oklch, hsl(var(--primary)) 34%, hsl(var(--background)));
+  --ridge-2: color-mix(in oklch, hsl(var(--primary)) 22%, hsl(var(--background)));
+  --ridge-3: color-mix(in oklch, hsl(var(--primary)) 12%, hsl(var(--background)));
+  --ridge-4: color-mix(in oklch, hsl(var(--primary)) 5%, hsl(var(--background)));
+  --ridge-sky: color-mix(in oklch, hsl(var(--glow)) 20%, hsl(var(--background)));
+}
+:root:not(.dark) .ridge-scene {
+  --ridge-1: color-mix(in oklch, hsl(var(--primary)) 16%, hsl(var(--background)));
+  --ridge-2: color-mix(in oklch, hsl(var(--primary)) 30%, hsl(var(--background)));
+  --ridge-3: color-mix(in oklch, hsl(var(--primary)) 46%, hsl(var(--background)));
+  --ridge-4: color-mix(in oklch, hsl(var(--primary)) 62%, hsl(var(--foreground)));
+  --ridge-sky: color-mix(in oklch, hsl(var(--glow)) 14%, hsl(var(--background)));
+}
+
+.ridge-star {
+  animation: ridge-twinkle var(--tw, 4s) ease-in-out infinite alternate;
+  animation-delay: var(--td, 0s);
+}
+@keyframes ridge-twinkle {
+  from { opacity: 0.15; }
+  to { opacity: 0.9; }
+}
+
+.ridge-mist {
+  animation: ridge-drift 22s ease-in-out infinite alternate;
+}
+@keyframes ridge-drift {
+  from { transform: translateX(-3%); }
+  to { transform: translateX(3%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ridge-star, .ridge-mist { animation: none; }
+}

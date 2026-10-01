@@ -593,7 +593,8 @@ export default ascent;
 // Device language/theme, sent on sign-up so new accounts start in the user's own settings
 export function systemPrefs() {
   try {
-    const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    // A language picked on the sign-in page wins over the device's
+    const lang = (localStorage.getItem('ascent_login_lang') || navigator.language || 'en').slice(0, 2).toLowerCase();
     return {
       language: ['en', 'he', 'ru'].includes(lang) ? lang : 'en',
       theme: window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark',
