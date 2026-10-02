@@ -12,6 +12,7 @@ import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { useCards, useExchangeRates } from '@/hooks/useWorkspaceData';
+import { useAuth } from '@/lib/AuthContext';
 import { conversionFields, keptConversion } from '@shared/money';
 import HouseholdFields, { splitIsValid } from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
@@ -50,6 +51,7 @@ export default function AddTransactionDialog({
   plans = [],
 }) {
   const { user, t, language, colors } = useTheme();
+  const { currentWorkspace } = useAuth();
   const { rates, isLoading: isLoadingRates } = useExchangeRates();
   const userCurrency = user?.currency || 'ILS';
   const startType = defaultType || 'Expense';
@@ -121,7 +123,14 @@ export default function AddTransactionDialog({
   const needsConversion = (formData.currency || userCurrency) !== userCurrency;
 
   const { data: allCards = [] } = useCards();
-  const cards = useMemo(() => allCards.filter((c) => c.isActive !== false), [allCards]);
+  // Cards belong to whoever added them: only the payer's own cards are offered (plus the one already on the row)
+  const payerEmail = (formData.type === 'Expense' && formData.paidBy) || editTransaction?.created_by || user?.email;
+  const payerId = payerEmail === user?.email
+    ? String(user?.id || user?._id || '')
+    : String(currentWorkspace?.members?.find((m) => m.email === payerEmail)?.userId || '');
+  const cards = useMemo(() => allCards.filter((c) =>
+    c.id === formData.cardId || (c.isActive !== false && (!c.createdBy || String(c.createdBy) === payerId))
+  ), [allCards, payerId, formData.cardId]);
 
   useEffect(() => {
     if (editTransaction) {
@@ -495,7 +504,11 @@ export default function AddTransactionDialog({
           {formData.type === 'Expense' && (
             <HouseholdFields
               value={{ paidBy: formData.paidBy, split: formData.split }}
-              onChange={(v) => { setFormData({ ...formData, ...v }); if (errors.split) setErrors({ ...errors, split: '' }); }}
+              onChange={(v) => {
+                // Another payer means another wallet: drop a card that was picked for the previous one
+                setFormData({ ...formData, ...v, ...(v.paidBy !== formData.paidBy && { cardId: '' }) });
+                if (errors.split) setErrors({ ...errors, split: '' });
+              }}
               amount={parseFloat(formData.amount) || 0}
               currency={formData.currency}
               creator={editTransaction?.created_by}

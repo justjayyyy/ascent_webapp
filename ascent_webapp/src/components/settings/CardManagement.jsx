@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ascent } from '@/api/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCards } from '@/hooks/useWorkspaceData';
@@ -21,7 +21,10 @@ export default function CardManagement({ index }) {
   const [formData, setFormData] = useState(EMPTY);
   const queryClient = useQueryClient();
 
-  const { data: cards = [] } = useCards();
+  const { data: allCards = [] } = useCards();
+  // Each member manages only the cards they added, even in a shared household
+  const myId = String(user?.id || user?._id || '');
+  const cards = useMemo(() => allCards.filter((c) => !c.createdBy || String(c.createdBy) === myId), [allCards, myId]);
 
   const close = () => {
     setIsAdding(false);
