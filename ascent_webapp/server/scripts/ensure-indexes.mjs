@@ -19,6 +19,7 @@ import RateLimit from '../models/RateLimit.js';
 import Budget from '../models/Budget.js';
 import Plan from '../models/Plan.js';
 import Commitment from '../models/Commitment.js';
+import FinancialGoal from '../models/FinancialGoal.js';
 
 // Older versions could seed the default categories twice when two screens loaded at once. Transactions
 // refer to categories by name, so dropping the later copy loses nothing.
@@ -42,7 +43,7 @@ async function main() {
     await Category.deleteMany({ _id: { $in: extra } });
     console.log(`Removed ${extra.length} duplicate default categories`);
   }
-  for (const Model of [ExpenseTransaction, IngestToken, IngestEvent, Category, Workspace, User, RateLimit, Budget, Plan, Commitment, CalendarLink]) {
+  for (const Model of [ExpenseTransaction, IngestToken, IngestEvent, Category, Workspace, User, RateLimit, Budget, Plan, Commitment, FinancialGoal, CalendarLink]) {
     await Model.createIndexes();
     const indexes = await Model.collection.indexes();
     console.log(`\n${Model.modelName} (${Model.collection.name})`);

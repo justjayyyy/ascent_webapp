@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useR
 import { useNavigate } from 'react-router-dom';
 import { useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from '@/lib/motion';
-import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket } from 'lucide-react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket, PiggyBank } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
@@ -199,6 +199,7 @@ function LayoutContent({ children, currentPageName }) {
     { name: t('income'), page: 'Income', icon: HandCoins, permission: 'viewExpenses' },
     { name: t('plans'), page: 'Plans', icon: Milestone, permission: 'viewExpenses' },
     { name: t('cmNavShort'), page: 'Commitments', icon: Landmark, permission: 'viewExpenses' },
+    { name: t('svTitle'), page: 'Savings', icon: PiggyBank, permission: 'viewGoals' },
     // Open to every member: notes shared with someone need no workspace-wide notes permission
     { name: t('notes'), page: 'Notes', icon: StickyNote },
     { name: t('grTitle'), page: 'Groceries', icon: ShoppingBasket },
@@ -210,6 +211,7 @@ function LayoutContent({ children, currentPageName }) {
 
   const canAddMoney = hasPermission('editExpenses');
   const canAddNotes = hasPermission('editNotes');
+  const canAddGoals = hasPermission('editGoals');
   const openQuickAdd = useCallback((type) => setQuickAdd({ type, nonce: Date.now() }), []);
   const quickFallback = useCallback(() => {
     if (canAddMoney) openQuickAdd('Expense');
@@ -220,8 +222,9 @@ function LayoutContent({ children, currentPageName }) {
     canAddMoney && { id: 'income', label: t('addIncome'), icon: HandCoins, run: () => openQuickAdd('Income') },
     canAddMoney && { id: 'plan', label: t('newPlan'), icon: Milestone, run: () => navigate('/Plans?new=1') },
     canAddMoney && { id: 'commitment', label: t('cmNew'), icon: Landmark, run: () => navigate('/Commitments?new=1') },
+    canAddGoals && { id: 'goal', label: t('svNewGoal'), icon: PiggyBank, run: () => navigate('/Savings?new=1') },
     canAddNotes && { id: 'note', label: t('ntNewNote'), icon: StickyNote, run: () => navigate('/Notes?new=1') },
-  ].filter(Boolean), [canAddMoney, canAddNotes, openQuickAdd, navigate, t]);
+  ].filter(Boolean), [canAddMoney, canAddNotes, canAddGoals, openQuickAdd, navigate, t]);
 
   // Tabs remember where they were scrolled to; a page seen for the first time starts at the top
   const lastPage = useRef(currentPageName);

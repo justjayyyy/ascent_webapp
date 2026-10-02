@@ -1,12 +1,13 @@
-// The lists that save offline (budgets, plans, loans) take a device's "app:" key, and a
+// The lists that save offline (budgets, plans, loans, savings goals) take a device's "app:" key, and a
 // second upload of the same row finds the first instead of adding a copy.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Budget from './Budget.js';
 import Plan from './Plan.js';
 import Commitment from './Commitment.js';
+import FinancialGoal from './FinancialGoal.js';
 
-for (const Model of [Budget, Plan, Commitment]) {
+for (const Model of [Budget, Plan, Commitment, FinancialGoal]) {
   test(`${Model.modelName} keeps one row per offline key`, () => {
     assert.ok(Model.schema.path('dedupeKey'), 'has the field, so the API accepts it');
     const index = Model.schema.indexes().find(([fields]) => fields.dedupeKey === 1);

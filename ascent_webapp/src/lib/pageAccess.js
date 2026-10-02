@@ -6,6 +6,7 @@ export const PAGE_PERMISSIONS = {
   Income: 'viewExpenses',
   Plans: 'viewExpenses',
   Commitments: 'viewExpenses',
+  Savings: 'viewGoals',
 };
 
 const FALLBACK_ORDER = ['Dashboard', 'Notes', 'Settings'];

@@ -1,4 +1,4 @@
-// Saving the household lists (budgets, plans, loans, groceries) through the offline queue (txOutbox.js):
+// Saving the household lists (budgets, plans, loans, groceries, savings goals) through the offline queue (txOutbox.js):
 // the change shows at once, goes out within the same tap when there is signal, and waits on the device
 // when there is none. Each call resolves 'synced' or 'queued', and rejects if the server refuses it.
 import { useMemo } from 'react';
@@ -22,7 +22,7 @@ export function useListWrites(entity) {
         return { id: box.resolveId(localIdOf(op.rows[0])), outcome };
       },
       update: (id, data) => submit(updateOp({ uuid: uuid(), workspaceId, txId: id, data, entity })),
-      /** One entry of a list field (a plan's items, a loan's payments); see src/lib/listEntries.js. */
+      /** One entry of a list field (a plan's items, a loan's payments, a goal's deposits); see src/lib/listEntries.js. */
       changeEntry: (id, list, change) => submit(entryOp({ uuid: uuid(), workspaceId, txId: id, list, change, entity })),
       remove: (id) => submit(deleteOp({ uuid: uuid(), workspaceId, txId: id, entity })),
     };
