@@ -59,3 +59,14 @@ describe('checklist suggestions', () => {
     expect(suggestFor({ id: 'e', text: '  ', done: false }, items, ['Milk'])).toEqual([]);
   });
 });
+
+describe('text and titles between checklist items', () => {
+  test('they are never ticked, suggested, or written with a box', async () => {
+    const { isTicked, noteToText } = await import('./noteUtils');
+    const title = { id: 't', text: 'Dairy', done: true, kind: 'title' };
+    expect(isTicked(title)).toBe(false);
+    expect(suggestFor({ id: 'n', text: 'dai', done: false }, [title], [])).toEqual([]);
+    expect(noteToText({ type: 'checklist', items: [title, { id: 'm', text: 'Milk', done: false }] }))
+      .toBe('Dairy\n[ ] Milk');
+  });
+});

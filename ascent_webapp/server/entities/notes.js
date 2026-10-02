@@ -15,6 +15,7 @@ const MAX_FILES = 10;
 const MAX_FILE_BYTES = 3 * 1024 * 1024; // base64 in JSON stays under Vercel's 4.5 MB body limit
 
 const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
+const LINE_KINDS = ['text', 'title']; // besides an ordinary tickable item, which stores no kind
 
 const sameId = (a, b) => a && b && a.toString() === b.toString();
 
@@ -65,18 +66,23 @@ function present(note, user, member) {
     collaborators: (note.collaborators || []).map(c => ({
       userId: c.userId.toString(), email: c.email, role: c.role
     })),
-    items: (note.items || []).map(({ id, text, done }) => ({ id, text, done: !!done })),
+    items: (note.items || []).map(({ id, text, done, kind }) => ({ id, text, done: !!done, ...(LINE_KINDS.includes(kind) ? { kind } : {}) })),
     attachments: (note.attachments || []).map(({ id, name, type, size }) => ({ id, name, type, size }))
   };
 }
 
 function cleanItems(items) {
   if (!Array.isArray(items)) return null;
-  return items.slice(0, MAX_ITEMS).map((it, i) => ({
-    id: String(it?.id || `i${Date.now().toString(36)}${i}`).slice(0, 40),
-    text: String(it?.text ?? '').slice(0, 2000),
-    done: !!it?.done
-  }));
+  return items.slice(0, MAX_ITEMS).map((it, i) => {
+    const kind = LINE_KINDS.includes(it?.kind) ? it.kind : null;
+    return {
+      id: String(it?.id || `i${Date.now().toString(36)}${i}`).slice(0, 40),
+      text: String(it?.text ?? '').slice(0, 2000),
+      // Text and titles are never ticked
+      done: !kind && !!it?.done,
+      ...(kind ? { kind } : {})
+    };
+  });
 }
 
 function cleanTags(tags) {

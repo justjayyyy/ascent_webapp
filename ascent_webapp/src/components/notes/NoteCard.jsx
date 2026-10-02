@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { LinkChips, PeopleStack, PersonDot } from './NoteParts';
-import { extractLinks, fmt, formatReminder, highlight, isOverdue, lastEditor, resolveColor, textDir, timeAgo } from './noteUtils';
+import { extractLinks, fmt, formatReminder, highlight, isOverdue, isTicked, lastEditor, lineKind, resolveColor, textDir, timeAgo } from './noteUtils';
 
 const PREVIEW_ITEMS = 5;
 // A long note shows a short preview; open it to read the rest
@@ -35,8 +35,8 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   const editorPerson = lastEditor(note, people);
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
 
-  const openItems = (note.items || []).filter(i => !i.done);
-  const doneCount = (note.items || []).length - openItems.length;
+  const openItems = (note.items || []).filter(i => !isTicked(i) && (i.text || lineKind(i) === 'item'));
+  const doneCount = (note.items || []).filter(isTicked).length;
   const previewItems = openItems.slice(0, PREVIEW_ITEMS);
   const hiddenItems = openItems.length - previewItems.length;
   const hasBody = note.type === 'checklist' ? (note.items || []).length > 0 : !!note.content?.trim();
@@ -152,7 +152,21 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
 
         {note.type === 'checklist' ? (
           <ul dir={textDir(note.title || note.items?.[0]?.text)} className="space-y-1">
-            {previewItems.map(item => (
+            {previewItems.map(item => (lineKind(item) !== 'item' ? (
+              // Text and titles between the items, without a checkbox
+              <li
+                key={item.id}
+                dir={textDir(item.text)}
+                className={cn(
+                  'min-w-0 break-words',
+                  lineKind(item) === 'title'
+                    ? 'pt-1 text-[13px] font-semibold text-foreground line-clamp-1'
+                    : 'whitespace-pre-wrap text-sm leading-snug text-foreground/80 line-clamp-3'
+                )}
+              >
+                {highlight(item.text, query)}
+              </li>
+            ) : (
               <li key={item.id} dir={textDir(item.text)} className="flex items-start gap-2 text-sm leading-snug">
                 <Checkbox
                   checked={false}
@@ -163,7 +177,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                 />
                 <span className="min-w-0 break-words text-foreground/90 line-clamp-2">{highlight(item.text, query)}</span>
               </li>
-            ))}
+            )))}
             {hiddenItems > 0 && (
               <li className="ps-6 text-xs text-muted-foreground">{fmt(t('ntMoreItems'), { n: hiddenItems })}</li>
             )}

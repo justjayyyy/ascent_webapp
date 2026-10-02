@@ -17,7 +17,7 @@ import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
 import { DictateButton, useDictation } from './useDictation';
 import {
-  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, itemsToText, lastEditor, noteToText, resolveColor, textToItems, timeAgo, blankItem,
+  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, isTicked, itemsToText, lastEditor, noteToText, resolveColor, textToItems, timeAgo, blankItem,
 } from './noteUtils';
 
 const ib = 'h-11 w-11 sm:h-9 sm:w-9 [@media(pointer:coarse)]:before:hidden';
@@ -188,9 +188,9 @@ export default function NoteEditor({
     }
   };
 
-  const doneCount = isChecklist ? (draft.items || []).filter(i => i.done).length : 0;
+  const doneCount = isChecklist ? (draft.items || []).filter(isTicked).length : 0;
   const uncheckAll = () => change({ items: (draft.items || []).map(i => ({ ...i, done: false })) });
-  const deleteChecked = () => change({ items: (draft.items || []).filter(i => !i.done) });
+  const deleteChecked = () => change({ items: (draft.items || []).filter(i => !isTicked(i)) });
   const links = extractLinks(draft);
 
   const meId = actions.meId;

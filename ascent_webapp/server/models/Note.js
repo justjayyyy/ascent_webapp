@@ -4,7 +4,9 @@ import mongoose from 'mongoose';
 const itemSchema = new mongoose.Schema({
   id: { type: String, required: true },
   text: { type: String, default: '' },
-  done: { type: Boolean, default: false }
+  done: { type: Boolean, default: false },
+  // A checklist line is a tickable item, or a plain line of text or a title placed between items
+  kind: { type: String, enum: ['item', 'text', 'title'], default: undefined }
 }, { _id: false });
 
 const collaboratorSchema = new mongoose.Schema({

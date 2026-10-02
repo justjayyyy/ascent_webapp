@@ -186,7 +186,8 @@ function Notes() {
     const out = [];
     visible.forEach(n => {
       if (n.trashedAt || n.type !== 'checklist') return;
-      (n.items || []).forEach(({ text }) => {
+      (n.items || []).forEach(({ text, kind }) => {
+        if (kind === 'text' || kind === 'title') return;
         const clean = text?.trim();
         const key = clean?.toLowerCase();
         if (clean && clean.length <= 200 && !seen.has(key)) { seen.add(key); out.push(clean); }

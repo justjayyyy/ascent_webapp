@@ -52,7 +52,7 @@ export const DATASETS = {
       const notes = await api.entities.Note.list('-updated_date', 10000);
       const rows = notes.map((n) => ({
         ...n,
-        content: n.type === 'checklist' ? (n.items || []).map((i) => `${i.done ? '[x]' : '[ ]'} ${i.text}`).join('\n') : n.content,
+        content: n.type === 'checklist' ? (n.items || []).map((i) => (i.kind === 'text' || i.kind === 'title' ? i.text : `${i.done ? '[x]' : '[ ]'} ${i.text}`)).join('\n') : n.content,
       }));
       return {
         filename: `notes_export_${today()}.csv`,

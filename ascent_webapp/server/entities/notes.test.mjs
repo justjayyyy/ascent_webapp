@@ -272,6 +272,22 @@ test('file bytes come back exactly, never the memory around them', () => {
   assert.equal(fileBytes(structuredClone(small)).toString(), 'hi'); // a copy that kept the pool around it
 });
 
+test('a checklist keeps text and titles between its items, never ticked', async () => {
+  const r = await call('PUT', { id: shared.id }, { items: [
+    { id: 'h', text: 'Dairy', kind: 'title', done: true },
+    { id: 'a', text: 'milk' },
+    { id: 'p', text: 'from the market', kind: 'text' },
+    { id: 'x', text: 'odd', kind: 'banner' },
+  ] });
+  assert.equal(r.code, 200);
+  assert.deepEqual(r.body.data.items, [
+    { id: 'h', text: 'Dairy', done: false, kind: 'title' },
+    { id: 'a', text: 'milk', done: false },
+    { id: 'p', text: 'from the market', done: false, kind: 'text' },
+    { id: 'x', text: 'odd', done: false },
+  ]);
+});
+
 test('two people ticking different checklist items at once both keep their tick', async () => {
   const start = (await call('PUT', { id: shared.id }, { items: [{ id: 'a', text: 'milk' }, { id: 'b', text: 'eggs' }] })).body.data.items;
   // the editor ticks eggs, based on what they saw

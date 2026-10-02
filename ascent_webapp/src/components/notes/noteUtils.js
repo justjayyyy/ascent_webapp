@@ -49,14 +49,19 @@ export function newItemId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export const blankItem = () => ({ id: newItemId(), text: '', done: false });
+export const blankItem = (kind) => ({ id: newItemId(), text: '', done: false, ...(kind && kind !== 'item' ? { kind } : {}) });
+
+// A checklist line is a tickable item unless it is plain text or a title placed between the items
+export const lineKind = (item) => (item?.kind === 'text' || item?.kind === 'title' ? item.kind : 'item');
+export const isTickable = (item) => lineKind(item) === 'item';
+export const isTicked = (item) => isTickable(item) && !!item.done;
 
 /** Plain text of a note, for search, copying and the share sheet. */
 export function noteToText(note, { withTitle = true } = {}) {
   const parts = [];
   if (withTitle && note.title) parts.push(note.title);
   if (note.type === 'checklist') {
-    (note.items || []).forEach(it => it.text && parts.push(`${it.done ? '[x]' : '[ ]'} ${it.text}`));
+    (note.items || []).forEach(it => it.text && parts.push(isTickable(it) ? `${it.done ? '[x]' : '[ ]'} ${it.text}` : it.text));
   } else if (note.content) {
     parts.push(note.content);
   }

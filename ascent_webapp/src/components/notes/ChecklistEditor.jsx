@@ -1,13 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, useDragControls } from '@/lib/motion';
-import { ChevronRight, CornerDownRight, GripVertical, Plus, RotateCcw, X } from 'lucide-react';
+import {
+  ChevronRight, CornerDownRight, GripVertical, Heading, Pilcrow, Plus, RotateCcw, SquareCheck, X,
+} from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { AutoTextarea } from './NoteParts';
-import { blankItem, fmt, highlight, textDir } from './noteUtils';
+import { blankItem, fmt, highlight, isTickable, isTicked, lineKind, textDir } from './noteUtils';
 
 const cleanLine = (l) => l.replace(/^\s*(?:[-*•]\s+|\[[ xX]\]\s*)/, '').trim();
 const MAX_SUGGESTIONS = 5;
+
+// The kinds of line a checklist can hold: tickable items, and plain text or titles between them
+const KINDS = [
+  { kind: 'item', icon: SquareCheck, label: 'ntKindItem' },
+  { kind: 'text', icon: Pilcrow, label: 'ntKindText' },
+  { kind: 'title', icon: Heading, label: 'ntKindTitle' },
+];
+const withKind = (item, kind) => {
+  const { kind: _old, ...rest } = item;
+  return kind === 'item' ? rest : { ...rest, kind, done: false };
+};
+const PLACEHOLDER = { item: 'ntListItem', text: 'ntTextLine', title: 'ntTitleLine' };
 
 /**
  * What to offer while typing an item: a ticked item of this list comes back, an item already
@@ -15,12 +32,12 @@ const MAX_SUGGESTIONS = 5;
  */
 export function suggestFor(item, items, elsewhere = []) {
   const q = item.text.trim().toLowerCase();
-  if (!q) return [];
+  if (!q || !isTickable(item)) return [];
   const out = [];
   const here = new Set();
   for (const other of items) {
     const text = other.text.trim();
-    if (other.id === item.id || !text) continue;
+    if (other.id === item.id || !text || !isTickable(other)) continue;
     here.add(text.toLowerCase());
     if (text.toLowerCase().includes(q)) out.push({ kind: other.done ? 'restore' : 'duplicate', text, id: other.id });
   }
@@ -76,23 +93,53 @@ function Suggestions({ list, highlighted, query, onPick, t }) {
   );
 }
 
+/** Switches a line between a checkbox item, plain text and a title. */
+function KindMenu({ kind, onChange, t }) {
+  const Current = KINDS.find(k => k.kind === kind)?.icon || SquareCheck;
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t('ntLineKind')}
+          title={t('ntLineKind')}
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-60"
+        >
+          <Current className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[10rem]" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">{t('ntLineKind')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={kind} onValueChange={onChange}>
+          {KINDS.map(({ kind: k, icon: Icon, label }) => (
+            <DropdownMenuRadioItem key={k} value={k}>
+              <Icon className="me-2 h-4 w-4" /> {t(label)}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function Row({
   item, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, onPasteLines, registerRef,
-  onInsertBelow, suggestions, onPick, onFocusChange,
+  onKind, suggestions, onPick, onFocusChange,
 }) {
   const controls = useDragControls();
   const [highlighted, setHighlighted] = useState(-1);
   const [dismissed, setDismissed] = useState(null);
   const list = suggestions?.length && dismissed !== item.text ? suggestions : [];
   useEffect(() => { setHighlighted(-1); }, [item.text]);
+  const kind = lineKind(item);
 
   const Wrapper = reorderable ? Reorder.Item : 'div';
   const wrapperProps = reorderable
     ? { value: item, dragListener: false, dragControls: controls, whileDrag: { scale: 1.02, boxShadow: '0 10px 30px -10px hsl(0 0% 0% / 0.45)', zIndex: 20 } }
     : {};
   return (
-    <Wrapper {...wrapperProps} className="group/row relative rounded-lg">
-      {/* A Hebrew item sits right to left in an English list, and the other way round */}
+    <Wrapper {...wrapperProps} className={cn('group/row relative rounded-lg', kind === 'title' && 'pt-2')}>
+      {/* A Hebrew line sits right to left in an English list, and the other way round */}
       <div dir={textDir(item.text)} className="flex items-start gap-1.5">
         {!readOnly && reorderable && (
           <button
@@ -104,23 +151,35 @@ function Row({
             <GripVertical className="h-4 w-4" />
           </button>
         )}
-        <Checkbox
-          checked={item.done}
-          disabled={readOnly}
-          onCheckedChange={(v) => onChange({ ...item, done: !!v })}
-          aria-label={item.text || t('ntListItem')}
-          className="mt-[7px] h-[18px] w-[18px] rounded-md"
-        />
+        {kind === 'item' && (
+          <Checkbox
+            checked={item.done}
+            disabled={readOnly}
+            onCheckedChange={(v) => onChange({ ...item, done: !!v })}
+            aria-label={item.text || t('ntListItem')}
+            className="mt-[7px] h-[18px] w-[18px] rounded-md"
+          />
+        )}
         <AutoTextarea
           ref={registerRef}
           value={item.text}
           readOnly={readOnly}
-          onChange={(e) => onChange({ ...item, text: e.target.value.replace(/\n/g, ' ') })}
+          onChange={(e) => {
+            let text = e.target.value;
+            // Only plain text may run over several lines
+            if (kind !== 'text') text = text.replace(/\n/g, ' ');
+            // "# " at the start of an item makes it a title, like in most editors
+            if (kind === 'item' && /^#\s/.test(text) && !/^#\s/.test(item.text)) {
+              onChange(withKind({ ...item, text: text.slice(2) }, 'title'));
+              return;
+            }
+            onChange({ ...item, text });
+          }}
           onFocus={() => onFocusChange?.(true)}
           onBlur={() => onFocusChange?.(false)}
           onPaste={(e) => {
             // Pasting several lines makes one item per line, like Keep
-            if (readOnly || !onPasteLines) return;
+            if (readOnly || !onPasteLines || kind === 'text') return;
             const text = e.clipboardData?.getData('text') || '';
             if (!/\r?\n/.test(text.trim())) return;
             const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
@@ -142,14 +201,24 @@ function Row({
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               if (highlighted >= 0 && list[highlighted]) onPick(list[highlighted]);
-              else onEnter(e.currentTarget.selectionStart ?? item.text.length);
+              else onEnter();
             }
-            if (e.key === 'Backspace' && item.text === '') { e.preventDefault(); onBackspaceEmpty(); }
+            if (e.key === 'Backspace' && item.text === '') {
+              e.preventDefault();
+              // An empty title or text line turns back into an item first
+              if (kind !== 'item') onKind('item');
+              else onBackspaceEmpty();
+            }
           }}
-          placeholder={t('ntListItem')}
-          aria-label={t('ntListItem')}
-          className={cn('py-1 text-base leading-6 sm:text-sm', item.done && 'text-muted-foreground line-through')}
+          placeholder={t(PLACEHOLDER[kind])}
+          aria-label={t(PLACEHOLDER[kind])}
+          className={cn(
+            'py-1',
+            kind === 'title' ? 'text-lg font-semibold leading-7 tracking-tight sm:text-base' : 'text-base leading-6 sm:text-sm',
+            kind === 'item' && item.done && 'text-muted-foreground line-through'
+          )}
         />
+        {!readOnly && onKind && <KindMenu kind={kind} onChange={onKind} t={t} />}
         {!readOnly && (
           <button
             type="button"
@@ -162,30 +231,19 @@ function Row({
         )}
       </div>
       {list.length > 0 && <Suggestions list={list} highlighted={highlighted} query={item.text.trim()} onPick={onPick} t={t} />}
-      {onInsertBelow && (
-        // A new item between this one and the next
-        <button
-          type="button"
-          onClick={onInsertBelow}
-          aria-label={t('ntInsertItemBelow')}
-          title={t('ntInsertItemBelow')}
-          className="absolute -bottom-2.5 start-7 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-foreground/15 bg-popover text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100"
-        >
-          <Plus className="h-3 w-3" />
-        </button>
-      )}
     </Wrapper>
   );
 }
 
-/** Checklist body of a note: reorderable open items and a collapsible list of completed ones. */
+/** Checklist body of a note: reorderable open lines (items, text, titles) and a collapsible list of completed ones. */
 export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, t, suggestions }) {
   const refs = useRef({});
   const [showDone, setShowDone] = useState(false);
-  const open = items.filter(i => !i.done);
-  const done = items.filter(i => i.done);
+  const open = items.filter(i => !isTicked(i));
+  const done = items.filter(isTicked);
 
-  // The item being typed in, for suggestions. Blur waits a moment so a tapped suggestion still lands.
+  // The line being typed in, for suggestions and for where new lines go.
+  // Blur waits a moment so a tapped suggestion or add button still knows the line.
   const [focusedId, setFocusedId] = useState(null);
   const blurTimer = useRef(null);
   useEffect(() => () => clearTimeout(blurTimer.current), []);
@@ -207,19 +265,30 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
     if (first) requestAnimationFrame(() => refs.current[first.id]?.focus());
   }, []);
 
-  const focusSoon = (id, caret) => requestAnimationFrame(() => {
-    const el = refs.current[id];
-    if (!el) return;
+  // Focus a line once it is on screen: a new line only exists after the list re-renders with it
+  const wantFocus = useRef(null);
+  const focusPending = () => {
+    const want = wantFocus.current;
+    const el = want && refs.current[want.id];
+    if (!el) return false;
+    wantFocus.current = null;
     el.focus();
-    if (caret !== undefined) el.setSelectionRange(caret, caret);
-  });
+    if (want.caret !== undefined) el.setSelectionRange(want.caret, want.caret);
+    return true;
+  };
+  useEffect(() => { focusPending(); });
+  const focusSoon = (id, caret) => {
+    wantFocus.current = { id, caret };
+    // Already on screen (an existing line): no re-render may come, so try on the next frame too
+    requestAnimationFrame(focusPending);
+  };
 
   const patch = (next) => onChange(next);
 
   const replace = (item) => patch(items.map(i => (i.id === item.id ? item : i)));
 
-  const insertAfter = (id) => {
-    const fresh = blankItem();
+  const insertAfter = (id, kind) => {
+    const fresh = blankItem(kind);
     const idx = items.findIndex(i => i.id === id);
     const next = [...items];
     next.splice(idx + 1, 0, fresh);
@@ -227,23 +296,18 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
     focusSoon(fresh.id);
   };
 
-  // Enter at the end adds an item below, at the start adds one above, in the middle splits the item in two
-  const enterAt = (id, caret) => {
-    const idx = items.findIndex(i => i.id === id);
-    const item = items[idx];
-    if (!item || caret >= item.text.length) { insertAfter(id); return; }
-    const next = [...items];
-    if (caret <= 0) {
-      const fresh = blankItem();
-      next.splice(idx, 0, fresh);
-      patch(next);
-      focusSoon(fresh.id);
-      return;
-    }
-    const rest = { ...blankItem(), text: item.text.slice(caret).trimStart() };
-    next.splice(idx, 1, { ...item, text: item.text.slice(0, caret).trimEnd() }, rest);
-    patch(next);
-    focusSoon(rest.id, 0);
+  // New lines go right under the line you were in, or at the end of the list
+  const addLine = (kind) => {
+    const anchor = focusedItem;
+    if (anchor) { insertAfter(anchor.id, kind); return; }
+    const fresh = blankItem(kind);
+    patch([...open, fresh, ...done]);
+    focusSoon(fresh.id);
+  };
+
+  const setKind = (id, kind) => {
+    patch(items.map(i => (i.id === id ? withKind(i, kind) : i)));
+    focusSoon(id);
   };
 
   const pick = (rowId, s) => {
@@ -289,16 +353,14 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
 
   const reorderOpen = (nextOpen) => patch([...nextOpen, ...done]);
 
-  const addItem = () => {
-    const fresh = blankItem();
-    patch([...open, fresh, ...done]);
-    focusSoon(fresh.id);
-  };
+  // Keep the line's text box focused while an add button is pressed, so the new line goes under it
+  const keepFocus = { onPointerDown: (e) => e.preventDefault(), onMouseDown: (e) => e.preventDefault() };
+  const addButton = 'flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground';
 
   return (
     <div className="space-y-0.5">
       <Reorder.Group axis="y" values={open} onReorder={reorderOpen} className="space-y-0.5">
-        {open.map((item, i) => (
+        {open.map(item => (
           <Row
             key={item.id}
             item={item}
@@ -307,10 +369,10 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
             t={t}
             onChange={replace}
             onRemove={() => remove(item.id)}
-            onEnter={(caret) => enterAt(item.id, caret)}
+            onEnter={() => insertAfter(item.id)}
             onBackspaceEmpty={() => backspaceEmpty(item.id)}
             onPasteLines={(lines) => pasteLines(item.id, lines)}
-            onInsertBelow={!readOnly && i < open.length - 1 ? () => insertAfter(item.id) : undefined}
+            onKind={(kind) => setKind(item.id, kind)}
             suggestions={focusedId === item.id ? offered : null}
             onPick={(s) => pick(item.id, s)}
             onFocusChange={trackFocus(item.id)}
@@ -320,13 +382,17 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
       </Reorder.Group>
 
       {!readOnly && (
-        <button
-          type="button"
-          onClick={addItem}
-          className="flex min-h-9 w-full items-center gap-2 rounded-lg px-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <Plus className="h-4 w-4" /> {t('ntAddItem')}
-        </button>
+        <div className="flex flex-wrap items-center gap-x-1">
+          <button type="button" {...keepFocus} onClick={() => addLine('item')} className={addButton}>
+            <Plus className="h-4 w-4" /> {t('ntAddItem')}
+          </button>
+          <button type="button" {...keepFocus} onClick={() => addLine('text')} className={addButton}>
+            <Pilcrow className="h-4 w-4" /> {t('ntAddText')}
+          </button>
+          <button type="button" {...keepFocus} onClick={() => addLine('title')} className={addButton}>
+            <Heading className="h-4 w-4" /> {t('ntAddTitle')}
+          </button>
+        </div>
       )}
 
       {done.length > 0 && (
