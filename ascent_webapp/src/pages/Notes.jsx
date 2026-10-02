@@ -180,6 +180,21 @@ function Notes() {
   }, [visible, language]);
   const labelNames = useMemo(() => labelList.map(l => l.name), [labelList]);
 
+  // Everything already written on a checklist, newest notes first, offered while typing a new item
+  const itemSuggestions = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    visible.forEach(n => {
+      if (n.trashedAt || n.type !== 'checklist') return;
+      (n.items || []).forEach(({ text }) => {
+        const clean = text?.trim();
+        const key = clean?.toLowerCase();
+        if (clean && clean.length <= 200 && !seen.has(key)) { seen.add(key); out.push(clean); }
+      });
+    });
+    return out.slice(0, 1000);
+  }, [visible]);
+
   // What the search filters can offer: only kinds and colours some note actually has
   const { availableFilters, colorsInUse } = useMemo(() => {
     const live = visible.filter(n => !n.trashedAt);
@@ -588,6 +603,7 @@ function Notes() {
                 <NoteComposer
                   t={t}
                   labels={labelNames}
+                  itemSuggestions={itemSuggestions}
                   defaultTag={label}
                   onCreate={onCreate}
                   onImage={newImageNote}
@@ -689,6 +705,7 @@ function Notes() {
               note={openNote}
               people={people}
               labels={labelNames}
+              itemSuggestions={itemSuggestions}
               actions={actions}
               onClose={() => { setOpenId(null); setFreshId(null); }}
               onShare={(id) => setShareId(id)}

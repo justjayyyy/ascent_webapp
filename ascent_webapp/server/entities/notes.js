@@ -56,6 +56,7 @@ function present(note, user, member) {
   return {
     ...rest,
     id: note._id.toString(),
+    updatedBy: note.updatedBy ? note.updatedBy.toString() : null,
     isPinned: pinned,
     isArchived: (archivedBy || []).some(id => sameId(id, uid)),
     reminder: mine ? new Date(mine.at).toISOString() : null,
@@ -189,7 +190,7 @@ export default async function handler(req, res) {
           { _id: id },
           {
             $push: { attachments: { id: file._id.toString(), name: file.name, type: file.type, size: file.size } },
-            $set: { updatedByEmail: user.email }
+            $set: { updatedByEmail: user.email, updatedBy: uid }
           },
           { new: true }
         ).lean();
@@ -201,7 +202,7 @@ export default async function handler(req, res) {
         await NoteFile.deleteOne({ _id: fileId, noteId: id });
         const updated = await Note.findOneAndUpdate(
           { _id: id },
-          { $pull: { attachments: { id: fileId } }, $set: { updatedByEmail: user.email } },
+          { $pull: { attachments: { id: fileId } }, $set: { updatedByEmail: user.email, updatedBy: uid } },
           { new: true }
         ).lean();
         return success(res, present(updated, user, member));
@@ -269,6 +270,7 @@ export default async function handler(req, res) {
           archivedBy: body.isArchived ? [uid] : [],
           isPinned: !!body.isPinned,
           updatedByEmail: user.email,
+          updatedBy: uid,
           workspaceId: workspace._id,
           createdBy: uid
         });
@@ -303,6 +305,7 @@ export default async function handler(req, res) {
         if (wantsContent) {
           Object.assign(set, contentPatch(body));
           set.updatedByEmail = user.email;
+          set.updatedBy = uid;
         }
 
         // Personal state: any collaborator, including view-only ones
@@ -321,7 +324,7 @@ export default async function handler(req, res) {
         // Reminders are personal too. $pull and $push can't share one update on the same
         // field, so the old reminder is cleared first.
         if (body.reminder !== undefined) {
-          await Note.updateOne({ _id: id }, { $pull: { reminders: { userId: uid } } });
+          await Note.updateOne({ _id: id }, { $pull: { reminders: { userId: uid } } }, { timestamps: false });
           const repeat = REPEATS.includes(body.reminderRepeat) ? body.reminderRepeat : 'none';
           if (reminderAt) update.$push = { ...(update.$push || {}), reminders: { userId: uid, at: reminderAt, repeat } };
           else if (!Object.keys(set).length && !Object.keys(update).length) {
@@ -344,6 +347,8 @@ export default async function handler(req, res) {
           return error(res, 'Nothing to update', 400);
         }
         if (Object.keys(set).length) update.$set = set;
+        // Pinning, archiving or a reminder is personal: it shouldn't show up as an edit to everyone else
+        const personalOnly = !wantsContent && !wantsOwnerOnly;
 
         // A checklist edit sent with the list it started from is merged into the list as it is now, so
         // people ticking different items at once keep both. The write only lands if nobody saved in between.
@@ -355,7 +360,7 @@ export default async function handler(req, res) {
             set.items = mergeChecklist(base, cleanItems(body.items), cleanItems(current.items || []));
             filter.updated_date = current.updated_date;
           }
-          const updated = await Note.findOneAndUpdate(filter, update, { new: true, runValidators: true }).lean();
+          const updated = await Note.findOneAndUpdate(filter, update, { new: true, runValidators: true, timestamps: !personalOnly }).lean();
           if (updated) return success(res, present(updated, user, member));
           if (!base) break;
           current = await Note.findOne({ _id: id, workspaceId: workspace._id }).lean();

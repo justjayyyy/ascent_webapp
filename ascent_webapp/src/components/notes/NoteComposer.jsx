@@ -13,7 +13,7 @@ const blank = (tag) => ({
 });
 
 /** "Take a note…" bar that opens into a full inline editor, like Google Keep. */
-export default function NoteComposer({ t, labels, defaultTag, onCreate, onImage, request, onRequestHandled }) {
+export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, onCreate, onImage, request, onRequestHandled }) {
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => blank(defaultTag));
@@ -147,6 +147,7 @@ export default function NoteComposer({ t, labels, defaultTag, onCreate, onImage,
                     items={draft.items.length ? draft.items : [blankItem()]}
                     onChange={(items) => patch({ items })}
                     autoFocus
+                    suggestions={itemSuggestions}
                     t={t}
                   />
                 ) : (

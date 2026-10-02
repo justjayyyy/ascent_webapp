@@ -17,7 +17,7 @@ import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
 import { DictateButton, useDictation } from './useDictation';
 import {
-  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, itemsToText, noteToText, resolveColor, textToItems, timeAgo, blankItem,
+  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, itemsToText, lastEditor, noteToText, resolveColor, textToItems, timeAgo, blankItem,
 } from './noteUtils';
 
 const ib = 'h-11 w-11 sm:h-9 sm:w-9 [@media(pointer:coarse)]:before:hidden';
@@ -45,7 +45,7 @@ function useVisualViewport() {
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export default function NoteEditor({
-  note, people, labels, actions, onClose, onShare, t, language, online, pending, canCreate, uploading, fresh,
+  note, people, labels, itemSuggestions, actions, onClose, onShare, t, language, online, pending, canCreate, uploading, fresh,
 }) {
   const reduce = useReducedMotion();
   const vv = useVisualViewport();
@@ -194,7 +194,7 @@ export default function NoteEditor({
   const links = extractLinks(draft);
 
   const meId = actions.meId;
-  const editor = note.updatedByEmail ? people.list.find(p => p.email === note.updatedByEmail) : null;
+  const editor = lastEditor(note, people);
   const status = !online ? 'offline' : (hasDirty || pending > 0 ? 'saving' : 'saved');
 
   const isMobileSheet = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches;
@@ -324,6 +324,7 @@ export default function NoteEditor({
                     onChange={(items) => change({ items })}
                     readOnly={!canEdit}
                     autoFocus={fresh}
+                    suggestions={itemSuggestions}
                     t={t}
                   />
                 ) : (
@@ -378,7 +379,7 @@ export default function NoteEditor({
                   {isShared && editor && !editor.isMe && <PersonDot person={editor} size={20} />}
                   {isShared && editor && !editor.isMe
                     ? fmt(t('ntEditedBy'), { name: editor.name, time: timeAgo(note.updated_date, language) })
-                    : isShared
+                    : isShared && editor
                       ? fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })
                       : fmt(t('ntEditedAt'), { time: timeAgo(note.updated_date, language) })}
                 </span>

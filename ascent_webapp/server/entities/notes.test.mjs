@@ -47,9 +47,10 @@ function matches(doc, q) {
   });
 }
 let saves = 0;
-function apply(doc, raw) {
+function apply(doc, raw, options = {}) {
   const update = norm(raw);
-  doc.updated_date = new Date(Date.UTC(2026, 0, 1) + (saves += 1) * 1000); // timestamps: every save moves it
+  // timestamps: every save moves it, unless the handler asks it not to
+  if (options.timestamps !== false) doc.updated_date = new Date(Date.UTC(2026, 0, 1) + (saves += 1) * 1000);
   Object.assign(doc, update.$set || {});
   for (const [f, v] of Object.entries(update.$addToSet || {})) if (!(doc[f] ||= []).some((x) => same(x, v))) doc[f].push(v);
   for (const [f, v] of Object.entries(update.$pull || {})) {
@@ -68,12 +69,12 @@ const Note = {
     rows.push(row);
     return { toObject: () => structuredClone(row) };
   },
-  findOneAndUpdate: (q, update) => {
+  findOneAndUpdate: (q, update, options) => {
     const doc = rows.find((d) => matches(d, q));
-    if (doc) apply(doc, update);
+    if (doc) apply(doc, update, options);
     return lean(doc);
   },
-  async updateOne(q, update) { const doc = rows.find((d) => matches(d, q)); if (doc) apply(doc, update); },
+  async updateOne(q, update, options) { const doc = rows.find((d) => matches(d, q)); if (doc) apply(doc, update, options); },
   async deleteOne(q) { rows = rows.filter((d) => !matches(d, q)); },
   async deleteMany(q) { const before = rows.length; rows = rows.filter((d) => !matches(d, q)); return { deletedCount: before - rows.length }; },
 };
@@ -153,6 +154,19 @@ test('pinning and archiving are personal, even for view-only readers', async () 
   const mine = (await call('GET', { id: shared.id, _single: 'true' })).body.data;
   assert.equal(mine.isPinned, false);
   assert.equal(mine.isArchived, false);
+});
+
+test('the note remembers who changed it last; personal changes are not edits', async () => {
+  assert.equal(shared.updatedBy, OWNER);
+  as(EDITOR);
+  const edited = (await call('PUT', { id: shared.id }, { title: 'Shopping' })).body.data;
+  assert.equal(edited.updatedBy, EDITOR);
+  assert.equal(edited.updatedByEmail, 'ed@x.test');
+
+  as(VIEWER);
+  const pinned = (await call('PUT', { id: shared.id }, { isPinned: true, reminder: '2026-12-01T09:00:00.000Z' })).body.data;
+  assert.equal(pinned.updatedBy, EDITOR);
+  assert.equal(String(pinned.updated_date), String(edited.updated_date));
 });
 
 test('a refused update changes nothing, not even the caller\'s reminder', async () => {

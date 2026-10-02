@@ -159,6 +159,31 @@ export function highlight(text, query) {
   return createElement(Fragment, null, ...out);
 }
 
+// The first letter decides which way a piece of text runs, so a Hebrew note reads right to left
+// in an English app and the other way round. No letters yet: follow the page.
+const span = (from, to) => `${String.fromCharCode(from)}-${String.fromCharCode(to)}`;
+const RTL_RANGES = span(0x0590, 0x08ff) + span(0xfb1d, 0xfdff) + span(0xfe70, 0xfefc); // Hebrew, Arabic and their forms
+const RTL_LETTER = new RegExp(`[${RTL_RANGES}]`);
+const STRONG_LETTER = new RegExp(`[A-Za-z${span(0x00c0, 0x024f)}${span(0x0370, 0x04ff)}${RTL_RANGES}]`); // plus Latin, Greek, Cyrillic
+export function textDir(text) {
+  const first = String(text || '').match(STRONG_LETTER);
+  if (!first) return undefined;
+  return RTL_LETTER.test(first[0]) ? 'rtl' : 'ltr';
+}
+
+/** Who made the latest change to a note: a workspace person, a stand-in from the email, or nobody known. */
+export function lastEditor(note, people) {
+  const email = note.updatedByEmail?.toLowerCase();
+  const byId = note.updatedBy ? people.byId[note.updatedBy] : null;
+  if (byId) return byId;
+  if (!email) return null;
+  const known = people.list.find(p => p.email?.toLowerCase() === email);
+  if (known) return known;
+  const name = email.split('@')[0] || email;
+  const isMe = email === people.me?.email || (!!note.updatedBy && note.updatedBy === people.me?.id);
+  return { id: null, email, name, initials: name.slice(0, 2).toUpperCase(), isMe, color: 'hsl(var(--muted-foreground))' };
+}
+
 export function timeAgo(date, language) {
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return '';

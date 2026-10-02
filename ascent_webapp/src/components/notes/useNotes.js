@@ -123,6 +123,7 @@ export function useNotes() {
       attachments: [],
       reminder: null,
       updatedByEmail: user?.email,
+      updatedBy: userId,
       created_date: now,
       updated_date: now,
     };
@@ -149,13 +150,14 @@ export function useNotes() {
     if (CONTENT_KEYS.some(k => k in changes)) {
       local.updated_date = new Date().toISOString();
       local.updatedByEmail = user?.email;
+      local.updatedBy = userId;
     }
     if (Array.isArray(local.collaborators)) {
       local.collaborators = local.collaborators.map(c => ({ email: '', ...c }));
     }
     update(list => list.map(n => (n.id === id ? { ...n, ...local } : n)));
     sync.enqueue({ type: 'patch', id, data: changes });
-  }, [update, sync, user?.email]);
+  }, [update, sync, user?.email, userId]);
 
   const deleteNote = useCallback((id) => {
     update(list => list.filter(n => n.id !== id));
@@ -170,7 +172,7 @@ export function useNotes() {
   // Files go straight to the server (not through the offline outbox), so they need a connection
   const applyAttachments = useCallback((saved) => {
     update(list => list.map(n => (n.id === saved.id
-      ? { ...n, attachments: saved.attachments, updatedByEmail: saved.updatedByEmail, updated_date: saved.updated_date }
+      ? { ...n, attachments: saved.attachments, updatedByEmail: saved.updatedByEmail, updatedBy: saved.updatedBy, updated_date: saved.updated_date }
       : n)));
   }, [update]);
 

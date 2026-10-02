@@ -2,7 +2,7 @@ import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRe
 import { Check, ExternalLink, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { NOTE_COLORS, highlight, linkHost, resolveColor } from './noteUtils';
+import { NOTE_COLORS, highlight, linkHost, resolveColor, textDir } from './noteUtils';
 
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
 
@@ -34,7 +34,8 @@ export function buildPeople(workspace, me) {
     list.push(person);
     if (id) byId[id] = person;
   });
-  return { byId, list };
+  const meId = me?.id || me?._id;
+  return { byId, list, me: { id: meId ? String(meId) : null, email: me?.email?.toLowerCase() || null } };
 }
 
 export function PersonDot({ person, size = 24, className }) {
@@ -68,7 +69,7 @@ export function PeopleStack({ people, max = 3, size = 24 }) {
   );
 }
 
-/** A textarea that grows with its content instead of scrolling. */
+/** A textarea that grows with its content instead of scrolling, and runs the way its text is written. */
 export const AutoTextarea = forwardRef(function AutoTextarea({ value, onChange, className, ...props }, ref) {
   const inner = useRef(null);
   useImperativeHandle(ref, () => inner.current);
@@ -84,6 +85,7 @@ export const AutoTextarea = forwardRef(function AutoTextarea({ value, onChange, 
       rows={1}
       value={value}
       onChange={onChange}
+      dir={textDir(value)}
       className={cn('block w-full resize-none bg-transparent outline-none placeholder:text-muted-foreground/70 overflow-hidden', className)}
       {...props}
     />

@@ -76,8 +76,13 @@ const noteSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Who made the latest content change (pin, archive and reminders are personal and don't count)
   updatedByEmail: {
     type: String
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   workspaceId: {
     type: mongoose.Schema.Types.ObjectId,
