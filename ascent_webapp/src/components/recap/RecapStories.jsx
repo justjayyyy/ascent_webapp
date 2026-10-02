@@ -216,7 +216,7 @@ function Player({ onClose, month, rows, members, t, language, isRTL, currency, b
         </motion.div>
       </div>
     ),
-    where: (
+    where: recap.categories.length > 0 && (
       <div className="flex h-full flex-col justify-center">
         <motion.h2 {...rise(0)} className="text-4xl font-bold tracking-tight text-balance">{t('rcWhereTitle')}</motion.h2>
         <motion.p {...rise(1)} className="mt-3 text-lg text-foreground/80 text-pretty">
