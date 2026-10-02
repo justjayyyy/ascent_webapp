@@ -15,6 +15,7 @@ import {
 import { Section, Group, Row, Segmented } from './SettingsShell';
 
 const errorText = (err, t) => {
+  if (err?.name === 'TimeoutError') return t('secTimedOut');
   if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return t('secCancelled');
   if (err?.data?.error === 'passkey_limit') return t('secLimit');
   if (err?.data?.error === 'origin_not_allowed') return t('secWrongSite');

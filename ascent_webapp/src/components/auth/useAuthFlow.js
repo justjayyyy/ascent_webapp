@@ -128,7 +128,9 @@ export function useAuthFlow() {
         enter(result.user);
       } catch { /* dismissed, or replaced by the button's own request */ }
     })();
-    return () => { cancelled = true; };
+    // Leaving the page (signed in with Google or a password) closes the autofill request, so it can't
+    // stall the Face ID setup offered right after
+    return () => { cancelled = true; ascent.auth.cancelPasskeyAutofill(); };
   }, []);
 
   const signInWithPasskey = useCallback(async () => {
@@ -139,7 +141,8 @@ export function useAuthFlow() {
       enter(result.user);
     } catch (error) {
       enteringRef.current = false;
-      if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') toast(t('secCancelled'));
+      if (error?.name === 'TimeoutError') toast.error(t('secTimedOut'));
+      else if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') toast(t('secCancelled'));
       else if (error?.data?.error === 'unknown_passkey') toast.error(t('passkeyUnknown'));
       else toast.error(t('passkeySignInFailed'));
     } finally {

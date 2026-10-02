@@ -15,6 +15,22 @@ function keyToBytes(base64Url) {
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 }
 
+// Each step of turning notifications on gets a time limit: on iPhone a step can wait forever without
+// failing, which left the button spinning. `step` says which one stalled, for the message.
+const within = (promise, ms, step) => {
+  let timer;
+  const stalled = new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error(`${step} stalled`), { step })), ms); });
+  return Promise.race([promise, stalled]).finally(() => clearTimeout(timer));
+};
+
+/** The app's service worker, started here when this phone never started it. */
+async function workerReady() {
+  if (!(await navigator.serviceWorker.getRegistration())) await navigator.serviceWorker.register('/sw.js');
+  return within(navigator.serviceWorker.ready, 15000, 'worker');
+}
+
+const STEP_ERRORS = { worker: 'apPushNoWorker', subscribe: 'apPushNoApple' };
+
 /** Turns push notifications on or off for this device (a phone needs Ascent on its Home Screen). */
 export default function PushToggle() {
   const { t } = useTheme();
@@ -37,15 +53,15 @@ export default function PushToggle() {
   const enable = async () => {
     setBusy(true);
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await within(Notification.requestPermission(), 60000, 'permission');
       if (permission !== 'granted') { setDenied(true); return; }
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await workerReady();
       const sub = (await reg.pushManager.getSubscription())
-        || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(config.publicKey) }));
+        || (await within(reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(config.publicKey) }), 20000, 'subscribe'));
       await ascent.push.subscribe(sub.toJSON());
       setSubscribed(true);
-    } catch {
-      toast.error(t('apPushFailed'));
+    } catch (err) {
+      toast.error(t(STEP_ERRORS[err?.step] || 'apPushFailed'));
     } finally {
       setBusy(false);
     }
@@ -54,7 +70,7 @@ export default function PushToggle() {
   const disable = async () => {
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await workerReady();
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
         await ascent.push.unsubscribe(sub.endpoint).catch(() => {});

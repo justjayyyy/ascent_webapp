@@ -142,6 +142,35 @@ function takeOptions(kind, endpoint) {
 
 const forgetPreparedOptions = () => { for (const kind of Object.keys(preparedOptions)) delete preparedOptions[kind]; };
 
+// The sign-in page's passkey autofill request stays open in the background. Left open after signing in
+// another way (Google), it stalls the next Face ID request on iPhone, which then never opens nor fails.
+let autofillOpen = false;
+const cancelAutofill = async () => {
+  if (!autofillOpen) return;
+  autofillOpen = false;
+  const { WebAuthnAbortService } = await import('@simplewebauthn/browser');
+  WebAuthnAbortService.cancelCeremony();
+};
+
+// A Face ID request that has neither opened nor failed after this long is stuck: it is cancelled, so the
+// screen stops waiting and says what to try
+const CEREMONY_LIMIT_MS = 60 * 1000;
+async function withinLimit(ceremony) {
+  let timer;
+  const stuck = new Promise((_, reject) => {
+    timer = setTimeout(async () => {
+      const { WebAuthnAbortService } = await import('@simplewebauthn/browser');
+      WebAuthnAbortService.cancelCeremony();
+      reject(Object.assign(new Error('Face ID did not open'), { name: 'TimeoutError' }));
+    }, CEREMONY_LIMIT_MS);
+  });
+  try {
+    return await Promise.race([ceremony, stuck]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const LOGIN_OPTIONS = '/auth/passkey?action=login-options';
 const REGISTER_OPTIONS = '/auth/passkey?action=register-options';
 
@@ -154,13 +183,21 @@ const auth = {
 
   // Face ID / fingerprint: sign in, or unlock this device's session, with a passkey
   preparePasskeyLogin: () => prepareOptions('login', LOGIN_OPTIONS).catch(() => {}),
+  /** Closes the sign-in page's passkey autofill request, if it is still open. */
+  cancelPasskeyAutofill: () => cancelAutofill().catch(() => {}),
   async passkeyLogin({ autofill = false } = {}) {
     const [{ startAuthentication }, optionsJSON] = await takeOptions('login', LOGIN_OPTIONS);
     // The autofill request stays open while the page waits, so the button needs options of its own
     if (autofill) auth.preparePasskeyLogin();
     let response;
     try {
-      response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
+      if (autofill) {
+        autofillOpen = true;
+        try { response = await startAuthentication({ optionsJSON, useBrowserAutofill: true }); } finally { autofillOpen = false; }
+      } else {
+        autofillOpen = false; // the button's request replaces it
+        response = await withinLimit(startAuthentication({ optionsJSON }));
+      }
     } catch (err) {
       if (!autofill) auth.preparePasskeyLogin(); // ready for the next tap
       throw err;
@@ -327,7 +364,8 @@ const passkeys = {
     const [{ startRegistration }, optionsJSON] = await takeOptions('register', REGISTER_OPTIONS);
     let response;
     try {
-      response = await startRegistration({ optionsJSON });
+      autofillOpen = false; // starting this request replaces it
+      response = await withinLimit(startRegistration({ optionsJSON }));
     } catch (err) {
       passkeys.prepareRegister(); // ready for the next tap
       throw err;

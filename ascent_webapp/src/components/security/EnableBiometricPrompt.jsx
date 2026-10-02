@@ -67,7 +67,8 @@ export default function EnableBiometricPrompt() {
       toast.success(t('secLockOn').replace('{method}', method));
       setOpen(false);
     } catch (err) {
-      if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') toast(t('secCancelled'));
+      if (err?.name === 'TimeoutError') toast.error(t('secTimedOut'));
+      else if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') toast(t('secCancelled'));
       else toast.error(t('secFailed'));
     } finally {
       setBusy(false);
