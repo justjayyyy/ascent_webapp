@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import AscentLogo from '@/components/AscentLogo';
 import DeleteAccountRow from '@/components/account/DeleteAccount';
+import DeleteWorkspaceRow from '@/components/workspace/DeleteWorkspace';
 import SignOutOthersRow from '@/components/account/SignOutOthers';
 import { useSignOut } from '@/hooks/useSignOut';
 
@@ -364,6 +365,7 @@ export default function Settings() {
                   </div>
                 )}
                 {(sectionHit(t('setNavHousehold')) || hit(t('aiTitle'), t('largeAlertTitle'))) && <HouseholdSmartSettings />}
+                {isOwner && (sectionHit(t('setNavHousehold')) || hit(t('wsDelete'))) && <DeleteWorkspaceRow />}
               </Group>
             </Section>
           )}
