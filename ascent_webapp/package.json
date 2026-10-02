@@ -21,6 +21,7 @@
     "backfill:ingest": "node --env-file=.env server/scripts/backfill-ingest-fields.mjs",
     "test:node": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\" \"src/lib/**/*.test.mjs\"",
     "test:web": "vitest run",
+    "test:e2e": "playwright test",
     "test": "npm run test:node && npm run test:web",
     "check": "npm run lint && npm test && npm run build"
   },
@@ -79,6 +80,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@playwright/test": "^1.63.0",
     "@sentry/vite-plugin": "^5.4.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
@@ -94,6 +96,7 @@
     "eslint-plugin-unused-imports": "^4.3.0",
     "globals": "^15.14.0",
     "jsdom": "^26.1.0",
+    "mongodb-memory-server": "^11.3.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",

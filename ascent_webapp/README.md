@@ -61,8 +61,14 @@ npm run check      # all three
   translations (every key in en/he/ru, every key the app uses exists), components and helpers, and
   `src/test/pages.test.jsx`, which renders every main screen in every language against an in-memory API
   (`src/test/fakeApi.js`).
+- `npm run test:e2e`: Playwright in Chromium (`e2e/`). The production build, service worker included, against
+  the real API on a throwaway in-memory MongoDB (`e2e/serve-api.mjs`; no real database or email is touched):
+  signing up, out and in with the session cookie, passkeys with a virtual authenticator, an expense added
+  offline reaching the server, and every main screen at iPhone size. The first run downloads Chromium
+  (`npx playwright install chromium`) and MongoDB once. Not part of `npm run check`.
 
-GitHub Actions (`.github/workflows/check.yml`) runs `npm run check` and a production `npm audit` on every push.
+GitHub Actions (`.github/workflows/check.yml`) runs `npm run check` and a production `npm audit` on every push,
+and the browser tests as a separate job (a failed run uploads the report and traces).
 
 ## Layout
 

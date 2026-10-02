@@ -49,4 +49,15 @@ export default [
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
+  // Browser tests: Node, plus the page's globals inside page.evaluate()
+  {
+    files: ["e2e/**/*.{js,mjs}"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser }, ecmaVersion: 2022, sourceType: "module" },
+    plugins: { "unused-imports": pluginUnusedImports },
+    rules: {
+      ...pluginJs.configs.recommended.rules,
+      ...unused,
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
 ];
