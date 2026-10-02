@@ -12,8 +12,9 @@ import { translateCategory } from '@/lib/translations';
 import BlurValue from '../BlurValue';
 import { kindEmoji } from './planUtils';
 import { PaymentTimeline, PlanBar, countdown, formatDay, moneyIn } from './PlanParts';
+import { localDay } from '@/lib/localDay';
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => localDay();
 
 function StatusButton({ item, canEdit, onToggle, t }) {
   const Icon = item.status === 'paid' ? CheckCircle2 : item.status === 'booked' ? Clock : Circle;

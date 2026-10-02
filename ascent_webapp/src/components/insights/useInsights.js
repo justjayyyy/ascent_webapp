@@ -7,10 +7,10 @@ import { monthForecast, baselineDaily } from '@shared/forecast';
 import { detectSubscriptions } from '@shared/subscriptions';
 import { householdBalances } from '@shared/balances';
 import { duesBetween } from '@shared/commitments';
+import { localDay, localMonth } from '@/lib/localDay';
 
-const pad = (n) => String(n).padStart(2, '0');
-export const localDay = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const monthOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+export { localDay };
+const monthOf = localMonth;
 
 /** Money in the viewer's currency, with the same locale rules as the rest of the Dashboard. */
 export function useMoneyFormat() {

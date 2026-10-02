@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import BlurValue from '../components/BlurValue';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
+import { localDay } from '@/lib/localDay';
 
 export default function Portfolio() {
   const { user, colors, t } = useTheme();
@@ -123,7 +124,7 @@ export default function Portfolio() {
               averageBuyPrice: 1,
               currentPrice: 1,
               currency: accountData.baseCurrency,
-              date: new Date().toISOString().split('T')[0],
+              date: localDay(),
             });
           } catch (positionError) {
             console.warn('Initial cash position failed after account creation:', positionError);

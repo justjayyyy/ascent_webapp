@@ -4,9 +4,10 @@ import { ChevronDown, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import BlurValue from '../BlurValue';
+import { localDay } from '@/lib/localDay';
 
 const SHOWN = 3;
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => localDay();
 
 /** Group big-purchase rows: installments of one purchase share a group id, single payments stand alone. */
 export function groupBigPurchases(rows) {

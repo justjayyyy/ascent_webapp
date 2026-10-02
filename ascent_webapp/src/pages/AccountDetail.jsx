@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import BlurValue from '../components/BlurValue';
 import { useCurrencyConversion } from '@/hooks/useCurrencyConversion';
 import { useAuth } from '@/lib/AuthContext';
+import { localDay } from '@/lib/localDay';
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--primary))', 'hsl(var(--destructive))'];
 
@@ -198,7 +199,7 @@ export default function AccountDetail() {
         pricePerUnit: data.averageBuyPrice,
         totalAmount: purchaseCost,
         currency: data.currency || account.baseCurrency,
-        date: data.date || new Date().toISOString().split('T')[0],
+        date: data.date || localDay(),
         notes: data.notes || '',
         positionId: newPosition.id
       });
@@ -298,7 +299,7 @@ export default function AccountDetail() {
           quantity: totalProceeds,
           averageBuyPrice: 1,
           currency: positionInfo?.currency || account.baseCurrency,
-          date: new Date().toISOString().split('T')[0],
+          date: localDay(),
           notes: `Proceeds from selling ${quantity} ${positionInfo?.symbol}`
         });
       }
@@ -313,7 +314,7 @@ export default function AccountDetail() {
         pricePerUnit: sellPrice,
         totalAmount: totalProceeds,
         currency: positionInfo?.currency || account.baseCurrency,
-        date: new Date().toISOString().split('T')[0],
+        date: localDay(),
         notes: notes || `P&L: ${profitLoss >= 0 ? '+' : ''}${formatCurrency(profitLoss, account.baseCurrency)}`,
         positionId: positionId || originalPositions?.[0]?.id
       });
@@ -739,7 +740,7 @@ export default function AccountDetail() {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = localDay(date);
 
       // Calculate portfolio value at this date
       // Only include positions that existed on or before this date
@@ -893,7 +894,7 @@ export default function AccountDetail() {
       const date = new Date(earliestDate);
       date.setDate(date.getDate() + i);
       date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = localDay(date);
 
       // Calculate cumulative quantity and value at this date
       let cumulativeQuantity = 0;

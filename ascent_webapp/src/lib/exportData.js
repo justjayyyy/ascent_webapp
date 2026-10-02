@@ -2,6 +2,7 @@
 // and transactions are paged past the API's per-request cap so the export is the whole history.
 import { ascent } from '@/api/client';
 import { toCSV, sections } from './csv';
+import { localDay } from '@/lib/localDay';
 
 const PAGE = 10000; // the API's largest page
 
@@ -21,7 +22,7 @@ export async function allTransactions(api = ascent) {
   return [...all.values()];
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 
 export const DATASETS = {
   expenses: {

@@ -5,6 +5,7 @@ import { useTheme } from '../ThemeProvider';
 import BlurValue from '../BlurValue';
 import { createPageUrl } from '@/utils';
 import { kindEmoji } from '../plans/planUtils';
+import { localDay } from '@/lib/localDay';
 
 /**
  * Plan costs (flights, a venue deposit) that fall due in the selected period and are not paid yet,
@@ -36,7 +37,7 @@ function PlannedPayments({ plans, selectedYear, selectedMonths }) {
 
   const money = (v, c) => new Intl.NumberFormat(loc, { style: 'currency', currency: c || user?.currency || 'ILS', maximumFractionDigits: 0 }).format(v || 0);
   const shortDate = (d) => new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${d}T12:00:00`));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
 
   return (
     <section className="rounded-3xl border border-dashed border-primary/30 bg-primary/[0.04] p-4 sm:p-5" aria-label={t('comingUpFromPlans')}>

@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { localDay } from '@/lib/localDay';
 
 const MONTH_KEYS = ['january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'];
@@ -140,7 +141,7 @@ function TransactionsPage({ kind }) {
       installmentGroupId, installmentIndex, installmentCount, installmentTotal, planItemId,
       ...fields
     } = transaction;
-    setEditingTransaction({ ...fields, date: new Date().toISOString().split('T')[0], id: undefined, _id: undefined });
+    setEditingTransaction({ ...fields, date: localDay(), id: undefined, _id: undefined });
     setAddDialogOpen(true);
   }, []);
 

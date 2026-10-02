@@ -4,6 +4,7 @@ import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BlurValue from '../BlurValue';
 import { kindEmoji } from './planUtils';
+import { localMonth } from '@/lib/localDay';
 
 export const localeOf = (language) => (language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US');
 
@@ -94,7 +95,7 @@ export const PlanCard = memo(function PlanCard({ plan, totals, onOpen, t, loc, b
 export function PaymentTimeline({ months, currency, loc, t, blur, emoji }) {
   const ref = useRef(null);
   const max = Math.max(1, ...months.map((m) => m.paid + m.due));
-  const nowKey = new Date().toISOString().slice(0, 7);
+  const nowKey = localMonth();
   const money = moneyIn(loc, currency);
   const compact = new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 });
 

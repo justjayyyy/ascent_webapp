@@ -50,12 +50,12 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
 
     let periodTransactions = transactions.filter(t => {
       if (!t.date || t.type !== 'Expense') return false;
-      const transDate = new Date(t.date);
-      const transYear = transDate.getFullYear();
+      // Read from the text: new Date('2026-03-01') is UTC midnight, which is still February west of London
+      const transYear = Number(String(t.date).slice(0, 4));
 
       if (selectedMonths && selectedMonths.length > 0) {
         // Filter by selected months
-        const transMonth = transDate.getMonth() + 1; // getMonth returns 0-11
+        const transMonth = Number(String(t.date).slice(5, 7));
         const monthNums = selectedMonths.map(m => parseInt(m));
         return transYear === yearNum && monthNums.includes(transMonth);
       } else {

@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
+import { localDay } from '@/lib/localDay';
 
 export default function AddPositionDialog({ open, onClose, onSubmit, isLoading, accountCurrency, editPosition = null, cashBalance = null, hasCashPosition = false }) {
   const { colors, t, user } = useTheme();
@@ -33,7 +34,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, isLoading, 
     quantity: '',
     averageBuyPrice: '',
     currency: currency,
-    date: new Date().toISOString().split('T')[0],
+    date: localDay(),
     strikePrice: '',
     expirationDate: '',
     optionType: 'Call',
@@ -54,7 +55,7 @@ export default function AddPositionDialog({ open, onClose, onSubmit, isLoading, 
         quantity: '',
         averageBuyPrice: '',
         currency: currency,
-        date: new Date().toISOString().split('T')[0],
+        date: localDay(),
         strikePrice: '',
         expirationDate: '',
         optionType: 'Call',

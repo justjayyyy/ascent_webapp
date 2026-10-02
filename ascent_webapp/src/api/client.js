@@ -1,4 +1,5 @@
 import { TOKEN_KEY, WORKSPACE_KEY, SESSION_CACHE_KEY } from '@/lib/storageKeys';
+import { localDay } from '@/lib/localDay';
 
 // The Ascent API client. Every call answers with the `data` of `{ success, data }`, or throws an Error
 // carrying `status` (0 = never reached the server), `data` (the error body) and `isNetworkError`.
@@ -262,9 +263,8 @@ const workspaces = {
   invitation: (token) => request(`/invitations/${enc(token)}`),
 };
 
-/** Today on this device, 'YYYY-MM-DD' ("yesterday" means the person's yesterday). */
-export const localDay = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Today on this device ("yesterday" means the person's yesterday)
+export { localDay } from '@/lib/localDay';
 
 // Smart help: category suggestions while typing, and the opt-in AI assistant
 const assist = {
