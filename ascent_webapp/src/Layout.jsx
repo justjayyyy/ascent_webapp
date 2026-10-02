@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAccounts, useCategories, usePlans } from '@/hooks/useWorkspaceData';
+import { useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from '@/lib/motion';
 import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
@@ -37,7 +37,6 @@ function QuickAddSheet({ request, onClose }) {
   const { save, saving } = useSaveTransaction();
   const enabled = !!request;
   const { data: categories = [] } = useCategories({ enabled });
-  const { data: accounts = [] } = useAccounts({ enabled });
   const { data: plans = [] } = usePlans({ enabled });
   return (
     <AddTransactionDialog
@@ -47,7 +46,6 @@ function QuickAddSheet({ request, onClose }) {
       onSubmit={async (data) => { if (await save(data)) onClose(); }}
       isLoading={saving}
       categories={categories}
-      accounts={accounts}
       plans={plans}
       defaultType={request?.type || 'Expense'}
     />
@@ -196,8 +194,6 @@ function LayoutContent({ children, currentPageName }) {
   // }, [permissions]);
 
   const navigation = useMemo(() => [
-    // Portfolio is hidden for now:
-    // { name: t('portfolio'), page: 'Portfolio', icon: Home, permission: 'viewPortfolio' },
     { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewExpenses' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('income'), page: 'Income', icon: HandCoins, permission: 'viewExpenses' },

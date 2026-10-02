@@ -61,23 +61,6 @@ export const DATASETS = {
       };
     },
   },
-  portfolio: {
-    permission: 'viewPortfolio',
-    async build(api = ascent) {
-      const [accounts, positions] = await Promise.all([
-        api.entities.Account.list('-created_date', 10000),
-        api.entities.Position.list('-created_date', 10000),
-      ]);
-      return {
-        filename: `portfolio_export_${today()}.csv`,
-        count: accounts.length + positions.length,
-        csv: sections([
-          ['ACCOUNTS', toCSV(accounts, ['name', 'type', 'baseCurrency', 'initialInvestment', 'totalDeposits', 'totalWithdrawals', 'totalFees', 'notes'])],
-          ['POSITIONS', toCSV(positions, ['accountId', 'symbol', 'assetType', 'quantity', 'averageBuyPrice', 'currentPrice', 'currency', 'notes'])],
-        ]),
-      };
-    },
-  },
 };
 
 /** Hands the file to the browser as a download. A BOM keeps Hebrew and Russian readable in Excel. */

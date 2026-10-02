@@ -1,7 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { PORTFOLIO_ENABLED } from '@/lib/features';
 import { useTheme } from '../ThemeProvider';
 import { Segmented } from '../settings/SettingsShell';
 import { cn } from '@/lib/utils';
@@ -21,7 +20,8 @@ export const presetOf = (role, permissions) => (role === 'admin' ? 'admin' : det
 export default function PermissionEditor({ value, onChange, canGrantAdmin = false }) {
   const { t } = useTheme();
   const preset = presetOf(value.role, value.permissions);
-  const areas = AREAS.filter((a) => a !== 'Portfolio' || PORTFOLIO_ENABLED);
+  // Portfolio permissions stay in stored data from older versions, but there is no Portfolio to grant
+  const areas = AREAS.filter((a) => a !== 'Portfolio');
   const options = [canGrantAdmin && 'admin', 'editor', 'viewer', 'custom'].filter(Boolean);
   if (preset === 'admin' && !options.includes('admin')) options.unshift('admin');
 

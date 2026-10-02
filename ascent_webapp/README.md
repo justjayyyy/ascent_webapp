@@ -36,7 +36,6 @@ npm run dev:all        # web app on :5173 and API on :3002
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email | Invitations, password reset, email confirmation and summary emails. `SMTP_ALLOW_SELF_SIGNED=true` only for a private relay |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | for push | Web Push |
 | `ANTHROPIC_API_KEY` | for the AI assistant | Off until a workspace owner turns it on |
-| `FINNHUB_API_KEY` | portfolio (hidden) | Stock quotes |
 | `SENTRY_DSN`, `VITE_SENTRY_DSN` | for error tracking | The Sentry project's DSN (the same value in both): the API and the app report errors. Off when unset |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | no | At build time: uploads source maps to Sentry for readable stack traces (they are not served) |
 | `API_PROXY_TARGET` | no | Where `npm run dev` proxies `/api` (default `http://localhost:3002`) |

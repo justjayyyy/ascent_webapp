@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ascent } from '@/api/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAccounts, useBudgets, useCards, useCategories, usePlans } from '@/hooks/useWorkspaceData';
+import { useBudgets, useCards, useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
 import { parseISO, getYear, getMonth } from 'date-fns';
@@ -66,7 +66,6 @@ function TransactionsPage({ kind }) {
   const bigPurchaseRows = useMemo(() => mergeRows(installments, transactions), [installments, transactions]);
 
   const { data: cards = [] } = useCards();
-  const { data: accounts = [] } = useAccounts();
   const { data: budgets = [] } = useBudgets({ enabled: canViewBudgets });
   const { data: categories = [] } = useCategories(); // the first load seeds the default categories
   const { data: plans = [] } = usePlans({ enabled: !isIncome });
@@ -264,7 +263,6 @@ function TransactionsPage({ kind }) {
           onClose={() => { setAddDialogOpen(false); setEditingTransaction(null); }}
           onSubmit={handleSubmit}
           isLoading={saving}
-          accounts={accounts}
           categories={categories}
           editTransaction={editingTransaction}
           defaultType={kind}

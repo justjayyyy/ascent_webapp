@@ -14,7 +14,7 @@ import {
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
-import { useAccounts, useCategories, useMoney, usePlans, workspaceKey } from '@/hooks/useWorkspaceData';
+import { useCategories, useMoney, usePlans, workspaceKey } from '@/hooks/useWorkspaceData';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
 import { useLinkedTransactions, useRealId } from '@/lib/offline/txOutbox';
@@ -52,7 +52,6 @@ function Plans() {
   // Every expense recorded for a plan, whenever it was paid, with changes waiting on this device drawn in
   const { data: transactions = [] } = useLinkedTransactions('planId');
   const { data: categories = [] } = useCategories();
-  const { data: accounts = [] } = useAccounts();
 
   const linkedByPlan = useMemo(() => {
     const map = {};
@@ -347,7 +346,6 @@ function Plans() {
         onClose={() => setPayTx(null)}
         onSubmit={onPaySubmit}
         isLoading={savingTx}
-        accounts={accounts}
         categories={categories}
         editTransaction={payTx}
         defaultType="Expense"

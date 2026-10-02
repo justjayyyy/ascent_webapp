@@ -33,8 +33,8 @@ describe('translations', () => {
 });
 
 describe('keys used in the code', () => {
-  // Every t('literal') in the app (portfolio pages are hidden and keep their own strings)
-  const sources = import.meta.glob(['/src/**/*.{js,jsx}', '!/src/**/*.test.*', '!/src/components/portfolio/**', '!/src/pages/Portfolio.jsx', '!/src/pages/AccountDetail.jsx'], { query: '?raw', import: 'default', eager: true });
+  // Every t('literal') in the app
+  const sources = import.meta.glob(['/src/**/*.{js,jsx}', '!/src/**/*.test.*'], { query: '?raw', import: 'default', eager: true });
   const used = new Map();
   for (const [file, text] of Object.entries(sources)) {
     for (const m of text.matchAll(/\bt\(\s*'([A-Za-z0-9_]+)'\s*[,)]/g)) {

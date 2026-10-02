@@ -13,7 +13,6 @@ import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { useCards, useExchangeRates } from '@/hooks/useWorkspaceData';
 import { conversionFields, keptConversion } from '@shared/money';
-import { PORTFOLIO_ENABLED } from '@/lib/features';
 import HouseholdFields, { splitIsValid } from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
 
@@ -34,7 +33,6 @@ const rememberChoices = ({ category, paymentMethod, currency, type }) => {
  * @property {boolean} isLoading
  * @property {Array} categories
  * @property {Object} editTransaction
- * @property {Array} accounts
  */
 
 /**
@@ -47,7 +45,6 @@ export default function AddTransactionDialog({
   isLoading,
   categories = [],
   editTransaction = null,
-  accounts = [],
   defaultType = null,
   plans = [],
 }) {
@@ -68,7 +65,6 @@ export default function AddTransactionDialog({
     currency: user?.currency || 'ILS',
     paymentMethod: '',
     cardId: '',
-    relatedAccountId: '',
     isRecurring: false,
     recurringFrequency: 'monthly',
     recurringStartDate: format(new Date(), 'yyyy-MM-dd'),
@@ -139,7 +135,6 @@ export default function AddTransactionDialog({
         currency: editTransaction.currency,
         paymentMethod: editTransaction.paymentMethod || '',
         cardId: editTransaction.cardId || '',
-        relatedAccountId: editTransaction.relatedAccountId || '',
         isRecurring: editTransaction.isRecurring || false,
         recurringFrequency: editTransaction.recurringFrequency || 'monthly',
         recurringStartDate: editTransaction.recurringStartDate || format(new Date(), 'yyyy-MM-dd'),
@@ -166,7 +161,6 @@ export default function AddTransactionDialog({
         currency: last.currency || user?.currency || 'ILS',
         paymentMethod: last.paymentMethod || '',
         cardId: '',
-        relatedAccountId: '',
         isRecurring: false,
         recurringFrequency: 'monthly',
         recurringStartDate: format(new Date(), 'yyyy-MM-dd'),
@@ -256,7 +250,6 @@ export default function AddTransactionDialog({
       description: formData.description.trim() || translateCategory(formData.category, language),
       amount: parseFloat(formData.amount),
       ...conversion,
-      relatedAccountId: formData.relatedAccountId || undefined,
       isBigPurchase: isExpense && formData.isBigPurchase,
       installmentCount: splitting ? installments : 1,
       planId: (isExpense && formData.planId) || null,
@@ -705,55 +698,9 @@ export default function AddTransactionDialog({
                 </Select>
               </div>
 
-              {PORTFOLIO_ENABLED && (
-              <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="relatedAccount" className={cn("text-xs sm:text-sm", colors.textSecondary)}>
-                  {t('relatedAccount')}
-                </Label>
-                <Select
-                  value={formData.relatedAccountId}
-                  onValueChange={(value) => setFormData({ ...formData, relatedAccountId: value })}
-                >
-                  <SelectTrigger id="relatedAccount" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                    <SelectValue placeholder={t('selectAccountOptional')} />
-                  </SelectTrigger>
-                  <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                    <SelectItem value={null} className={colors.textPrimary}>{t('none')}</SelectItem>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id} className={colors.textPrimary}>
-                        {account.name} ({account.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              )}
             </div>
           )}
 
-          {formData.paymentMethod !== 'Card' && PORTFOLIO_ENABLED && (
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="relatedAccount" className={cn("text-xs sm:text-sm", colors.textSecondary)}>
-                {t('relatedAccount')}
-              </Label>
-              <Select
-                value={formData.relatedAccountId}
-                onValueChange={(value) => setFormData({ ...formData, relatedAccountId: value })}
-              >
-                <SelectTrigger id="relatedAccount" className={cn("h-8 sm:h-10 text-xs sm:text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
-                  <SelectValue placeholder={t('selectAccountOptional')} />
-                </SelectTrigger>
-                <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
-                  <SelectItem value={null} className={colors.textPrimary}>{t('none')}</SelectItem>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id} className={colors.textPrimary}>
-                      {account.name} ({account.type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className="sticky -bottom-3 z-10 -mx-3 flex gap-2 bg-popover/95 px-3 pb-3 pt-3 backdrop-blur sm:static sm:mx-0 sm:gap-3 sm:bg-transparent sm:p-0 sm:pt-4 sm:backdrop-blur-none">
             <Button

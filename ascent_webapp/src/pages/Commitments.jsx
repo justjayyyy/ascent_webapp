@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
-import { useAccounts, useCategories, useCommitments, workspaceKey } from '@/hooks/useWorkspaceData';
+import { useCategories, useCommitments, workspaceKey } from '@/hooks/useWorkspaceData';
 import { cn } from '@/lib/utils';
 import { createPageUrl } from '@/utils';
 import BlurValue from '@/components/BlurValue';
@@ -64,7 +64,6 @@ function Commitments() {
   const { data: transactions = [] } = useTransactions();
   const { data: installmentRows = [] } = useLinkedTransactions('installmentGroupId');
   const { data: categories = [] } = useCategories();
-  const { data: accounts = [] } = useAccounts();
 
   const rows = useMemo(() => commitments.map((c) => ({ c, s: commitmentStatus(c, today) })), [commitments, today]);
   const summary = useMemo(() => commitmentsSummary(commitments, today, toUser), [commitments, today, toUser]);
@@ -460,7 +459,6 @@ function Commitments() {
         onClose={() => setPayTx(null)}
         onSubmit={onPaySubmit}
         isLoading={savingTx}
-        accounts={accounts}
         categories={categories}
         editTransaction={payTx}
         defaultType="Expense"

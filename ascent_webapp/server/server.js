@@ -98,9 +98,6 @@ any('/api/assist', route(() => import('./api/assist.js')), ['get', 'post']);
 
 // Workspace data
 const ENTITIES = {
-  accounts: () => import('./entities/accounts.js'),
-  positions: () => import('./entities/positions.js'),
-  'day-trades': () => import('./entities/day-trades.js'),
   transactions: () => import('./entities/transactions.js'),
   budgets: () => import('./entities/budgets.js'),
   categories: () => import('./entities/categories.js'),
@@ -108,9 +105,7 @@ const ENTITIES = {
   goals: () => import('./entities/goals.js'),
   'dashboard-widgets': () => import('./entities/dashboard-widgets.js'),
   'page-layouts': () => import('./entities/page-layouts.js'),
-  snapshots: () => import('./entities/snapshots.js'),
   notes: () => import('./entities/notes.js'),
-  'portfolio-transactions': () => import('./entities/portfolio-transactions.js'),
   plans: () => import('./entities/plans.js'),
   settlements: () => import('./entities/settlements.js'),
   commitments: () => import('./entities/commitments.js'),
@@ -118,7 +113,6 @@ const ENTITIES = {
 for (const [name, load] of Object.entries(ENTITIES)) any(`/api/entities/${name}`, route(load, { live: true }));
 
 // Integrations
-app.get('/api/integrations/stock-quote', route(() => import('./integrations/stock-quote.js')));
 // Apple Pay via the older single-key Shortcut (new setups use /api/ingest with per-device tokens)
 any('/api/integrations/quick-add', route(() => import('./integrations/quick-add.js'), { live: true }), ['get', 'post', 'delete']);
 any('/api/integrations/google-calendar', route(() => import('./integrations/google-calendar.js')), ['get', 'post', 'put', 'patch', 'delete']);

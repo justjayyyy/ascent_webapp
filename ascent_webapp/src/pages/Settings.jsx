@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import {
   Loader2, User, Bell, Palette, Users, CreditCard, Database, LogOut, Search, X, Lock, Mail, SearchX, UserCircle, Smartphone, ShieldCheck,
 } from 'lucide-react';
-import { PORTFOLIO_ENABLED } from '@/lib/features';
 import ImportExportSection from '../components/settings/ImportExportSection';
 import MembersSection from '../components/workspace/MembersSection';
 import { roleLabel as memberRoleLabel } from '../components/workspace/utils';
@@ -116,7 +115,6 @@ export default function Settings() {
   const hit = (...texts) => !q || texts.some((x) => x && String(x).toLowerCase().includes(q));
 
   const notificationRows = [
-    PORTFOLIO_ENABLED && { key: 'priceAlerts', label: t('priceAlerts'), desc: t('getNotifiedPriceChanges'), checked: user?.priceAlerts || false },
     { key: 'dailySummary', label: t('dailySummary'), desc: t('receiveDailyReports'), checked: user?.dailySummary !== false },
     { key: 'weeklyReports', label: t('weeklySummary'), desc: t('receiveWeeklyReports'), checked: user?.weeklyReports !== false },
     { key: 'emailNotifications', label: t('emailNotifications'), desc: t('receiveImportantUpdates'), checked: user?.emailNotifications !== false },

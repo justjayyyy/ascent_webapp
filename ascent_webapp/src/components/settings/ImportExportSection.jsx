@@ -1,7 +1,6 @@
-import { PORTFOLIO_ENABLED } from '@/lib/features';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Database, Loader2, Receipt, StickyNote, PieChart, FileSpreadsheet, Upload } from 'lucide-react';
+import { Download, Database, Loader2, Receipt, StickyNote, FileSpreadsheet, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../ThemeProvider';
 import { Section, Group, Row } from './SettingsShell';
@@ -31,7 +30,6 @@ export default function ImportExportSection({ index }) {
   };
 
   const datasets = [
-    PORTFOLIO_ENABLED && { key: 'portfolio', label: t('portfolio'), icon: PieChart, description: t('setExportPortfolioDesc') },
     { key: 'expenses', label: t('expenses'), icon: Receipt, description: t('setExportExpensesDesc') },
     { key: 'notes', label: t('notes'), icon: StickyNote, description: t('setExportNotesDesc') },
   ].filter((d) => d && (!DATASETS[d.key].permission || hasPermission(DATASETS[d.key].permission)));

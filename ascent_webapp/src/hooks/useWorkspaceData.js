@@ -19,7 +19,6 @@ const pinned = (workspaceId) => ({ headers: { 'x-workspace-id': workspaceId } })
 const LISTS = {
   categories: { load: (ws) => ascent.entities.Category.list('-created_date', 1000, pinned(ws)), staleTime: 5 * MINUTE },
   cards: { load: (ws) => ascent.entities.Card.list('-created_date', 1000, pinned(ws)), staleTime: 5 * MINUTE },
-  accounts: { load: (ws) => ascent.entities.Account.list('-created_date', 1000, pinned(ws)), staleTime: 5 * MINUTE },
   budgets: { load: (ws) => ascent.entities.Budget.list('-created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   plans: { load: (ws) => ascent.entities.Plan.list('startDate', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   commitments: { load: (ws) => ascent.entities.Commitment.list('-created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
@@ -46,7 +45,6 @@ export function useWorkspaceList(name, { enabled = true } = {}) {
 
 export const useCategories = (opts) => useWorkspaceList('categories', opts);
 export const useCards = (opts) => useWorkspaceList('cards', opts);
-export const useAccounts = (opts) => useWorkspaceList('accounts', opts);
 export const useBudgets = (opts) => useWorkspaceList('budgets', opts);
 export const usePlans = (opts) => useWorkspaceList('plans', opts);
 export const useCommitments = (opts) => useWorkspaceList('commitments', opts);

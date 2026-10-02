@@ -213,9 +213,6 @@ export function createEntity(path) {
 }
 
 const entities = {
-  Account: createEntity('accounts'),
-  Position: createEntity('positions'),
-  DayTrade: createEntity('day-trades'),
   ExpenseTransaction: createEntity('transactions'),
   Budget: createEntity('budgets'),
   Category: createEntity('categories'),
@@ -224,8 +221,6 @@ const entities = {
   Plan: createEntity('plans'),
   DashboardWidget: createEntity('dashboard-widgets'),
   PageLayout: createEntity('page-layouts'),
-  PortfolioSnapshot: createEntity('snapshots'),
-  PortfolioTransaction: createEntity('portfolio-transactions'),
   Settlement: createEntity('settlements'),
   Commitment: createEntity('commitments'),
   Note: {
@@ -236,14 +231,6 @@ const entities = {
     uploadFile: (noteId, file) => request(`/entities/notes?action=file&id=${enc(noteId)}`, json('POST', file)),
     getFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`),
     deleteFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`, { method: 'DELETE' }),
-  },
-};
-
-const integrations = {
-  Core: {
-    getStockQuote: (symbol, provider = 'finnhub') => request(`/integrations/stock-quote?symbol=${enc(symbol)}&provider=${enc(provider)}`),
-    getStockQuotes: (symbols, provider = 'finnhub') =>
-      request(`/integrations/stock-quote?symbols=${enc([].concat(symbols).join(','))}&provider=${enc(provider)}`),
   },
 };
 
@@ -319,5 +306,5 @@ const push = {
   unsubscribe: (endpoint) => request(`/push?endpoint=${enc(endpoint)}`, { method: 'DELETE' }),
 };
 
-export const ascent = { auth, passkeys, entities, workspaces, integrations, ingestTokens, push, assist, imports };
+export const ascent = { auth, passkeys, entities, workspaces, ingestTokens, push, assist, imports };
 export default ascent;
