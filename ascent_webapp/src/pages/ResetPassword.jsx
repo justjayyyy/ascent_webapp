@@ -6,6 +6,7 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from '@/component
 import { PasswordField } from '@/components/auth/AuthParts';
 import { PublicCard, usePublicLanguage } from '@/components/auth/PublicCard';
 import { useAuth } from '@/lib/AuthContext';
+import { isCoarsePointer } from '@/lib/pointer';
 
 // Reached from the emailed "choose a new password" link. Saving signs in (and signs out other devices).
 export default function ResetPassword() {
@@ -68,7 +69,7 @@ export default function ResetPassword() {
             onChange={(e) => { setPassword(e.target.value); if (error) setError(null); }}
             error={error}
             errorKey={errorKey}
-            autoFocus
+            autoFocus={!isCoarsePointer()}
           />
           <Button type="submit" disabled={busy} className="h-11 w-full rounded-xl">
             {busy && <Loader2 className="me-1.5 h-4 w-4 animate-spin" aria-hidden="true" />}

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { translateCategory } from '@/lib/translations';
 import { useTheme } from '../ThemeProvider';
 import { newPlanItemId } from './planUtils';
+import { isCoarsePointer } from '@/lib/pointer';
 
 const STATUSES = ['planned', 'booked', 'paid'];
 
@@ -53,7 +54,7 @@ export default function PlanItemDialog({ open, onClose, item, currency, categori
         <form onSubmit={submit} className="mt-1 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="item-name" className="text-sm text-muted-foreground">{t('planItemName')}</Label>
-            <Input id="item-name" value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('planItemNamePlaceholder')} maxLength={200} className="h-11" autoFocus={!editing} />
+            <Input id="item-name" value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('planItemNamePlaceholder')} maxLength={200} className="h-11" autoFocus={!editing && !isCoarsePointer()} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

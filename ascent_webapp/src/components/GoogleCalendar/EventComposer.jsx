@@ -4,6 +4,7 @@ import { AlignLeft, Check, Clock, Loader2, MapPin, Trash2, X } from 'lucide-reac
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { GOOGLE_EVENT_COLORS } from './calendarUtils';
+import { isCoarsePointer } from '@/lib/pointer';
 
 const DT = "yyyy-MM-dd'T'HH:mm";
 const D = 'yyyy-MM-dd';
@@ -41,7 +42,7 @@ export default function EventComposer({ request, onClose, onSave, onDelete, onTo
   const titleRef = useRef(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
-  useEffect(() => { if (!readOnly) titleRef.current?.focus(); }, [readOnly]);
+  useEffect(() => { if (!readOnly && !isCoarsePointer()) titleRef.current?.focus(); }, [readOnly]);
 
   const accent = useMemo(() => {
     if (item) return item.color;

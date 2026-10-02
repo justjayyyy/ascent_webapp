@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTheme } from '../ThemeProvider';
 import { newPaymentId } from './commitmentUtils';
+import { isCoarsePointer } from '@/lib/pointer';
 
 /**
  * Money paid towards a commitment outside its schedule: an extra payment on a loan, or a repayment
@@ -52,7 +53,7 @@ export default function PaymentDialog({ open, onClose, commitment, mode, onSave 
           <div className="grid grid-cols-[1fr_auto] gap-3">
             <div className="space-y-2">
               <Label htmlFor="cm-pay-amount" className="text-sm text-muted-foreground">{t('amount')} ({commitment?.currency})</Label>
-              <Input id="cm-pay-amount" type="number" inputMode="decimal" min="0" step="any" autoFocus value={amount}
+              <Input id="cm-pay-amount" type="number" inputMode="decimal" min="0" step="any" autoFocus={!isCoarsePointer()} value={amount}
                 onChange={(e) => setAmount(e.target.value)} placeholder="0" className="h-12 text-xl font-semibold tabular-nums" />
             </div>
             <div className="space-y-2">

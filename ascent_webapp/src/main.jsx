@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 import { ensureStandaloneTopInset } from '@/lib/safeArea'
-import { trackVisualViewport } from '@/lib/viewport'
+import { trackVisualViewport, preventFocusZoom } from '@/lib/viewport'
 import { registerSW } from 'virtual:pwa-register'
 import { startMonitoring } from '@/lib/monitoring'
 import { loadLanguage } from '@/lib/translations'
@@ -13,6 +13,7 @@ import { likelyLanguage } from '@/lib/startLanguage'
 startMonitoring();
 ensureStandaloneTopInset();
 trackVisualViewport();
+preventFocusZoom();
 
 // The first screen is drawn in the right language: its strings come before the render (a small file,
 // and cached by the service worker after the first visit)

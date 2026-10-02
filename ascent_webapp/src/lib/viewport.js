@@ -27,3 +27,15 @@ export function trackVisualViewport() {
   window.addEventListener('orientationchange', schedule);
   update();
 }
+
+// iOS zooms the page into any field whose text is under 16px when it takes focus, and never zooms back
+// out. maximum-scale=1 stops that; iOS still lets people pinch-zoom. Other platforms don't auto-zoom, and
+// there the same setting would block pinch-zoom, so it is applied on iOS only.
+export function preventFocusZoom() {
+  if (typeof navigator === 'undefined') return;
+  const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!iOS || !meta || /maximum-scale/.test(meta.content)) return;
+  meta.content += ', maximum-scale=1';
+}

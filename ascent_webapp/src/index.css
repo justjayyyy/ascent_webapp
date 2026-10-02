@@ -724,8 +724,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 input, textarea, [contenteditable] { caret-color: hsl(var(--primary)); }
 
 /* Taps are taps: no double-tap zoom delay on controls */
-a, button, [role="button"], input, select, label, summary { touch-action: manipulation; }
-
+a, button, [role="button"], input, select, label, summary, textarea { touch-action: manipulation; }
 /* Stop iOS from inflating text in landscape and from flashing a grey tap box */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (display-mode: standalone) {

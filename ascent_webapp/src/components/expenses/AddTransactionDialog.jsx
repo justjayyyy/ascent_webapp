@@ -15,6 +15,7 @@ import { useCards, useExchangeRates } from '@/hooks/useWorkspaceData';
 import { conversionFields, keptConversion } from '@shared/money';
 import HouseholdFields, { splitIsValid } from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
+import { isCoarsePointer } from '@/lib/pointer';
 
 const LAST_KEY = 'ascent_last_transaction_choices';
 const readLastChoices = () => {
@@ -302,7 +303,7 @@ export default function AddTransactionDialog({
                 id="amount"
                 type="number"
                 inputMode="decimal"
-                autoFocus={!editTransaction}
+                autoFocus={!editTransaction && !isCoarsePointer()}
                 step="0.01"
                 min="0.01"
                 placeholder="0.00"
