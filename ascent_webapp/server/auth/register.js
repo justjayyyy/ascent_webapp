@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     }
 
     await sendVerification(req, user);
-    const token = await issueSession(user);
+    const token = await issueSession(user, { userAgent: req.headers?.['user-agent'] });
     return success(res, { user: user.toJSON(), token, isFirstLogin: true }, 201);
   } catch (err) {
     return serverError(res, err);

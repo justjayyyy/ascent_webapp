@@ -143,16 +143,29 @@ const auth = {
   sendVerification: () => request('/auth/verify-email?action=send', json('POST', {})),
   confirmEmail: (token) => request('/auth/verify-email?action=confirm', json('POST', { token })),
 
-  logout(redirectUrl, { reason } = {}) {
+  // Ends every other device's session; this one stays signed in
+  signOutOtherDevices: () => request('/auth/logout?scope=others', { method: 'POST' }),
+
+  /**
+   * Signs out on this device: the server ends this session (other devices stay signed in), then what this
+   * device kept for offline use is forgotten. `endSession: false` when there is no session left to end.
+   */
+  logout(redirectUrl, { reason, endSession = true } = {}) {
+    const token = getToken();
+    // Plain fetch: a session that already ended must not send this page to the sign-in screen itself
+    const ending = endSession && token
+      ? fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+      : Promise.resolve();
     removeToken();
     storage.remove(SESSION_CACHE_KEY);
-    // Forget what this device kept for offline use (bounded, so sign-out never hangs)
+    // Bounded, so sign-out never hangs on a slow connection
     Promise.race([
       Promise.all([
+        ending,
         import('@/components/notes/notesSync').then((m) => m.clearNotesStorage()),
         import('@/lib/offline/deviceData').then((m) => m.clearDeviceData()),
       ]),
-      wait(800),
+      wait(2500),
     ]).catch(() => {}).finally(() => toLogin(redirectUrl, reason));
   },
 

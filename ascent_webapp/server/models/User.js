@@ -79,7 +79,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // Id of the one active login session; rotated on every sign-in (see lib/session.js)
+  // Signed-in devices (lib/session.js). sessionId is the single session of accounts from before.
+  sessions: {
+    type: [new mongoose.Schema({ id: String, createdAt: Date, device: { type: String, maxlength: 60 } }, { _id: false })],
+    default: []
+  },
   sessionId: {
     type: String,
     default: null
@@ -155,6 +159,7 @@ userSchema.methods.toJSON = function() {
   delete obj.password;
   delete obj.shortcutTokenHash;
   delete obj.sessionId;
+  delete obj.sessions;
   delete obj.verifyTokenHash;
   delete obj.verifyExpiresAt;
   delete obj.resetTokenHash;

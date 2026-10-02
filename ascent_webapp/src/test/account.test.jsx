@@ -146,3 +146,13 @@ test('deleting the account needs the email typed, then signs out', async () => {
   expect(api.calls.find((c) => c.method === 'DELETE' && c.path === '/api/auth/me').body).toEqual({ confirm: 'dana@x.test' });
   await waitFor(() => expect(localStorage.getItem('ascent_access_token')).toBeNull());
 }, 20000);
+
+test('signing out of the other devices keeps this one signed in', async () => {
+  const user = userEvent.setup();
+  openApp('/Settings');
+  await screen.findAllByDisplayValue('Dana');
+  await user.click(screen.getByRole('button', { name: en.setSignOutOthers }));
+  expect(await screen.findByText(en.setSignedOutOthers)).toBeTruthy();
+  expect(callTo('/api/auth/logout').query.scope).toBe('others');
+  expect(localStorage.getItem('ascent_access_token')).toBe('test-token');
+}, 20000);

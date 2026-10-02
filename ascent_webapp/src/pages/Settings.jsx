@@ -23,6 +23,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import AscentLogo from '@/components/AscentLogo';
 import DeleteAccountRow from '@/components/account/DeleteAccount';
+import SignOutOthersRow from '@/components/account/SignOutOthers';
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -375,6 +376,7 @@ export default function Settings() {
                     {t('logout')}
                   </Button>
                 </Row>
+                <SignOutOthersRow />
                 <DeleteAccountRow />
               </Group>
               <div className="mt-8 flex items-center justify-center gap-3 text-center">

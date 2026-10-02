@@ -74,7 +74,7 @@ export default async function handler(req, res) {
       console.error('[Google Auth] accepting invitations failed:', err?.message); // never blocks sign-in
     }
 
-    const token = await issueSession(user);
+    const token = await issueSession(user, { userAgent: req.headers?.['user-agent'] });
     return success(res, { user: user.toJSON(), token, isFirstLogin });
   } catch (err) {
     return serverError(res, err);

@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       // user is a lean document, so toJSON() never ran: drop the secrets here
-      const { password, shortcutTokenHash, passkeys, verifyTokenHash, verifyExpiresAt, resetTokenHash, resetExpiresAt, ...safe } = user;
+      const { password, shortcutTokenHash, passkeys, verifyTokenHash, verifyExpiresAt, resetTokenHash, resetExpiresAt, sessions, ...safe } = user;
       return success(res, { ...safe, passkeyCount: Array.isArray(passkeys) ? passkeys.length : 0 });
     }
 

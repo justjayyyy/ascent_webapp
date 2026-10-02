@@ -2,6 +2,7 @@ import { verifyToken, getTokenFromHeader } from '../lib/jwt.js';
 import { unauthorized } from '../lib/response.js';
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
+import { isLiveSession } from '../lib/session.js';
 import Workspace from '../models/Workspace.js';
 
 // `signedInElsewhere` = the token was valid but has been superseded by a newer sign-in; the client
@@ -46,12 +47,14 @@ export async function authMiddleware(req, res) {
       return null;
     }
 
-    // Only the most recent sign-in is valid; an older token means the account was signed in elsewhere.
-    if (!user.sessionId || decoded.sid !== user.sessionId) {
-      replaced(res, decoded.sid && user.sessionId);
+    // The token's session must still be live (it ends on sign-out, "sign out other devices" or a password reset)
+    if (!isLiveSession(user, decoded.sid)) {
+      replaced(res, !!decoded.sid);
       return null;
     }
+    req.sessionId = decoded.sid;
     delete user.sessionId;
+    delete user.sessions;
 
     // Handle Workspace Context
     const workspaceId = req.headers['x-workspace-id'];
@@ -101,7 +104,7 @@ export async function optionalAuth(req) {
   
   const user = await User.findById(decoded.userId);
 
-  if (!user || !user.sessionId || decoded.sid !== user.sessionId) return null;
+  if (!user || !isLiveSession(user, decoded.sid)) return null;
 
   return user;
 }

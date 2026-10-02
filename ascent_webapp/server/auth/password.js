@@ -51,7 +51,8 @@ export default async function handler(req, res) {
       user.verifyExpiresAt = undefined;
       user.isFirstLogin = false;
       await user.save();
-      const session = await issueSession(user);
+      // A new password ends every other session: whoever knew the old one is signed out
+      const session = await issueSession(user, { userAgent: req.headers?.['user-agent'], only: true });
       return success(res, { user: user.toJSON(), token: session });
     }
 

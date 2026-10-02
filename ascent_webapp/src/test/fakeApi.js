@@ -76,6 +76,7 @@ export function fakeFetch(data) {
       if (q.action === 'forgot') return ok({ sent: true });
       if (q.action === 'reset') return body.token === 'bad'.padEnd(43, 'x') ? fail(400, 'This link is invalid or has expired') : ok({ user: data.me, token: 'fresh-token' });
     }
+    if (path === '/auth/logout') return ok(q.scope === 'others' ? { signedOutOthers: true } : { signedOut: true });
     if (path === '/auth/verify-email') return ok(q.action === 'send' ? { sent: true } : { verified: true });
     if (path === '/workspaces' && (q.action === 'claim' || q.action === 'release')) {
       const ws = data.workspaces.find((w) => w.id === q.id);

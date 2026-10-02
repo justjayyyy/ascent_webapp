@@ -2,6 +2,10 @@
 // workspace whose owner left. Merged into translations.js like the other files.
 export const accountTranslations = {
   en: {
+    setSignOutOthers: 'Sign out other devices',
+    setSignOutOthersDesc: 'You can be signed in on your phone and computer at once. This signs out everywhere except here.',
+    setSignedOutOthers: 'Signed out on your other devices',
+    setSignOutOthersFailed: 'Could not sign out the other devices. Please try again.',
     authForgotPassword: 'Forgot password?',
     authResetSent: 'If there is an account for {email}, a link to choose a new password is on its way.',
     authResetFailed: 'Could not send the email. Try again in a moment.',
@@ -39,6 +43,10 @@ export const accountTranslations = {
     olFailed: 'Something went wrong. Please try again.',
   },
   he: {
+    setSignOutOthers: 'התנתקות ממכשירים אחרים',
+    setSignOutOthersDesc: 'אפשר להיות מחוברים בטלפון ובמחשב בו-זמנית. הפעולה מנתקת את כל המכשירים חוץ מהמכשיר הזה.',
+    setSignedOutOthers: 'נותקת מהמכשירים האחרים',
+    setSignOutOthersFailed: 'לא הצלחנו לנתק את המכשירים האחרים. נסו שוב.',
     authForgotPassword: 'שכחת סיסמה?',
     authResetSent: 'אם קיים חשבון עבור {email}, נשלח אליו קישור לבחירת סיסמה חדשה.',
     authResetFailed: 'לא הצלחנו לשלוח את המייל. נסו שוב בעוד רגע.',
@@ -76,6 +84,10 @@ export const accountTranslations = {
     olFailed: 'משהו השתבש. נסו שוב.',
   },
   ru: {
+    setSignOutOthers: 'Выйти на других устройствах',
+    setSignOutOthersDesc: 'Можно быть в аккаунте на телефоне и компьютере одновременно. Это завершит все сеансы, кроме этого.',
+    setSignedOutOthers: 'Вы вышли на других устройствах',
+    setSignOutOthersFailed: 'Не удалось выйти на других устройствах. Попробуйте ещё раз.',
     authForgotPassword: 'Забыли пароль?',
     authResetSent: 'Если для {email} есть аккаунт, ссылка для нового пароля уже в пути.',
     authResetFailed: 'Не удалось отправить письмо. Попробуйте чуть позже.',

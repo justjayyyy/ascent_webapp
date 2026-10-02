@@ -25,7 +25,7 @@ class FakeUser {
 }
 mock.module(at('../models/User.js'), { exports: { default: FakeUser } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
-mock.module(at('../lib/session.js'), { exports: { issueSession: async (u) => `token-for-${u._id}` } });
+mock.module(at('../lib/session.js'), { exports: { issueSession: async (u) => `token-for-${u._id}`, isLiveSession: () => true } });
 mock.module(at('../lib/rateLimit.js'), { exports: { authRateLimit: () => false, rateLimit: () => false } });
 mock.module(at('../lib/email-helper.js'), { exports: { sendEmail: async (m) => { sent.push(m); return { sent: true }; } } });
 mock.module(at('../middleware/auth.js'), {

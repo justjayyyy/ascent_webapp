@@ -139,3 +139,23 @@ describe('sessions', () => {
     expect(location.href).toBe('/login?reason=session_replaced');
   });
 });
+
+describe('signing out', () => {
+  test('ends this device\'s session on the server and forgets the token', async () => {
+    localStorage.setItem('ascent_access_token', 'tok');
+    fetchMock.mockResolvedValue(ok({ signedOut: true }));
+    ascent.auth.logout();
+    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/auth/logout');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe('Bearer tok');
+  });
+
+  test('after deleting the account there is no session to end', () => {
+    localStorage.setItem('ascent_access_token', 'tok');
+    ascent.auth.logout(undefined, { endSession: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+  });
+});

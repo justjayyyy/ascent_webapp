@@ -9,7 +9,7 @@ Hebrew (right to left) and Russian. Installable PWA that keeps working offline. 
 - **Web app**: React 18, Vite, Tailwind, Radix UI, TanStack Query (persisted to IndexedDB), motion
 - **API**: one Express app (`server/server.js`), served on Vercel by `api/index.js`
 - **Database**: MongoDB via Mongoose
-- **Auth**: JWT (one live session per account), Google Sign-In (ID tokens), passkeys (WebAuthn), password reset and
+- **Auth**: JWT sessions (up to 10 devices at once, each can be signed out), Google Sign-In (ID tokens), passkeys (WebAuthn), password reset and
   email confirmation by emailed one-time links (only their hashes are stored)
 
 ## Getting started

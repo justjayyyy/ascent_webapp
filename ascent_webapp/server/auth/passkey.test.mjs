@@ -25,7 +25,10 @@ mock.module('@simplewebauthn/server', {
 });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../middleware/auth.js'), { exports: { authMiddleware: async (req, res) => { res.status(401).json({ success: false }); return null; } } });
-mock.module(at('../lib/session.js'), { exports: { issueSession: async (u) => { issued += 1; u.sessionId = 'fresh'; return 'new-token'; } } });
+mock.module(at('../lib/session.js'), { exports: {
+  issueSession: async (u) => { issued += 1; u.sessionId = 'fresh'; return 'new-token'; },
+  isLiveSession: (u, sid) => !!sid && (u.sessionId === sid || (u.sessions || []).some((s) => s.id === sid)),
+} });
 mock.module(at('../models/AuthChallenge.js'), {
   exports: {
     default: {

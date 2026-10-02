@@ -21,7 +21,7 @@ import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
 import AuthChallenge from '../models/AuthChallenge.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { issueSession } from '../lib/session.js';
+import { issueSession, isLiveSession } from '../lib/session.js';
 import { verifyToken, getTokenFromHeader } from '../lib/jwt.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
@@ -151,11 +151,11 @@ async function loginVerify(req, res, rp) {
   user.lastLogin = new Date();
   if (user.isFirstLogin) user.isFirstLogin = false;
 
-  // Unlocking the device that already holds the live session keeps it, so nothing else is signed out
+  // Unlocking a device whose session is still live keeps that session instead of starting another
   const current = getTokenFromHeader(req);
   const decoded = current ? verifyToken(current) : null;
-  const unlocked = !!(decoded && String(decoded.userId) === String(user._id) && user.sessionId && decoded.sid === user.sessionId);
-  const token = unlocked ? current : await issueSession(user);
+  const unlocked = !!(decoded && String(decoded.userId) === String(user._id) && isLiveSession(user, decoded.sid));
+  const token = unlocked ? current : await issueSession(user, { userAgent: req.headers?.['user-agent'] });
   await user.save();
 
   return success(res, { user: user.toJSON(), token, unlocked });

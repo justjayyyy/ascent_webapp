@@ -77,6 +77,7 @@ app.post('/api/auth/register', route(() => import('./auth/register.js')));
 app.post('/api/auth/login', route(() => import('./auth/login.js')));
 app.post('/api/auth/google', route(() => import('./auth/google.js')));
 app.post('/api/auth/password', route(() => import('./auth/password.js')));
+app.post('/api/auth/logout', route(() => import('./auth/logout.js')));
 app.post('/api/auth/verify-email', route(() => import('./auth/verify-email.js')));
 any('/api/auth/me', route(() => import('./auth/me.js')), ['get', 'put', 'patch', 'delete']);
 any('/api/auth/passkey', route(() => import('./auth/passkey.js')), ['get', 'post', 'put', 'delete']);
