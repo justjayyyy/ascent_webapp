@@ -1049,6 +1049,8 @@ export default {
   noIncomeFound: 'אין כאן הכנסות',
   monthlyRecurring: 'חוזר כל חודש',
   recurringTransactionHelp: 'תתווסף רשומה לכל חודש מתאריך ההתחלה ועד תאריך הסיום.',
+  salaryForMonth: 'משכורת של {month}',
+  salaryForMonthHelp: "תירשם ביום האחרון של {month}, כך שתיספר בהכנסות של אותו חודש.",
   recurringTransactionsCreated: 'נוספו {count} רשומות חודשיות',
   applyChangesTo: 'להחיל את השינויים על',
   thisEntryOnly: 'רק הרשומה הזו',

@@ -4,6 +4,23 @@ import { expandTransaction, seriesOf, STRIP } from './transactionRows';
 const base = { type: 'Expense', amount: 100, currency: 'ILS', category: 'shopping', date: '2026-01-31', description: 'TV' };
 
 describe('one save, the rows it becomes', () => {
+  test('salary received on the 1st counts for the month before', () => {
+    const [row] = expandTransaction({ ...base, type: 'Income', category: 'salary', date: '2026-10-01', forPreviousMonth: true });
+    expect(row.date).toBe('2026-09-30');
+    expect(row).not.toHaveProperty('forPreviousMonth');
+  });
+
+  test('a recurring salary puts every month on the month before', () => {
+    const rows = expandTransaction({ ...base, type: 'Income', category: 'salary', forPreviousMonth: true, isRecurring: true, recurringFrequency: 'monthly', recurringStartDate: '2026-01-01', recurringEndDate: '2026-03-31' });
+    expect(rows.map((r) => r.date)).toEqual(['2025-12-31', '2026-01-31', '2026-02-28']);
+  });
+
+  test('only income can be moved to the month before', () => {
+    const [row] = expandTransaction({ ...base, date: '2026-10-01', forPreviousMonth: true });
+    expect(row.date).toBe('2026-10-01');
+    expect(row).not.toHaveProperty('forPreviousMonth');
+  });
+
   test('a plain expense is one row without server fields or plumbing', () => {
     const rows = expandTransaction({ ...base, id: 'x', _id: 'y', workspaceId: 'w', installmentCount: '1', isRecurring: false, recurringFrequency: 'monthly' });
     expect(rows).toHaveLength(1);

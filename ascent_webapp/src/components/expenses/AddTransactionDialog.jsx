@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Repeat, ShoppingBag, Minus, Plus, Sparkles } from 'lucide-react';
+import { Loader2, Repeat, ShoppingBag, Minus, Plus, Sparkles, CalendarClock } from 'lucide-react';
 import { format, addMonths, parseISO, isAfter } from 'date-fns';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
@@ -17,11 +17,16 @@ import { conversionFields, keptConversion } from '@shared/money';
 import HouseholdFields, { splitIsValid } from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
 import { isCoarsePointer } from '@/lib/pointer';
+import { previousMonthEnd } from './transactionRows';
 
 const LAST_KEY = 'ascent_last_transaction_choices';
 const readLastChoices = () => {
   try { return JSON.parse(localStorage.getItem(LAST_KEY)) || {}; } catch { return {}; }
 };
+// Salary in any language the default category comes in, or a custom one named the same way
+const SALARY_NAMES = ['salary', 'משכורת', 'зарплата'];
+const isSalaryCategory = (name) => SALARY_NAMES.includes(String(name || '').trim().toLowerCase());
+
 const rememberChoices = ({ category, paymentMethod, currency, type }) => {
   if (type !== 'Expense') return;
   try { localStorage.setItem(LAST_KEY, JSON.stringify({ category, paymentMethod, currency })); } catch { /* storage unavailable */ }
@@ -84,6 +89,7 @@ export default function AddTransactionDialog({
     commitmentId: '',
     paidBy: '',
     split: null,
+    forPreviousMonth: true,
   });
 
   const [errors, setErrors] = useState({});
@@ -173,6 +179,7 @@ export default function AddTransactionDialog({
         commitmentId: editTransaction.commitmentId || '',
         paidBy: editTransaction.paidBy || '',
         split: editTransaction.split?.mode ? editTransaction.split : null,
+        forPreviousMonth: false,
       });
       // If editing and no amountInGlobalCurrency exists, we'll recalculate it on submit
     } else {
@@ -199,6 +206,7 @@ export default function AddTransactionDialog({
         commitmentId: '',
         paidBy: '',
         split: null,
+        forPreviousMonth: true,
       });
     }
     categoryTouched.current = false;
@@ -273,8 +281,10 @@ export default function AddTransactionDialog({
 
     rememberChoices(formData);
     const isExpense = formData.type === 'Expense';
+    const { forPreviousMonth, ...fields } = formData;
     await onSubmit({
-      ...formData,
+      ...fields,
+      ...(salaryShift && forPreviousMonth && { forPreviousMonth: true }),
       description: formData.description.trim() || translateCategory(formData.category, language),
       amount: parseFloat(formData.amount),
       ...conversion,
@@ -287,6 +297,13 @@ export default function AddTransactionDialog({
       split: (isExpense && formData.split) || null,
     }, { wholeSeries: inSeries && wholeSeries });
   };
+
+  // Salary that lands at the start of a month is usually the previous month's pay
+  const salaryShift = formData.type === 'Income' && !isEditing && isSalaryCategory(formData.category);
+  const salaryDay = formData.isRecurring ? formData.recurringStartDate : formData.date;
+  const salaryMonth = salaryShift && salaryDay
+    ? new Intl.DateTimeFormat(loc, { month: 'long', year: 'numeric' }).format(parseISO(previousMonthEnd(salaryDay)))
+    : '';
 
   const installments = Math.max(1, Math.min(60, parseInt(formData.installmentCount, 10) || 1));
   const splitting = formData.type === 'Expense' && formData.isBigPurchase && !isEditing && installments > 1;
@@ -488,6 +505,26 @@ export default function AddTransactionDialog({
               </Select>
             </div>}
           </div>
+
+          {salaryMonth && (
+            <div className={cn("rounded-2xl border p-2 transition-colors sm:p-3", formData.forPreviousMonth ? "border-primary/40 bg-primary/[0.06]" : colors.border)}>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="forPreviousMonth"
+                  checked={formData.forPreviousMonth}
+                  onCheckedChange={(checked) => setFormData({ ...formData, forPreviousMonth: !!checked })}
+                  className={cn(colors.border)}
+                />
+                <Label htmlFor="forPreviousMonth" className={cn("flex cursor-pointer items-center gap-1.5 text-xs sm:text-sm", colors.textSecondary)}>
+                  <CalendarClock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>{t('salaryForMonth').replace('{month}', salaryMonth)}</span>
+                </Label>
+              </div>
+              {formData.forPreviousMonth && (
+                <p className={cn("mt-1.5 ps-6 text-xs text-pretty", colors.textTertiary)}>{t('salaryForMonthHelp').replace('{month}', salaryMonth)}</p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div className="space-y-1 sm:space-y-2">

@@ -1,7 +1,7 @@
 // Every main screen renders in every language: the real app (router, auth, client, hooks, offline queue)
 // against an in-memory API. Catches crashes, missing data wiring and right-to-left mistakes.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fakeFetch, seedData } from './fakeApi';
 import { translations } from '@/lib/translations';
@@ -98,6 +98,22 @@ test('adding an expense through the dialog saves it to the open workspace and sh
   expect(post.body).toMatchObject({ amount: 64.5, description: 'Bakery', type: 'Expense', currency: 'ILS' });
   expect(post.body.dedupeKey).toMatch(/^app:/);
   expect(await screen.findAllByText('Bakery')).not.toHaveLength(0);
+}, 20000);
+
+test('salary received on the 1st is added to the month before', async () => {
+  const user = userEvent.setup();
+  openApp('/Income', 'en');
+  await screen.findAllByText('Salary');
+  await user.click(screen.getAllByRole('button', { name: translations.en.addIncome })[0]);
+  const dialog = await screen.findByRole('dialog');
+  await user.type(within(dialog).getByPlaceholderText('0.00'), '12000');
+  fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: '2026-10-01' } });
+  expect(within(dialog).getByRole('checkbox', { name: 'Salary for September 2026' }).getAttribute('aria-checked')).toBe('true');
+  await user.click(within(dialog).getByRole('button', { name: translations.en.addTransaction }));
+  await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/api/entities/transactions')).toBe(true));
+  const post = api.calls.find((c) => c.method === 'POST' && c.path === '/api/entities/transactions');
+  expect(post.body).toMatchObject({ amount: 12000, type: 'Income', category: 'salary', date: '2026-09-30' });
+  expect(post.body).not.toHaveProperty('forPreviousMonth');
 }, 20000);
 
 test('a page someone may not open sends them to one they can', async () => {

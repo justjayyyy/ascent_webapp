@@ -1049,6 +1049,8 @@ export default {
   noIncomeFound: 'Доходов нет',
   monthlyRecurring: 'Повторять каждый месяц',
   recurringTransactionHelp: 'Запись добавится на каждый месяц от даты начала до даты окончания.',
+  salaryForMonth: 'Зарплата за {month}',
+  salaryForMonthHelp: "Запишется последним днём месяца ({month}) и войдёт в доход за этот месяц.",
   recurringTransactionsCreated: 'Добавлено ежемесячных записей: {count}',
   applyChangesTo: 'Применить изменения к',
   thisEntryOnly: 'Только этой записи',

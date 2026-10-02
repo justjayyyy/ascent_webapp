@@ -1,9 +1,12 @@
-import { addMonths, format, parseISO } from 'date-fns';
+import { addMonths, endOfMonth, format, parseISO, subMonths } from 'date-fns';
 
 const round2 = (n) => Math.round(n * 100) / 100;
 export const STRIP = ['id', '_id', 'created_date', 'updated_date', 'createdBy', 'workspaceId'];
 const RECURRING = ['isRecurring', 'recurringFrequency', 'recurringStartDate', 'recurringEndDate', 'recurringGroupId'];
 const INSTALLMENT = ['installmentGroupId', 'installmentIndex', 'installmentCount', 'installmentTotal'];
+
+/** Salary paid at the start of a month is for the month before: it is dated on that month's last day. */
+export const previousMonthEnd = (day) => format(endOfMonth(subMonths(parseISO(day), 1)), 'yyyy-MM-dd');
 
 export const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -15,6 +18,9 @@ export const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toSt
 export function expandTransaction(input) {
   const data = { ...input };
   STRIP.forEach((k) => delete data[k]);
+  const forPreviousMonth = data.type === 'Income' && !!data.forPreviousMonth;
+  delete data.forPreviousMonth;
+  const dated = (day) => (forPreviousMonth ? previousMonthEnd(day) : day);
   const count = Math.max(1, Math.min(60, parseInt(data.installmentCount, 10) || 1));
   delete data.installmentCount;
 
@@ -51,13 +57,13 @@ export function expandTransaction(input) {
     const groupId = newGroupId();
     // addMonths keeps the day of month and clamps it (Jan 31 -> Feb 28), so no month is skipped
     for (let i = 0, d = start; d <= end && i < 120; i += 1, d = addMonths(start, i)) {
-      rows.push({ ...data, date: format(d, 'yyyy-MM-dd'), isRecurring: true, recurringFrequency: 'monthly', recurringGroupId: groupId });
+      rows.push({ ...data, date: dated(format(d, 'yyyy-MM-dd')), isRecurring: true, recurringFrequency: 'monthly', recurringGroupId: groupId });
     }
-    return rows.length ? rows : [{ ...data, date: data.recurringStartDate }];
+    return rows.length ? rows : [{ ...data, date: dated(data.recurringStartDate) }];
   }
 
   RECURRING.forEach((k) => delete data[k]);
-  return [data];
+  return [{ ...data, ...(data.date && { date: dated(data.date) }) }];
 }
 
 // Which monthly series a row belongs to. Series added before rows carried recurringGroupId are

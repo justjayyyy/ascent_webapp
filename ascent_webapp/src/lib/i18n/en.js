@@ -1125,6 +1125,8 @@ export default {
   noIncomeFound: 'No income here',
   monthlyRecurring: 'Repeats monthly',
   recurringTransactionHelp: 'One entry is added for every month from the start date to the end date.',
+  salaryForMonth: 'Salary for {month}',
+  salaryForMonthHelp: "Saved on the last day of {month}, so it counts toward that month's income.",
   recurringTransactionsCreated: '{count} monthly entries added',
   applyChangesTo: 'Apply changes to',
   thisEntryOnly: 'This entry only',
