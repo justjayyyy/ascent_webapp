@@ -106,6 +106,13 @@ export default function AddTransactionDialog({
   const dateInputRef = useRef(null);
   const isInitialOpenRef = useRef(true);
 
+  // Categories that arrive after the form opened (a new account's first load) fill an empty choice
+  useEffect(() => {
+    if (!open || formData.category || categoryTouched.current) return;
+    const fallback = categories.find((c) => c.type === formData.type || c.type === 'Both');
+    if (fallback) setFormData((f) => (f.category ? f : { ...f, category: fallback.name }));
+  }, [open, categories, formData.type, formData.category]);
+
   // What gets stored next to the amount: its value in the person's own currency at today's rate,
   // or nothing when there is no rate yet (never the unconverted amount)
   // An edit that keeps the amount and currency keeps the rate the row was saved with
@@ -220,6 +227,11 @@ export default function AddTransactionDialog({
 
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = t('amountGreaterThanZero');
+    }
+
+    // The server refuses a row without one, which offline would only show up later as "could not sync"
+    if (!formData.category) {
+      newErrors.category = t('selectCategory');
     }
 
     if (formData.type === 'Expense' && !splitIsValid(formData.split)) {
@@ -365,6 +377,7 @@ export default function AddTransactionDialog({
                 </Select>
               )}
             </div>
+            {errors.category && <p className="text-xs text-danger">{errors.category}</p>}
           </div>
 
           <div className="space-y-1 sm:space-y-2">

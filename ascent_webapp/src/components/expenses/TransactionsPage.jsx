@@ -14,6 +14,7 @@ import CategoryManager from './CategoryManager';
 import ExpenseMonthView from './ExpenseMonthView';
 import PeriodSelector from './PeriodSelector';
 import { useSaveTransaction, useDeleteTransactions, useConfirmTransaction } from './useTransactionMutations';
+import { useListWrites } from '@/lib/offline/listWrites';
 import { useTheme } from '../ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
@@ -77,21 +78,27 @@ function TransactionsPage({ kind }) {
 
   const confirmTransaction = useConfirmTransaction();
 
+  // Budgets save through the offline queue: they show at once and wait on the device without signal
+  const budgetsApi = useListWrites('budgets');
+  const budgetSaved = (doneKey) => (outcome) => {
+    if (outcome === 'queued') toast(t('offSavedOnDevice'), { description: t('offSavedOnDeviceHint') });
+    else toast.success(t(doneKey));
+  };
   const createBudgetMutation = useMutation({
-    mutationFn: (budgetData) => ascent.entities.Budget.create(budgetData),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budgets'] }); toast.success(t('budgetCreatedSuccessfully')); },
+    mutationFn: async (budgetData) => (await budgetsApi.create(budgetData)).outcome,
+    onSuccess: budgetSaved('budgetCreatedSuccessfully'),
     onError: () => toast.error(t('failedToCreateBudget')),
   });
 
   const updateBudgetMutation = useMutation({
-    mutationFn: ({ id, data }) => ascent.entities.Budget.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budgets'] }); toast.success(t('budgetUpdatedSuccessfully')); },
+    mutationFn: ({ id, data }) => budgetsApi.update(id, data),
+    onSuccess: budgetSaved('budgetUpdatedSuccessfully'),
     onError: () => toast.error(t('failedToUpdateBudget')),
   });
 
   const deleteBudgetMutation = useMutation({
-    mutationFn: (budgetId) => ascent.entities.Budget.delete(budgetId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['budgets'] }); toast.success(t('budgetDeletedSuccessfully')); },
+    mutationFn: (budgetId) => budgetsApi.remove(budgetId),
+    onSuccess: budgetSaved('budgetDeletedSuccessfully'),
     onError: () => toast.error(t('failedToDeleteBudget')),
   });
 

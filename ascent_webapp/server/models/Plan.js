@@ -1,5 +1,6 @@
 import './limits.js';
 import mongoose from 'mongoose';
+import { addDedupeKey } from './dedupe.js';
 
 // One cost inside a plan: flights, the venue, a deposit. Money for big events leaves in pieces,
 // often months before the day, so each item carries its own due date and payment state.
@@ -51,5 +52,7 @@ planSchema.virtual('id').get(function() {
 
 planSchema.set('toJSON', { virtuals: true });
 planSchema.set('toObject', { virtuals: true });
+
+addDedupeKey(planSchema);
 
 export default mongoose.models.Plan || mongoose.model('Plan', planSchema);

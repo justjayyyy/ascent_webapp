@@ -6,7 +6,8 @@ import { WORKSPACE_MODELS, deleteWorkspaceData } from './workspaceData.js';
 
 test('every model stored per workspace is deleted with the workspace', async () => {
   const dir = new URL('../models/', import.meta.url);
-  for (const file of await readdir(dir)) await import(new URL(file, dir).href);
+  // Model files only (Name.js), not the tests and helpers next to them
+  for (const file of await readdir(dir)) if (/^[A-Z]\w+\.js$/.test(file)) await import(new URL(file, dir).href);
   const scoped = mongoose.modelNames()
     .map((name) => mongoose.model(name))
     .filter((Model) => Model.schema.path('workspaceId'));

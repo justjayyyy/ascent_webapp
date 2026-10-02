@@ -6,7 +6,7 @@ import { useCategories, useCards, useBudgets, useMoney, useAssistStatus, workspa
 const state = vi.hoisted(() => ({ workspaceId: 'w1' }));
 const api = vi.hoisted(() => ({ categoryList: vi.fn(), cardList: vi.fn(), budgetList: vi.fn(), assistStatus: vi.fn() }));
 
-vi.mock('@/lib/AuthContext', () => ({ useWorkspaceId: () => state.workspaceId }));
+vi.mock('@/lib/AuthContext', () => ({ useWorkspaceId: () => state.workspaceId, useAuth: () => ({ user: null }) }));
 vi.mock('@/api/client', () => ({
   ascent: {
     entities: {

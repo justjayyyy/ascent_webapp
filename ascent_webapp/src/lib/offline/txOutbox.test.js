@@ -1,6 +1,6 @@
 // The offline queue engine: storing, sending in order, folding, failures and recovery.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { createOp, updateOp, deleteOp, localIdOf } from './outboxModel';
+import { createOp, updateOp, deleteOp, entryOp, localIdOf } from './outboxModel';
 
 const idb = vi.hoisted(() => new Map());
 vi.mock('idb-keyval', () => ({
@@ -10,12 +10,16 @@ vi.mock('idb-keyval', () => ({
   keys: async () => [...idb.keys()],
 }));
 
-const api = vi.hoisted(() => ({ create: vi.fn(), bulkCreate: vi.fn(), update: vi.fn(), remove: vi.fn(), planChange: vi.fn() }));
+const api = vi.hoisted(() => ({
+  create: vi.fn(), bulkCreate: vi.fn(), update: vi.fn(), remove: vi.fn(), planChange: vi.fn(),
+  planCreate: vi.fn(), planUpdate: vi.fn(), planDelete: vi.fn(), budgetCreate: vi.fn(),
+}));
 vi.mock('@/api/client', () => ({
   ascent: {
     entities: {
       ExpenseTransaction: { create: api.create, bulkCreate: api.bulkCreate, update: api.update, delete: api.remove, list: vi.fn() },
-      Plan: { changeEntry: api.planChange },
+      Plan: { changeEntry: api.planChange, create: api.planCreate, update: api.planUpdate, delete: api.planDelete },
+      Budget: { create: api.budgetCreate },
     },
   },
 }));
@@ -176,4 +180,56 @@ test('a synced add lands in every loaded view it belongs to, and only those', as
   expect(ids({ from: '2026-11-01' })).toEqual([]); // dated before that window
   expect(ids({ has: 'planId' })).toEqual([]); // not for a plan
   expect(ids({ from: '2026-01-01' }, 'ws2')).toEqual([]); // another workspace
+});
+
+describe('household lists', () => {
+  const trip = { name: 'Trip', items: [] };
+  const planOp = (extra = {}) => createOp({ rows: [trip], uuid: 'pppppppp-1', workspaceId: 'ws1', entity: 'plans', ...extra });
+
+  test('a plan made offline, an item added to it and an expense paid from it go out in order, with its real id', async () => {
+    const box = freshBox();
+    setOnline(false);
+    const add = planOp();
+    const localId = localIdOf(add.rows[0]);
+    await box.submit(add, { waitMs: 0 });
+    // The plan is still on the device, so the item goes out inside it
+    await box.submit(entryOp({ uuid: 'e1', workspaceId: 'ws1', txId: localId, list: 'items', change: { op: 'put', item: { id: 'i1', name: 'Flights' } }, entity: 'plans' }), { waitMs: 0 });
+    await box.submit(createOp({ rows: [{ ...coffee, planId: localId, planItemId: 'i1' }], uuid: 'aaaaaaaa-9', workspaceId: 'ws1', plan: { planId: localId, itemId: 'i1' } }), { waitMs: 0 });
+    expect(box.getSnapshot().ops).toHaveLength(2);
+
+    api.planCreate.mockImplementation(async (row) => ({ ...row, id: 'plan-real' }));
+    api.planChange.mockResolvedValue({ id: 'plan-real' });
+    queryClientInstance.setQueryData(['plans', 'ws1'], []);
+    setOnline(true);
+    await box.flush();
+
+    const [sentPlan, opts] = api.planCreate.mock.calls[0];
+    expect(sentPlan).toMatchObject({ name: 'Trip', dedupeKey: 'app:pppppppp-1', items: [{ id: 'i1', name: 'Flights' }] });
+    expect(opts.headers['x-workspace-id']).toBe('ws1');
+    // The expense names the plan by its real id, and the item is marked paid on the real plan
+    expect(api.create.mock.calls[0][0].planId).toBe('plan-real');
+    expect(api.planChange.mock.calls[0].slice(0, 2)).toEqual(['plan-real', 'items']);
+    expect(queryClientInstance.getQueryData(['plans', 'ws1']).map((p) => p.id)).toEqual(['plan-real']);
+    expect(box.resolveId(localId)).toBe('plan-real');
+    expect(box.getSnapshot().ops).toEqual([]);
+  });
+
+  test('edits and entries to a stored plan go out one by one; a plan already gone counts as done', async () => {
+    const box = freshBox();
+    api.planUpdate.mockResolvedValue({ id: 'p1', name: 'Renamed' });
+    api.planChange.mockResolvedValue({ id: 'p1', items: [] });
+    await expect(box.submit(updateOp({ uuid: 'u1', workspaceId: 'ws1', txId: 'p1', data: { name: 'Renamed' }, entity: 'plans' }))).resolves.toBe('synced');
+    await expect(box.submit(entryOp({ uuid: 'e1', workspaceId: 'ws1', txId: 'p1', list: 'items', change: { op: 'remove', id: 'i1' }, entity: 'plans' }))).resolves.toBe('synced');
+    expect(api.planUpdate).toHaveBeenCalledWith('p1', { name: 'Renamed' }, expect.anything());
+    expect(api.planChange).toHaveBeenCalledWith('p1', 'items', { op: 'remove', id: 'i1' }, expect.anything());
+    api.planDelete.mockRejectedValue(refused(404));
+    await expect(box.submit(deleteOp({ uuid: 'd1', workspaceId: 'ws1', txId: 'p1', entity: 'plans' }))).resolves.toBe('synced');
+  });
+
+  test('a budget the server refuses stays on the device, marked, and the caller hears about it', async () => {
+    const box = freshBox();
+    api.budgetCreate.mockRejectedValue(refused(400, 'amount required'));
+    await expect(box.submit(createOp({ rows: [{ category: 'food' }], uuid: 'bbbbbbbb-7', workspaceId: 'ws1', entity: 'budgets' }))).rejects.toMatchObject({ status: 400 });
+    expect(box.getSnapshot().ops[0]).toMatchObject({ entity: 'budgets', error: 'amount required' });
+  });
 });

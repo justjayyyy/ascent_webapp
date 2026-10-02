@@ -15,10 +15,12 @@ const SPRING = { type: 'spring', stiffness: 460, damping: 34 };
 function describe(op, t, language) {
   if (op.kind === 'create') {
     const row = op.rows[0] || {};
-    const title = row.description || translateCategory(row.category, language) || t('offItemAdd');
+    // A transaction or budget by its description or category; a plan or loan by its name
+    const title = row.description || row.name || translateCategory(row.category, language) || row.note || t('offItemAdd');
     return { title, amount: row.amount, currency: row.currency, extra: op.rows.length > 1 ? op.rows.length : 0, verb: t('offItemAdd') };
   }
-  if (op.kind === 'update') return { title: op.data?.description || t('offItemEdit'), amount: op.data?.amount, currency: op.data?.currency, verb: t('offItemEdit') };
+  if (op.kind === 'update') return { title: op.data?.description || op.data?.name || t('offItemEdit'), amount: op.data?.amount, currency: op.data?.currency, verb: t('offItemEdit') };
+  if (op.kind === 'entry') return { title: op.change?.item?.name || t('offItemEdit'), verb: t('offItemEdit') };
   return { title: t('offItemDelete'), verb: t('offItemDelete') };
 }
 

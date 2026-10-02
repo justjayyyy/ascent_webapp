@@ -1,5 +1,6 @@
 import './limits.js';
 import mongoose from 'mongoose';
+import { addDedupeKey } from './dedupe.js';
 
 // A payment recorded against a commitment: an extra payment towards a loan (straight to the
 // principal), or a repayment of a flexible one (money lent to or borrowed from family).
@@ -55,5 +56,7 @@ commitmentSchema.virtual('id').get(function() {
 
 commitmentSchema.set('toJSON', { virtuals: true });
 commitmentSchema.set('toObject', { virtuals: true });
+
+addDedupeKey(commitmentSchema);
 
 export default mongoose.models.Commitment || mongoose.model('Commitment', commitmentSchema);

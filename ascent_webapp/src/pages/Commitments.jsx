@@ -4,8 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from '@/lib/motion';
 import { ChevronDown, CreditCard, HandCoins, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { applyEntryChange, restoreEntry } from '@/lib/listEntries';
-import { ascent } from '@/api/client';
+import { restoreEntry } from '@/lib/listEntries';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -21,7 +20,8 @@ import { useChartTokens } from '@/components/charts/EChart';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
 import { groupBigPurchases } from '@/components/expenses/BigPurchases';
-import { useTransactions, useLinkedTransactions } from '@/lib/offline/txOutbox';
+import { useTransactions, useLinkedTransactions, useRealId } from '@/lib/offline/txOutbox';
+import { useListWrites } from '@/lib/offline/listWrites';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import { localDay } from '@/components/insights/useInsights';
 import { localeOf, moneyIn, formatDay } from '@/components/plans/PlanParts';
@@ -95,7 +95,15 @@ function Commitments() {
     [installmentRows]
   );
 
-  const current = openId ? rows.find((r) => r.c.id === openId) : null;
+  // A loan made offline keeps its place on screen when the server gives it its real id
+  const realOpenId = useRealId(openId);
+  useEffect(() => {
+    if (!openId || realOpenId === openId) return;
+    const next = new URLSearchParams(params);
+    next.set('id', realOpenId);
+    setParams(next, { replace: true });
+  }, [openId, realOpenId, params, setParams]);
+  const current = realOpenId ? rows.find((r) => r.c.id === realOpenId) : null;
 
   // ---- navigation ----
   const openOne = useCallback((id) => {
@@ -123,42 +131,40 @@ function Commitments() {
     setParams(next, { replace: true });
   }, [openId, current, isLoading, saving, params, setParams, queryClient, key]);
 
-  // ---- writes: applied to the cache first so the page reacts instantly ----
+  // ---- writes: through the offline queue, so they show at once and wait on the device without signal ----
+  const loansApi = useListWrites('commitments');
+  const announce = useCallback((outcome, doneKey) => {
+    if (outcome === 'queued') toast(t('offSavedOnDevice'), { description: t('offSavedOnDeviceHint') });
+    else if (doneKey) toast.success(t(doneKey));
+  }, [t]);
+
   const update = useCallback(async (id, changes) => {
-    queryClient.setQueryData(key, (list = []) => list.map((c) => (c.id === id ? { ...c, ...changes } : c)));
     try {
-      await ascent.entities.Commitment.update(id, changes);
+      return await loansApi.update(id, changes);
     } catch {
       toast.error(t('cmSaveFailed'));
-    } finally {
-      queryClient.invalidateQueries({ queryKey: ['commitments'] });
+      return null;
     }
-  }, [queryClient, key, t]);
+  }, [loansApi, t]);
 
   // Payments change one at a time on the server, so two people recording at once keep both
   const changePayment = useCallback(async (id, change) => {
-    queryClient.setQueryData(key, (list = []) => list.map((c) => (c.id === id ? { ...c, payments: applyEntryChange(c.payments, change) } : c)));
     try {
-      await ascent.entities.Commitment.changeEntry(id, 'payments', change);
+      await loansApi.changeEntry(id, 'payments', change);
     } catch {
       toast.error(t('cmSaveFailed'));
-    } finally {
-      queryClient.invalidateQueries({ queryKey: ['commitments'] });
     }
-  }, [queryClient, key, t]);
+  }, [loansApi, t]);
 
   const saveCommitment = useCallback(async (data) => {
     setSaving(true);
     try {
       if (dialog?.commitment) {
-        await update(dialog.commitment.id, data);
-        toast.success(t('cmSaved'));
+        announce(await loansApi.update(dialog.commitment.id, data), 'cmSaved');
       } else {
-        const created = await ascent.entities.Commitment.create({ ...data, payments: [], status: 'active' });
-        queryClient.setQueryData(key, (list = []) => [created, ...list]);
-        queryClient.invalidateQueries({ queryKey: ['commitments'] });
-        toast.success(t('cmCreated'));
-        if (created?.id) openOne(created.id);
+        const { id, outcome } = await loansApi.create({ ...data, payments: [], status: 'active' });
+        announce(outcome, 'cmCreated');
+        openOne(id);
       }
       setDialog(null);
     } catch {
@@ -166,22 +172,19 @@ function Commitments() {
     } finally {
       setSaving(false);
     }
-  }, [dialog, update, queryClient, key, openOne, t]);
+  }, [dialog, loansApi, announce, openOne, t]);
 
   const remove = useCallback(async () => {
     if (!current) return;
     const id = current.c.id;
     setConfirmDelete(false);
     openOne(null);
-    queryClient.setQueryData(key, (list = []) => list.filter((c) => c.id !== id));
     try {
-      await ascent.entities.Commitment.delete(id);
-      toast.success(t('cmDeleted'));
+      announce(await loansApi.remove(id), 'cmDeleted');
     } catch {
       toast.error(t('cmSaveFailed'));
-      queryClient.invalidateQueries({ queryKey: ['commitments'] });
     }
-  }, [current, openOne, queryClient, key, t]);
+  }, [current, openOne, loansApi, announce, t]);
 
   const categoryFor = useCallback((c) => {
     const wanted = c.category || kindOf(c.kind).category;

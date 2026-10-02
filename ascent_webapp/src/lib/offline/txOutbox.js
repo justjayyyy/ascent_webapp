@@ -5,21 +5,33 @@ import { ascent } from '@/api/client';
 import { queryClientInstance } from '@/lib/query-client';
 import { setPlanItem } from '@/components/expenses/planLink';
 import { useAuth, useWorkspaceId } from '@/lib/AuthContext';
-import { workspaceKey } from '@/hooks/useWorkspaceData';
+import { workspaceKey } from '@/lib/workspaceKey';
 export { mergeRows } from './outboxModel';
-import { enqueue, applyOutbox, opsForWorkspace, inView, windowStart, earliestDay, isLocalId, localIdOf, isTransientError, pendingCount, failedCount } from './outboxModel';
+import {
+  enqueue, applyOutbox, applyListOutbox, opsForWorkspace, opsForEntity, entityOf, withRealIds, inView, windowStart, earliestDay,
+  isLocalId, localIdOf, isTransientError, pendingCount, failedCount, TRANSACTIONS, LIST_ENTITIES,
+} from './outboxModel';
 import { isOnline } from './network';
 
-// Offline-first writes for transactions. Every add, edit and delete goes through this queue: it is
-// stored in IndexedDB first (so it survives the app being closed), drawn into the lists at once, and
-// sent in order whenever there is a connection. With signal it syncs within the same tap; without,
-// it waits and goes out when the phone is back online. See outboxModel.js for the folding rules.
+// Offline-first writes. Every add, edit and delete of a transaction, budget, plan, loan or settle-up goes
+// through this one queue: it is stored in IndexedDB first (so it survives the app being closed), drawn
+// into the lists at once, and sent in the order it was made whenever there is a connection. With signal
+// it syncs within the same tap; without, it waits and goes out when the phone is back online. See
+// outboxModel.js for the folding rules. (The storage key still says "tx" so queues saved earlier carry on.)
 
 const REQUEST = { timeout: 15000, retries: 0 };
 // A safety cap per view (the server allows no more); a view is a date window or one kind of link
 const TRANSACTION_LIMIT = 10000;
 const BACKOFF = [3000, 10000, 30000, 60000, 180000];
 const Tx = () => ascent.entities.ExpenseTransaction;
+// The household lists' APIs, by entity name
+const LIST_API = {
+  budgets: () => ascent.entities.Budget,
+  plans: () => ascent.entities.Plan,
+  commitments: () => ascent.entities.Commitment,
+  settlements: () => ascent.entities.Settlement,
+};
+const rowId = (row) => row?.id || row?._id;
 
 class TxOutbox {
   constructor(userId) {
@@ -95,26 +107,53 @@ class TxOutbox {
     return this.state.idMap[id] || id;
   }
 
+  /** A household list change: its row, or what became of it. */
+  async runList(op, opts) {
+    const api = LIST_API[op.entity]();
+    const real = (value) => withRealIds(value, this.state.idMap);
+    const base = { entity: op.entity, workspaceId: op.workspaceId };
+    if (op.kind === 'create') {
+      const [row] = op.rows;
+      const created = await api.create(real(row), opts);
+      return { ...base, created: [created], idMap: { [localIdOf(row)]: rowId(created) } };
+    }
+    const id = this.resolveId(op.txId);
+    if (isLocalId(id)) return {}; // its add was refused, so there is nothing on the server to change
+    try {
+      if (op.kind === 'update') return { ...base, updated: await api.update(id, real(op.data), opts) };
+      if (op.kind === 'entry') return { ...base, updated: await api.changeEntry(id, op.list, real(op.change), opts) };
+      await api.delete(id, opts);
+      return { ...base, deleted: id };
+    } catch (err) {
+      if (err?.status === 404) return {}; // already gone
+      throw err;
+    }
+  }
+
   async run(op) {
     const opts = { ...REQUEST, headers: { 'x-workspace-id': op.workspaceId } };
+    if (entityOf(op) !== TRANSACTIONS) return this.runList(op, opts);
     if (op.kind === 'create') {
-      const created = op.rows.length > 1
-        ? await Tx().bulkCreate(op.rows, opts)
-        : [await Tx().create(op.rows[0], opts)];
+      // A plan or loan made offline a moment before has its real id by now
+      const rows = withRealIds(op.rows, this.state.idMap);
+      const plan = withRealIds(op.plan, this.state.idMap);
+      const created = rows.length > 1
+        ? await Tx().bulkCreate(rows, opts)
+        : [await Tx().create(rows[0], opts)];
       const idMap = {};
       created.forEach((row) => {
         const mine = op.rows.find((r) => r.dedupeKey === row?.dedupeKey);
         if (mine) idMap[localIdOf(mine)] = row.id || row._id;
       });
-      if (op.plan && created[0]) {
-        await setPlanItem(op.plan.planId, op.plan.itemId, { status: 'paid', transactionId: created[0].id || created[0]._id || null }, opts).catch(() => {});
+      if (plan && created[0]) {
+        await setPlanItem(plan.planId, plan.itemId, { status: 'paid', transactionId: created[0].id || created[0]._id || null }, opts).catch(() => {});
       }
       return { created, idMap, workspaceId: op.workspaceId };
     }
     const id = this.resolveId(op.txId);
     if (isLocalId(id)) return {}; // its add was refused, so there is nothing on the server to change
     try {
-      if (op.kind === 'update') return { updated: await Tx().update(id, op.data, opts), workspaceId: op.workspaceId };
+      if (op.kind === 'update') return { updated: await Tx().update(id, withRealIds(op.data, this.state.idMap), opts), workspaceId: op.workspaceId };
       await Tx().delete(id, opts);
       if (op.plan) await setPlanItem(op.plan.planId, op.plan.itemId, { status: 'planned', transactionId: null }, opts).catch(() => {});
       return { deleted: id, workspaceId: op.workspaceId };
@@ -127,6 +166,19 @@ class TxOutbox {
   /** Put what the server answered into the cached list right away, so nothing blinks while it refetches. */
   absorb(result) {
     if (!result.workspaceId) return;
+    if (result.entity) {
+      queryClientInstance.setQueryData(workspaceKey(result.entity, result.workspaceId), (list) => {
+        if (!Array.isArray(list)) return list;
+        let next = list;
+        for (const row of [...(result.created || []), ...(result.updated ? [result.updated] : [])]) {
+          const id = rowId(row);
+          next = next.some((r) => r.id === id) ? next.map((r) => (r.id === id ? { ...row, id } : r)) : [...next, { ...row, id }];
+        }
+        if (result.deleted) next = next.filter((r) => r.id !== result.deleted);
+        return next;
+      });
+      return;
+    }
     // Every loaded view of this workspace's transactions, each taking only the rows it shows
     const views = queryClientInstance.getQueryCache().findAll({ queryKey: workspaceKey('transactions', result.workspaceId) });
     for (const { queryKey } of views) {
@@ -154,6 +206,7 @@ class TxOutbox {
     this.flushing = (async () => {
       await this.ready;
       let sent = 0;
+      const touched = new Set();
       this.setState({ syncing: true });
       try {
         for (;;) {
@@ -176,6 +229,7 @@ class TxOutbox {
           this.busyId = null;
           this.attempt = 0;
           sent += 1;
+          touched.add(entityOf(op));
           this.setState({
             ops: this.state.ops.filter((o) => o.id !== op.id),
             idMap: { ...this.state.idMap, ...(result.idMap || {}) },
@@ -190,8 +244,9 @@ class TxOutbox {
         this.state.ops.forEach((o) => { if (!o.error) this.settle(o.id, 'queued'); });
         this.setState({ syncing: false, lastSyncedAt: sent ? Date.now() : this.state.lastSyncedAt });
         if (sent) {
-          queryClientInstance.invalidateQueries({ queryKey: ['transactions'] });
-          if (sent && this.state.ops.length === 0) queryClientInstance.invalidateQueries({ queryKey: ['plans'] });
+          touched.forEach((entity) => queryClientInstance.invalidateQueries({ queryKey: [entity] }));
+          // A transaction paid from a plan also changed that plan's item
+          if (touched.has(TRANSACTIONS) && this.state.ops.length === 0) queryClientInstance.invalidateQueries({ queryKey: ['plans'] });
         }
       }
     })().finally(() => { this.flushing = null; });
@@ -272,8 +327,8 @@ function useTransactionView(view, enabled) {
     refetchOnWindowFocus: 'always',
   });
   const { ops, idMap } = useOutboxState(userId);
-  // Only this workspace's waiting changes belong in this workspace's list
-  const here = useMemo(() => opsForWorkspace(ops, workspaceId), [ops, workspaceId]);
+  // Only this workspace's waiting changes to transactions belong in this list
+  const here = useMemo(() => opsForEntity(opsForWorkspace(ops, workspaceId), TRANSACTIONS), [ops, workspaceId]);
   const data = useMemo(() => applyOutbox(query.data || [], here, idMap, (row) => inView(row, view)), [query.data, here, idMap, view]);
   // Offline with nothing cached yet: the query is paused, so show the empty list instead of a spinner
   return { ...query, data, isLoading: query.isPending && query.fetchStatus !== 'paused' };
@@ -311,4 +366,26 @@ export function useOldestTransactionDate() {
     staleTime: 60 * 60 * 1000,
   });
   return query.data ?? null;
+}
+
+/**
+ * A household list (`entity` is one of LIST_ENTITIES) with this workspace's waiting changes drawn in.
+ * Other lists come back as they are.
+ */
+export function useQueuedChanges(entity, rows) {
+  const { user } = useAuth();
+  const workspaceId = useWorkspaceId();
+  const { ops, idMap } = useOutboxState(user?.id || user?._id);
+  return useMemo(() => {
+    if (!LIST_ENTITIES.includes(entity)) return rows;
+    const mine = opsForEntity(opsForWorkspace(ops, workspaceId), entity);
+    return mine.length ? applyListOutbox(rows || [], mine, idMap) : rows;
+  }, [entity, rows, ops, idMap, workspaceId]);
+}
+
+/** The real id of a row made on this device, once the server has it (else the id as given). */
+export function useRealId(id) {
+  const { user } = useAuth();
+  const { idMap } = useOutboxState(user?.id || user?._id);
+  return (id && idMap[id]) || id;
 }

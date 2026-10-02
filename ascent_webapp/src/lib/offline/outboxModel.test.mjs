@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createOp, updateOp, deleteOp, enqueue, applyOutbox, opsForWorkspace, localIdOf, isTransientError, pendingCount } from './outboxModel.js';
+import {
+  createOp, updateOp, deleteOp, entryOp, enqueue, applyOutbox, applyListOutbox, withRealIds, opsForWorkspace, opsForEntity, entityOf,
+  localIdOf, isTransientError, pendingCount,
+} from './outboxModel.js';
 
 const ws = 'ws1';
 const coffee = { type: 'Expense', amount: 18, category: 'food', date: '2026-10-01', description: 'Coffee' };
@@ -108,4 +111,57 @@ test('a queued add only shows in the views it belongs to', () => {
   const add = createOp({ rows: [{ ...coffee, date: '2026-10-01' }], uuid: 'aaaaaaaa-1', workspaceId: ws });
   assert.equal(applyOutbox([], [add], {}, (r) => r.date >= '2026-01-01').length, 1);
   assert.equal(applyOutbox([], [add], {}, (r) => !!r.planId).length, 0);
+});
+
+// ---- the household lists (budgets, plans, loans, settle-ups) ----
+
+const trip = { name: 'Trip', items: [{ id: 'i1', name: 'Flights', amount: 900 }] };
+
+test('a list change says which list it is for; old queued changes are transactions', () => {
+  const add = createOp({ rows: [trip], uuid: 'pppppppp-1', workspaceId: ws, entity: 'plans' });
+  assert.equal(add.entity, 'plans');
+  assert.equal(entityOf(add), 'plans');
+  assert.equal(createOp({ rows: [coffee], uuid: 'aaaaaaaa-1', workspaceId: ws }).entity, undefined);
+  assert.equal(entityOf({ kind: 'update', txId: 'x' }), 'transactions');
+  assert.deepEqual(opsForEntity([add, updateOp({ uuid: 'u', workspaceId: ws, txId: 't' })], 'plans'), [add]);
+});
+
+test('an entry added to a plan that was never sent goes out inside it', () => {
+  const add = createOp({ rows: [trip], uuid: 'pppppppp-1', workspaceId: ws, entity: 'plans' });
+  const id = localIdOf(add.rows[0]);
+  const ops = enqueue([add], entryOp({ uuid: 'e1', workspaceId: ws, txId: id, list: 'items', change: { op: 'put', item: { id: 'i2', name: 'Hotel' } }, entity: 'plans' }));
+  assert.equal(ops.length, 1);
+  assert.deepEqual(ops[0].rows[0].items.map((i) => i.id), ['i1', 'i2']);
+});
+
+test('entries to a stored plan stay separate and in order; deleting the plan drops them', () => {
+  const e = (n, change) => entryOp({ uuid: `e${n}`, workspaceId: ws, txId: 'p1', list: 'items', change, entity: 'plans' });
+  let ops = enqueue([], e(1, { op: 'patch', id: 'i1', changes: { status: 'booked' } }));
+  ops = enqueue(ops, e(2, { op: 'patch', id: 'i1', changes: { status: 'planned' } }));
+  assert.equal(ops.length, 2);
+  ops = enqueue(ops, deleteOp({ uuid: 'd1', workspaceId: ws, txId: 'p1', entity: 'plans' }));
+  assert.deepEqual(ops.map((o) => o.kind), ['delete']);
+});
+
+test('a plan list is drawn with its waiting changes in the order they were made', () => {
+  const server = [{ id: 'p1', name: 'Wedding', items: [{ id: 'a', status: 'planned' }] }, { id: 'p2', name: 'Old' }];
+  const add = createOp({ rows: [trip], uuid: 'pppppppp-1', workspaceId: ws, entity: 'plans' });
+  const ops = [
+    entryOp({ uuid: 'e1', workspaceId: ws, txId: 'p1', list: 'items', change: { op: 'patch', id: 'a', changes: { status: 'booked' } }, entity: 'plans' }),
+    updateOp({ uuid: 'u1', workspaceId: ws, txId: 'p1', data: { name: 'Our wedding' }, entity: 'plans' }),
+    deleteOp({ uuid: 'd1', workspaceId: ws, txId: 'p2', entity: 'plans' }),
+    add,
+  ];
+  const rows = applyListOutbox(server, ops);
+  assert.deepEqual(rows.map((r) => [r.id, r.name, r._sync]), [['p1', 'Our wedding', 'pending'], [localIdOf(add.rows[0]), 'Trip', 'pending']]);
+  assert.equal(rows[0].items[0].status, 'booked');
+  // Once the server has the new plan (same dedupeKey), it is not drawn twice
+  const stored = [...server, { ...add.rows[0], id: 'p9' }];
+  assert.equal(applyListOutbox(stored, [add]).filter((r) => r.name === 'Trip').length, 1);
+});
+
+test('local ids of rows the server has since stored are swapped for their real ids', () => {
+  const map = { 'local:app:x': 'real-1' };
+  assert.deepEqual(withRealIds({ planId: 'local:app:x', other: 'local:app:y', n: 2, list: ['local:app:x'] }, map),
+    { planId: 'real-1', other: 'local:app:y', n: 2, list: ['real-1'] });
 });

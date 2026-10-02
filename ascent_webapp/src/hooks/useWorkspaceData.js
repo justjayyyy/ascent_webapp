@@ -5,12 +5,13 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ascent } from '@/api/client';
 import { useWorkspaceId } from '@/lib/AuthContext';
+import { useQueuedChanges } from '@/lib/offline/txOutbox';
+import { workspaceKey } from '@/lib/workspaceKey';
 import { amountInCurrency, convertAmount } from '@shared/money';
 
 const MINUTE = 60 * 1000;
 
-/** The query key of a workspace list: [name, workspaceId]. */
-export const workspaceKey = (name, workspaceId) => [name, workspaceId ?? null];
+export { workspaceKey };
 
 // Requests name the workspace explicitly, so the data always matches the key it is stored under
 const pinned = (workspaceId) => ({ headers: { 'x-workspace-id': workspaceId } });
@@ -25,16 +26,22 @@ const LISTS = {
   settlements: { load: (ws) => ascent.entities.Settlement.list('-date', 1000, pinned(ws)), staleTime: MINUTE },
 };
 
-/** One of the lists above for the workspace on screen. `enabled: false` skips fetching (e.g. without permission). */
+/**
+ * One of the lists above for the workspace on screen, with changes still waiting on this device drawn in
+ * (budgets, plans, loans and settle-ups save offline). `enabled: false` skips fetching (e.g. without permission).
+ */
 export function useWorkspaceList(name, { enabled = true } = {}) {
   const workspaceId = useWorkspaceId();
   const { load, staleTime } = LISTS[name];
-  return useQuery({
+  const query = useQuery({
     queryKey: workspaceKey(name, workspaceId),
     queryFn: () => load(workspaceId),
     enabled: !!workspaceId && enabled,
     staleTime,
   });
+  const data = useQueuedChanges(name, query.data);
+  // Offline with nothing cached yet: the query is paused, so show what is on the device instead of a spinner
+  return data === query.data ? query : { ...query, data, isLoading: query.isPending && query.fetchStatus !== 'paused' };
 }
 
 export const useCategories = (opts) => useWorkspaceList('categories', opts);

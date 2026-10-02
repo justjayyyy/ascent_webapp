@@ -1,5 +1,6 @@
 import './limits.js';
 import mongoose from 'mongoose';
+import { addDedupeKey } from './dedupe.js';
 
 // Delete cached model to allow schema changes
 if (mongoose.models.Budget) {
@@ -73,6 +74,8 @@ budgetSchema.virtual('id').get(function() {
 
 budgetSchema.set('toJSON', { virtuals: true });
 budgetSchema.set('toObject', { virtuals: true });
+
+addDedupeKey(budgetSchema);
 
 export default mongoose.model('Budget', budgetSchema);
 

@@ -33,10 +33,12 @@ export async function openApp(page, path = '/Dashboard') {
   await dismissWelcome(page);
 }
 
-/** The signed-in person's transactions, as the server has them. */
-export async function serverTransactions(page) {
+/** One of the signed-in person's lists ('transactions', 'plans'...), as the server has it. */
+export async function serverList(page, entity) {
   const workspaceId = await page.evaluate(() => localStorage.getItem('ascent_current_workspace_id'));
-  const res = await page.request.get('/api/entities/transactions?limit=50', { headers: { 'x-workspace-id': workspaceId } });
+  const res = await page.request.get(`/api/entities/${entity}?limit=50`, { headers: { 'x-workspace-id': workspaceId } });
   expect(res.ok()).toBe(true);
   return (await res.json()).data;
 }
+
+export const serverTransactions = (page) => serverList(page, 'transactions');

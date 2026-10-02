@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Scale, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import MemberAvatar from '@/components/workspace/MemberAvatar';
-import { ascent } from '@/api/client';
+import { useListWrites } from '@/lib/offline/listWrites';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { useHousehold } from '@/hooks/useHousehold';
@@ -21,7 +20,7 @@ export default function HouseholdBalanceCard({ balances }) {
   const { hasPermission } = useAuth();
   const { byEmail, meEmail } = useHousehold();
   const { money, currency, blur } = useMoneyFormat();
-  const queryClient = useQueryClient();
+  const settlementsApi = useListWrites('settlements');
   const [settling, setSettling] = useState(null);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -49,9 +48,9 @@ export default function HouseholdBalanceCard({ balances }) {
     if (!(value > 0)) return;
     setSaving(true);
     try {
-      await ascent.entities.Settlement.create({ from: settling.from, to: settling.to, amount: value, currency, date: localDay(), note: note.trim() });
-      await queryClient.invalidateQueries({ queryKey: ['settlements'] });
-      toast.success(t('hhSettled'));
+      const { outcome } = await settlementsApi.create({ from: settling.from, to: settling.to, amount: value, currency, date: localDay(), note: note.trim() });
+      if (outcome === 'queued') toast(t('offSavedOnDevice'), { description: t('offSavedOnDeviceHint') });
+      else toast.success(t('hhSettled'));
       setSettling(null);
     } catch {
       toast.error(t('hhSettleFailed'));

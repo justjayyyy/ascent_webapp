@@ -5,8 +5,7 @@ import { AnimatePresence, LayoutGroup, motion } from '@/lib/motion';
 import { ChevronDown, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { applyEntryChange, restoreEntry } from '@/lib/listEntries';
-import { ascent } from '@/api/client';
+import { restoreEntry } from '@/lib/listEntries';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -18,7 +17,8 @@ import { cn } from '@/lib/utils';
 import { useAccounts, useCategories, useMoney, usePlans, workspaceKey } from '@/hooks/useWorkspaceData';
 import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
 import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
-import { useLinkedTransactions } from '@/lib/offline/txOutbox';
+import { useLinkedTransactions, useRealId } from '@/lib/offline/txOutbox';
+import { useListWrites } from '@/lib/offline/listWrites';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import PlanDialog from '@/components/plans/PlanDialog';
 import PlanItemDialog from '@/components/plans/PlanItemDialog';
@@ -77,7 +77,15 @@ function Plans() {
     };
   }, [plans]);
 
-  const plan = openId ? plans.find((p) => p.id === openId) : null;
+  // A plan made offline keeps its place on screen when the server gives it its real id
+  const realOpenId = useRealId(openId);
+  useEffect(() => {
+    if (!openId || realOpenId === openId) return;
+    const next = new URLSearchParams(params);
+    next.set('plan', realOpenId);
+    setParams(next, { replace: true });
+  }, [openId, realOpenId, params, setParams]);
+  const plan = realOpenId ? plans.find((p) => p.id === realOpenId) : null;
 
   // The dock's +: a new plan from the list, a new cost inside an open plan
   const createHere = useCallback(() => (plan ? setItemDialog({}) : setPlanDialog({})), [plan]);
@@ -105,42 +113,42 @@ function Plans() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [params, setParams]);
 
-  // ---- writes: applied to the cache first so the page reacts instantly ----
+  // ---- writes: through the offline queue, so they show at once and wait on the device without signal ----
+  const plansApi = useListWrites('plans');
+  // Small edits say nothing when they wait (the sync pill shows them); saving a whole plan says where it went
+  const announce = useCallback((outcome, doneKey) => {
+    if (outcome === 'queued') toast(t('offSavedOnDevice'), { description: t('offSavedOnDeviceHint') });
+    else if (doneKey) toast.success(t(doneKey));
+  }, [t]);
+
   const updatePlan = useCallback(async (id, changes) => {
-    queryClient.setQueryData(plansKey, (list = []) => list.map((p) => (p.id === id ? { ...p, ...changes } : p)));
     try {
-      await ascent.entities.Plan.update(id, changes);
+      return await plansApi.update(id, changes);
     } catch {
       toast.error(t('failedToSavePlan'));
-    } finally {
-      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      return null;
     }
-  }, [queryClient, plansKey, t]);
+  }, [plansApi, t]);
 
   // Items change one at a time on the server, so two people editing the same plan keep both changes
   const changeItem = useCallback(async (id, change) => {
-    queryClient.setQueryData(plansKey, (list = []) => list.map((p) => (p.id === id ? { ...p, items: applyEntryChange(p.items, change) } : p)));
     try {
-      await ascent.entities.Plan.changeEntry(id, 'items', change);
+      await plansApi.changeEntry(id, 'items', change);
     } catch {
       toast.error(t('failedToSavePlan'));
-    } finally {
-      queryClient.invalidateQueries({ queryKey: ['plans'] });
     }
-  }, [queryClient, plansKey, t]);
+  }, [plansApi, t]);
 
   const savePlan = useCallback(async (data) => {
     setSavingPlan(true);
     try {
       if (planDialog?.plan) {
-        await updatePlan(planDialog.plan.id, data);
-        toast.success(t('planSaved'));
+        const outcome = await plansApi.update(planDialog.plan.id, data);
+        announce(outcome, 'planSaved');
       } else {
-        const created = await ascent.entities.Plan.create(data);
-        queryClient.setQueryData(plansKey, (list = []) => [...list, created]);
-        queryClient.invalidateQueries({ queryKey: ['plans'] });
-        toast.success(t('planCreated'));
-        if (created?.id) openPlan(created.id);
+        const { id, outcome } = await plansApi.create(data);
+        announce(outcome, 'planCreated');
+        openPlan(id);
       }
       setPlanDialog(null);
     } catch {
@@ -148,22 +156,19 @@ function Plans() {
     } finally {
       setSavingPlan(false);
     }
-  }, [planDialog, updatePlan, queryClient, plansKey, openPlan, t]);
+  }, [planDialog, plansApi, announce, openPlan, t]);
 
   const deletePlan = useCallback(async () => {
     if (!plan) return;
     const id = plan.id;
     setConfirmDelete(false);
     openPlan(null);
-    queryClient.setQueryData(plansKey, (list = []) => list.filter((p) => p.id !== id));
     try {
-      await ascent.entities.Plan.delete(id);
-      toast.success(t('planDeleted'));
+      announce(await plansApi.remove(id), 'planDeleted');
     } catch {
       toast.error(t('failedToSavePlan'));
-      queryClient.invalidateQueries({ queryKey: ['plans'] });
     }
-  }, [plan, openPlan, queryClient, plansKey, t]);
+  }, [plan, openPlan, plansApi, announce, t]);
 
   const saveItem = useCallback((item) => {
     if (!plan) return;

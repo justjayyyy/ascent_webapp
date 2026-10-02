@@ -1,11 +1,24 @@
-// The offline queue for transactions, as plain data: what a queued change looks like, how a new change
-// folds into the ones already waiting, and how the waiting changes are drawn on top of the server's rows.
-// No browser APIs here, so it runs under `node --test`. The engine that stores and sends it is txOutbox.js.
+// The offline queue, as plain data: what a queued change looks like, how a new change folds into the ones
+// already waiting, and how the waiting changes are drawn on top of the server's rows. No browser APIs
+// here, so it runs under `node --test`. The engine that stores and sends it is txOutbox.js.
 //
-// op = { id, kind: 'create', workspaceId, rows: [...], plan?: { planId, itemId } }
-//    | { id, kind: 'update', workspaceId, txId, data }
-//    | { id, kind: 'delete', workspaceId, txId, plan? }
+// One queue holds every kind of row, in the order the changes were made: transactions, and the
+// household's lists (budgets, plans, loans, settle-ups). `entity` says which; queues saved before it
+// existed hold transactions only. `txId` is the id of the row a change is for, whatever its kind.
+//
+// op = { id, kind: 'create', entity?, workspaceId, rows: [...], plan?: { planId, itemId } }
+//    | { id, kind: 'update', entity?, workspaceId, txId, data }
+//    | { id, kind: 'entry',  entity, workspaceId, txId, list, change }   (one plan item or loan payment)
+//    | { id, kind: 'delete', entity?, workspaceId, txId, plan? }
 // plus createdAt and, once the server refused it for good, error.
+import { applyEntryChange } from '../listEntries.js';
+
+export const TRANSACTIONS = 'transactions';
+/** The household lists that save through the queue, by the name of their API path and cache key. */
+export const LIST_ENTITIES = ['budgets', 'plans', 'commitments', 'settlements'];
+export const entityOf = (op) => op.entity || TRANSACTIONS;
+/** The waiting changes to one kind of row. */
+export const opsForEntity = (ops, entity) => ops.filter((o) => entityOf(o) === entity);
 
 export const LOCAL_PREFIX = 'local:';
 export const isLocalId = (id) => typeof id === 'string' && id.startsWith(LOCAL_PREFIX);
@@ -17,11 +30,12 @@ export const localIdOf = (row) => `${LOCAL_PREFIX}${row.dedupeKey}`;
  * A queued add. Every row gets an "app:" dedupeKey, so if the upload reached the server but the answer
  * was lost, sending it again returns the stored row instead of adding a second one.
  */
-export function createOp({ rows, uuid, workspaceId, plan = null, now = Date.now() }) {
+export function createOp({ rows, uuid, workspaceId, plan = null, entity, now = Date.now() }) {
   const key = `app:${uuid}`;
   return {
     id: key,
     kind: 'create',
+    ...(entity && entity !== TRANSACTIONS ? { entity } : {}),
     workspaceId,
     rows: rows.map((r, i) => ({ ...r, dedupeKey: rows.length > 1 ? `${key}:${i}` : key })),
     plan,
@@ -29,11 +43,17 @@ export function createOp({ rows, uuid, workspaceId, plan = null, now = Date.now(
   };
 }
 
-export const updateOp = ({ uuid, workspaceId, txId, data, now = Date.now() }) =>
-  ({ id: `upd:${uuid}`, kind: 'update', workspaceId, txId, data, createdAt: now });
+const tagged = (entity) => (entity && entity !== TRANSACTIONS ? { entity } : {});
 
-export const deleteOp = ({ uuid, workspaceId, txId, plan = null, now = Date.now() }) =>
-  ({ id: `del:${uuid}`, kind: 'delete', workspaceId, txId, plan, createdAt: now });
+export const updateOp = ({ uuid, workspaceId, txId, data, entity, now = Date.now() }) =>
+  ({ id: `upd:${uuid}`, kind: 'update', ...tagged(entity), workspaceId, txId, data, createdAt: now });
+
+/** One entry of a row's list field: `change` as in listEntries.js ({ op: 'put' | 'patch' | 'remove', ... }). */
+export const entryOp = ({ uuid, workspaceId, txId, list, change, entity, now = Date.now() }) =>
+  ({ id: `ent:${uuid}`, kind: 'entry', ...tagged(entity), workspaceId, txId, list, change, createdAt: now });
+
+export const deleteOp = ({ uuid, workspaceId, txId, plan = null, entity, now = Date.now() }) =>
+  ({ id: `del:${uuid}`, kind: 'delete', ...tagged(entity), workspaceId, txId, plan, createdAt: now });
 
 const ownsRow = (op, localId) => op.kind === 'create' && op.rows.some((r) => localIdOf(r) === localId);
 
@@ -58,9 +78,22 @@ export function enqueue(ops, op, busyId = null) {
     return [...ops, op];
   }
 
+  if (op.kind === 'entry') {
+    // A row that has not been sent yet simply goes out with the entry in it
+    const host = ops.find((o) => open(o) && ownsRow(o, op.txId));
+    if (host) {
+      return ops.map((o) => (o !== host ? o : {
+        ...o,
+        rows: o.rows.map((r) => (localIdOf(r) === op.txId ? { ...r, [op.list]: applyEntryChange(r[op.list] || [], op.change) } : r)),
+      }));
+    }
+    // Entries are never folded together: each one is a separate change other people may also be making
+    return [...ops, op];
+  }
+
   if (op.kind === 'delete') {
     const host = ops.find((o) => open(o) && ownsRow(o, op.txId));
-    const rest = ops.filter((o) => !(open(o) && o.kind === 'update' && o.txId === op.txId));
+    const rest = ops.filter((o) => !(open(o) && (o.kind === 'update' || o.kind === 'entry') && o.txId === op.txId));
     if (host) {
       // Never sent, so the server never needs to hear about it
       return rest
@@ -106,6 +139,39 @@ export function applyOutbox(serverRows = [], ops = [], idMap = {}, include = () 
     .map((r) => (edits.has(r.id) ? { ...r, ...edits.get(r.id), _sync: 'pending' } : r));
 
   return [...queued, ...stored];
+}
+
+/**
+ * A household list (budgets, plans...) with its waiting changes drawn on top, in the order they were
+ * made: `ops` are that list's own. New rows go at the end with `_sync`; changed rows carry `_sync` too.
+ */
+export function applyListOutbox(serverRows = [], ops = [], idMap = {}) {
+  if (!ops.length) return serverRows;
+  const resolve = (id) => idMap[id] || id;
+  const storedKeys = new Set(serverRows.map((r) => r.dedupeKey).filter(Boolean));
+  let rows = [...serverRows];
+  const mark = (row, op) => ({ ...row, _sync: op.error ? 'failed' : 'pending' });
+  for (const op of ops) {
+    if (op.kind === 'create') {
+      for (const row of op.rows) {
+        if (!storedKeys.has(row.dedupeKey)) rows.push(mark({ ...row, id: localIdOf(row) }, op));
+      }
+      continue;
+    }
+    const id = resolve(op.txId);
+    if (op.kind === 'delete') rows = rows.filter((r) => r.id !== id);
+    else if (op.kind === 'update') rows = rows.map((r) => (r.id === id ? mark({ ...r, ...op.data }, op) : r));
+    else if (op.kind === 'entry') rows = rows.map((r) => (r.id === id ? mark({ ...r, [op.list]: applyEntryChange(r[op.list] || [], op.change) }, op) : r));
+  }
+  return rows;
+}
+
+/** Every string in `value` that is the local id of a row the server has since stored, swapped for its real id. */
+export function withRealIds(value, idMap = {}) {
+  if (typeof value === 'string') return isLocalId(value) && idMap[value] ? idMap[value] : value;
+  if (Array.isArray(value)) return value.map((v) => withRealIds(v, idMap));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withRealIds(v, idMap)]));
+  return value;
 }
 
 // ---- views: which transactions a screen loads ----

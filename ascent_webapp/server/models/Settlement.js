@@ -1,5 +1,6 @@
 import './limits.js';
 import mongoose from 'mongoose';
+import { addDedupeKey } from './dedupe.js';
 
 // Money one household member paid another to even out split expenses ("settle up").
 // People are emails, like `created_by` and `paidBy` on transactions.
@@ -31,5 +32,7 @@ settlementSchema.virtual('id').get(function() {
 
 settlementSchema.set('toJSON', { virtuals: true });
 settlementSchema.set('toObject', { virtuals: true });
+
+addDedupeKey(settlementSchema);
 
 export default mongoose.models.Settlement || mongoose.model('Settlement', settlementSchema);
