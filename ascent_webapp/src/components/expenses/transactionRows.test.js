@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { expandTransaction, STRIP } from './transactionRows';
+import { expandTransaction, seriesOf, STRIP } from './transactionRows';
 
 const base = { type: 'Expense', amount: 100, currency: 'ILS', category: 'shopping', date: '2026-01-31', description: 'TV' };
 
@@ -49,5 +49,33 @@ describe('one save, the rows it becomes', () => {
 
   test('income is never split into installments', () => {
     expect(expandTransaction({ ...base, type: 'Income', isBigPurchase: true, installmentCount: '3' })).toHaveLength(1);
+  });
+});
+
+describe('a recurring series, found from any of its rows', () => {
+  const rec = { ...base, date: '2026-01-15', isRecurring: true, recurringFrequency: 'monthly', recurringStartDate: '2026-01-15', recurringEndDate: '2026-03-15', description: 'Rent' };
+
+  test('one monthly save shares one group id', () => {
+    const rows = expandTransaction(rec);
+    expect(rows).toHaveLength(3);
+    expect(new Set(rows.map((r) => r.recurringGroupId)).size).toBe(1);
+    expect(rows[0].recurringGroupId).toBeTruthy();
+  });
+
+  test('rows of the same group, whatever was edited on one of them', () => {
+    const rows = expandTransaction(rec).map((r, i) => ({ ...r, id: `r${i}` }));
+    rows[2].description = 'Rent (raised)';
+    const other = expandTransaction({ ...rec, description: 'Gym' }).map((r, i) => ({ ...r, id: `o${i}` }));
+    expect(seriesOf(rows[1], [...other, ...rows].reverse()).map((r) => r.id)).toEqual(['r0', 'r1', 'r2']);
+  });
+
+  test('older series without a group id match by what the run shares', () => {
+    const legacy = ['2026-01-15', '2026-02-15'].map((date, i) => ({ ...rec, date, id: `l${i}` }));
+    const gym = { ...legacy[0], id: 'g', description: 'Gym' };
+    expect(seriesOf(legacy[0], [gym, ...legacy]).map((r) => r.id)).toEqual(['l0', 'l1']);
+  });
+
+  test('a row that is not recurring has no series', () => {
+    expect(seriesOf({ ...base, id: 'x' }, [{ ...base, id: 'x' }])).toEqual([]);
   });
 });

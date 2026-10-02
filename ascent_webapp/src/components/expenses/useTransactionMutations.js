@@ -6,7 +6,7 @@ import { getOutbox } from '@/lib/offline/txOutbox';
 import { createOp, updateOp, deleteOp } from '@/lib/offline/outboxModel';
 import { uuid } from '@/lib/offline/network';
 import { haptic } from '@/lib/haptics';
-import { STRIP, expandTransaction } from './transactionRows';
+import { STRIP, expandTransaction, newGroupId } from './transactionRows';
 
 // Saves and deletes go through the offline queue (lib/offline/txOutbox.js): the change shows at once,
 // syncs within the same tap when there is signal, and waits on the device when there is none.
@@ -16,14 +16,17 @@ function useBox() {
   return getOutbox(user?.id || user?._id);
 }
 
-/** Create or update a transaction, including recurring runs, installments and plan payments. */
+/**
+ * Create or update a transaction, including recurring runs, installments and plan payments.
+ * Pass `series` (every row of a monthly recurring run) to apply an edit to all of them; each keeps its own date.
+ */
 export function useSaveTransaction() {
   const box = useBox();
   const workspaceId = useWorkspaceId();
   const { t } = useTheme();
   const [saving, setSaving] = useState(false);
 
-  const save = useCallback(async (data, existing) => {
+  const save = useCallback(async (data, existing, series = null) => {
     if (!box) return false;
     setSaving(true);
     const isEdit = !!(existing && existing.id);
@@ -36,6 +39,21 @@ export function useSaveTransaction() {
         delete payload.installmentCount;
         // Saving an automatically added payment after looking at it counts as reviewing it
         if (existing.status === 'pending') payload.status = 'confirmed';
+        if (series?.length > 1) {
+          // One id for the whole run from now on, so it stays together even if a row is later edited alone
+          const recurringGroupId = existing.recurringGroupId || series.find((x) => x.recurringGroupId)?.recurringGroupId || newGroupId();
+          const { date, status, ...shared } = payload;
+          const outcomes = await Promise.all(series.map((tx) => box.submit(updateOp({
+            uuid: uuid(),
+            workspaceId,
+            txId: tx.id,
+            data: tx.id === existing.id ? { ...payload, recurringGroupId } : { ...shared, recurringGroupId },
+          }))));
+          haptic('success');
+          if (outcomes.includes('queued')) toast(t('offSavedOnDevice'), { description: t('offSavedOnDeviceHint') });
+          else toast.success(t('recurringSeriesUpdated').replace('{count}', series.length));
+          return true;
+        }
         op = updateOp({ uuid: uuid(), workspaceId, txId: existing.id, data: payload });
         doneKey = 'transactionUpdatedSuccessfully';
       } else {
@@ -80,7 +98,7 @@ export function useConfirmTransaction() {
   }, [box, workspaceId, t]);
 }
 
-/** Delete one transaction, or every installment of a big purchase. Paid plan items go back to planned. */
+/** Delete one transaction, every installment of a big purchase or a whole recurring run. Paid plan items go back to planned. */
 export function useDeleteTransactions() {
   const box = useBox();
   const workspaceId = useWorkspaceId();

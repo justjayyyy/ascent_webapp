@@ -83,6 +83,11 @@ const expenseTransactionSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Shared by every row one monthly recurring save added, so the series can be edited or deleted together
+  recurringGroupId: {
+    type: String,
+    default: null
+  },
   relatedAccountId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',

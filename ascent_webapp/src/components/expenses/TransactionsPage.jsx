@@ -14,6 +14,7 @@ import CategoryManager from './CategoryManager';
 import ExpenseMonthView from './ExpenseMonthView';
 import PeriodSelector from './PeriodSelector';
 import { useSaveTransaction, useDeleteTransactions, useConfirmTransaction } from './useTransactionMutations';
+import { seriesOf } from './transactionRows';
 import { useListWrites } from '@/lib/offline/listWrites';
 import { useTheme } from '../ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
@@ -60,6 +61,8 @@ function TransactionsPage({ kind }) {
   // The selected year (and the usual recent history); every part of big purchases, whenever it falls
   const { data: allTransactions = [], isLoading } = useTransactions({ from: `${selectedYear}-01-01` });
   const { data: installments = [] } = useLinkedTransactions('installmentGroupId', { enabled: !isIncome });
+  // Every row of monthly recurring runs, so a run can be edited or deleted as a whole
+  const { data: recurringRows = [] } = useLinkedTransactions('recurringStartDate');
   const oldestDate = useOldestTransactionDate();
 
   const transactions = useMemo(() => allTransactions.filter((x) => x.type === kind), [allTransactions, kind]);
@@ -136,28 +139,36 @@ function TransactionsPage({ kind }) {
   }, [allTransactions]);
 
   const siblings = useMemo(() => {
-    if (!toDelete?.installmentGroupId) return [];
-    return mergeRows(installments, allTransactions).filter((x) => x.installmentGroupId === toDelete.installmentGroupId);
-  }, [toDelete, allTransactions, installments]);
+    if (!toDelete) return [];
+    if (toDelete.installmentGroupId) {
+      return mergeRows(installments, allTransactions).filter((x) => x.installmentGroupId === toDelete.installmentGroupId);
+    }
+    return seriesOf(toDelete, mergeRows(recurringRows, allTransactions));
+  }, [toDelete, allTransactions, installments, recurringRows]);
+
+  const editSeries = useMemo(
+    () => (editingTransaction?.id ? seriesOf(editingTransaction, mergeRows(recurringRows, allTransactions)) : []),
+    [editingTransaction, allTransactions, recurringRows]
+  );
 
   const handleDuplicateTransaction = useCallback((transaction) => {
     // A copy dated today; ids, timestamps and installment bookkeeping stay with the original
     const {
       id, _id, created_date, updated_date, created_by,
-      installmentGroupId, installmentIndex, installmentCount, installmentTotal, planItemId,
+      installmentGroupId, installmentIndex, installmentCount, installmentTotal, planItemId, recurringGroupId,
       ...fields
     } = transaction;
     setEditingTransaction({ ...fields, date: localDay(), id: undefined, _id: undefined });
     setAddDialogOpen(true);
   }, []);
 
-  const handleSubmit = useCallback(async (data) => {
-    const ok = await save(data, editingTransaction);
+  const handleSubmit = useCallback(async (data, { wholeSeries = false } = {}) => {
+    const ok = await save(data, editingTransaction, wholeSeries && editSeries.length > 1 ? editSeries : null);
     if (ok) {
       setAddDialogOpen(false);
       setEditingTransaction(null);
     }
-  }, [save, editingTransaction]);
+  }, [save, editingTransaction, editSeries]);
 
   const inPeriod = useCallback((x) => {
     if (!x.date) return false;
@@ -265,6 +276,7 @@ function TransactionsPage({ kind }) {
           isLoading={saving}
           categories={categories}
           editTransaction={editingTransaction}
+          seriesCount={editSeries.length}
           defaultType={kind}
           plans={plans}
         />
@@ -300,7 +312,9 @@ function TransactionsPage({ kind }) {
             <AlertDialogHeader>
               <AlertDialogTitle className={cn(colors.textPrimary)}>{t('deleteTransaction')}</AlertDialogTitle>
               <AlertDialogDescription className={colors.textTertiary}>
-                {siblings.length > 1 ? t('deleteInstallmentConfirm').replace('{count}', siblings.length) : t('deleteTransactionConfirmation')}
+                {siblings.length > 1
+                  ? t(toDelete?.installmentGroupId ? 'deleteInstallmentConfirm' : 'deleteRecurringConfirm').replace('{count}', siblings.length)
+                  : t('deleteTransactionConfirmation')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">

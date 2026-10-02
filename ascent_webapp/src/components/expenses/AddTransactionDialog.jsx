@@ -35,6 +35,7 @@ const rememberChoices = ({ category, paymentMethod, currency, type }) => {
  * @property {boolean} isLoading
  * @property {Array} categories
  * @property {Object} editTransaction
+ * @property {number} [seriesCount] rows in editTransaction's monthly recurring series (offers editing them all)
  */
 
 /**
@@ -47,6 +48,7 @@ export default function AddTransactionDialog({
   isLoading,
   categories = [],
   editTransaction = null,
+  seriesCount = 0,
   defaultType = null,
   plans = [],
 }) {
@@ -56,6 +58,9 @@ export default function AddTransactionDialog({
   const userCurrency = user?.currency || 'ILS';
   const startType = defaultType || 'Expense';
   const isEditing = !!(editTransaction && (editTransaction.id || editTransaction._id));
+  const inSeries = isEditing && seriesCount > 1;
+  const [wholeSeries, setWholeSeries] = useState(false);
+  useEffect(() => { if (open) setWholeSeries(false); }, [open, editTransaction]);
   const activePlans = useMemo(() => plans.filter(p => p.status !== 'archived'), [plans]);
   const loc = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
   const defaultCategory = categories.find(c => c.type === startType || c.type === 'Both');
@@ -280,7 +285,7 @@ export default function AddTransactionDialog({
       commitmentId: (isExpense && formData.commitmentId) || null,
       paidBy: (isExpense && formData.paidBy) || null,
       split: (isExpense && formData.split) || null,
-    });
+    }, { wholeSeries: inSeries && wholeSeries });
   };
 
   const installments = Math.max(1, Math.min(60, parseInt(formData.installmentCount, 10) || 1));
@@ -319,6 +324,29 @@ export default function AddTransactionDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4 mt-1.5 sm:mt-4">
+          {inSeries && (
+            <div className="space-y-1.5 rounded-2xl border border-border p-2 sm:p-3">
+              <p className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('applyChangesTo')}</p>
+              <div role="radiogroup" aria-label={t('applyChangesTo')} className="flex flex-wrap gap-2">
+                {[false, true].map((all) => (
+                  <button
+                    key={String(all)}
+                    type="button"
+                    role="radio"
+                    aria-checked={wholeSeries === all}
+                    onClick={() => setWholeSeries(all)}
+                    className={cn(
+                      'inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-medium transition-colors sm:min-h-9',
+                      wholeSeries === all ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:bg-primary/10'
+                    )}
+                  >
+                    {all ? t('allRecurringEntries').replace('{count}', seriesCount) : t('thisEntryOnly')}
+                  </button>
+                ))}
+              </div>
+              {wholeSeries && <p className="text-xs text-muted-foreground text-pretty">{t('recurringSeriesHelp')}</p>}
+            </div>
+          )}
           <div className="space-y-1 sm:space-y-2">
               <Label htmlFor="amount" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('amount')} *</Label>
               <Input
@@ -408,8 +436,8 @@ export default function AddTransactionDialog({
             {errors.description && <p className="text-xs text-danger">{errors.description}</p>}
           </div>
 
-          <div className={cn("grid gap-2 sm:gap-4", (formData.isRecurring && !isEditing) || (defaultType && !isEditing) ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-            {(!formData.isRecurring || isEditing) && (
+          <div className={cn("grid gap-2 sm:gap-4", (formData.isRecurring && !isEditing) || (defaultType && !isEditing) || (inSeries && wholeSeries) ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+            {(!formData.isRecurring || (isEditing && !wholeSeries)) && (
               <div className="space-y-1 sm:space-y-2">
                 <Label htmlFor="date" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{splitting ? t('firstPayment') : t('date')} *</Label>
                 <Input
@@ -752,7 +780,7 @@ export default function AddTransactionDialog({
                   <span className="hidden sm:inline">{editTransaction && (editTransaction.id || editTransaction._id) ? t('updating') : t('adding')}</span>
                 </>
               ) : (
-                isEditing ? t('updateTransaction') : splitting ? t('addInstallments').replace('{count}', installments) : t('addTransaction')
+                isEditing ? (inSeries && wholeSeries ? t('updateAllRecurring').replace('{count}', seriesCount) : t('updateTransaction')) : splitting ? t('addInstallments').replace('{count}', installments) : t('addTransaction')
               )}
             </Button>
           </div>
