@@ -7,7 +7,7 @@ import { rangeAndPresence } from '../lib/entityHandler.js';
 const cast = (filter) => ExpenseTransaction.find(filter).cast(ExpenseTransaction);
 
 test('every "has" view the app uses casts against the real schema', () => {
-  for (const field of ['planId', 'commitmentId', 'installmentGroupId', 'split']) {
+  for (const field of ['planId', 'commitmentId', 'installmentGroupId']) {
     const filter = rangeAndPresence(ExpenseTransaction, { has: field }, 'date');
     assert.equal(filter.invalid, undefined, field);
     assert.doesNotThrow(() => cast(filter), field);

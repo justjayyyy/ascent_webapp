@@ -344,7 +344,7 @@ export default function Settings() {
                     <MembersSection />
                   </div>
                 )}
-                {(sectionHit(t('setNavHousehold')) || hit(t('aiTitle'), t('largeAlertTitle'), t('splitSettingTitle'))) && <HouseholdSmartSettings />}
+                {(sectionHit(t('setNavHousehold')) || hit(t('aiTitle'), t('largeAlertTitle'))) && <HouseholdSmartSettings />}
               </Group>
             </Section>
           )}

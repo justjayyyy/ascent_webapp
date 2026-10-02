@@ -13,7 +13,7 @@ const initialsOf = (name = '') => {
 
 /**
  * The people who share this workspace, keyed by email (transactions carry `created_by`).
- * `isShared` is true once more than one person is in the workspace; `splits` when they also split expenses.
+ * `isShared` is true once more than one person is in the workspace.
  */
 export function useHousehold() {
   const { currentWorkspace } = useAuth();
@@ -32,8 +32,6 @@ export function useHousehold() {
     });
     const byEmail = Object.fromEntries(members.map((m) => [m.email, m]));
     const isShared = members.length > 1;
-    // Households that pool everything turn splitting off, which also hides who owes whom
-    const splits = isShared && currentWorkspace?.settings?.splitExpenses !== false;
-    return { members, byEmail, isShared, splits, meEmail: user?.email };
-  }, [currentWorkspace?.members, currentWorkspace?.settings?.splitExpenses, user?.email, user?.full_name]);
+    return { members, byEmail, isShared, meEmail: user?.email };
+  }, [currentWorkspace?.members, user?.email, user?.full_name]);
 }

@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { useCards, useExchangeRates } from '@/hooks/useWorkspaceData';
 import { useAuth } from '@/lib/AuthContext';
 import { conversionFields, keptConversion } from '@shared/money';
-import HouseholdFields, { splitIsValid } from './HouseholdFields';
+import HouseholdFields from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
 import { isCoarsePointer } from '@/lib/pointer';
 import { previousMonthEnd } from './transactionRows';
@@ -89,7 +89,6 @@ export default function AddTransactionDialog({
     planItemId: '',
     commitmentId: '',
     paidBy: '',
-    split: null,
     forPreviousMonth: true,
   });
 
@@ -181,7 +180,6 @@ export default function AddTransactionDialog({
         planItemId: editTransaction.planItemId || '',
         commitmentId: editTransaction.commitmentId || '',
         paidBy: editTransaction.paidBy || '',
-        split: editTransaction.split?.mode ? editTransaction.split : null,
         // A copy (no id yet) happens now; an existing row keeps the time it has, if any
         time: txTime(editTransaction) ? format(txTime(editTransaction), 'HH:mm') : (isEditing ? '' : format(new Date(), 'HH:mm')),
         forPreviousMonth: false,
@@ -211,7 +209,6 @@ export default function AddTransactionDialog({
         planItemId: '',
         commitmentId: '',
         paidBy: '',
-        split: null,
         forPreviousMonth: true,
       });
     }
@@ -271,10 +268,6 @@ export default function AddTransactionDialog({
       newErrors.category = t('selectCategory');
     }
 
-    if (formData.type === 'Expense' && !splitIsValid(formData.split)) {
-      newErrors.split = t('splitMustTotal');
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -304,7 +297,6 @@ export default function AddTransactionDialog({
       planItemId: (isExpense && formData.planId && formData.planItemId) || null,
       commitmentId: (isExpense && formData.commitmentId) || null,
       paidBy: (isExpense && formData.paidBy) || null,
-      split: (isExpense && formData.split) || null,
     }, { wholeSeries: inSeries && wholeSeries });
   };
 
@@ -607,20 +599,16 @@ export default function AddTransactionDialog({
 
 
 
-          {/* Households: who paid, and whether the others owe their part */}
+          {/* Households: who paid */}
           {formData.type === 'Expense' && (
             <HouseholdFields
-              value={{ paidBy: formData.paidBy, split: formData.split }}
+              value={{ paidBy: formData.paidBy }}
               onChange={(v) => {
                 // Another payer means another wallet: drop a card that was picked for the previous one
                 if (v.paidBy !== formData.paidBy) autoCardRef.current = true;
                 setFormData({ ...formData, ...v, ...(v.paidBy !== formData.paidBy && { cardId: '' }) });
-                if (errors.split) setErrors({ ...errors, split: '' });
               }}
-              amount={parseFloat(formData.amount) || 0}
-              currency={formData.currency}
               creator={editTransaction?.created_by}
-              error={errors.split}
             />
           )}
 
@@ -824,7 +812,7 @@ export default function AddTransactionDialog({
           )}
 
 
-          <div className="sticky -bottom-3 z-10 -mx-3 flex gap-2 bg-popover/95 px-3 pb-3 pt-3 backdrop-blur sm:static sm:mx-0 sm:gap-3 sm:bg-transparent sm:p-0 sm:pt-4 sm:backdrop-blur-none">
+          <div className="sheet-actions flex gap-2 md:gap-3 md:pt-4">
             <Button
               type="button"
               variant="outline"

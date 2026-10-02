@@ -11,15 +11,6 @@ const ingestSourceSchema = new mongoose.Schema({
   ref: String // statement imports: the replay key of the row that was merged in, so a re-import skips it
 }, { _id: false });
 
-// How one expense is shared between people: equal parts, or each person's percentage.
-const splitSchema = new mongoose.Schema({
-  mode: { type: String, enum: ['equal', 'custom'], required: true },
-  shares: {
-    type: [{ email: { type: String, required: true }, percent: { type: Number, min: 0, max: 100 } }],
-    default: []
-  }
-}, { _id: false });
-
 const expenseTransactionSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -143,15 +134,10 @@ const expenseTransactionSchema = new mongoose.Schema({
     default: null // set for an extra payment, so it is not taken for the month's scheduled one
   },
 
-  // Households: who actually paid (an email, like created_by; empty means whoever added it) and, for
-  // money that one person fronts for others, how it is shared. No split means shared money nobody owes back.
+  // Households: who actually paid (an email, like created_by; empty means whoever added it)
   paidBy: {
     type: String,
     default: null
-  },
-  split: {
-    type: splitSchema,
-    default: undefined
   },
 
   workspaceId: {

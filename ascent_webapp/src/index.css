@@ -698,6 +698,22 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   }
   /* A sheet's primary actions span the width, the way a phone app lays them out */
   [data-sheet][role="alertdialog"] button { min-height: 2.75rem; }
+  /* A form's Cancel / Save row (.sheet-actions) stays on the sheet's bottom edge while the form scrolls:
+     edge to edge, over the home indicator's strip, with nothing showing through beneath it */
+  [data-sheet] .sheet-actions {
+    position: sticky;
+    z-index: 10;
+    bottom: calc(-1 * (env(safe-area-inset-bottom) + 1.25rem));
+    margin: 0 -1.25rem calc(-1 * (env(safe-area-inset-bottom) + 1.25rem));
+    padding: 0.75rem 1.25rem calc(env(safe-area-inset-bottom) + 1.25rem);
+    background: hsl(var(--popover));
+    box-shadow: 0 -1px 0 0 hsl(var(--border) / 0.6);
+  }
+  html[data-keyboard] [data-sheet] .sheet-actions {
+    bottom: -1rem;
+    margin-bottom: -1rem;
+    padding-bottom: 1rem;
+  }
 }
 @media (min-width: 768px) {
   .sheet-handle { display: none; }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { toast } from 'sonner';
-import { Sparkles, BellRing, Scale } from 'lucide-react';
+import { Sparkles, BellRing } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { ascent } from '@/api/client';
@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '../ThemeProvider';
 import { Row } from './SettingsShell';
 
-/** Household-wide options owners and admins set: the AI assistant, splitting expenses and large-expense alerts. */
+/** Household-wide options owners and admins set: the AI assistant and large-expense alerts. */
 export default function HouseholdSmartSettings() {
   const { t, user } = useTheme();
   const { currentWorkspace, currentMember, isWorkspaceOwner, refreshWorkspaces } = useAuth();
@@ -61,18 +61,6 @@ export default function HouseholdSmartSettings() {
           checked={!!settings.aiAssistant}
           disabled={!canManage || !configured || saving}
           onCheckedChange={(on) => save({ aiAssistant: on })}
-        />
-      </Row>
-      <Row
-        label={<span className="flex items-center gap-2"><Scale className="h-4 w-4 text-primary" aria-hidden />{t('splitSettingTitle')}</span>}
-        description={<>{t('splitSettingDesc')}{managerHint && <span className="mt-1 block text-xs">{managerHint}</span>}</>}
-        htmlFor="settings-split"
-      >
-        <Switch
-          id="settings-split"
-          checked={settings.splitExpenses !== false}
-          disabled={!canManage || saving}
-          onCheckedChange={(on) => save({ splitExpenses: on })}
         />
       </Row>
       <Row

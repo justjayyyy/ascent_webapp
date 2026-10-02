@@ -257,7 +257,6 @@ const entities = {
   Plan: createEntity('plans'),
   DashboardWidget: createEntity('dashboard-widgets'),
   PageLayout: createEntity('page-layouts'),
-  Settlement: createEntity('settlements'),
   Commitment: createEntity('commitments'),
   GroceryItem: createEntity('groceries'),
   Note: {

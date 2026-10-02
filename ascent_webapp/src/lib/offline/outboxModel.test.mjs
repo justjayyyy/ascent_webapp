@@ -113,7 +113,7 @@ test('a queued add only shows in the views it belongs to', () => {
   assert.equal(applyOutbox([], [add], {}, (r) => !!r.planId).length, 0);
 });
 
-// ---- the household lists (budgets, plans, loans, settle-ups) ----
+// ---- the household lists (budgets, plans, loans, groceries) ----
 
 const trip = { name: 'Trip', items: [{ id: 'i1', name: 'Flights', amount: 900 }] };
 

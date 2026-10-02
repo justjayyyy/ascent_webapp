@@ -107,7 +107,6 @@ const ENTITIES = {
   'page-layouts': () => import('./entities/page-layouts.js'),
   notes: () => import('./entities/notes.js'),
   plans: () => import('./entities/plans.js'),
-  settlements: () => import('./entities/settlements.js'),
   commitments: () => import('./entities/commitments.js'),
   groceries: () => import('./entities/groceries.js'),
 };

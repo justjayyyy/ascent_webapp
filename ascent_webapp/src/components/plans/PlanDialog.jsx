@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,11 +22,15 @@ export default function PlanDialog({ open, onClose, plan, initialKind, onSave, s
   const { t, user } = useTheme();
   const [form, setForm] = useState(() => emptyForm(user?.currency || 'ILS'));
   const [error, setError] = useState('');
+  const [nameError, setNameError] = useState('');
+  const nameRef = useRef(null);
   const editing = !!plan;
+  const other = form.kind === 'other';
 
   useEffect(() => {
     if (!open) return;
     setError('');
+    setNameError('');
     if (plan) {
       setForm({
         name: plan.name || '', kind: plan.kind || 'other', emoji: plan.emoji || '',
@@ -43,6 +47,12 @@ export default function PlanDialog({ open, onClose, plan, initialKind, onSave, s
 
   const submit = async (e) => {
     e.preventDefault();
+    // "Other" has no name of its own, so the household gives it one
+    if (other && !form.name.trim()) {
+      setNameError(t('planNameRequired'));
+      nameRef.current?.focus();
+      return;
+    }
     const name = form.name.trim() || t(`planKind_${form.kind}`);
     if (form.endDate && form.startDate && form.endDate < form.startDate) {
       setError(t('endDateAfterStartDate'));
@@ -82,7 +92,12 @@ export default function PlanDialog({ open, onClose, plan, initialKind, onSave, s
                     type="button"
                     role="radio"
                     aria-checked={active}
-                    onClick={() => set({ kind: key, emoji: form.emoji && form.emoji !== kindEmoji(form.kind) ? form.emoji : '' })}
+                    onClick={() => {
+                      set({ kind: key, emoji: form.emoji && form.emoji !== kindEmoji(form.kind) ? form.emoji : '' });
+                      setNameError('');
+                      // Picking Other means naming it: straight to the name
+                      if (key === 'other') requestAnimationFrame(() => nameRef.current?.focus());
+                    }}
                     className={cn(
                       "flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border px-1 py-2 text-xs font-medium transition-[background-color,border-color,transform] active:scale-95",
                       active ? "border-primary bg-primary/15 text-primary" : "border-border/60 text-muted-foreground hover:bg-foreground/[0.05]"
@@ -97,15 +112,20 @@ export default function PlanDialog({ open, onClose, plan, initialKind, onSave, s
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="plan-name" className="text-sm text-muted-foreground">{t('planName')}</Label>
+            <Label htmlFor="plan-name" className={cn('text-sm', other ? 'font-medium text-foreground' : 'text-muted-foreground')}>{other ? t('planOtherName') : t('planName')}</Label>
             <Input
               id="plan-name"
+              ref={nameRef}
               value={form.name}
-              onChange={(e) => set({ name: e.target.value })}
+              onChange={(e) => { set({ name: e.target.value }); if (nameError) setNameError(''); }}
               placeholder={t(`planNamePlaceholder_${form.kind}`)}
               maxLength={200}
-              className="h-11"
+              enterKeyHint="next"
+              aria-invalid={!!nameError}
+              aria-describedby={nameError ? 'plan-name-error' : undefined}
+              className={cn('h-11', other && 'border-primary/60', nameError && 'border-danger')}
             />
+            {nameError && <p id="plan-name-error" className="text-xs text-danger">{nameError}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -155,7 +175,7 @@ export default function PlanDialog({ open, onClose, plan, initialKind, onSave, s
             </label>
           )}
 
-          <div className="sticky -bottom-4 z-10 -mx-4 flex gap-2 bg-popover/95 px-4 pb-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:pt-2 sm:backdrop-blur-none">
+          <div className="sheet-actions flex gap-2 md:pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="h-11 flex-1">{t('cancel')}</Button>
             <Button type="submit" disabled={saving} className="h-11 flex-1">
               {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}

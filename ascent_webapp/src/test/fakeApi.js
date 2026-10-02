@@ -8,7 +8,7 @@ const day = (offset = 0) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** A household with a bit of everything: income, foreign currency, a split, a plan, installments, a loan, a note. */
+/** A household with a bit of everything: income, foreign currency, someone else paying, a plan, installments, a loan, a note. */
 export function seedData({ language = 'en' } = {}) {
   const me = { id: 'u1', _id: 'u1', email: 'dana@x.test', full_name: 'Dana', language, currency: 'ILS', theme: 'dark', passkeyCount: 0 };
   const workspace = {
@@ -27,7 +27,7 @@ export function seedData({ language = 'en' } = {}) {
         tx('t1', { amount: 120 }),
         tx('t2', { amount: 3000, type: 'Income', category: 'salary', description: 'Salary', date: day(0) }),
         tx('t3', { amount: 18, currency: 'USD', amountInGlobalCurrency: null, description: 'Coffee NYC' }),
-        tx('t4', { amount: 400, description: 'Dinner', paidBy: 'dana@x.test', split: { mode: 'equal', shares: [] } }),
+        tx('t4', { amount: 400, description: 'Dinner', paidBy: 'dana@x.test' }),
         tx('t5', { amount: 250, planId: 'p1', planItemId: 'i1', description: 'Flights' }),
         tx('t6', { amount: 100, isBigPurchase: true, installmentGroupId: 'g1', installmentIndex: 1, installmentCount: 3, installmentTotal: 300, description: 'TV' }),
         tx('t7', { amount: 55, status: 'pending', source: 'wallet', merchant: 'Cafe', description: 'Cafe' }),
@@ -43,7 +43,6 @@ export function seedData({ language = 'en' } = {}) {
         items: [{ id: 'i1', name: 'Flights', amount: 250, status: 'paid', transactionId: 't5' }, { id: 'i2', name: 'Hotel', amount: 2000, status: 'planned', dueDate: day(20) }],
       }],
       commitments: [{ id: 'cm1', name: 'Car loan', kind: 'car', direction: 'borrowed', currency: 'ILS', principal: 60000, annualRate: 5, termMonths: 48, firstPaymentDate: day(-200), payments: [], status: 'active' }],
-      settlements: [],
       accounts: [],
       notes: [{ id: 'n1', title: 'Groceries', type: 'checklist', items: [{ id: 'a', text: 'milk', done: false }], tags: [], isShared: true, myAccess: 'owner', collaborators: [], attachments: [], createdBy: 'u1' }],
     },

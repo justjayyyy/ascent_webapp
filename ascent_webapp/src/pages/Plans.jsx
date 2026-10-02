@@ -280,7 +280,7 @@ function Plans() {
                 <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{t('plansEmptyHint')}</p>
                 {canEdit && (
                   <div className="mx-auto mt-6 grid max-w-lg grid-cols-3 gap-2 sm:grid-cols-4">
-                    {PLAN_KINDS.filter((k) => k.key !== 'other').map(({ key, emoji }, i) => (
+                    {PLAN_KINDS.map(({ key, emoji }, i) => (
                       <motion.button
                         key={key}
                         type="button"

@@ -13,7 +13,7 @@ import {
 } from './outboxModel';
 import { isOnline } from './network';
 
-// Offline-first writes. Every add, edit and delete of a transaction, budget, plan, loan or settle-up goes
+// Offline-first writes. Every add, edit and delete of a transaction, budget, plan, loan or grocery item goes
 // through this one queue: it is stored in IndexedDB first (so it survives the app being closed), drawn
 // into the lists at once, and sent in the order it was made whenever there is a connection. With signal
 // it syncs within the same tap; without, it waits and goes out when the phone is back online. See
@@ -29,7 +29,6 @@ const LIST_API = {
   budgets: () => ascent.entities.Budget,
   plans: () => ascent.entities.Plan,
   commitments: () => ascent.entities.Commitment,
-  settlements: () => ascent.entities.Settlement,
   groceries: () => ascent.entities.GroceryItem,
 };
 const rowId = (row) => row?.id || row?._id;
@@ -110,7 +109,8 @@ class TxOutbox {
 
   /** A household list change: its row, or what became of it. */
   async runList(op, opts) {
-    const api = LIST_API[op.entity]();
+    const api = LIST_API[op.entity]?.();
+    if (!api) return {}; // a change saved before that kind of list was removed (settle-ups): nothing to send
     const real = (value) => withRealIds(value, this.state.idMap);
     const base = { entity: op.entity, workspaceId: op.workspaceId };
     if (op.kind === 'create') {
@@ -347,7 +347,7 @@ export function useTransactions({ from, enabled = true } = {}) {
 
 /**
  * Every transaction where `field` is set, whatever its date: 'planId', 'commitmentId',
- * 'installmentGroupId' (all parts of big purchases) or 'split' (shared expenses, for who owes whom).
+ * or 'installmentGroupId' (all parts of big purchases).
  */
 export function useLinkedTransactions(field, { enabled = true } = {}) {
   const view = useMemo(() => ({ has: field }), [field]);

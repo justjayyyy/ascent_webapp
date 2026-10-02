@@ -74,15 +74,14 @@ test('SMS alerts share the ingest route and its credentials check', async () => 
   assert.equal(r.code, 401);
 });
 
-test('statement import, smart help and settlements require a login', async () => {
+test('statement import and smart help require a login', async () => {
   assert.equal((await send('/api/import/statement', { body: JSON.stringify({ rows: [] }) })).code, 401);
   assert.equal((await send('/api/assist', { method: 'GET' })).code, 401);
   assert.equal((await send('/api/assist?action=ask', { body: JSON.stringify({ question: 'x' }) })).code, 401);
-  assert.equal((await send('/api/entities/settlements', { method: 'GET' })).code, 401);
 });
 
 test('every data entity is mounted and requires a login', async () => {
-  for (const entity of ['transactions', 'categories', 'budgets', 'cards', 'plans', 'commitments', 'settlements', 'notes', 'goals', 'groceries']) {
+  for (const entity of ['transactions', 'categories', 'budgets', 'cards', 'plans', 'commitments', 'notes', 'goals', 'groceries']) {
     assert.equal((await send(`/api/entities/${entity}`, { method: 'GET' })).code, 401, entity);
   }
 });

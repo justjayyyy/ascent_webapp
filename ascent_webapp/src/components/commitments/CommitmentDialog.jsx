@@ -297,7 +297,7 @@ export default function CommitmentDialog({ open, onClose, commitment, initial, c
 
           {error && <p role="alert" className="text-sm text-danger">{error}</p>}
 
-          <div className="sticky -bottom-4 z-10 -mx-4 flex gap-2 bg-popover/95 px-4 pb-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:pt-2 sm:backdrop-blur-none">
+          <div className="sheet-actions flex gap-2 md:pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="h-11 flex-1">{t('cancel')}</Button>
             <Button type="submit" disabled={saving} className="h-11 flex-1">
               {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}

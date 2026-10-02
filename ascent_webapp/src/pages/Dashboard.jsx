@@ -14,12 +14,11 @@ import { useHousehold } from '@/hooks/useHousehold';
 import { useInsights } from '@/components/insights/useInsights';
 import SafeToSpendCard from '@/components/insights/SafeToSpendCard';
 import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
-import HouseholdBalanceCard from '@/components/insights/HouseholdBalanceCard';
 import { formatTxTime, newestFirst } from '@/lib/txOrder';
 import { localDay } from '@/lib/localDay';
 import CommitmentsCard from '@/components/insights/CommitmentsCard';
 import AssistantBar from '@/components/insights/AssistantBar';
-import { useTransactions, useLinkedTransactions } from '@/lib/offline/txOutbox';
+import { useTransactions } from '@/lib/offline/txOutbox';
 import RecapStories from '@/components/recap/RecapStories';
 import { RecapRingButton, RecapBanner, useRecapSeen } from '@/components/recap/RecapEntry';
 import { buildRecap, recapToOffer, monthKeyOf } from '@/lib/recap';
@@ -68,11 +67,10 @@ export default function Dashboard() {
   });
 
   // The selected month and the six before it (trend chart, comparisons, forecast baseline), with changes
-  // still waiting on this device drawn in; and every shared expense, for who owes whom
+  // still waiting on this device drawn in
   const { data: transactions = [], isLoading } = useTransactions({
     from: `${monthKey(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 6, 1))}-01`,
   });
-  const { data: splitTransactions = [] } = useLinkedTransactions('split');
 
   const { amountOf: toUserCurrency, convert: convertOrNull } = useMoney(userCurrency);
 
@@ -95,17 +93,13 @@ export default function Dashboard() {
       _day: parseInt(String(tx.date).slice(8, 10), 10),
       _amount: toUserCurrency(tx),
     })), [transactions, toUserCurrency]);
-  const splitRows = useMemo(
-    () => splitTransactions.map((tx) => ({ ...tx, _amount: toUserCurrency(tx) })),
-    [splitTransactions, toUserCurrency]
-  );
 
   // Budgets and plans keep their own currency; everything on this page is shown in the user's
   // (shown as is until rates arrive, rather than as zero)
   const convert = useCallback((amount, from) => (amount ? convertOrNull(amount, from) ?? amount : 0), [convertOrNull]);
 
-  const { isShared, splits, members } = useHousehold();
-  const { forecast, subscriptions, balances, commitments } = useInsights({ rows: normalized, splitRows, selectedMonth, convert });
+  const { isShared, members } = useHousehold();
+  const { forecast, subscriptions, commitments } = useInsights({ rows: normalized, selectedMonth, convert });
   const showForecast = forecast.phase === 'current';
 
   const selectedKey = monthKey(selectedMonth);
@@ -406,12 +400,7 @@ export default function Dashboard() {
             <CommitmentsCard commitments={commitments} convert={convert} />
           </Tile>
 
-          {splits && (
-            <Tile i={3} className="md:col-span-3 xl:col-span-2">
-              <HouseholdBalanceCard balances={balances} />
-            </Tile>
-          )}
-          <Tile i={3} className={splits ? 'md:col-span-3 xl:col-span-4' : 'md:col-span-6'}>
+          <Tile i={3} className="md:col-span-6">
             <SubscriptionsCard subscriptions={subscriptions} />
           </Tile>
 

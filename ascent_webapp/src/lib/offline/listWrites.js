@@ -1,4 +1,4 @@
-// Saving the household lists (budgets, plans, loans, settle-ups) through the offline queue (txOutbox.js):
+// Saving the household lists (budgets, plans, loans, groceries) through the offline queue (txOutbox.js):
 // the change shows at once, goes out within the same tap when there is signal, and waits on the device
 // when there is none. Each call resolves 'synced' or 'queued', and rejects if the server refuses it.
 import { useMemo } from 'react';

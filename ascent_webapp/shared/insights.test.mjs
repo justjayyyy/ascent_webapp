@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { monthForecast, baselineDaily, addDays } from './forecast.js';
 import { detectSubscriptions } from './subscriptions.js';
-import { householdBalances, splitShares } from './balances.js';
 
 const exp = (date, amount, extra = {}) => ({ type: 'Expense', date, amount, category: 'food', ...extra });
 const inc = (date, amount) => ({ type: 'Income', date, amount, category: 'salary' });
@@ -162,44 +161,6 @@ test('weekly and yearly rhythms, costed per month', () => {
   assert.deepEqual(subs.map((s) => [s.cadence, s.monthlyCost]), [['weekly', 130], ['yearly', 100]]);
   // a year and a bit after the last charge, the yearly one has stopped
   assert.deepEqual(detectSubscriptions(yearly, '2026-08-01'), []);
-});
-
-// ---------- household balances ----------
-
-test('equal split: the payer is owed half', () => {
-  const r = householdBalances({
-    transactions: [{ type: 'Expense', amount: 300, paidBy: 'a@x', split: { mode: 'equal', shares: [{ email: 'a@x' }, { email: 'b@x' }] } }],
-  });
-  assert.deepEqual(r.net, { 'a@x': 150, 'b@x': -150 });
-  assert.deepEqual(r.debts, [{ from: 'b@x', to: 'a@x', amount: 150 }]);
-});
-
-test('custom percentages, the creator as payer by default, and settlements', () => {
-  const r = householdBalances({
-    transactions: [
-      { type: 'Expense', amount: 1000, created_by: 'a@x', split: { mode: 'custom', shares: [{ email: 'a@x', percent: 60 }, { email: 'b@x', percent: 40 }] } },
-      { type: 'Expense', amount: 200, paidBy: 'b@x', split: { mode: 'equal' } },
-      { type: 'Expense', amount: 999 }, // not split: shared money, nobody owes anything
-    ],
-    settlements: [{ from: 'b@x', to: 'a@x', amount: 100 }],
-    members: ['a@x', 'b@x'],
-  });
-  // b owes 400 for the first, is owed 100 for the second, paid back 100: owes 200
-  assert.deepEqual(r.debts, [{ from: 'b@x', to: 'a@x', amount: 200 }]);
-});
-
-test('three people settle with the fewest payments', () => {
-  const r = householdBalances({
-    transactions: [{ type: 'Expense', amount: 90, paidBy: 'a@x', split: { mode: 'equal', shares: [{ email: 'a@x' }, { email: 'b@x' }, { email: 'c@x' }] } }],
-  });
-  assert.equal(r.debts.length, 2);
-  assert.ok(r.debts.every((d) => d.to === 'a@x' && d.amount === 30));
-});
-
-test('splitShares refuses splits with fewer than two people', () => {
-  assert.equal(splitShares({ mode: 'equal' }, ['a@x']), null);
-  assert.equal(splitShares({ mode: 'custom', shares: [{ email: 'a@x', percent: 100 }] }), null);
-  assert.equal(splitShares(null), null);
 });
 
 test('a bill saved as recurring shows from its first charge, with the next one it already has', () => {

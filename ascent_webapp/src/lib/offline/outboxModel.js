@@ -3,7 +3,7 @@
 // here, so it runs under `node --test`. The engine that stores and sends it is txOutbox.js.
 //
 // One queue holds every kind of row, in the order the changes were made: transactions, and the
-// household's lists (budgets, plans, loans, settle-ups). `entity` says which; queues saved before it
+// household's lists (budgets, plans, loans, groceries). `entity` says which; queues saved before it
 // existed hold transactions only. `txId` is the id of the row a change is for, whatever its kind.
 //
 // op = { id, kind: 'create', entity?, workspaceId, rows: [...], plan?: { planId, itemId } }
@@ -15,7 +15,7 @@ import { applyEntryChange } from '../listEntries.js';
 
 export const TRANSACTIONS = 'transactions';
 /** The household lists that save through the queue, by the name of their API path and cache key. */
-export const LIST_ENTITIES = ['budgets', 'plans', 'commitments', 'settlements', 'groceries'];
+export const LIST_ENTITIES = ['budgets', 'plans', 'commitments', 'groceries'];
 export const entityOf = (op) => op.entity || TRANSACTIONS;
 /** The waiting changes to one kind of row. */
 export const opsForEntity = (ops, entity) => ops.filter((o) => entityOf(o) === entity);

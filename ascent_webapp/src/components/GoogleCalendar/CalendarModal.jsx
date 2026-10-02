@@ -17,6 +17,7 @@ import AgendaPanel from './AgendaPanel';
 import EventComposer from './EventComposer';
 import { LOCALES, weekStartsOnFor, normalizeItem, buildDayMap, dayKey } from './calendarUtils';
 import { CALENDAR_EXPIRY_KEY, CALENDAR_TOKEN_KEY } from '@/lib/storageKeys';
+import { loadGoogleIdentity } from '@/lib/googleIdentity';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
@@ -30,8 +31,8 @@ const readLayers = () => {
   try { return { event: true, task: true, holiday: true, ...JSON.parse(localStorage.getItem(LAYERS_KEY) || '{}') }; } catch { return { event: true, task: true, holiday: true }; }
 };
 
-/** First-run screen: what you get, plus the Google button. */
-function ConnectScreen({ t, onConnect }) {
+/** First-run screen: what you get, plus the Google button (ready once Google's script has loaded). */
+function ConnectScreen({ t, onConnect, gis }) {
   const perks = [t('calPerk1'), t('calPerk2'), t('calPerk3')];
   return (
     <div className="grid h-full place-items-center overflow-y-auto p-6">
@@ -53,11 +54,16 @@ function ConnectScreen({ t, onConnect }) {
           <button
             type="button"
             onClick={onConnect}
-            className="mt-8 inline-flex h-12 items-center gap-3 rounded-xl border border-border bg-white px-5 text-sm font-semibold text-slate-800 shadow-sm transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover"
+            disabled={gis === 'loading'}
+            aria-busy={gis === 'loading'}
+            className="mt-8 inline-flex h-12 items-center gap-3 rounded-xl border border-border bg-white px-5 text-sm font-semibold text-slate-800 shadow-sm transition-[filter,opacity] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover disabled:opacity-60"
           >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-5 w-5" />
+            {gis === 'loading'
+              ? <RefreshCw className="h-5 w-5 animate-spin text-slate-500" aria-hidden />
+              : <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-5 w-5" />}
             {t('connectWithGoogle')}
           </button>
+          {gis === 'failed' && <p className="mt-3 max-w-sm text-sm text-muted-foreground" role="status">{t('calGoogleOffline')}</p>}
         </div>
 
         {/* Decorative preview */}
@@ -99,6 +105,7 @@ export default function CalendarModal({ open, onOpenChange }) {
   // (it survives signing out), { kind: 'browser', token } for an hour-long token on deployments without one
   const [connection, setConnection] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [gis, setGis] = useState(() => (window.google?.accounts?.oauth2 ? 'ready' : 'loading')); // Google's script
   const accountMode = useRef(false);
   const [rawEvents, setRawEvents] = useState([]);
   const [rawTasks, setRawTasks] = useState([]);
@@ -172,9 +179,30 @@ export default function CalendarModal({ open, onOpenChange }) {
     return res;
   }, [clearSession, t]);
 
+  // Google's script is fetched as soon as the calendar opens, so the tap on Connect can open its window
+  // straight away (Safari only allows a popup that opens right from the tap). The installed app usually
+  // starts without visiting the sign-in page, which is the only other place that loads it.
+  const loadGis = useCallback(() => {
+    setGis(window.google?.accounts?.oauth2 ? 'ready' : 'loading');
+    loadGoogleIdentity().then(() => setGis('ready'), () => setGis('failed'));
+  }, []);
+  useEffect(() => { loadGis(); }, [loadGis]);
+
+  // Google's window could not open (a blocked popup) or was closed before finishing
+  const popupError = useCallback((err) => {
+    if (err?.type === 'popup_closed') return;
+    toast.error(t(err?.type === 'popup_failed_to_open' ? 'calPopupBlocked' : 'calSaveFailed'));
+  }, [t]);
+
   const handleGoogleAuth = useCallback(() => {
-    if (!window.google || !GOOGLE_CLIENT_ID) {
+    if (!GOOGLE_CLIENT_ID) {
       toast.error(t('calGoogleUnavailable'));
+      return;
+    }
+    if (!window.google?.accounts?.oauth2) {
+      // Still loading, or it failed (offline): try again and say so
+      toast(t('calGoogleLoading'));
+      loadGis();
       return;
     }
     if (accountMode.current) {
@@ -183,6 +211,7 @@ export default function CalendarModal({ open, onOpenChange }) {
         client_id: GOOGLE_CLIENT_ID,
         scope: CALENDAR_SCOPES,
         ux_mode: 'popup',
+        error_callback: popupError,
         callback: async (response) => {
           if (!response.code) {
             if (response.error) toast.error(t('calSaveFailed'));
@@ -211,6 +240,7 @@ export default function CalendarModal({ open, onOpenChange }) {
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: CALENDAR_SCOPES,
+      error_callback: popupError,
       callback: (response) => {
         if (response.access_token) {
           setConnection({ kind: 'browser', token: response.access_token });
@@ -225,7 +255,7 @@ export default function CalendarModal({ open, onOpenChange }) {
       },
     });
     tokenClient.requestAccessToken({ prompt: 'consent' }); // consent again so new scopes are granted
-  }, [t]);
+  }, [t, loadGis, popupError]);
 
   const disconnect = useCallback(() => {
     if (connRef.current?.kind === 'account') {
@@ -483,7 +513,7 @@ export default function CalendarModal({ open, onOpenChange }) {
             <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
           </div>
         ) : !isAuthenticated ? (
-          <ConnectScreen t={t} onConnect={handleGoogleAuth} />
+          <ConnectScreen t={t} onConnect={handleGoogleAuth} gis={gis} />
         ) : (
           <>
             {/* Toolbar */}

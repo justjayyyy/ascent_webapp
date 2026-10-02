@@ -22,13 +22,12 @@ const LISTS = {
   budgets: { load: (ws) => ascent.entities.Budget.list('-created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   plans: { load: (ws) => ascent.entities.Plan.list('startDate', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   commitments: { load: (ws) => ascent.entities.Commitment.list('-created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
-  settlements: { load: (ws) => ascent.entities.Settlement.list('-date', 1000, pinned(ws)), staleTime: MINUTE },
   groceries: { load: (ws) => ascent.entities.GroceryItem.list('-created_date', 2000, pinned(ws)), staleTime: MINUTE },
 };
 
 /**
  * One of the lists above for the workspace on screen, with changes still waiting on this device drawn in
- * (budgets, plans, loans and settle-ups save offline). `enabled: false` skips fetching (e.g. without permission).
+ * (budgets, plans, loans and groceries save offline). `enabled: false` skips fetching (e.g. without permission).
  */
 export function useWorkspaceList(name, { enabled = true } = {}) {
   const workspaceId = useWorkspaceId();
@@ -49,7 +48,6 @@ export const useCards = (opts) => useWorkspaceList('cards', opts);
 export const useBudgets = (opts) => useWorkspaceList('budgets', opts);
 export const usePlans = (opts) => useWorkspaceList('plans', opts);
 export const useCommitments = (opts) => useWorkspaceList('commitments', opts);
-export const useSettlements = (opts) => useWorkspaceList('settlements', opts);
 export const useGroceries = (opts) => useWorkspaceList('groceries', opts);
 
 /** Whether the AI assistant is set up on the server and switched on for this workspace. */
