@@ -49,6 +49,13 @@ export default function EnableBiometricPrompt() {
     return () => { cancelled = true; };
   }, [userId]);
 
+  // Options fetched before the tap, so Face ID opens at once (see the API client)
+  useEffect(() => {
+    if (!open) return;
+    ascent.passkeys.prepareRegister();
+    ascent.auth.preparePasskeyLogin();
+  }, [open]);
+
   const turnOn = async () => {
     setBusy(true);
     try {

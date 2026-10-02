@@ -5,6 +5,7 @@ import { ScanFace, Fingerprint, KeyRound, Loader2, CloudOff } from 'lucide-react
 import AscentLogo from '@/components/AscentLogo';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
+import { ascent } from '@/api/client';
 import { getLockPrefs, rememberCredential, unlockOnDevice, biometricName, biometricKind, markUnlocked, unlockedThisSession } from '@/lib/appLock';
 import { isOnline, isNetworkError, useOnline } from '@/lib/offline/network';
 import { haptic } from '@/lib/haptics';
@@ -160,6 +161,7 @@ function LockScreen({ userId, onUnlocked }) {
   useEffect(() => {
     if (tried.current) return;
     tried.current = true;
+    if (isOnline()) ascent.auth.preparePasskeyLogin();
     const id = setTimeout(() => unlock({ auto: true }), 350);
     return () => clearTimeout(id);
   }, [unlock]);

@@ -118,6 +118,33 @@ const toLogin = (redirectUrl, reason) => {
   window.location.href = params.size ? `/login?${params}` : '/login';
 };
 
+// Safari opens Face ID only when the prompt starts within about a second of the tap; a slow answer from
+// the server (or the WebAuthn code still downloading) and it cancels the prompt, on every step. So the
+// options are fetched ahead, and a tap starts the prompt straight away.
+const OPTIONS_FRESH_MS = 4 * 60 * 1000; // the server keeps a challenge five minutes
+const preparedOptions = {};
+
+function prepareOptions(kind, endpoint) {
+  const slot = preparedOptions[kind];
+  if (slot && Date.now() - slot.at < OPTIONS_FRESH_MS) return slot.promise;
+  const promise = Promise.all([import('@simplewebauthn/browser'), request(endpoint, json('POST', {}))]);
+  preparedOptions[kind] = { at: Date.now(), promise };
+  promise.catch(() => { if (preparedOptions[kind]?.promise === promise) delete preparedOptions[kind]; });
+  return promise;
+}
+
+/** The prepared options, used once: a challenge is good for one ceremony. */
+function takeOptions(kind, endpoint) {
+  const promise = prepareOptions(kind, endpoint);
+  delete preparedOptions[kind];
+  return promise;
+}
+
+const forgetPreparedOptions = () => { for (const kind of Object.keys(preparedOptions)) delete preparedOptions[kind]; };
+
+const LOGIN_OPTIONS = '/auth/passkey?action=login-options';
+const REGISTER_OPTIONS = '/auth/passkey?action=register-options';
+
 const auth = {
   login: async (email, password) => signedIn(await request('/auth/login', json('POST', { email, password }))),
   register: async (email, password, full_name) =>
@@ -126,10 +153,18 @@ const auth = {
   googleLogin: async (credential) => signedIn(await request('/auth/google', json('POST', { credential, ...systemPrefs() }))),
 
   // Face ID / fingerprint: sign in, or unlock this device's session, with a passkey
+  preparePasskeyLogin: () => prepareOptions('login', LOGIN_OPTIONS).catch(() => {}),
   async passkeyLogin({ autofill = false } = {}) {
-    const { startAuthentication } = await import('@simplewebauthn/browser');
-    const optionsJSON = await request('/auth/passkey?action=login-options', json('POST', {}));
-    const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
+    const [{ startAuthentication }, optionsJSON] = await takeOptions('login', LOGIN_OPTIONS);
+    // The autofill request stays open while the page waits, so the button needs options of its own
+    if (autofill) auth.preparePasskeyLogin();
+    let response;
+    try {
+      response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
+    } catch (err) {
+      if (!autofill) auth.preparePasskeyLogin(); // ready for the next tap
+      throw err;
+    }
     const result = await request('/auth/passkey?action=login-verify', json('POST', { response }));
     markSignedIn();
     return { ...result, credentialId: response.id };
@@ -168,6 +203,7 @@ const auth = {
       headers: legacy ? { Authorization: `Bearer ${legacy}` } : {},
     }).catch(() => {});
     forgetSession();
+    forgetPreparedOptions();
     storage.remove(SESSION_CACHE_KEY);
     // Bounded, so sign-out never hangs on a slow connection
     Promise.race([
@@ -274,10 +310,16 @@ const assist = {
 // Passkeys registered on this account (Settings > Security)
 const passkeys = {
   list: () => request('/auth/passkey?action=list'),
+  prepareRegister: () => prepareOptions('register', REGISTER_OPTIONS).catch(() => {}),
   async register(name) {
-    const { startRegistration } = await import('@simplewebauthn/browser');
-    const optionsJSON = await request('/auth/passkey?action=register-options', json('POST', {}));
-    const response = await startRegistration({ optionsJSON });
+    const [{ startRegistration }, optionsJSON] = await takeOptions('register', REGISTER_OPTIONS);
+    let response;
+    try {
+      response = await startRegistration({ optionsJSON });
+    } catch (err) {
+      passkeys.prepareRegister(); // ready for the next tap
+      throw err;
+    }
     const list = await request('/auth/passkey?action=register-verify', json('POST', { response, name }));
     return { list, credentialId: response.id };
   },

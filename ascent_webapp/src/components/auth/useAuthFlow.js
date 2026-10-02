@@ -120,6 +120,7 @@ export function useAuthFlow() {
       const { browserSupportsWebAuthn, browserSupportsWebAuthnAutofill } = await import('@simplewebauthn/browser');
       if (cancelled || !browserSupportsWebAuthn()) return;
       setPasskeyReady(true);
+      ascent.auth.preparePasskeyLogin();
       if (!(await browserSupportsWebAuthnAutofill()) || cancelled) return;
       try {
         const result = await loginWithPasskey({ autofill: true });

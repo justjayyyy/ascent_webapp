@@ -73,6 +73,11 @@ export function biometricName(t) {
   return t('lockPasskey');
 }
 
+function fromBase64Url(text) {
+  const base64 = text.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((text.length + 3) % 4);
+  return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+}
+
 /**
  * Unlock without the server: ask the authenticator to verify the person (Face ID) with a passkey known
  * to be on this device. The phone itself checks the face or finger; there is no network round trip.
@@ -80,13 +85,13 @@ export function biometricName(t) {
 export async function unlockOnDevice(userId) {
   const { credentialIds } = getLockPrefs(userId);
   if (!credentialIds.length || !window.PublicKeyCredential) throw new Error('no_local_passkey');
-  const { base64URLStringToBuffer } = await import('@simplewebauthn/browser');
+  // Nothing to load first: Safari opens Face ID only straight after the tap
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const credential = await navigator.credentials.get({
     publicKey: {
       challenge,
       rpId: window.location.hostname,
-      allowCredentials: credentialIds.map((id) => ({ type: 'public-key', id: base64URLStringToBuffer(id) })),
+      allowCredentials: credentialIds.map((id) => ({ type: 'public-key', id: fromBase64Url(id) })),
       userVerification: 'required',
       timeout: 60000,
     },
@@ -99,14 +104,24 @@ export async function unlockOnDevice(userId) {
  * Turn the Face ID lock on for this device: make a passkey here (or, when this phone already holds one
  * for the account, prove it with Face ID) and remember it for unlocking offline.
  */
+// Accounts whose passkey is already on this phone: the next try goes straight to Face ID
+const passkeyAlreadyHere = new Set();
+
 export async function enableBiometricLock(userId, { register, verify }) {
-  try {
-    const { credentialId } = await register();
-    rememberCredential(userId, credentialId);
-  } catch (err) {
-    if (err?.name !== 'InvalidStateError') throw err;
+  if (passkeyAlreadyHere.has(userId)) {
     const { credentialId } = await verify();
     rememberCredential(userId, credentialId);
+  } else {
+    try {
+      const { credentialId } = await register();
+      rememberCredential(userId, credentialId);
+    } catch (err) {
+      if (err?.name !== 'InvalidStateError') throw err;
+      passkeyAlreadyHere.add(userId);
+      // Safari may refuse a second prompt from the same tap; the next tap then opens it
+      const { credentialId } = await verify();
+      rememberCredential(userId, credentialId);
+    }
   }
   markUnlocked();
   return setLockPrefs(userId, { enabled: true });

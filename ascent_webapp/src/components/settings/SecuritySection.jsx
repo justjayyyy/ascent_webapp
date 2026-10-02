@@ -36,6 +36,12 @@ export default function SecuritySection({ index }) {
   const locale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
 
   useEffect(() => { deviceCanUseBiometrics().then(setCapable); }, []);
+  // Options fetched before the tap, so Face ID opens at once (see the API client)
+  useEffect(() => {
+    if (!capable) return;
+    ascent.passkeys.prepareRegister();
+    if (!enabled) ascent.auth.preparePasskeyLogin();
+  }, [capable, enabled]);
 
   const { data: passkeys = [], isLoading } = useQuery({
     queryKey: ['passkeys', userId],
