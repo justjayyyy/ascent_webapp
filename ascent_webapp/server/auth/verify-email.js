@@ -5,7 +5,7 @@ import User from '../models/User.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
-import { authRateLimit } from '../lib/rateLimit.js';
+import { limitAuth } from '../lib/authLimit.js';
 import { VERIFY_TTL_MS, hashToken, isTokenShape, newAccountToken } from '../lib/accountTokens.js';
 import { sendAccountEmail } from '../lib/accountEmails.js';
 import { linkOrigin } from '../lib/links.js';
@@ -24,7 +24,7 @@ export async function sendVerification(req, user) {
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
-  if (authRateLimit(req, res)) return;
+  if (await limitAuth(req, res, 'verify')) return;
   if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
 
   try {

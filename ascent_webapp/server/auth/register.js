@@ -3,14 +3,14 @@ import User from '../models/User.js';
 import { issueSession } from '../lib/session.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
-import { authRateLimit } from '../lib/rateLimit.js';
+import { limitAuth } from '../lib/authLimit.js';
 import { sanitize, isValidEmail, isValidPassword } from '../lib/validate.js';
 import { createAccount, startingPrefs } from '../lib/accounts.js';
 import { sendVerification } from './verify-email.js';
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
-  if (authRateLimit(req, res)) return;
+  if (await limitAuth(req, res, 'register')) return;
   if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
 
   try {

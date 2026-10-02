@@ -219,6 +219,7 @@ export function useAuthFlow() {
     } catch (error) {
       enteringRef.current = false;
       setBusy(false);
+      if (error.status === 429) return t('authTooManyAttempts');
       return error.message || t('loginFailed');
     }
   }, [login, enter, t]);
@@ -234,6 +235,7 @@ export function useAuthFlow() {
     } catch (error) {
       enteringRef.current = false;
       setBusy(false);
+      if (error.status === 429) return t('authTooManyAttempts');
       return error.message || t('registrationFailed');
     }
   }, [register, enter, t]);
@@ -248,7 +250,7 @@ export function useAuthFlow() {
       setResetSentTo(email.trim());
       return null;
     } catch (error) {
-      return error.status === 429 ? error.message : t('authResetFailed');
+      return error.status === 429 ? t('authTooManyAttempts') : t('authResetFailed');
     } finally {
       setBusy(false);
     }

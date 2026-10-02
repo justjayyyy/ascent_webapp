@@ -5,7 +5,7 @@ import User from '../models/User.js';
 import { issueSession } from '../lib/session.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
-import { authRateLimit } from '../lib/rateLimit.js';
+import { clearFailedPasswords, limitAuth, mayEmailReset } from '../lib/authLimit.js';
 import { sanitize, isValidEmail, isValidPassword } from '../lib/validate.js';
 import { RESET_TTL_MS, hashToken, isTokenShape, newAccountToken } from '../lib/accountTokens.js';
 import { sendAccountEmail } from '../lib/accountEmails.js';
@@ -13,7 +13,7 @@ import { linkOrigin } from '../lib/links.js';
 
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
-  if (authRateLimit(req, res)) return;
+  if (await limitAuth(req, res, 'password')) return;
   if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
 
   try {
@@ -25,7 +25,8 @@ export default async function handler(req, res) {
       if (!isValidEmail(email)) return error(res, 'Invalid email format', 400);
       await connectDB();
       const user = await User.findOne({ email }).select('email language').lean();
-      if (user) {
+      // A few emails an hour per address at most, so nobody can flood someone's inbox from here
+      if (user && await mayEmailReset(email)) {
         const { token, hash, expiresAt } = newAccountToken(RESET_TTL_MS);
         await User.updateOne({ _id: user._id }, { $set: { resetTokenHash: hash, resetExpiresAt: expiresAt } });
         const sent = await sendAccountEmail({ kind: 'reset', user, origin: linkOrigin(req), token });
@@ -51,6 +52,7 @@ export default async function handler(req, res) {
       user.verifyExpiresAt = undefined;
       user.isFirstLogin = false;
       await user.save();
+      await clearFailedPasswords(user.email); // a new password lifts a lock from wrong guesses at the old one
       // A new password ends every other session: whoever knew the old one is signed out
       const session = await issueSession(user, { userAgent: req.headers?.['user-agent'], only: true });
       return success(res, { user: user.toJSON(), token: session });

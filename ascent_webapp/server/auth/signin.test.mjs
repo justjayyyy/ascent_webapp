@@ -40,6 +40,21 @@ let sent; // emails "sent"
 mock.module(at('../lib/email-helper.js'), { exports: { sendEmail: async (m) => { sent.push(m); return { sent: true }; } } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../lib/session.js'), { exports: { issueSession: async (u) => `token-for-${u._id}`, isLiveSession: () => true } });
+// Wrong passwords per account, as the shared counters would keep them
+const fails = new Map();
+mock.module(at('../lib/authLimit.js'), {
+  exports: {
+    limitAuth: async () => false,
+    accountLocked: async (email, res) => {
+      if ((fails.get(email) || 0) < 10) return false;
+      res.status(429).json({ success: false, error: 'Too many wrong passwords' });
+      return true;
+    },
+    recordFailedPassword: async (email) => { fails.set(email, (fails.get(email) || 0) + 1); },
+    clearFailedPasswords: async (email) => { fails.delete(email); },
+    mayEmailReset: async () => true,
+  },
+});
 mock.module(at('../lib/rateLimit.js'), { exports: { authRateLimit: () => false, rateLimit: () => false } });
 
 let googleAnswer;
@@ -69,6 +84,7 @@ beforeEach(() => {
   workspaces = [];
   workspaceUpdates = [];
   sent = [];
+  fails.clear();
   googleAnswer = { email: 'dana@gmail.com', name: 'Dana', picture: 'p.png', googleId: 'g-1' };
 });
 
@@ -237,4 +253,14 @@ test("if the new account's workspace cannot be made, no half-made account is lef
   }
   assert.deepEqual(users, []);
   assert.equal((await call(register, { email: 'a@b.test', password: 'secret1' })).code, 201, 'signing up again works');
+});
+
+test("ten wrong passwords lock the account for a while, even for the right password; a success clears the count", async () => {
+  users.push(new FakeUser({ email: 'a@b.test', password: 'secret1', isFirstLogin: false }));
+  for (let i = 0; i < 9; i += 1) assert.equal((await call(login, { email: 'a@b.test', password: 'nope' })).code, 401);
+  assert.equal((await call(login, { email: 'a@b.test', password: 'secret1' })).code, 200, 'nine misses: still allowed');
+  assert.equal(fails.get('a@b.test'), undefined, 'a success clears the count');
+  for (let i = 0; i < 10; i += 1) await call(login, { email: 'a@b.test', password: 'nope' });
+  assert.equal((await call(login, { email: 'a@b.test', password: 'secret1' })).code, 429);
+  assert.equal((await call(login, { email: 'ghost@b.test', password: 'x' })).code, 401, 'other accounts are unaffected');
 });

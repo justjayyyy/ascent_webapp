@@ -25,7 +25,7 @@ import { issueSession, isLiveSession } from '../lib/session.js';
 import { verifyToken, getTokenFromHeader } from '../lib/jwt.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
-import { authRateLimit } from '../lib/rateLimit.js';
+import { limitAuth } from '../lib/authLimit.js';
 import { relyingParty, deviceLabel, toBase64Url, fromBase64Url } from '../lib/webauthn.js';
 
 const MAX_PASSKEYS = 10;
@@ -168,7 +168,7 @@ export default async function handler(req, res) {
   try {
     if (action === 'login-options' || action === 'login-verify') {
       if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
-      if (authRateLimit(req, res)) return;
+      if (await limitAuth(req, res, 'passkey')) return;
       const rp = relyingParty(req);
       if (!rp) return error(res, 'origin_not_allowed', 403);
       await connectDB();

@@ -156,3 +156,20 @@ test('signing out of the other devices keeps this one signed in', async () => {
   expect(callTo('/api/auth/logout').query.scope).toBe('others');
   expect(localStorage.getItem('ascent_access_token')).toBe('test-token');
 }, 20000);
+
+test('a locked sign-in says why, in the page language', async () => {
+  const user = userEvent.setup();
+  localStorage.setItem('ascent_login_lang', 'he');
+  const he = translations.he;
+  api = fakeFetch(seedData());
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => (String(input).endsWith('/api/auth/login')
+    ? new Response(JSON.stringify({ success: false, error: 'Too many wrong passwords', retryAfter: 900 }), { status: 429, headers: { 'content-type': 'application/json' } })
+    : api.fetchImpl(input, init))));
+  window.history.pushState({}, '', '/login');
+  render(<App />);
+  await user.type(await screen.findByLabelText(he.email), 'dana@x.test');
+  await user.click(screen.getByRole('button', { name: he.authContinue }));
+  await user.type(await screen.findByLabelText(he.password), 'whatever');
+  await user.click(screen.getByRole('button', { name: he.signIn }));
+  expect(await screen.findByText(he.authTooManyAttempts)).toBeTruthy();
+}, 20000);

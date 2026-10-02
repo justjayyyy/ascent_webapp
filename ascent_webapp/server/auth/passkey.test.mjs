@@ -23,6 +23,7 @@ mock.module('@simplewebauthn/server', {
     verifyAuthenticationResponse: async () => verifyResult,
   },
 });
+mock.module(at('../lib/authLimit.js'), { exports: { limitAuth: async () => false } });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 mock.module(at('../middleware/auth.js'), { exports: { authMiddleware: async (req, res) => { res.status(401).json({ success: false }); return null; } } });
 mock.module(at('../lib/session.js'), { exports: {

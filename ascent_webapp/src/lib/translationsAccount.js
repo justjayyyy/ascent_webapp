@@ -2,6 +2,7 @@
 // workspace whose owner left. Merged into translations.js like the other files.
 export const accountTranslations = {
   en: {
+    authTooManyAttempts: 'Too many attempts. Wait a few minutes and try again, or reset your password.',
     setSignOutOthers: 'Sign out other devices',
     setSignOutOthersDesc: 'You can be signed in on your phone and computer at once. This signs out everywhere except here.',
     setSignedOutOthers: 'Signed out on your other devices',
@@ -43,6 +44,7 @@ export const accountTranslations = {
     olFailed: 'Something went wrong. Please try again.',
   },
   he: {
+    authTooManyAttempts: 'יותר מדי ניסיונות. המתינו כמה דקות ונסו שוב, או אפסו את הסיסמה.',
     setSignOutOthers: 'התנתקות ממכשירים אחרים',
     setSignOutOthersDesc: 'אפשר להיות מחוברים בטלפון ובמחשב בו-זמנית. הפעולה מנתקת את כל המכשירים חוץ מהמכשיר הזה.',
     setSignedOutOthers: 'נותקת מהמכשירים האחרים',
@@ -84,6 +86,7 @@ export const accountTranslations = {
     olFailed: 'משהו השתבש. נסו שוב.',
   },
   ru: {
+    authTooManyAttempts: 'Слишком много попыток. Подождите несколько минут и попробуйте снова или сбросьте пароль.',
     setSignOutOthers: 'Выйти на других устройствах',
     setSignOutOthersDesc: 'Можно быть в аккаунте на телефоне и компьютере одновременно. Это завершит все сеансы, кроме этого.',
     setSignedOutOthers: 'Вы вышли на других устройствах',

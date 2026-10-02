@@ -4,7 +4,7 @@ import Workspace from '../models/Workspace.js';
 import { issueSession } from '../lib/session.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
-import { authRateLimit } from '../lib/rateLimit.js';
+import { limitAuth } from '../lib/authLimit.js';
 import { verifyGoogleIdToken, GoogleAuthError } from '../lib/googleAuth.js';
 import { createAccount, startingPrefs, unusablePassword } from '../lib/accounts.js';
 
@@ -21,7 +21,7 @@ export async function acceptPendingInvitations(user) {
 // POST { credential } where credential is the ID token from Google Identity Services.
 export default async function handler(req, res) {
   if (handleCors(req, res)) return;
-  if (authRateLimit(req, res)) return;
+  if (await limitAuth(req, res, 'google')) return;
   if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
 
   try {
