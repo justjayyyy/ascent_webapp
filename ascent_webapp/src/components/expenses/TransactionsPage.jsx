@@ -154,7 +154,7 @@ function TransactionsPage({ kind }) {
   const handleDuplicateTransaction = useCallback((transaction) => {
     // A copy dated today; ids, timestamps and installment bookkeeping stay with the original
     const {
-      id, _id, created_date, updated_date, created_by,
+      id, _id, created_date, updated_date, created_by, occurredAt,
       installmentGroupId, installmentIndex, installmentCount, installmentTotal, planItemId, recurringGroupId,
       ...fields
     } = transaction;

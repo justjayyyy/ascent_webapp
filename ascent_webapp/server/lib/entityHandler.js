@@ -193,7 +193,9 @@ export function createEntityHandler(Model, options = {}) {
           const sortField = typeof sort === 'string' && /^-?[A-Za-z_]+$/.test(sort) ? sort : '-created_date';
           const limitValue = Math.min(Math.max(parseInt(limit, 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);
 
-          const items = await Model.find(query).sort(sortField).limit(limitValue).lean();
+          // Rows with the same value (several on one day) come newest first, and always in the same order
+          const order = /^-?_id$/.test(sortField) ? sortField : `${sortField} -_id`;
+          const items = await Model.find(query).sort(order).limit(limitValue).lean();
           return success(res, items.map(toPlain));
         }
 

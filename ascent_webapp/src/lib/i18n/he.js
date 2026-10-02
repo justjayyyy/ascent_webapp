@@ -1407,6 +1407,7 @@ export default {
   subsShowLess: 'הצגת פחות',
 
   hhTitle: 'ביניכם',
+  txTime: 'שעה',
   splitSettingTitle: 'חלוקת הוצאות בינינו',
   splitSettingDesc: 'מאפשר לחלק הוצאה ומציג בלוח הבקרה מי חייב למי. כבו אם אתם סופרים הכול יחד.',
   hhOwesYou: '{name} חייב/ת לך',

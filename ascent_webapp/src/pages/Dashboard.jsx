@@ -15,6 +15,8 @@ import { useInsights } from '@/components/insights/useInsights';
 import SafeToSpendCard from '@/components/insights/SafeToSpendCard';
 import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
 import HouseholdBalanceCard from '@/components/insights/HouseholdBalanceCard';
+import { formatTxTime, newestFirst } from '@/lib/txOrder';
+import { localDay } from '@/lib/localDay';
 import CommitmentsCard from '@/components/insights/CommitmentsCard';
 import AssistantBar from '@/components/insights/AssistantBar';
 import { useTransactions, useLinkedTransactions } from '@/lib/offline/txOutbox';
@@ -166,7 +168,11 @@ export default function Dashboard() {
     return perDay.map((d) => { running += d.amount; return { ...d, cumulative: running }; });
   }, [monthTx, selectedMonth]);
 
-  const recent = useMemo(() => [...monthTx].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 6), [monthTx]);
+  // What already happened, latest first (scheduled rows later this month are not "recent")
+  const recent = useMemo(() => {
+    const today = localDay();
+    return monthTx.filter((tx) => String(tx.date).slice(0, 10) <= today).sort(newestFirst).slice(0, 6);
+  }, [monthTx]);
 
   // ---- Monthly Recap ----
   // The header button plays the month on screen; in the first week of a month a card offers last
@@ -456,7 +462,7 @@ export default function Dashboard() {
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{tx.description || translateCategory(tx.category, language)}</p>
-                        <p className={cn('text-xs', muted)}>{translateCategory(tx.category, language)} · {String(tx.date).slice(0, 10)}</p>
+                        <p className={cn('text-xs', muted)}>{[translateCategory(tx.category, language), String(tx.date).slice(0, 10), formatTxTime(tx, locale)].filter(Boolean).join(' · ')}</p>
                       </div>
                     </div>
                     <span className={cn('text-sm font-semibold tabular-nums', tx.type === 'Income' ? 'text-success' : 'text-foreground')}>

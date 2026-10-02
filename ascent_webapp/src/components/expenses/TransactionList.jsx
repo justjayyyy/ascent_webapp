@@ -9,6 +9,7 @@ import { useExchangeRates } from '@/hooks/useWorkspaceData';
 import { amountInCurrency } from '@shared/money';
 import { useHousehold } from '@/hooks/useHousehold';
 import BlurValue from '../BlurValue';
+import { formatTxTime, newestFirst } from '@/lib/txOrder';
 
 const PAGE = 30;
 const isObjectId = (s) => !!s && /^[0-9a-fA-F]{24}$/.test(s);
@@ -104,8 +105,10 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
     return (tx.paymentMethod === 'Card' && tx.ingest?.sources?.[0]?.cardText) || tx.paymentMethod || '';
   }, [cards, t]);
 
-  const shown = useMemo(() => transactions.slice(0, visible), [transactions, visible]);
-  const hasMore = visible < transactions.length;
+  // Latest on top, whatever order the rows arrived in (rows saved on this device come in last)
+  const ordered = useMemo(() => [...transactions].sort(newestFirst), [transactions]);
+  const shown = useMemo(() => ordered.slice(0, visible), [ordered, visible]);
+  const hasMore = visible < ordered.length;
 
   useEffect(() => {
     if (!hasMore || !sentinel.current) return undefined;
@@ -160,7 +163,7 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                 const conv = converted(tx);
                 const pending = tx.status === 'pending';
                 const cat = isObjectId(tx.category) ? '' : translateCategory(tx.category, language);
-                const meta = [cat, cardText(tx)].filter(Boolean).join(' · ');
+                const meta = [formatTxTime(tx, localeOf(language)), cat, cardText(tx)].filter(Boolean).join(' · ');
                 return (
                   <motion.li
                     key={tx.id}
@@ -247,7 +250,7 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                 <DrawerDescription className="text-center">
                   {[
                     isObjectId(active.category) ? '' : translateCategory(active.category, language),
-                    new Intl.DateTimeFormat(loc, { dateStyle: 'medium' }).format(new Date(`${dayKey(active.date)}T12:00:00`)) + (active.occurredAt ? ` · ${new Intl.DateTimeFormat(loc, { timeStyle: 'short' }).format(new Date(active.occurredAt))}` : ''),
+                    new Intl.DateTimeFormat(loc, { dateStyle: 'medium' }).format(new Date(`${dayKey(active.date)}T12:00:00`)) + (formatTxTime(active, loc) ? ` · ${formatTxTime(active, loc)}` : ''),
                     cardText(active),
                     activeAuthor ? (activeAuthor.isMe ? t('me') : activeAuthor.name) : '',
                     activeConverted !== null ? money(activeConverted, userCurrency, 0) : '',

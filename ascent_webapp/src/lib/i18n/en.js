@@ -1412,6 +1412,7 @@ export default {
 
   // Household balance
   hhTitle: 'Between you',
+  txTime: 'Time',
   splitSettingTitle: 'Split expenses between us',
   splitSettingDesc: 'Lets an expense be split and shows who owes whom on the dashboard. Turn off if you count everything together.',
   hhOwesYou: '{name} owes you',

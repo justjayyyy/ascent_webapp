@@ -1407,6 +1407,7 @@ export default {
   subsShowLess: 'Свернуть',
 
   hhTitle: 'Между вами',
+  txTime: 'Время',
   splitSettingTitle: 'Делить расходы между нами',
   splitSettingDesc: 'Позволяет делить расходы и показывает на главной, кто кому должен. Выключите, если вы считаете всё вместе.',
   hhOwesYou: '{name}: долг вам',

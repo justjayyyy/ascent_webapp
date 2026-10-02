@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Repeat, ShoppingBag, Minus, Plus, Sparkles, CalendarClock } from 'lucide-react';
 import { format, addMonths, parseISO, isAfter } from 'date-fns';
+import { txTime } from '@/lib/txOrder';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
@@ -93,6 +94,8 @@ export default function AddTransactionDialog({
   });
 
   const [errors, setErrors] = useState({});
+  // Set once the time is changed by hand, so picking another date keeps it
+  const timeTouched = useRef(false);
   // A category picked by hand is never replaced by a suggestion
   const categoryTouched = useRef(false);
   const suggestion = useCategorySuggestion(formData.description, formData.type, open && !isEditing);
@@ -179,6 +182,8 @@ export default function AddTransactionDialog({
         commitmentId: editTransaction.commitmentId || '',
         paidBy: editTransaction.paidBy || '',
         split: editTransaction.split?.mode ? editTransaction.split : null,
+        // A copy (no id yet) happens now; an existing row keeps the time it has, if any
+        time: txTime(editTransaction) ? format(txTime(editTransaction), 'HH:mm') : (isEditing ? '' : format(new Date(), 'HH:mm')),
         forPreviousMonth: false,
       });
       // If editing and no amountInGlobalCurrency exists, we'll recalculate it on submit
@@ -188,6 +193,7 @@ export default function AddTransactionDialog({
       const defaultCategory = categories.find(c => c.type === startType || c.type === 'Both');
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
+        time: format(new Date(), 'HH:mm'),
         type: startType,
         category: usable(last.category) ? last.category : (defaultCategory?.name || ''),
         description: '',
@@ -210,6 +216,7 @@ export default function AddTransactionDialog({
       });
     }
     categoryTouched.current = false;
+    timeTouched.current = isEditing;
     autoCardRef.current = !editTransaction;
     setErrors({});
   }, [editTransaction, open, user?.currency, categories, startType]);
@@ -281,9 +288,12 @@ export default function AddTransactionDialog({
 
     rememberChoices(formData);
     const isExpense = formData.type === 'Expense';
-    const { forPreviousMonth, ...fields } = formData;
+    const { forPreviousMonth, time, ...fields } = formData;
+    // The time belongs to one row only, not to every month of a series or every installment
+    const single = !splitting && !(formData.isRecurring && !isEditing) && !(inSeries && wholeSeries);
     await onSubmit({
       ...fields,
+      ...(single && { occurredAt: time && formData.date ? new Date(`${formData.date}T${time}`).toISOString() : null }),
       ...(salaryShift && forPreviousMonth && { forPreviousMonth: true }),
       description: formData.description.trim() || translateCategory(formData.category, language),
       amount: parseFloat(formData.amount),
@@ -457,12 +467,18 @@ export default function AddTransactionDialog({
             {(!formData.isRecurring || (isEditing && !wholeSeries)) && (
               <div className="space-y-1 sm:space-y-2">
                 <Label htmlFor="date" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{splitting ? t('firstPayment') : t('date')} *</Label>
+                <div className="flex gap-2">
                 <Input
                   ref={dateInputRef}
                   id="date"
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) => {
+                    const date = e.target.value;
+                    // A time nobody chose is only a guess for today; another day starts without one
+                    const time = timeTouched.current ? formData.time : (date === format(new Date(), 'yyyy-MM-dd') ? format(new Date(), 'HH:mm') : '');
+                    setFormData({ ...formData, date, time });
+                  }}
                   max={splitting ? undefined : format(new Date(), 'yyyy-MM-dd')}
                   autoFocus={false}
                   onFocus={(e) => {
@@ -474,8 +490,20 @@ export default function AddTransactionDialog({
                       }, 0);
                     }
                   }}
-                  className={cn("h-8 sm:h-10 text-xs sm:text-sm w-full", colors.bgTertiary, colors.border, colors.textPrimary, errors.date && 'border-danger')}
+                  className={cn("h-8 sm:h-10 text-xs sm:text-sm w-full min-w-0 flex-1", colors.bgTertiary, colors.border, colors.textPrimary, errors.date && 'border-danger')}
                 />
+                {!splitting && (
+                  <Input
+                    id="time"
+                    type="time"
+                    aria-label={t('txTime')}
+                    title={t('txTime')}
+                    value={formData.time || ''}
+                    onChange={(e) => { timeTouched.current = true; setFormData({ ...formData, time: e.target.value }); }}
+                    className={cn("h-8 sm:h-10 text-xs sm:text-sm w-[6.5rem] shrink-0 tabular-nums", colors.bgTertiary, colors.border, colors.textPrimary)}
+                  />
+                )}
+                </div>
                 {errors.date && <p className="text-xs text-danger">{errors.date}</p>}
               </div>
             )}

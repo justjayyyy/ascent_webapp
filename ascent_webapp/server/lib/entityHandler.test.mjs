@@ -245,11 +245,11 @@ test('the list limit is bounded and the sort field cannot be an expression', asy
     find() { return { sort(s) { seen.push(['sort', s]); return this; }, limit(l) { seen.push(['limit', l]); return this; }, lean: async () => [{ _id: { toString: () => 'r1' } }] }; },
   };
   const r = await call(M, 'GET', 'limit=999999&sort=$where');
-  assert.deepEqual(seen, [['sort', '-created_date'], ['limit', 10000]]);
+  assert.deepEqual(seen, [['sort', '-created_date -_id'], ['limit', 10000]]);
   assert.equal(r.body.data[0].id, 'r1');
   seen.length = 0;
   await call(M, 'GET', 'limit=-5&sort=-date');
-  assert.deepEqual(seen, [['sort', '-date'], ['limit', 1]]);
+  assert.deepEqual(seen, [['sort', '-date -_id'], ['limit', 1]]);
 });
 
 test('shared-only entities: members see their own rows and shared ones, the owner sees all', async () => {
