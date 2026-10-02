@@ -1,32 +1,72 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 
-/** Scroll-spy: the section nearest the top third of the viewport is "active". */
+/**
+ * Scroll-spy: the last section whose top has passed the upper third of the viewport is "active".
+ * Sections are looked up on every check, so it works even when they mount after the page's
+ * loading state. Picking a section holds it until that smooth scroll settles, so the nav
+ * doesn't flick through every section in between.
+ */
 export function useActiveSection(ids) {
   const [active, setActive] = useState(ids[0]);
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
+  const held = useRef(false);
+  const settle = useRef(0);
   const key = ids.join('|');
 
-  useEffect(() => {
-    const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
-    if (!els.length || typeof IntersectionObserver === 'undefined') return undefined;
-    const visible = new Set();
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => (e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id)));
-        const first = ids.find((id) => visible.has(id));
-        const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
-        if (atBottom) setActive(ids[ids.length - 1]);
-        else if (first) setActive(first);
-      },
-      { rootMargin: '-15% 0px -60% 0px' }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  // Release the hold once the scroll a tap started has gone quiet (or never began)
+  const holdBriefly = useCallback(() => {
+    held.current = true;
+    clearTimeout(settle.current);
+    settle.current = setTimeout(() => { held.current = false; }, 150);
+  }, []);
 
-  return [active, setActive];
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const list = idsRef.current;
+      if (!list.length) return;
+      const doc = document.documentElement;
+      if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4 && doc.scrollHeight > window.innerHeight) {
+        setActive(list[list.length - 1]);
+        return;
+      }
+      const line = window.innerHeight * 0.3;
+      let current = list[0];
+      let best = -Infinity;
+      for (const id of list) {
+        const top = document.getElementById(id)?.getBoundingClientRect().top;
+        if (top != null && top <= line && top > best) { best = top; current = id; }
+      }
+      setActive(current);
+    };
+    const onScroll = () => {
+      if (held.current) {
+        holdBriefly();
+        return;
+      }
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      cancelAnimationFrame(frame);
+      clearTimeout(settle.current);
+    };
+  }, [key, holdBriefly]);
+
+  const select = useCallback((id) => {
+    holdBriefly();
+    setActive(id);
+  }, [holdBriefly]);
+
+  return [active, select];
 }
 
 /** variant 'strip' = sticky chips for phones (render as a direct child of the tall page container); 'rail' = desktop side list. */

@@ -355,12 +355,12 @@ export default function Settings() {
           {/* Apple Pay */}
           {show.applepay && <ApplePaySection index={order++} />}
 
+          {show.security && <SecuritySection index={order++} />}
+
           {/* Data */}
           {show.data && (
             <ImportExportSection index={order++} />
           )}
-
-          {show.security && <SecuritySection index={order++} />}
 
           {/* Account */}
           {show.account && (
