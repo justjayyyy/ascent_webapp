@@ -56,7 +56,12 @@ export function ThemeProvider({ children }) {
   }, [palette]);
 
   const strings = useLanguage(language);
-  const t = useCallback((key) => strings[key] || key, [strings]);
+  // An optional second argument fills the string's placeholders: { n: 3 } replaces {n}
+  const t = useCallback((key, vars) => {
+    const s = strings[key] || key;
+    if (!vars || typeof vars !== 'object') return s;
+    return Object.entries(vars).reduce((out, [k, v]) => out.replaceAll(`{${k}}`, v), s);
+  }, [strings]);
 
   // Apply theme to <html> so shadcn CSS variable tokens switch
   useLayoutEffect(() => {

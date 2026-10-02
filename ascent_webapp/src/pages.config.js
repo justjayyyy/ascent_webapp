@@ -8,6 +8,7 @@ const Income = lazy(() => import('./pages/Income'));
 const Plans = lazy(() => import('./pages/Plans'));
 const Commitments = lazy(() => import('./pages/Commitments'));
 const Notes = lazy(() => import('./pages/Notes'));
+const Groceries = lazy(() => import('./pages/Groceries'));
 const Settings = lazy(() => import('./pages/Settings'));
 
 export const pagesConfig = {
@@ -19,6 +20,7 @@ export const pagesConfig = {
     Plans,
     Commitments,
     Notes,
+    Groceries,
     Settings,
   },
   Layout

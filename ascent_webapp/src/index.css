@@ -96,6 +96,8 @@ button:focus-visible {
     --destructive-foreground: 0 0% 100%;
     --success: 152 65% 32%;
     --danger: 350 75% 48%;
+    /* Running low, nearly due: calm amber, the same meaning in every palette */
+    --warning: 30 92% 36%;
     --border: 230 20% 89%;
     --input: 230 20% 85%;
     --ring: 252 78% 60%;
@@ -137,6 +139,7 @@ button:focus-visible {
     --destructive-foreground: 0 0% 100%;
     --success: 156 72% 52%;
     --danger: 350 90% 68%;
+    --warning: 38 95% 62%;
     --border: 234 20% 19%;
     --input: 234 20% 24%;
     --ring: 252 95% 76%;
@@ -159,6 +162,8 @@ button:focus-visible {
   /* ---- Dark: OLED Black + Gold (try with ?palette=gold, reset with ?palette=indigo) ---- */
   .dark[data-palette="gold"] {
     --background: 0 0% 0%;
+    /* Amber would read as the gold accent here, so warnings lean orange */
+    --warning: 24 95% 62%;
     --foreground: 40 25% 96%;
     --card: 40 8% 5.5%;
     --card-foreground: 40 25% 96%;
@@ -191,6 +196,7 @@ button:focus-visible {
     --sidebar-ring: 43 95% 64%;
   }
   :root[data-palette="gold"]:not(.dark) {
+    --warning: 20 88% 42%;
     /* 34% keeps white text on gold buttons at WCAG AA (4.6:1); 40% was 3.5:1 */
     --primary: 36 92% 34%;
     --ring: 36 92% 40%;
@@ -783,3 +789,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Face ID lock: while the app is in the background its figures are blurred, so the app switcher's
    snapshot shows nothing private (components/security/AppLock.jsx) */
 html[data-privacy-curtain] #root { filter: blur(24px); }
+
+/* Groceries: the line that runs down a receipt photo while it is being read (FinishTrip.jsx) */
+@keyframes grScan { 0% { transform: translateY(0); } 50% { transform: translateY(158px); } 100% { transform: translateY(0); } }

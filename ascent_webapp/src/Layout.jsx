@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useR
 import { useNavigate } from 'react-router-dom';
 import { useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from '@/lib/motion';
-import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark } from 'lucide-react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
@@ -201,6 +201,7 @@ function LayoutContent({ children, currentPageName }) {
     { name: t('cmNavShort'), page: 'Commitments', icon: Landmark, permission: 'viewExpenses' },
     // Open to every member: notes shared with someone need no workspace-wide notes permission
     { name: t('notes'), page: 'Notes', icon: StickyNote },
+    { name: t('grTitle'), page: 'Groceries', icon: ShoppingBasket },
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
   ].filter(item => !item.permission || hasPermission(item.permission)), [t, hasPermission]);
 

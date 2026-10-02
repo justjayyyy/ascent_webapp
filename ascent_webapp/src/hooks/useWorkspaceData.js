@@ -23,6 +23,7 @@ const LISTS = {
   plans: { load: (ws) => ascent.entities.Plan.list('startDate', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   commitments: { load: (ws) => ascent.entities.Commitment.list('-created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   settlements: { load: (ws) => ascent.entities.Settlement.list('-date', 1000, pinned(ws)), staleTime: MINUTE },
+  groceries: { load: (ws) => ascent.entities.GroceryItem.list('-created_date', 2000, pinned(ws)), staleTime: MINUTE },
 };
 
 /**
@@ -49,6 +50,7 @@ export const useBudgets = (opts) => useWorkspaceList('budgets', opts);
 export const usePlans = (opts) => useWorkspaceList('plans', opts);
 export const useCommitments = (opts) => useWorkspaceList('commitments', opts);
 export const useSettlements = (opts) => useWorkspaceList('settlements', opts);
+export const useGroceries = (opts) => useWorkspaceList('groceries', opts);
 
 /** Whether the AI assistant is set up on the server and switched on for this workspace. */
 export function useAssistStatus() {

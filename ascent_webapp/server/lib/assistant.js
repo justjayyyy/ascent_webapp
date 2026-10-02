@@ -1,5 +1,6 @@
-// The opt-in AI assistant: turns a quick note ("קפה 18 בויזה") into a transaction draft, and answers
-// questions about the household's spending from an aggregated summary. Needs ANTHROPIC_API_KEY.
+// The opt-in AI assistant: turns a quick note ("קפה 18 בויזה") into a transaction draft, reads grocery
+// receipt photos, and answers questions about the household's spending from an aggregated summary.
+// Needs ANTHROPIC_API_KEY.
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
@@ -73,6 +74,56 @@ const ASK_SYSTEM = `You are the money assistant inside Ascent, a household finan
 - Be calm and practical about money: point out a trend or a concrete next step, never lecture or alarm.
 - Plain text with simple "- " bullets. No headings, tables or code.
 - "stillCommitted" and "upcoming" are payments already scheduled later this month; "safeToSpend" is what is left after spending so far and those payments.`;
+
+const ReceiptSchema = z.object({
+  isReceipt: z.boolean(),
+  store: z.string().nullable(),
+  date: z.string().nullable(),
+  total: z.number().nullable(),
+  currency: z.string().nullable(),
+  items: z.array(z.object({
+    text: z.string(),
+    price: z.number().nullable(),
+    matchId: z.string().nullable(),
+  })),
+});
+
+const RECEIPT_SYSTEM = `You read photos of shop receipts (usually supermarket receipts in Hebrew, Russian or English) for a household finance app.
+
+- isReceipt: false when the photo is not a receipt or is too blurry to read; then use nulls and no items.
+- total: the final amount paid, after discounts and including tax. Not a subtotal, not the change given back. Null if you cannot read it.
+- currency: an ISO 4217 code from the receipt (₪, ש"ח -> ILS; $ -> USD; € -> EUR; руб, ₽ -> RUB), otherwise null.
+- store: the shop's name as printed, short (no address, no branch number). Null if not printed.
+- date: the purchase date as YYYY-MM-DD. Receipts often print DD/MM/YY. Null if not printed.
+- items: every product line, in receipt order. text is the line as printed, cleaned of codes. price is that line's final price after any discount on it, or null. Skip deposit, bag, discount-only and total lines.
+- matchId: when a line is clearly one of the shopping list items you are given (same product, in any language or spelling), that item's id; otherwise null. Never match two lines to one id unless the receipt repeats the product.
+
+Read only what is printed. Never invent a number.`;
+
+/** A receipt photo -> its total, store, date and lines, with lines matched to the shopping list. */
+export async function readReceipt({ image, mediaType, listItems }) {
+  const list = listItems.length
+    ? listItems.map((i) => `- ${i.id}: ${i.name}`).join('\n')
+    : '(empty)';
+  const response = await getClient().beta.messages.parse({
+    model: MODEL,
+    max_tokens: 16000,
+    betas: BETAS,
+    fallbacks: 'default',
+    output_config: { effort: 'low', format: betaZodOutputFormat(ReceiptSchema) },
+    system: RECEIPT_SYSTEM,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+        { type: 'text', text: `Shopping list items (id: name):\n${list}` },
+      ],
+    }],
+  });
+  if (response.stop_reason === 'refusal') throw new AssistantDeclined('declined');
+  if (!response.parsed_output) throw new Error('unparseable');
+  return response.parsed_output;
+}
 
 /** A question about the household's money -> a short answer in the user's language. */
 export async function answerQuestion({ question, summary, language }) {

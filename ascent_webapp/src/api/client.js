@@ -259,6 +259,7 @@ const entities = {
   PageLayout: createEntity('page-layouts'),
   Settlement: createEntity('settlements'),
   Commitment: createEntity('commitments'),
+  GroceryItem: createEntity('groceries'),
   Note: {
     ...createEntity('notes'),
     // Permanently delete everything the caller has in the trash
@@ -305,6 +306,9 @@ const assist = {
   suggestCategory: (description, type = 'Expense') => request('/assist?action=suggest-category', json('POST', { description, type })),
   parse: (text) => request('/assist?action=parse', json('POST', { text, today: localDay() })),
   ask: (question) => request('/assist?action=ask', json('POST', { question, today: localDay() })),
+  // A receipt photo (base64, no data: prefix) read into { isReceipt, store, date, total, currency, items }
+  readReceipt: ({ image, mediaType, items }) =>
+    request('/assist?action=receipt', json('POST', { image, mediaType, items, today: localDay() }, { timeout: 60000 })),
 };
 
 // Passkeys registered on this account (Settings > Security)

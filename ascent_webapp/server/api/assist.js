@@ -3,6 +3,7 @@
 //   POST /api/assist?action=suggest-category  { description, type } -> { name, source } | null
 //   POST /api/assist?action=parse             { text }     -> a transaction draft      (AI, opt-in)
 //   POST /api/assist?action=ask               { question } -> { answer }               (AI, opt-in)
+//   POST /api/assist?action=receipt           { image, mediaType, items } -> receipt   (AI, opt-in)
 // The AI actions only run when the workspace owner turned the assistant on in Settings.
 import connectDB from '../lib/mongodb.js';
 import { handleCors } from '../lib/cors.js';
@@ -14,7 +15,7 @@ import { categoryTranslations } from '../lib/categoryTranslations.js';
 import { loadRules, ruleKeyFor } from '../lib/merchantRules.js';
 import { spendingSummary } from '../lib/spendingSummary.js';
 import { amountInCurrency } from '../../shared/money.js';
-import { aiConfigured, parseNote, answerQuestion, AssistantDeclined } from '../lib/assistant.js';
+import { aiConfigured, parseNote, answerQuestion, readReceipt, AssistantDeclined } from '../lib/assistant.js';
 import Category from '../models/Category.js';
 import Card from '../models/Card.js';
 import Budget from '../models/Budget.js';
@@ -22,6 +23,9 @@ import ExpenseTransaction from '../models/ExpenseTransaction.js';
 
 const AI_LIMIT = { windowMs: 60 * 60_000, max: 40 }; // per person per hour
 const aiCalls = new Map();
+// A receipt photo, resized on the phone first (about 1600px); the cap keeps it under Vercel's 4.5 MB body limit
+const RECEIPT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_RECEIPT_CHARS = 4_000_000;
 
 function aiRateLimited(userId) {
   const now = Date.now();
@@ -77,7 +81,7 @@ export default async function handler(req, res) {
       return success(res, suggestCategory({ description, merchantKey: key, type, categories, history, rules }));
     }
 
-    if (action !== 'parse' && action !== 'ask') return error(res, 'unknown_action', 404);
+    if (!['parse', 'ask', 'receipt'].includes(action)) return error(res, 'unknown_action', 404);
     if (!aiConfigured()) return error(res, 'ai_not_configured', 503);
     if (!aiEnabled) return forbidden(res, 'ai_disabled');
     if (aiRateLimited(String(user._id))) return error(res, 'rate_limited', 429);
@@ -110,6 +114,36 @@ export default async function handler(req, res) {
         amount: draft.amount > 0 && draft.amount < 1e7 ? draft.amount : null,
         cardId: card ? String(card._id) : null,
         paymentMethod: card ? 'Card' : draft.paymentMethod,
+      });
+    }
+
+    if (action === 'receipt') {
+      const image = typeof body.image === 'string' ? body.image : '';
+      const mediaType = RECEIPT_TYPES.has(body.mediaType) ? body.mediaType : null;
+      if (!image || !mediaType || image.length > MAX_RECEIPT_CHARS || !/^[A-Za-z0-9+/]+={0,2}$/.test(image)) {
+        return error(res, 'image_required', 400);
+      }
+      const listItems = (Array.isArray(body.items) ? body.items : [])
+        .filter((i) => i && typeof i.id === 'string' && typeof i.name === 'string')
+        .slice(0, 200)
+        .map((i) => ({ id: i.id.slice(0, 64), name: i.name.slice(0, 120) }));
+      const read = await readReceipt({ image, mediaType, listItems });
+      // Only let through what the app can use as is
+      const ids = new Set(listItems.map((i) => i.id));
+      const money = (n) => (typeof n === 'number' && n >= 0 && n < 1e7 ? Math.round(n * 100) / 100 : null);
+      return success(res, {
+        isReceipt: read.isReceipt === true,
+        store: read.store?.trim().slice(0, 80) || null,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(read.date || '') && read.date <= today ? read.date : null,
+        total: read.total > 0 ? money(read.total) : null,
+        currency: /^[A-Z]{3}$/.test(read.currency || '') ? read.currency : null,
+        items: (read.items || []).slice(0, 150)
+          .map((line) => ({
+            text: String(line.text || '').trim().slice(0, 120),
+            price: money(line.price),
+            matchId: line.matchId && ids.has(line.matchId) ? line.matchId : null,
+          }))
+          .filter((line) => line.text),
       });
     }
 

@@ -15,6 +15,7 @@ module.exports = {
   		colors: {
   			success: 'hsl(var(--success) / <alpha-value>)',
   			danger: 'hsl(var(--danger) / <alpha-value>)',
+  			warning: 'hsl(var(--warning) / <alpha-value>)',
   			background: 'hsl(var(--background) / <alpha-value>)',
   			foreground: 'hsl(var(--foreground) / <alpha-value>)',
   			card: {

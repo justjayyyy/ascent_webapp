@@ -15,7 +15,7 @@ import { applyEntryChange } from '../listEntries.js';
 
 export const TRANSACTIONS = 'transactions';
 /** The household lists that save through the queue, by the name of their API path and cache key. */
-export const LIST_ENTITIES = ['budgets', 'plans', 'commitments', 'settlements'];
+export const LIST_ENTITIES = ['budgets', 'plans', 'commitments', 'settlements', 'groceries'];
 export const entityOf = (op) => op.entity || TRANSACTIONS;
 /** The waiting changes to one kind of row. */
 export const opsForEntity = (ops, entity) => ops.filter((o) => entityOf(o) === entity);
