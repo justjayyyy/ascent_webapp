@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
-  boughtChanges, findByName, groupByAisle, guessItem, isTracked, learnedInterval, parseEntries, runningLow, supplyOf,
+  basketEstimate, boughtChanges, findByName, groupByAisle, guessItem, isTracked, knownStores, learnedInterval, parseEntries,
+  priceMovers, priceStats, purchasePriceChanges, runningLow, storeComparison, supplyOf,
 } from './groceryUtils';
 
 const bought = (...dates) => dates.map((date, i) => ({ id: `p${i}`, date }));
@@ -122,5 +123,59 @@ describe('the list', () => {
     expect(changes).toMatchObject({ onList: false, inCart: false, qty: '', level: null });
     expect(changes.purchases).toHaveLength(2);
     expect(changes.purchases[1]).toMatchObject({ date: '2026-09-30', qty: '2', price: 12.9, currency: 'ILS', by: 'Dana' });
+  });
+});
+
+describe('prices', () => {
+  const buy = (date, price, store, currency = 'ILS') => ({ id: `${date}-${store}`, date, price, store, currency });
+  const milk = { id: 'm', name: 'Milk', onList: true, purchases: [buy('2026-08-01', 6.9, 'Shufersal'), buy('2026-08-15', 5.9, 'Rami Levy'), buy('2026-09-01', 7.5, 'Shufersal')] };
+  const eggs = { id: 'e', name: 'Eggs', onList: true, purchases: [buy('2026-08-01', 14, 'Shufersal'), buy('2026-09-01', 12, 'Rami Levy')] };
+  const bread = { id: 'b', name: 'Bread', onList: true, purchases: [{ id: 'x', date: '2026-09-01', price: null }] };
+
+  test('an item: last price, how it moved, its range and the cheapest shop', () => {
+    const s = priceStats(milk);
+    expect(s.last).toMatchObject({ price: 7.5, store: 'Shufersal' });
+    // Against Shufersal's own earlier price, not Rami Levy's cheaper one
+    expect(s.changeFromPrev).toBeCloseTo((7.5 - 6.9) / 6.9);
+    expect(s.changeFromAvg).toBeCloseTo((7.5 - 6.9) / 6.9);
+    expect([s.min, s.max]).toEqual([5.9, 7.5]);
+    expect(s.cheapest).toMatchObject({ store: 'Rami Levy', avg: 5.9 });
+    expect(s.saving).toBeCloseTo(1.6);
+    expect(priceStats(bread)).toBeNull();
+    // Bought at the cheapest shop already: nothing to save by going there
+    const atCheapest = { purchases: [buy('2026-08-01', 7, 'Shufersal'), buy('2026-09-01', 6, 'Rami Levy'), buy('2026-09-08', 6.5, 'Rami Levy')] };
+    expect(priceStats(atCheapest).saving).toBe(0);
+  });
+
+  test('prices in another currency are converted, or left out when they cannot be', () => {
+    const item = { purchases: [buy('2026-09-01', 2, 'Duty free', 'USD'), buy('2026-09-02', 7, 'Shufersal')] };
+    expect(priceStats(item, (p, c) => (c === 'USD' ? p * 3.7 : p)).min).toBeCloseTo(7);
+    expect(priceStats(item, (p, c) => (c === 'USD' ? null : p)).points).toHaveLength(1);
+  });
+
+  test('the list: estimated at the last prices, or at the chosen shop where it was bought before', () => {
+    expect(basketEstimate([milk, eggs, bread])).toEqual({ total: 19.5, priced: 2, missing: 1, atStore: 0 });
+    expect(basketEstimate([milk, eggs, bread], { store: 'rami levy' })).toEqual({ total: 17.9, priced: 2, missing: 1, atStore: 2 });
+  });
+
+  test('shops compared on the things bought at both', () => {
+    const [cheap, dear] = storeComparison([milk, eggs]);
+    expect(cheap.store).toBe('Rami Levy');
+    expect(cheap.index).toBeLessThan(1);
+    expect(dear.store).toBe('Shufersal');
+    expect(cheap.items).toBe(2);
+  });
+
+  test('prices that went up or down from usual', () => {
+    const { up, down } = priceMovers([milk, eggs]);
+    expect(up.map((x) => x.item.name)).toEqual(['Milk']);
+    expect(down.map((x) => x.item.name)).toEqual(['Eggs']);
+  });
+
+  test('shops, most recent first; a purchase priced by hand; the shop kept on a purchase', () => {
+    expect(knownStores([milk, eggs])).toEqual(['Shufersal', 'Rami Levy']);
+    const changed = purchasePriceChanges(bread, 'x', { price: 9.9, currency: 'ILS', store: ' Victory ' });
+    expect(changed.purchases[0]).toMatchObject({ price: 9.9, currency: 'ILS', store: 'Victory' });
+    expect(boughtChanges({ purchases: [] }, { date: '2026-10-01', store: 'Osher Ad' }).purchases[0].store).toBe('Osher Ad');
   });
 });

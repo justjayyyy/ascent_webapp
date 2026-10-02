@@ -77,14 +77,27 @@ export async function runSummaryJob(kind, { now = new Date(), send = sendEmail, 
   return result;
 }
 
-/** The cron route for one kind of summary. */
-export function summaryHandler(kind, { authorized, connect }) {
+/**
+ * The cron route for one kind of summary. `also` is more daily work riding on the same cron (household
+ * task reminders); its failure is reported but does not undo the summaries.
+ */
+export function summaryHandler(kind, { authorized, connect, also = null }) {
   return async function handler(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
     if (!authorized(req)) return res.status(401).json({ success: false, error: 'Unauthorized' });
     try {
       await connect();
-      return res.status(200).json({ success: true, ...(await runSummaryJob(kind)) });
+      const result = await runSummaryJob(kind);
+      if (also) {
+        try {
+          result.also = await also();
+        } catch (err) {
+          console.error(`[Summary ${kind}] extra work failed:`, err?.message);
+          await reportError(err, { req });
+          result.also = { failed: true };
+        }
+      }
+      return res.status(200).json({ success: true, ...result });
     } catch (err) {
       console.error(`[Summary ${kind}] failed:`, err?.message);
       await reportError(err, { req });

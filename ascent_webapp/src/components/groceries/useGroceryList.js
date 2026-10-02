@@ -9,7 +9,7 @@ import { useListWrites } from '@/lib/offline/listWrites';
 import { localDay } from '@/lib/localDay';
 import { haptic } from '@/lib/haptics';
 import {
-  boughtChanges, findByName, groupByAisle, isTracked, levelChanges, listChanges, newItem, parseEntries, runningLow, unlistChanges,
+  boughtChanges, cleanStore, findByName, groupByAisle, isTracked, levelChanges, listChanges, newItem, parseEntries, purchasePriceChanges, runningLow, unlistChanges,
 } from './groceryUtils';
 
 export function useGroceryList() {
@@ -78,9 +78,9 @@ export function useGroceryList() {
   }, [update]);
 
   /** Bought today: each item off the list with a purchase recorded. `prices`: { [itemId]: price }. */
-  const markBought = useCallback(async (list, { prices = {}, currency = null, date = localDay() } = {}) => {
+  const markBought = useCallback(async (list, { prices = {}, currency = null, date = localDay(), store = '' } = {}) => {
     haptic('success');
-    await Promise.all(list.map((item) => update(item, boughtChanges(item, { date, by: me, price: prices[item.id] ?? null, currency }))));
+    await Promise.all(list.map((item) => update(item, boughtChanges(item, { date, by: me, price: prices[item.id] ?? null, currency, store }))));
   }, [update, me]);
 
   /** One thing bought on its own (tapped off the list at home), with undo. */
@@ -94,16 +94,25 @@ export function useGroceryList() {
     toast(t('grBoughtOne', { name: item.name }), { action: { label: t('ntUndo'), onClick: () => update(item, before) } });
   }, [update, me, t]);
 
-  /** Prices read from a receipt after the shop: written onto that day's purchase of each item. */
-  const addPrices = useCallback((list, prices, { currency = null, date }) => Promise.all(list
-    .filter((item) => typeof prices[item.id] === 'number')
+  /**
+   * Prices read from a receipt after the shop: written onto that day's purchase of each item, with the
+   * shop's name where the purchase does not have one yet.
+   */
+  const addPrices = useCallback((list, prices, { currency = null, date, store = '' }) => Promise.all(list
+    .filter((item) => typeof prices[item.id] === 'number' || store)
     .map((item) => {
       const purchases = [...(item.purchases || [])];
       const at = purchases.map((p) => p.date).lastIndexOf(date);
       if (at < 0) return null;
-      purchases[at] = { ...purchases[at], price: prices[item.id], currency };
+      const price = typeof prices[item.id] === 'number' ? { price: prices[item.id], currency } : {};
+      const shop = store && !purchases[at].store ? { store: cleanStore(store) } : {};
+      if (!Object.keys(price).length && !Object.keys(shop).length) return null;
+      purchases[at] = { ...purchases[at], ...price, ...shop };
       return update(item, { purchases });
     })), [update]);
+
+  /** A price (and shop) typed in by hand for one purchase. */
+  const setPurchasePrice = useCallback((item, purchaseId, values) => update(item, purchasePriceChanges(item, purchaseId, values)), [update]);
 
   const save = useCallback((item, changes) => update(item, changes), [update]);
 
@@ -120,5 +129,5 @@ export function useGroceryList() {
     });
   }, [api, failed, t]);
 
-  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, addPrices, save, remove };
+  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, addPrices, setPurchasePrice, save, remove };
 }

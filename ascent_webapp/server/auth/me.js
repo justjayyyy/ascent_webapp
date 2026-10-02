@@ -19,6 +19,8 @@ const EDITABLE = {
   dailySummary: isBool,
   weeklyReports: isBool,
   emailNotifications: isBool,
+  noSpendTracking: isBool,
+  noSpendTarget: (v) => Number.isInteger(v) && v >= 0 && v <= 31,
 };
 
 /** The valid changes in `body`, or { invalid: field } for the first bad one. */

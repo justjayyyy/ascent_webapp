@@ -51,7 +51,7 @@ export default function FinishTrip({ trip, list, onClose }) {
     setExpense({
       type: 'Expense',
       category: category?.name || '',
-      description: fromReceipt?.store || t('grExpenseDescription'),
+      description: fromReceipt?.store || trip.store || t('grExpenseDescription'),
       amount: fromReceipt?.total || '',
       currency: fromReceipt?.currency || currency,
       date: fromReceipt?.date || trip.date || localDay(),
@@ -79,7 +79,7 @@ export default function FinishTrip({ trip, list, onClose }) {
       const prices = {};
       result.items.forEach((line) => { if (line.matchId && line.price !== null && prices[line.matchId] === undefined) prices[line.matchId] = line.price; });
       const fresh = trip.items.map((i) => list.items.find((x) => x.id === i.id) || i);
-      list.addPrices(fresh, prices, { currency: result.currency || currency, date: trip.date });
+      list.addPrices(fresh, prices, { currency: result.currency || currency, date: trip.date, store: trip.store ? '' : result.store || '' });
     } catch {
       setStage('failed');
     }

@@ -124,7 +124,7 @@ export default function Settings() {
   const roleLabel = memberRoleLabel(t, isOwner ? 'owner' : currentMember?.role);
   const show = {
     profile: hit(t('setNavProfile'), t('fullName'), t('email'), roleLabel),
-    appearance: hit(t('setNavAppearance'), t('language'), t('defaultCurrency'), t('blurValues')) || themeHit,
+    appearance: hit(t('setNavAppearance'), t('language'), t('defaultCurrency'), t('blurValues'), t('nsSetting'), t('nsSettingDesc')) || themeHit,
     notifications: hit(t('setNavNotifications'), ...notificationRows.flatMap((r) => [r.label, r.desc])),
     household: hit(t('setNavHousehold'), t('workspaceName'), t('wsMembers'), t('wsInviteMember')),
     cards: hasPermission('manageCards') && hit(t('setNavCards'), t('paymentCards'), t('addCard')),
@@ -298,6 +298,25 @@ export default function Settings() {
                       id="settings-blur"
                       checked={user.blurValues || false}
                       onCheckedChange={(checked) => saveUser({ blurValues: checked })}
+                    />
+                  </Row>
+                )}
+                {(sectionHit(t('setNavAppearance')) || hit(t('nsSetting'), t('nsSettingDesc'))) && (
+                  <Row label={t('nsSetting')} description={t('nsSettingDesc')} htmlFor="settings-nospend">
+                    <Switch
+                      id="settings-nospend"
+                      checked={!!user.noSpendTracking}
+                      onCheckedChange={(checked) => saveUser({ noSpendTracking: checked })}
+                    />
+                  </Row>
+                )}
+                {user.noSpendTracking && (sectionHit(t('setNavAppearance')) || hit(t('nsSetting'), t('nsTargetSetting'))) && (
+                  <Row label={t('nsTargetSetting')} description={t('nsTargetSettingDesc')} wide>
+                    <Segmented
+                      label={t('nsTargetSetting')}
+                      value={String(user.noSpendTarget || 0)}
+                      onValueChange={(value) => saveUser({ noSpendTarget: Number(value) })}
+                      options={[0, 4, 8, 12, 15].map((n) => ({ value: String(n), label: n ? <span className="tabular-nums">{n}</span> : t('nsNoTarget') }))}
                     />
                   </Row>
                 )}

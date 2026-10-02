@@ -2,6 +2,7 @@
 // the notes they may see) and Settings gates its own sections.
 export const PAGE_PERMISSIONS = {
   Dashboard: 'viewExpenses', // the dashboard shows expense data only
+  Review: 'viewExpenses',
   Expenses: 'viewExpenses',
   Income: 'viewExpenses',
   Plans: 'viewExpenses',

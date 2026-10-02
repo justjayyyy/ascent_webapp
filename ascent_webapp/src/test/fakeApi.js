@@ -44,6 +44,14 @@ export function seedData({ language = 'en' } = {}) {
       }],
       commitments: [{ id: 'cm1', name: 'Car loan', kind: 'car', direction: 'borrowed', currency: 'ILS', principal: 60000, annualRate: 5, termMonths: 48, firstPaymentDate: day(-200), payments: [], status: 'active' }],
       accounts: [],
+      tasks: [
+        { id: 'tk1', title: 'Car insurance', kind: 'car', dueDate: day(3), repeat: 'yearly', amount: 2400, currency: 'ILS', remindDays: 7, status: 'open', history: [] },
+        { id: 'tk2', title: 'Passport', kind: 'documents', dueDate: null, repeat: 'none', amount: 0, currency: 'ILS', remindDays: 7, status: 'open', history: [] },
+      ],
+      groceries: [
+        { id: 'g1', name: 'Milk', emoji: '🥛', aisle: 'dairy', onList: true, purchases: [{ id: 'q1', date: day(-20), price: 6.9, currency: 'ILS', store: 'Shufersal' }, { id: 'q2', date: day(-5), price: 5.9, currency: 'ILS', store: 'Rami Levy' }] },
+        { id: 'g2', name: 'Eggs', emoji: '🥚', aisle: 'dairy', onList: false, purchases: [{ id: 'q3', date: day(-20), price: 14, currency: 'ILS', store: 'Shufersal' }, { id: 'q4', date: day(-5), price: 12, currency: 'ILS', store: 'Rami Levy' }] },
+      ],
       notes: [{ id: 'n1', title: 'Groceries', type: 'checklist', items: [{ id: 'a', text: 'milk', done: false }], tags: [], isShared: true, myAccess: 'owner', collaborators: [], attachments: [], createdBy: 'u1' }],
     },
   };

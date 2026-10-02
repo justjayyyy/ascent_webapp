@@ -269,8 +269,8 @@ export const unlistChanges = () => ({ onList: false, inCart: false, cartBy: '', 
  * It was bought: off the list, a purchase recorded (with the receipt price when there is one), and any
  * level set by hand cleared so it counts as full from today.
  */
-export function boughtChanges(item, { date = localDay(), by = '', price = null, currency = null } = {}) {
-  const purchase = { id: randomId(), date, qty: item.qty || '', price: price ?? null, currency: price != null ? currency : null, by };
+export function boughtChanges(item, { date = localDay(), by = '', price = null, currency = null, store = '' } = {}) {
+  const purchase = { id: randomId(), date, qty: item.qty || '', price: price ?? null, currency: price != null ? currency : null, by, store: cleanStore(store) };
   return {
     ...unlistChanges(),
     level: null,
@@ -282,11 +282,11 @@ export function boughtChanges(item, { date = localDay(), by = '', price = null, 
 /** Setting the level by hand ("we're low on rice"). */
 export const levelChanges = (level) => ({ level, levelAt: level ? new Date().toISOString() : null });
 
-/** The last price paid, as { price, currency, date }, or null. */
+/** The last price paid, as { price, currency, date, store }, or null. */
 export function lastPrice(item) {
   const priced = (item.purchases || []).filter((p) => typeof p.price === 'number');
   const p = priced.at(-1);
-  return p ? { price: p.price, currency: p.currency, date: p.date } : null;
+  return p ? { price: p.price, currency: p.currency, date: p.date, store: p.store || '' } : null;
 }
 
 /**
@@ -319,5 +319,161 @@ export function newItem(name, { qty = '', by = '', onList = true } = {}) {
     staple: null,
     ...(onList ? listChanges({ qty, by }) : { onList: false }),
     purchases: [],
+  };
+}
+
+// ---- prices: what things cost, and where they cost less ----
+
+/** A shop name as stored: trimmed, single spaces, at most 80 characters. */
+export const cleanStore = (store) => String(store || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+const storeKey = (store) => normalizeName(store);
+
+/**
+ * Every priced purchase of an item, oldest first, in the viewer's currency: { date, price, store }.
+ * `toMine(price, currency)` converts; a price it cannot convert is left out.
+ */
+export function pricePoints(item, toMine = (p) => p) {
+  return (item.purchases || [])
+    .filter((p) => typeof p.price === 'number' && p.price > 0)
+    .map((p) => ({ date: p.date, price: toMine(p.price, p.currency), store: cleanStore(p.store) }))
+    .filter((p) => typeof p.price === 'number' && Number.isFinite(p.price))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+const mean = (values) => values.reduce((s, v) => s + v, 0) / values.length;
+
+/** The price of each shop that sold it: [{ store, avg, last, count }], cheapest on average first. */
+function storesOf(points) {
+  const by = new Map();
+  for (const p of points) {
+    if (!p.store) continue;
+    const k = storeKey(p.store);
+    const s = by.get(k) || { store: p.store, prices: [] };
+    s.store = p.store; // the latest spelling
+    s.prices.push(p.price);
+    by.set(k, s);
+  }
+  return [...by.values()]
+    .map((s) => ({ store: s.store, avg: mean(s.prices), last: s.prices.at(-1), count: s.prices.length }))
+    .sort((a, b) => a.avg - b.avg);
+}
+
+/**
+ * What an item has cost: the last price and how it moved (against the one before, and against the
+ * average before it), the range, and each shop's price with the cheapest named. Movement is measured
+ * against the same shop when it sold it before, so buying at a dearer shop does not read as a price rise.
+ * Null until it has a price.
+ */
+export function priceStats(item, toMine) {
+  const points = pricePoints(item, toMine);
+  if (!points.length) return null;
+  const last = points.at(-1);
+  const before = points.slice(0, -1);
+  const sameShop = last.store ? before.filter((p) => storeKey(p.store) === storeKey(last.store)) : [];
+  const like = sameShop.length ? sameShop : before;
+  const prev = like.at(-1) || null;
+  const earlier = like.map((p) => p.price);
+  const prices = points.map((p) => p.price);
+  const stores = storesOf(points);
+  const cheapest = stores.length >= 2 ? stores[0] : null;
+  return {
+    points,
+    last,
+    prev,
+    min: Math.min(...prices),
+    max: Math.max(...prices),
+    avg: mean(prices),
+    changeFromPrev: prev && prev.price > 0 ? (last.price - prev.price) / prev.price : null,
+    changeFromAvg: earlier.length ? (last.price - mean(earlier)) / mean(earlier) : null,
+    stores,
+    cheapest,
+    // How much less the cheapest shop usually asks than the last price paid somewhere else
+    saving: cheapest && storeKey(last.store) !== storeKey(cheapest.store) && last.price > cheapest.avg ? last.price - cheapest.avg : 0,
+  };
+}
+
+/**
+ * What the list will probably cost: each item at its last price (at `store`'s last price when it was
+ * bought there before). { total, priced, missing, atStore }.
+ */
+export function basketEstimate(items, { toMine, store = '' } = {}) {
+  const want = store ? storeKey(store) : null;
+  let total = 0;
+  let priced = 0;
+  let atStore = 0;
+  for (const item of items) {
+    const points = pricePoints(item, toMine);
+    if (!points.length) continue;
+    const here = want ? points.filter((p) => storeKey(p.store) === want).at(-1) : null;
+    total += (here || points.at(-1)).price;
+    priced += 1;
+    if (here) atStore += 1;
+  }
+  return { total, priced, missing: items.length - priced, atStore };
+}
+
+/**
+ * Which shop is cheaper, on the things bought at more than one: for each shop, the average of its price
+ * over the usual price of the same item. 0.94 means about 6% below usual. Shops compared on fewer than
+ * `minItems` items are left out. [{ store, index, items }], cheapest first.
+ */
+export function storeComparison(items, { toMine, minItems = 2 } = {}) {
+  const ratios = new Map();
+  for (const item of items) {
+    const stores = storesOf(pricePoints(item, toMine));
+    if (stores.length < 2) continue;
+    const usual = mean(stores.map((s) => s.avg));
+    if (!(usual > 0)) continue;
+    for (const s of stores) {
+      const k = storeKey(s.store);
+      const entry = ratios.get(k) || { store: s.store, values: [] };
+      entry.values.push(s.avg / usual);
+      ratios.set(k, entry);
+    }
+  }
+  return [...ratios.values()]
+    .filter((r) => r.values.length >= minItems)
+    .map((r) => ({ store: r.store, index: mean(r.values), items: r.values.length }))
+    .sort((a, b) => a.index - b.index);
+}
+
+/** Items whose last price moved at least `threshold` from their usual price: { up, down }, biggest moves first. */
+export function priceMovers(items, { toMine, threshold = 0.08 } = {}) {
+  const moved = items
+    .map((item) => ({ item, stats: priceStats(item, toMine) }))
+    .filter(({ stats }) => stats && stats.changeFromAvg !== null && Math.abs(stats.changeFromAvg) >= threshold)
+    .map((x) => ({ ...x, change: x.stats.changeFromAvg }));
+  return {
+    up: moved.filter((x) => x.change > 0).sort((a, b) => b.change - a.change),
+    down: moved.filter((x) => x.change < 0).sort((a, b) => a.change - b.change),
+  };
+}
+
+/** The shops the household has bought at, most recent first. */
+export function knownStores(items) {
+  const by = new Map();
+  for (const item of items) {
+    for (const p of item.purchases || []) {
+      const store = cleanStore(p.store);
+      if (!store) continue;
+      const k = storeKey(store);
+      const s = by.get(k) || { store, last: '', count: 0 };
+      s.count += 1;
+      if (String(p.date) >= s.last) { s.last = String(p.date); s.store = store; }
+      by.set(k, s);
+    }
+  }
+  return [...by.values()].sort((a, b) => b.last.localeCompare(a.last) || b.count - a.count).map((s) => s.store);
+}
+
+/** One purchase's price (and shop) filled in by hand: the changes for the item. */
+export function purchasePriceChanges(item, purchaseId, { price, currency, store }) {
+  return {
+    purchases: (item.purchases || []).map((p) => (p.id !== purchaseId ? p : {
+      ...p,
+      price: typeof price === 'number' && price > 0 ? price : null,
+      currency: typeof price === 'number' && price > 0 ? currency || null : null,
+      ...(store !== undefined && { store: cleanStore(store) }),
+    })),
   };
 }

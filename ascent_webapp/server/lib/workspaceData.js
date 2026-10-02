@@ -10,6 +10,7 @@ import DayTrade from '../models/DayTrade.js';
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import FinancialGoal from '../models/FinancialGoal.js';
 import GroceryItem from '../models/GroceryItem.js';
+import HouseTask from '../models/HouseTask.js';
 import IngestEvent from '../models/IngestEvent.js';
 import IngestToken from '../models/IngestToken.js';
 import MerchantRule from '../models/MerchantRule.js';
@@ -24,7 +25,7 @@ import User from '../models/User.js';
 
 export const WORKSPACE_MODELS = [
   Account, Budget, Card, Category, Commitment, DashboardWidget, DayTrade, ExpenseTransaction,
-  FinancialGoal, GroceryItem, IngestEvent, IngestToken, MerchantRule, Note, NoteFile, PageLayout, Plan,
+  FinancialGoal, GroceryItem, HouseTask, IngestEvent, IngestToken, MerchantRule, Note, NoteFile, PageLayout, Plan,
   PortfolioSnapshot, PortfolioTransaction, Position,
 ];
 

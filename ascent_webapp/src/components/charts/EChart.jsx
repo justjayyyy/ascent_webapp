@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent, AriaComponent, TitleComponent } from 'echarts/components';
+import { GridComponent, TooltipComponent, AriaComponent, TitleComponent, MarkLineComponent } from 'echarts/components';
 import { LabelLayout } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useTheme } from '@/components/ThemeProvider';
 
-echarts.use([BarChart, LineChart, PieChart, GridComponent, TooltipComponent, AriaComponent, TitleComponent, LabelLayout, CanvasRenderer]);
+echarts.use([BarChart, LineChart, PieChart, GridComponent, TooltipComponent, AriaComponent, TitleComponent, MarkLineComponent, LabelLayout, CanvasRenderer]);
 
 const readVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 // zrender only understands comma-separated hsl()/hsla(), so build that form from the CSS variable

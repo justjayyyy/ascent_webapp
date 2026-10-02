@@ -24,11 +24,12 @@ const LISTS = {
   commitments: { load: (ws) => ascent.entities.Commitment.list('-created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   groceries: { load: (ws) => ascent.entities.GroceryItem.list('-created_date', 2000, pinned(ws)), staleTime: MINUTE },
   goals: { load: (ws) => ascent.entities.FinancialGoal.list('created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
+  tasks: { load: (ws) => ascent.entities.HouseTask.list('dueDate', 1000, pinned(ws)), staleTime: 2 * MINUTE },
 };
 
 /**
  * One of the lists above for the workspace on screen, with changes still waiting on this device drawn in
- * (budgets, plans, loans, groceries and savings goals save offline). `enabled: false` skips fetching (e.g. without permission).
+ * (budgets, plans, loans, groceries, savings goals and household tasks save offline). `enabled: false` skips fetching (e.g. without permission).
  */
 export function useWorkspaceList(name, { enabled = true } = {}) {
   const workspaceId = useWorkspaceId();
@@ -51,6 +52,7 @@ export const usePlans = (opts) => useWorkspaceList('plans', opts);
 export const useCommitments = (opts) => useWorkspaceList('commitments', opts);
 export const useGroceries = (opts) => useWorkspaceList('groceries', opts);
 export const useGoals = (opts) => useWorkspaceList('goals', opts);
+export const useTasks = (opts) => useWorkspaceList('tasks', opts);
 
 /** Whether the AI assistant is set up on the server and switched on for this workspace. */
 export function useAssistStatus() {

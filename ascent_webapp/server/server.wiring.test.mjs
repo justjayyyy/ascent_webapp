@@ -81,7 +81,7 @@ test('statement import and smart help require a login', async () => {
 });
 
 test('every data entity is mounted and requires a login', async () => {
-  for (const entity of ['transactions', 'categories', 'budgets', 'cards', 'plans', 'commitments', 'notes', 'goals', 'groceries']) {
+  for (const entity of ['transactions', 'categories', 'budgets', 'cards', 'plans', 'commitments', 'notes', 'goals', 'groceries', 'tasks']) {
     assert.equal((await send(`/api/entities/${entity}`, { method: 'GET' })).code, 401, entity);
   }
 });

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useR
 import { useNavigate } from 'react-router-dom';
 import { useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from '@/lib/motion';
-import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket, PiggyBank } from 'lucide-react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket, PiggyBank, BarChart3, ClipboardList } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
@@ -195,6 +195,7 @@ function LayoutContent({ children, currentPageName }) {
 
   const navigation = useMemo(() => [
     { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewExpenses' },
+    { name: t('rvNav'), page: 'Review', icon: BarChart3, permission: 'viewExpenses' },
     { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
     { name: t('income'), page: 'Income', icon: HandCoins, permission: 'viewExpenses' },
     { name: t('plans'), page: 'Plans', icon: Milestone, permission: 'viewExpenses' },
@@ -203,6 +204,8 @@ function LayoutContent({ children, currentPageName }) {
     // Open to every member: notes shared with someone need no workspace-wide notes permission
     { name: t('notes'), page: 'Notes', icon: StickyNote },
     { name: t('grTitle'), page: 'Groceries', icon: ShoppingBasket },
+    // Household chores with a date and a cost, open to every member like the shopping list
+    { name: t('tkNav'), page: 'Tasks', icon: ClipboardList },
     // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
   ].filter(item => !item.permission || hasPermission(item.permission)), [t, hasPermission]);
 
@@ -224,6 +227,7 @@ function LayoutContent({ children, currentPageName }) {
     canAddMoney && { id: 'commitment', label: t('cmNew'), icon: Landmark, run: () => navigate('/Commitments?new=1') },
     canAddGoals && { id: 'goal', label: t('svNewGoal'), icon: PiggyBank, run: () => navigate('/Savings?new=1') },
     canAddNotes && { id: 'note', label: t('ntNewNote'), icon: StickyNote, run: () => navigate('/Notes?new=1') },
+    { id: 'task', label: t('tkNewTask'), icon: ClipboardList, run: () => navigate('/Tasks?new=1') },
   ].filter(Boolean), [canAddMoney, canAddNotes, canAddGoals, openQuickAdd, navigate, t]);
 
   // Tabs remember where they were scrolled to; a page seen for the first time starts at the top

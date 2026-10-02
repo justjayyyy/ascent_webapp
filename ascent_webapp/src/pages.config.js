@@ -10,6 +10,8 @@ const Commitments = lazy(() => import('./pages/Commitments'));
 const Savings = lazy(() => import('./pages/Savings'));
 const Notes = lazy(() => import('./pages/Notes'));
 const Groceries = lazy(() => import('./pages/Groceries'));
+const Review = lazy(() => import('./pages/Review'));
+const Tasks = lazy(() => import('./pages/Tasks'));
 const Settings = lazy(() => import('./pages/Settings'));
 
 export const pagesConfig = {
@@ -23,6 +25,8 @@ export const pagesConfig = {
     Savings,
     Notes,
     Groceries,
+    Review,
+    Tasks,
     Settings,
   },
   Layout

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ListPlus, ListX, Trash2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDownRight, ArrowUpRight, ListPlus, ListX, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { haptic } from '@/lib/haptics';
-import { AISLES, LEVEL_VALUE, isTracked, lastPrice, supplyOf } from './groceryUtils';
+import { AISLES, LEVEL_VALUE, isTracked, knownStores, lastPrice, priceStats, supplyOf } from './groceryUtils';
+import { useMoney } from '@/hooks/useWorkspaceData';
+import { Sparkline } from '@/components/review/ReviewParts';
 import { TONE, daysAgo, leftLabel, localeOf, money } from './GroceryParts';
 
 const LEVELS = ['full', 'half', 'low', 'out'];
@@ -88,8 +90,100 @@ export function LevelVessel({ item, supply, onLevel, t }) {
   );
 }
 
+/**
+ * What it has cost: the last price and how it moved, the range, each shop's price with the cheapest
+ * named, and a place to type in the price of the last purchase when it has none.
+ */
+function PriceMemory({ item, items, onPrice, t, loc, user }) {
+  const currency = user?.currency || 'ILS';
+  const { convert } = useMoney(currency);
+  const toMine = useCallback((p, c) => (!c || c === currency ? p : convert(p, c)), [convert, currency]);
+  const stats = useMemo(() => priceStats(item, toMine), [item, toMine]);
+  const stores = useMemo(() => knownStores(items || []), [items]);
+  const fmt = money(loc, currency);
+  const blur = !!user?.blurValues;
+  const lastPurchase = (item.purchases || []).at(-1);
+  const needsPrice = lastPurchase && typeof lastPurchase.price !== 'number';
+  const [price, setPrice] = useState('');
+  const [store, setStore] = useState('');
+  useEffect(() => { setPrice(''); setStore(lastPurchase?.store || ''); }, [item.id, lastPurchase?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!stats && !needsPrice) return null;
+  const move = stats?.changeFromAvg;
+  const savePrice = (e) => {
+    e.preventDefault();
+    const value = parseFloat(price);
+    if (!(value > 0)) return;
+    onPrice(item, lastPurchase.id, { price: value, currency, store });
+    haptic('light');
+  };
+
+  return (
+    <section aria-labelledby="gr-price-title" className="rounded-2xl bg-foreground/[0.04] p-3.5">
+      <h3 id="gr-price-title" className="text-sm font-semibold text-foreground">{t('grPriceTitle')}</h3>
+      {stats && (
+        <>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className={cn('text-2xl font-bold tabular-nums tracking-tight text-foreground', blur && 'blur-sm')} dir="ltr">{fmt(stats.last.price)}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {[stats.last.store, new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${stats.last.date}T12:00:00`))].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+            {stats.points.length > 1 && <Sparkline values={stats.points.slice(-10).map((p) => p.price)} width={88} height={28} className="text-foreground" />}
+          </div>
+          {move !== null && Math.abs(move) >= 0.03 && (
+            <p className={cn('mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold', move > 0 ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success')}>
+              {move > 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+              {t(move > 0 ? 'grPriceUp' : 'grPriceDown', { pct: Math.round(Math.abs(move) * 100) })}
+            </p>
+          )}
+          {stats.points.length > 1 && (
+            <dl className={cn('mt-3 grid grid-cols-3 gap-2 text-center text-xs', blur && 'blur-sm')}>
+              {[['grPriceLow', stats.min], ['grPriceAvg', stats.avg], ['grPriceHigh', stats.max]].map(([k, v]) => (
+                <div key={k} className="rounded-xl bg-background/50 p-2">
+                  <dt className="text-muted-foreground">{t(k)}</dt>
+                  <dd className="mt-0.5 font-semibold tabular-nums text-foreground" dir="ltr">{fmt(v)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {stats.stores.length > 1 && (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {stats.stores.map((s, i) => (
+                <li key={s.store} className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-foreground">{s.store}</span>
+                    {i === 0 && <span className="shrink-0 rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success">{t('grCheapest')}</span>}
+                  </span>
+                  <span className={cn('shrink-0 tabular-nums text-muted-foreground', blur && 'blur-sm')} dir="ltr">{fmt(s.avg)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {stats.saving > 0.05 && stats.cheapest && (
+            <p className="mt-2 text-xs text-success">{t('grUsuallyLessAt', { amount: blur ? '••' : fmt(stats.saving), store: stats.cheapest.store })}</p>
+          )}
+        </>
+      )}
+      {needsPrice && onPrice && (
+        <form onSubmit={savePrice} className="mt-3 grid grid-cols-[1fr_1.3fr_auto] gap-2">
+          <Input
+            type="number" inputMode="decimal" min="0" step="any" value={price} onChange={(e) => setPrice(e.target.value)}
+            placeholder={t('grPricePlaceholder')} aria-label={t('grPriceOn', { date: lastPurchase.date })} className="h-10 rounded-xl tabular-nums"
+          />
+          <Input value={store} onChange={(e) => setStore(e.target.value)} list="gr-stores" maxLength={80} placeholder={t('grStore')} aria-label={t('grStore')} className="h-10 rounded-xl" />
+          <datalist id="gr-stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
+          <Button type="submit" variant="secondary" disabled={!(parseFloat(price) > 0)} className="h-10 rounded-xl px-3">{t('save')}</Button>
+          <p className="col-span-3 text-xs text-muted-foreground">{t('grPriceOn', { date: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${lastPurchase.date}T12:00:00`)) })}</p>
+        </form>
+      )}
+    </section>
+  );
+}
+
 /** Everything about one item: its level, aisle, how often it is bought, and putting it on or off the list. */
-export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList, onUnlist, onDelete }) {
+export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList, onUnlist, onDelete, onPrice, items }) {
   const { t, language, user } = useTheme();
   const loc = localeOf(language);
   const [form, setForm] = useState(null);
@@ -183,6 +277,8 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
             </dd>
           </div>
         </dl>
+
+        <PriceMemory item={item} items={items} onPrice={onPrice} t={t} loc={loc} user={user} />
 
         {item.onList && (
           <div className="grid grid-cols-[1fr_2fr] gap-2">

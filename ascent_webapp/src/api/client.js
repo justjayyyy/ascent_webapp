@@ -259,6 +259,7 @@ const entities = {
   PageLayout: createEntity('page-layouts'),
   Commitment: createEntity('commitments'),
   GroceryItem: createEntity('groceries'),
+  HouseTask: createEntity('tasks'),
   Note: {
     ...createEntity('notes'),
     // Permanently delete everything the caller has in the trash

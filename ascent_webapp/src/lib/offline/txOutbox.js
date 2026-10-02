@@ -31,6 +31,7 @@ const LIST_API = {
   commitments: () => ascent.entities.Commitment,
   groceries: () => ascent.entities.GroceryItem,
   goals: () => ascent.entities.FinancialGoal,
+  tasks: () => ascent.entities.HouseTask,
 };
 const rowId = (row) => row?.id || row?._id;
 

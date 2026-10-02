@@ -48,6 +48,7 @@ function openApp(path, language) {
 }
 
 // Something only that page shows once its data has loaded
+const thisMonth = new Date().toLocaleDateString('sv').slice(0, 7);
 const PAGES = {
   '/Dashboard': () => screen.findAllByText(/Rome|Car loan|₪/),
   '/Expenses': () => screen.findAllByText('Shufersal'),
@@ -57,6 +58,13 @@ const PAGES = {
   '/Commitments': () => screen.findAllByText('Car loan'),
   '/Notes': () => screen.findAllByText('milk'),
   '/Settings': () => screen.findAllByDisplayValue('Dana'),
+  // The seeded rows are this month's; early in a month the review opens on the month before
+  [`/Review?month=${thisMonth}`]: () => screen.findAllByText('Shufersal'),
+  [`/Review?month=${thisMonth}&vs=avg3`]: () => screen.findAllByText('Shufersal'),
+  '/Tasks': () => screen.findAllByText('Car insurance'),
+  '/Groceries': () => screen.findAllByText('Milk'),
+  '/Groceries?view=prices': () => screen.findAllByText('Rami Levy'),
+  '/Dashboard?checkin=1': () => screen.findAllByText('Cafe'),
 };
 
 describe.each(['en', 'he', 'ru'])('in %s', (language) => {

@@ -109,6 +109,7 @@ const ENTITIES = {
   plans: () => import('./entities/plans.js'),
   commitments: () => import('./entities/commitments.js'),
   groceries: () => import('./entities/groceries.js'),
+  tasks: () => import('./entities/tasks.js'),
 };
 for (const [name, load] of Object.entries(ENTITIES)) any(`/api/entities/${name}`, route(load, { live: true }));
 

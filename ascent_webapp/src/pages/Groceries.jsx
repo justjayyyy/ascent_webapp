@@ -1,6 +1,6 @@
 import React, { memo, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LayoutGrid, ListChecks, Loader2 } from 'lucide-react';
+import { LayoutGrid, ListChecks, Loader2, Tag } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
@@ -10,12 +10,14 @@ import { GroceriesEmpty, GroceryHeader, StartShopping, useGroceryShell } from '@
 import AddBar from '@/components/groceries/AddBar';
 import WallView from '@/components/groceries/WallView';
 import CheckView from '@/components/groceries/CheckView';
+import PricesView from '@/components/groceries/PricesView';
 import { checkQueue } from '@/components/groceries/groceryUtils';
 
-// The Wall is the default; the Check is one tap away and kept in the address (?view=check)
+// The Wall is the default; the Check and Prices are one tap away and kept in the address (?view=check)
 const VIEWS = [
   { key: 'wall', icon: LayoutGrid, label: 'grViewWall' },
   { key: 'check', icon: ListChecks, label: 'grViewCheck' },
+  { key: 'prices', icon: Tag, label: 'grViewPrices' },
 ];
 
 /** Wall | Check, as tabs: arrow keys move between them, the pill slides to the one chosen. */
@@ -74,7 +76,7 @@ function Groceries() {
   const { t } = useTheme();
   const reduce = useReducedMotion();
   const [params, setParams] = useSearchParams();
-  const view = params.get('view') === 'check' ? 'check' : 'wall';
+  const view = ['check', 'prices'].includes(params.get('view')) ? params.get('view') : 'wall';
   const list = useGroceryList();
   const shell = useGroceryShell(list);
   const { items, isLoading, low, onList, today } = list;
@@ -92,7 +94,7 @@ function Groceries() {
     : view === 'check' && toCheck ? t('grCheckToGo', { n: toCheck })
       : [t('grToBuyCount', { n: onList.length }), low.length ? t('grRunningLowCount', { n: low.length }) : null].filter(Boolean).join(' · ');
 
-  const View = view === 'check' ? CheckView : WallView;
+  const View = view === 'check' ? CheckView : view === 'prices' ? PricesView : WallView;
 
   return (
     <div className="relative mx-auto flex w-full max-w-5xl flex-col p-3 pb-40 sm:p-4 sm:pb-24 md:p-8">

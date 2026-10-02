@@ -60,6 +60,17 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // No-spend days on the Dashboard (opt-in), and how many a month the person aims for (0: no aim)
+  noSpendTracking: {
+    type: Boolean,
+    default: false
+  },
+  noSpendTarget: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 31
+  },
   // OAuth fields
   googleId: {
     type: String,

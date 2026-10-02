@@ -26,11 +26,11 @@ export function useGroceryShell(list) {
     addRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, []));
 
-  const finish = useCallback(async (cart) => {
+  const finish = useCallback(async (cart, { store = '' } = {}) => {
     const date = localDay();
     setShopping(false);
-    setTrip({ items: cart, date });
-    await list.markBought(cart, { date });
+    setTrip({ items: cart, date, store });
+    await list.markBought(cart, { date, store });
   }, [list]);
 
   const item = openId ? list.items.find((i) => i.id === openId) : null;
@@ -46,6 +46,8 @@ export function useGroceryShell(list) {
         onList={(i) => list.putOnList(i)}
         onUnlist={list.takeOffList}
         onDelete={list.remove}
+        onPrice={list.setPurchasePrice}
+        items={list.items}
       />
       <ShoppingMode open={shopping} list={list} onClose={() => setShopping(false)} onDone={finish} />
       <FinishTrip trip={trip} list={list} onClose={() => setTrip(null)} />

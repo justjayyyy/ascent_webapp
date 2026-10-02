@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from '@/lib/motion';
 import NumberFlow from '@number-flow/react';
-import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank, BarChart3 } from 'lucide-react';
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
 import BlurValue from '@/components/BlurValue';
 import { useTheme } from '@/components/ThemeProvider';
@@ -22,6 +22,17 @@ import { useTransactions } from '@/lib/offline/txOutbox';
 import RecapStories from '@/components/recap/RecapStories';
 import { RecapRingButton, RecapBanner, useRecapSeen } from '@/components/recap/RecapEntry';
 import { buildRecap, recapToOffer, monthKeyOf } from '@/lib/recap';
+import { noSpendStats } from '@/lib/noSpend';
+import { useAuth } from '@/lib/AuthContext';
+import { useCategories, useTasks } from '@/hooks/useWorkspaceData';
+import { useCheckin } from '@/components/checkin/useCheckin';
+import CheckinSheet from '@/components/checkin/CheckinSheet';
+import CheckinCard from '@/components/insights/CheckinCard';
+import { NoSpendCard, NoSpendInvite } from '@/components/insights/NoSpendCard';
+import TasksDueCard from '@/components/insights/TasksDueCard';
+import { dueState } from '@/components/tasks/taskUtils';
+
+const NOSPEND_INVITE_KEY = 'ascent_nospend_invite_dismissed';
 
 const MAX_CATEGORY_SLICES = 6;
 const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -56,7 +67,9 @@ function Money({ value, locale, currency, blur, className }) {
 }
 
 export default function Dashboard() {
-  const { user, t, language, isRTL } = useTheme();
+  const { user, t, language, isRTL, saveUserPrefs } = useTheme();
+  const { hasPermission } = useAuth();
+  const navigate = useNavigate();
   const tokens = useChartTokens();
   const userCurrency = user?.currency || 'ILS';
   const blur = !!user?.blurValues;
@@ -193,6 +206,30 @@ export default function Dashboard() {
   }, [params, setParams, openRecap]);
   const selectedRecapFresh = monthKeyOf(selectedMonth) < monthKeyOf(new Date()) && !recapSeen.has(monthKeyOf(selectedMonth));
 
+  // ---- Weekly check-in, no-spend days and household tasks: about now, whatever month is on screen ----
+  // The default history window (everything the check-in and the streak look at), separate from the month view
+  const { data: recentTx = [] } = useTransactions();
+  const recentRows = useMemo(() => recentTx.filter((tx) => tx?.date).map((tx) => ({ ...tx, _amount: toUserCurrency(tx) })), [recentTx, toUserCurrency]);
+  const checkin = useCheckin(recentRows);
+  const canEditExpenses = hasPermission('editExpenses');
+  const { data: categories = [] } = useCategories({ enabled: canEditExpenses });
+  const [checkinOpen, setCheckinOpen] = useState(false);
+  useEffect(() => {
+    if (params.get('checkin') !== '1') return;
+    setCheckinOpen(true);
+    params.delete('checkin');
+    setParams(params, { replace: true });
+  }, [params, setParams]);
+
+  const tracking = !!user?.noSpendTracking;
+  const streak = useMemo(() => (tracking ? noSpendStats(recentRows) : null), [tracking, recentRows]);
+  const [inviteDismissed, setInviteDismissed] = useState(() => { try { return localStorage.getItem(NOSPEND_INVITE_KEY) === '1'; } catch { return true; } });
+  const dismissInvite = () => { setInviteDismissed(true); try { localStorage.setItem(NOSPEND_INVITE_KEY, '1'); } catch { /* storage unavailable */ } };
+  const showInvite = !tracking && !inviteDismissed && recentRows.length >= 10;
+
+  const { data: tasks = [] } = useTasks();
+  const dueTasks = useMemo(() => tasks.filter((x) => ['overdue', 'today', 'soon'].includes(dueState(x))).slice(0, 4), [tasks]);
+
   const shiftMonth = (delta) => setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   const hasData = monthTx.length > 0;
 
@@ -327,6 +364,13 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
           <RecapRingButton onOpen={() => openRecap(selectedMonth)} fresh={selectedRecapFresh && hasData} label={t('rcButton')} />
+          <Link
+            to={`${createPageUrl('Review')}?month=${selectedKey}`}
+            className="inline-flex h-11 items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-4 text-sm font-semibold backdrop-blur-xl transition hover:bg-foreground/10 active:scale-95"
+          >
+            <BarChart3 className="h-4 w-4 text-primary" aria-hidden />
+            <span className="max-sm:sr-only">{t('rvOpen')}</span>
+          </Link>
           <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/70 p-1 backdrop-blur-xl">
             <button type="button" aria-label={t('dashPrevMonth')} onClick={() => shiftMonth(-1)}
               className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-foreground/10 active:scale-95 sm:h-9 sm:w-9">
@@ -354,6 +398,12 @@ export default function Dashboard() {
         )}
 
         <AssistantBar />
+
+        {(checkin.due && (canEditExpenses || checkin.queue.length === 0)) && (
+          <Tile i={1}>
+            <CheckinCard checkin={checkin} onOpen={() => setCheckinOpen(true)} t={t} fmt={fmtMoney} blur={blur} />
+          </Tile>
+        )}
 
         {/* Bento grid */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-6 md:gap-5">
@@ -394,6 +444,24 @@ export default function Dashboard() {
               kpis.savingsRate === null ? '—' : <NumberFlow value={kpis.savingsRate / 100} locales={locale} format={{ style: 'percent', maximumFractionDigits: 0 }} trend={0} />,
               PiggyBank, 'text-primary')}
           </div>
+
+          {/* No-spend days, for those who turned them on */}
+          {streak && (
+            <Tile i={2} className={dueTasks.length ? 'md:col-span-3' : 'md:col-span-6'}>
+              <NoSpendCard stats={streak} target={user?.noSpendTarget || 0} t={t} onSettings={() => navigate('/Settings#appearance')} />
+            </Tile>
+          )}
+          {showInvite && (
+            <Tile i={2} className={dueTasks.length ? 'md:col-span-3' : 'md:col-span-6'}>
+              <NoSpendInvite t={t} onDismiss={dismissInvite} onEnable={() => { saveUserPrefs({ noSpendTracking: true }).catch(() => {}); dismissInvite(); }} />
+            </Tile>
+          )}
+          {/* Household tasks that are late or close */}
+          {dueTasks.length > 0 && (
+            <Tile i={2} className={streak || showInvite ? 'md:col-span-3' : 'md:col-span-6'}>
+              <TasksDueCard tasks={dueTasks} t={t} loc={locale} blur={blur} />
+            </Tile>
+          )}
 
           {/* Loans and commitments: what is owed, what leaves each month, when it ends */}
           <Tile i={3} className="md:col-span-6">
@@ -464,6 +532,15 @@ export default function Dashboard() {
           </Tile>
         </div>
       </div>
+
+      <CheckinSheet
+        open={checkinOpen}
+        onClose={() => setCheckinOpen(false)}
+        checkin={checkin}
+        rows={recentRows}
+        categories={categories}
+        canEdit={canEditExpenses}
+      />
 
       <RecapStories
         open={!!recapMonth}

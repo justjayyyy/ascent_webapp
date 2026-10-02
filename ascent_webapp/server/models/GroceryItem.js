@@ -13,6 +13,7 @@ const purchaseSchema = new mongoose.Schema({
   price: { type: Number, default: null, min: 0 },
   currency: { type: String, default: null, maxlength: 3 },
   by: { type: String, default: '', maxlength: 120 }, // who bought it (their email)
+  store: { type: String, default: '', maxlength: 80 }, // the shop, so prices can be compared between shops
 }, { _id: false });
 
 // Something the household buys: either just on this trip's list, or a staple whose supply is tracked
