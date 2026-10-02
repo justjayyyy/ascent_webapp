@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CreditCard, Plus, Trash2, Pencil } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Pencil, Star } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { toast } from 'sonner';
 import BlurValue from '../BlurValue';
@@ -47,6 +47,17 @@ export default function CardManagement({ index }) {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       close();
       toast.success(t('cardUpdatedSuccessfully'));
+    },
+  });
+
+  // Only one default per person: mark the picked card and clear the flag on their others
+  const defaultCardMutation = useMutation({
+    mutationFn: (id) => Promise.all(cards
+      .filter((c) => !!c.isDefault !== (c.id === id))
+      .map((c) => ascent.entities.Card.update(c.id, { isDefault: c.id === id }))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      toast.success(t('defaultCardUpdated'));
     },
   });
 
@@ -172,8 +183,25 @@ export default function CardManagement({ index }) {
                   </>
                 )}
               </p>
-              <p className="text-sm text-muted-foreground">{t(card.type) || card.type}</p>
+              <p className="text-sm text-muted-foreground">
+                {t(card.type) || card.type}
+                {(cards.length === 1 || card.isDefault) && <span className="ms-2 font-medium text-primary">· {t('defaultCard')}</span>}
+              </p>
             </div>
+            {cards.length > 1 && (
+              <Button
+                onClick={() => !card.isDefault && defaultCardMutation.mutate(card.id)}
+                size="icon"
+                variant="ghost"
+                disabled={defaultCardMutation.isPending}
+                aria-label={t('setAsDefaultCard')}
+                aria-pressed={!!card.isDefault}
+                title={t('setAsDefaultCard')}
+                className={`h-11 w-11 rounded-xl sm:h-9 sm:w-9 ${card.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Star className="h-4 w-4" fill={card.isDefault ? 'currentColor' : 'none'} />
+              </Button>
+            )}
             <Button
               onClick={() => handleEdit(card)}
               size="icon"

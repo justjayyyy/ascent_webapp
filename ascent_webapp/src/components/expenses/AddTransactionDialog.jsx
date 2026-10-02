@@ -131,6 +131,18 @@ export default function AddTransactionDialog({
   const cards = useMemo(() => allCards.filter((c) =>
     c.id === formData.cardId || (c.isActive !== false && (!c.createdBy || String(c.createdBy) === payerId))
   ), [allCards, payerId, formData.cardId]);
+  // The payer's default card: their only card, or the one they marked as default in Settings
+  const defaultCardId = useMemo(() => {
+    const own = allCards.filter((c) => c.isActive !== false && (!c.createdBy || String(c.createdBy) === payerId));
+    return (own.length === 1 ? own[0] : own.find((c) => c.isDefault))?.id || '';
+  }, [allCards, payerId]);
+  // New rows get the default card; on edits only once the person changes the method or payer, so saved rows stay as they were
+  const autoCardRef = useRef(false);
+  useEffect(() => {
+    if (open && autoCardRef.current && formData.paymentMethod === 'Card' && !formData.cardId && defaultCardId) {
+      setFormData((f) => ({ ...f, cardId: defaultCardId }));
+    }
+  }, [open, formData.paymentMethod, formData.cardId, defaultCardId]);
 
   useEffect(() => {
     if (editTransaction) {
@@ -185,6 +197,7 @@ export default function AddTransactionDialog({
       });
     }
     categoryTouched.current = false;
+    autoCardRef.current = !editTransaction;
     setErrors({});
   }, [editTransaction, open, user?.currency, categories, startType]);
 
@@ -472,6 +485,7 @@ export default function AddTransactionDialog({
               <Select
                 value={formData.paymentMethod}
                 onValueChange={(value) => {
+                  autoCardRef.current = true;
                   setFormData({ ...formData, paymentMethod: value, cardId: value === 'Card' ? formData.cardId : '' });
                 }}
               >
@@ -506,6 +520,7 @@ export default function AddTransactionDialog({
               value={{ paidBy: formData.paidBy, split: formData.split }}
               onChange={(v) => {
                 // Another payer means another wallet: drop a card that was picked for the previous one
+                if (v.paidBy !== formData.paidBy) autoCardRef.current = true;
                 setFormData({ ...formData, ...v, ...(v.paidBy !== formData.paidBy && { cardId: '' }) });
                 if (errors.split) setErrors({ ...errors, split: '' });
               }}

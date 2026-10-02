@@ -34,6 +34,11 @@ const cardSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // The card new expenses pick when paid by Card (per person: each member marks one of their own)
+  isDefault: {
+    type: Boolean,
+    default: false
+  },
   workspaceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Workspace',
