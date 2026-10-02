@@ -27,6 +27,7 @@ Set these for Production (and Preview if previews should work). The README has t
 | `FRONTEND_URL` | The app's address, used for every link in emails (`https://ascentwebapp.vercel.app` or your domain) |
 | `CRON_SECRET` | Vercel sends it to the summary-email crons; without it they are refused |
 | `VITE_GOOGLE_CLIENT_ID` | Google sign-in (the API accepts tokens issued for this client only) |
+| `GOOGLE_CLIENT_SECRET` | The same OAuth client's secret: keeps Google Calendar connected across sign-ins. Without it the calendar connects for an hour at a time |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Invitations, password reset, email confirmation, summaries |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Push notifications |
 | `ANTHROPIC_API_KEY` | The AI assistant (off until a workspace owner turns it on) |

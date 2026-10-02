@@ -132,6 +132,7 @@ export default {
   calSchedule: 'Расписание',
   calSaveFailed: 'Что-то пошло не так. Попробуйте ещё раз.',
   calGoogleUnavailable: 'Вход через Google сейчас недоступен.',
+  calConnectTryAgain: "Google не завершил подключение. Подключитесь ещё раз.",
   calFreeDay: 'Свободный день. Наслаждайтесь.',
   newNote: 'Новая заметка',
   editNote: 'Редактировать заметку',

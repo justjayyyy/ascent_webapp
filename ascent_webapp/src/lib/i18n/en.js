@@ -132,6 +132,7 @@ export default {
   calSchedule: 'Schedule',
   calSaveFailed: 'Something went wrong. Please try again.',
   calGoogleUnavailable: 'Google Sign-In is not available right now.',
+  calConnectTryAgain: "Google didn't finish connecting. Please connect once more.",
   calFreeDay: 'A free day. Enjoy it.',
   newNote: 'New Note',
   editNote: 'Edit Note',

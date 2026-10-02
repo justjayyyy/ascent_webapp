@@ -9,6 +9,7 @@ import IngestToken from '../models/IngestToken.js';
 import IngestEvent from '../models/IngestEvent.js';
 import PushSubscription from '../models/PushSubscription.js';
 import AuthChallenge from '../models/AuthChallenge.js';
+import CalendarLink from '../models/CalendarLink.js';
 import { deleteWorkspaceData } from './workspaceData.js';
 import { isSame } from '../../shared/workspaceAccess.js';
 
@@ -63,6 +64,7 @@ export async function deleteAccount(user) {
     IngestEvent.deleteMany({ userId: uid }),
     PushSubscription.deleteMany({ userId: uid }),
     AuthChallenge.deleteMany({ userId: uid }),
+    CalendarLink.deleteMany({ userId: uid }),
   ]);
   await User.deleteOne({ _id: uid });
 }

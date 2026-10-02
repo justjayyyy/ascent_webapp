@@ -30,6 +30,7 @@ npm run dev:all        # web app on :5173 and API on :3002
 | `JWT_SECRET` | yes in production | Signs sessions. The API refuses to start signing without it in production |
 | `JWT_EXPIRES_IN` | no | Session length, default `7d` |
 | `VITE_GOOGLE_CLIENT_ID` (or `GOOGLE_CLIENT_ID`) | for Google sign-in | The OAuth client id; the API only accepts ID tokens issued for it |
+| `GOOGLE_CLIENT_SECRET` | for a lasting calendar connection | The same OAuth client's secret. The API keeps each person's Google Calendar refresh token (encrypted with `JWT_SECRET`), so the calendar stays connected after signing out. Without it the calendar connects in the browser for an hour at a time |
 | `FRONTEND_URL` | yes in production | The app's address: links in every email (invitations, password reset, email confirmation, summaries) and an allowed browser origin. In production emailed links never follow the request's Origin |
 | `PASSKEY_ORIGIN` | no | Another origin allowed to use passkeys |
 | `CRON_SECRET` | yes in production | Vercel Cron sends it to the summary-email routes |

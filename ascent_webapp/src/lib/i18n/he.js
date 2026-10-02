@@ -132,6 +132,7 @@ export default {
   calSchedule: 'לוח זמנים',
   calSaveFailed: 'משהו השתבש. נסו שוב.',
   calGoogleUnavailable: 'התחברות עם גוגל אינה זמינה כרגע.',
+  calConnectTryAgain: "החיבור ל-Google לא הושלם. נא להתחבר שוב.",
   calFreeDay: 'יום פנוי. תיהנו ממנו.',
   newNote: 'פתק חדש',
   editNote: 'עריכת פתק',

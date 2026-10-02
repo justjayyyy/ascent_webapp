@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import { connectDB } from '../lib/mongodb.js';
 import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import IngestToken from '../models/IngestToken.js';
+import CalendarLink from '../models/CalendarLink.js';
 import IngestEvent from '../models/IngestEvent.js';
 import Category from '../models/Category.js';
 import Workspace from '../models/Workspace.js';
@@ -42,7 +43,7 @@ async function main() {
     await Category.deleteMany({ _id: { $in: extra } });
     console.log(`Removed ${extra.length} duplicate default categories`);
   }
-  for (const Model of [ExpenseTransaction, IngestToken, IngestEvent, Category, Workspace, User, RateLimit, Budget, Plan, Commitment, Settlement]) {
+  for (const Model of [ExpenseTransaction, IngestToken, IngestEvent, Category, Workspace, User, RateLimit, Budget, Plan, Commitment, Settlement, CalendarLink]) {
     await Model.createIndexes();
     const indexes = await Model.collection.indexes();
     console.log(`\n${Model.modelName} (${Model.collection.name})`);

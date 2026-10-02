@@ -95,7 +95,11 @@ export default function CalendarModal({ open, onOpenChange }) {
   const [view, setView] = useState('month');
   const [layers, setLayers] = useState(readLayers);
 
-  const [accessToken, setAccessToken] = useState(null);
+  // How the calendar reaches Google: { kind: 'account' } when the connection is kept on the account
+  // (it survives signing out), { kind: 'browser', token } for an hour-long token on deployments without one
+  const [connection, setConnection] = useState(null);
+  const [checking, setChecking] = useState(true);
+  const accountMode = useRef(false);
   const [rawEvents, setRawEvents] = useState([]);
   const [rawTasks, setRawTasks] = useState([]);
   const [rawHolidays, setRawHolidays] = useState([]);
@@ -104,19 +108,37 @@ export default function CalendarModal({ open, onOpenChange }) {
   const [composer, setComposer] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const tokenRef = useRef(null);
+  const connRef = useRef(null);
   const loadedRange = useRef(null);
-  const isAuthenticated = !!accessToken;
+  const isAuthenticated = !!connection;
 
-  useEffect(() => { tokenRef.current = accessToken; }, [accessToken]);
+  useEffect(() => { connRef.current = connection; }, [connection]);
 
-  // Restore a still-valid token
+  // Is the account connected? If this deployment cannot keep a connection, restore a still-valid browser token
   useEffect(() => {
-    try {
-      const token = localStorage.getItem(CALENDAR_TOKEN_KEY);
-      const expiry = localStorage.getItem(CALENDAR_EXPIRY_KEY);
-      if (token && expiry && Date.now() < parseInt(expiry, 10)) setAccessToken(token);
-    } catch { /* storage unavailable */ }
+    let cancelled = false;
+    const restoreBrowserToken = () => {
+      try {
+        const token = localStorage.getItem(CALENDAR_TOKEN_KEY);
+        const expiry = localStorage.getItem(CALENDAR_EXPIRY_KEY);
+        if (token && expiry && Date.now() < parseInt(expiry, 10)) setConnection({ kind: 'browser', token });
+      } catch { /* storage unavailable */ }
+    };
+    (async () => {
+      try {
+        const res = await fetch('/api/integrations/google-calendar?action=status');
+        const status = res.ok ? await res.json() : null;
+        if (cancelled) return;
+        accountMode.current = !!status?.available;
+        if (status?.connected) setConnection({ kind: 'account' });
+        else if (!status?.available) restoreBrowserToken();
+      } catch {
+        if (!cancelled) restoreBrowserToken();
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const clearSession = useCallback(() => {
@@ -125,18 +147,24 @@ export default function CalendarModal({ open, onOpenChange }) {
       localStorage.removeItem(CALENDAR_EXPIRY_KEY);
     } catch { /* storage unavailable */ }
     loadedRange.current = null;
-    setAccessToken(null);
+    setConnection(null);
     setRawEvents([]); setRawTasks([]); setRawHolidays([]);
   }, []);
 
   const gcal = useCallback(async (action, { method = 'GET', params = {}, body } = {}) => {
     const qs = new URLSearchParams({ action, ...params });
+    const conn = connRef.current;
     const res = await fetch(`/api/integrations/google-calendar?${qs}`, {
       method,
-      headers: { Authorization: `Bearer ${tokenRef.current}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: {
+        ...(conn?.kind === 'browser' ? { Authorization: `Bearer ${conn.token}` } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (res.status === 401) {
+    // On the account connection a 401 without the code is the app session ending, which the app handles
+    const lost = res.status === 401 && (conn?.kind === 'browser' || (await res.clone().json().catch(() => null))?.code === 'CALENDAR_NOT_CONNECTED');
+    if (lost) {
       clearSession();
       toast.error(t('calendarSessionExpired'));
       throw new Error('unauthorized');
@@ -149,12 +177,43 @@ export default function CalendarModal({ open, onOpenChange }) {
       toast.error(t('calGoogleUnavailable'));
       return;
     }
+    if (accountMode.current) {
+      // Connect once for the account: Google's popup hands over a code the server keeps a refresh token for
+      const codeClient = window.google.accounts.oauth2.initCodeClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: CALENDAR_SCOPES,
+        ux_mode: 'popup',
+        callback: async (response) => {
+          if (!response.code) {
+            if (response.error) toast.error(t('calSaveFailed'));
+            return;
+          }
+          try {
+            const res = await fetch('/api/integrations/google-calendar?action=connect', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: response.code }),
+            });
+            if (res.ok) {
+              setConnection({ kind: 'account' });
+              toast.success(t('calendarConnected'));
+            } else {
+              toast.error(res.status === 409 ? t('calConnectTryAgain') : t('calSaveFailed'));
+            }
+          } catch {
+            toast.error(t('calSaveFailed'));
+          }
+        },
+      });
+      codeClient.requestCode();
+      return;
+    }
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: CALENDAR_SCOPES,
       callback: (response) => {
         if (response.access_token) {
-          setAccessToken(response.access_token);
+          setConnection({ kind: 'browser', token: response.access_token });
           try {
             localStorage.setItem(CALENDAR_TOKEN_KEY, response.access_token);
             localStorage.setItem(CALENDAR_EXPIRY_KEY, String(Date.now() + 3600000));
@@ -169,6 +228,9 @@ export default function CalendarModal({ open, onOpenChange }) {
   }, [t]);
 
   const disconnect = useCallback(() => {
+    if (connRef.current?.kind === 'account') {
+      fetch('/api/integrations/google-calendar?action=disconnect', { method: 'POST' }).catch(() => {});
+    }
     clearSession();
     setComposer(null);
     toast.success(t('calendarDisconnected'));
@@ -176,7 +238,7 @@ export default function CalendarModal({ open, onOpenChange }) {
 
   // ---- Data -------------------------------------------------------------
   const fetchAll = useCallback(async (center = new Date()) => {
-    if (!tokenRef.current) return;
+    if (!connRef.current) return;
     setIsRefreshing(true);
     const from = startOfMonth(subMonths(center, 3));
     const to = endOfMonth(addMonths(center, 3));
@@ -416,7 +478,11 @@ export default function CalendarModal({ open, onOpenChange }) {
 
         {isRefreshing && <div className="absolute inset-x-0 top-0 z-30 h-0.5 animate-pulse bg-primary" role="progressbar" aria-label={t('refresh')} />}
 
-        {!isAuthenticated ? (
+        {checking ? (
+          <div className="grid flex-1 place-items-center" role="status" aria-label={t('loading')}>
+            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
+          </div>
+        ) : !isAuthenticated ? (
           <ConnectScreen t={t} onConnect={handleGoogleAuth} />
         ) : (
           <>
