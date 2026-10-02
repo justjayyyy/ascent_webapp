@@ -1398,6 +1398,7 @@ export default {
   subsEmpty: 'Повторяющиеся платежи появятся здесь после нескольких списаний.',
   subsWent: 'было {from}',
   subsNext: 'следующий {date}',
+  subsCadence_daily: 'ежедневно',
   subsCadence_weekly: 'еженедельно',
   subsCadence_monthly: 'ежемесячно',
   subsCadence_yearly: 'ежегодно',
@@ -1406,6 +1407,8 @@ export default {
   subsShowLess: 'Свернуть',
 
   hhTitle: 'Между вами',
+  splitSettingTitle: 'Делить расходы между нами',
+  splitSettingDesc: 'Позволяет делить расходы и показывает на главной, кто кому должен. Выключите, если вы считаете всё вместе.',
   hhOwesYou: '{name}: долг вам',
   hhYouOwe: 'Ваш долг: {name}',
   hhOwes: '{from} → {to}',

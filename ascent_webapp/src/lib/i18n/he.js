@@ -1398,6 +1398,7 @@ export default {
   subsEmpty: 'תשלומים חוזרים יופיעו כאן אחרי כמה חיובים.',
   subsWent: 'עלה מ-{from}',
   subsNext: 'הבא ב-{date}',
+  subsCadence_daily: 'יומי',
   subsCadence_weekly: 'שבועי',
   subsCadence_monthly: 'חודשי',
   subsCadence_yearly: 'שנתי',
@@ -1406,6 +1407,8 @@ export default {
   subsShowLess: 'הצגת פחות',
 
   hhTitle: 'ביניכם',
+  splitSettingTitle: 'חלוקת הוצאות בינינו',
+  splitSettingDesc: 'מאפשר לחלק הוצאה ומציג בלוח הבקרה מי חייב למי. כבו אם אתם סופרים הכול יחד.',
   hhOwesYou: '{name} חייב/ת לך',
   hhYouOwe: 'את/ה חייב/ת ל-{name}',
   hhOwes: '{from} חייב/ת ל-{to}',

@@ -102,7 +102,7 @@ export default function Dashboard() {
   // (shown as is until rates arrive, rather than as zero)
   const convert = useCallback((amount, from) => (amount ? convertOrNull(amount, from) ?? amount : 0), [convertOrNull]);
 
-  const { isShared, members } = useHousehold();
+  const { isShared, splits, members } = useHousehold();
   const { forecast, subscriptions, balances, commitments } = useInsights({ rows: normalized, splitRows, selectedMonth, convert });
   const showForecast = forecast.phase === 'current';
 
@@ -400,12 +400,12 @@ export default function Dashboard() {
             <CommitmentsCard commitments={commitments} convert={convert} />
           </Tile>
 
-          {isShared && (
+          {splits && (
             <Tile i={3} className="md:col-span-3 xl:col-span-2">
               <HouseholdBalanceCard balances={balances} />
             </Tile>
           )}
-          <Tile i={3} className={isShared ? 'md:col-span-3 xl:col-span-4' : 'md:col-span-6'}>
+          <Tile i={3} className={splits ? 'md:col-span-3 xl:col-span-4' : 'md:col-span-6'}>
             <SubscriptionsCard subscriptions={subscriptions} />
           </Tile>
 

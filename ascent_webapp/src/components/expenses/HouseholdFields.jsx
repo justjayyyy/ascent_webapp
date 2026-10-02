@@ -20,7 +20,7 @@ export const splitIsValid = (split) =>
  */
 export default function HouseholdFields({ value, onChange, amount, currency, error, creator }) {
   const { t, language } = useTheme();
-  const { members, isShared, meEmail } = useHousehold();
+  const { members, isShared, splits, meEmail } = useHousehold();
   if (!isShared) return null;
 
   const loc = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
@@ -69,6 +69,7 @@ export default function HouseholdFields({ value, onChange, amount, currency, err
         </div>
       </div>
 
+      {(splits || split) && (<>
       <div className="flex items-center gap-2">
         <Checkbox id="splitExpense" checked={!!split} onCheckedChange={(c) => toggleSplit(!!c)} />
         <Label htmlFor="splitExpense" className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
@@ -109,6 +110,7 @@ export default function HouseholdFields({ value, onChange, amount, currency, err
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 }

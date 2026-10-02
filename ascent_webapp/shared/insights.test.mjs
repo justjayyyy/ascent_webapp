@@ -201,3 +201,25 @@ test('splitShares refuses splits with fewer than two people', () => {
   assert.equal(splitShares({ mode: 'custom', shares: [{ email: 'a@x', percent: 100 }] }), null);
   assert.equal(splitShares(null), null);
 });
+
+test('a bill saved as recurring shows from its first charge, with the next one it already has', () => {
+  const series = { isRecurring: true, recurringFrequency: 'monthly', recurringGroupId: 'g1', recurringStartDate: '2026-04-10', recurringEndDate: '2027-03-10' };
+  const rows = monthly('electric', [300, 300, 300, 300], '2026-04-10', series);
+  const [sub] = detectSubscriptions(rows, '2026-04-20');
+  assert.equal(sub.key, 'series:g1');
+  assert.equal(sub.cadence, 'monthly');
+  assert.equal(sub.amount, 300);
+  assert.equal(sub.nextDate, '2026-05-10');
+  assert.equal(sub.count, 1);
+  // one starting soon is already listed; one starting months away is not yet
+  assert.equal(detectSubscriptions(rows, '2026-04-01').length, 1);
+  assert.deepEqual(detectSubscriptions(rows, '2026-01-15'), []);
+  // after its last charge it has ended
+  assert.deepEqual(detectSubscriptions(rows, '2026-09-01'), []);
+});
+
+test('a recurring bill is not listed twice when its history also looks like a subscription', () => {
+  const series = { isRecurring: true, recurringFrequency: 'monthly', recurringGroupId: 'g2', recurringStartDate: '2026-01-05', recurringEndDate: '2026-12-05' };
+  const rows = monthly('netflix', [49.9, 49.9, 49.9, 49.9, 49.9], '2026-01-05', series);
+  assert.equal(detectSubscriptions(rows, '2026-04-20').length, 1);
+});

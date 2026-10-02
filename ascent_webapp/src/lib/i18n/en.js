@@ -1402,6 +1402,7 @@ export default {
   subsEmpty: 'Payments that repeat show up here after they have charged a few times.',
   subsWent: 'up from {from}',
   subsNext: 'next {date}',
+  subsCadence_daily: 'daily',
   subsCadence_weekly: 'weekly',
   subsCadence_monthly: 'monthly',
   subsCadence_yearly: 'yearly',
@@ -1411,6 +1412,8 @@ export default {
 
   // Household balance
   hhTitle: 'Between you',
+  splitSettingTitle: 'Split expenses between us',
+  splitSettingDesc: 'Lets an expense be split and shows who owes whom on the dashboard. Turn off if you count everything together.',
   hhOwesYou: '{name} owes you',
   hhYouOwe: 'You owe {name}',
   hhOwes: '{from} owes {to}',

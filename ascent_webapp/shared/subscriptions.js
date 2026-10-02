@@ -29,6 +29,59 @@ export function payeeKey(tx) {
     .trim();
 }
 
+const PER_MONTH = { daily: 30.4, weekly: 52 / 12, monthly: 1, yearly: 1 / 12 };
+const PERIOD_DAYS = { daily: 1, weekly: 7, monthly: 30.4, yearly: 365 };
+const skipped = (tx) => tx.type !== 'Expense' || !tx.date || tx.installmentGroupId || tx.commitmentId || !(tx.amount > 0);
+
+/** Which recurring series a row belongs to (rows saved before series carried an id share their settings). */
+const seriesId = (tx) => (tx.isRecurring && (tx.recurringGroupId || tx.recurringStartDate)
+  ? tx.recurringGroupId || ['legacy', tx.recurringStartDate, tx.recurringEndDate, tx.description, tx.category].join('|')
+  : null);
+
+/**
+ * Bills entered as recurring: they count from the first charge, since the coming ones are already saved.
+ * A series is shown while it is running, or when its first charge is due within about a period.
+ */
+function declaredSeries(transactions, today) {
+  const groups = new Map();
+  for (const tx of transactions) {
+    const id = !skipped(tx) && seriesId(tx);
+    if (!id) continue;
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(tx);
+  }
+  const found = [];
+  for (const [id, list] of groups) {
+    const rows = [...list].sort((a, b) => a.date.localeCompare(b.date));
+    const past = rows.filter((tx) => tx.date <= today);
+    const next = rows.find((tx) => tx.date > today);
+    const frequency = PER_MONTH[rows[0].recurringFrequency] ? rows[0].recurringFrequency : 'monthly';
+    const period = PERIOD_DAYS[frequency];
+    const latest = past[past.length - 1];
+    // Ended (its last charge is well behind), or not started yet and not coming up soon
+    if (latest && !next && daysBetween(latest.date, today) > period + 10) continue;
+    if (!latest && daysBetween(today, next.date) > Math.max(period, 31) + 3) continue;
+    const current = latest || next;
+    const previous = past.length > 1 ? past[past.length - 2].amount : null;
+    const pct = previous > 0 ? (current.amount - previous) / previous : 0;
+    const rising = previous > 0 && pct >= 0.03 && current.amount - previous >= 0.5;
+    found.push({
+      key: `series:${id}`,
+      payee: payeeKey(current),
+      name: current.merchant || current.description || current.category,
+      category: current.category,
+      cadence: frequency,
+      amount: round2(current.amount),
+      monthlyCost: round2(current.amount * PER_MONTH[frequency]),
+      count: past.length,
+      lastDate: latest?.date || null,
+      nextDate: next?.date || addDays(current.date, period),
+      priceChange: rising ? { from: round2(previous), to: round2(current.amount), pct: Math.round(pct * 1000) / 10 } : null,
+    });
+  }
+  return found;
+}
+
 /**
  * @param {Array}  transactions { type, date, amount, description, merchant, merchantKey, category, isRecurring }
  * @param {string} today        'YYYY-MM-DD'
@@ -36,11 +89,14 @@ export function payeeKey(tx) {
  *                  biggest monthly cost first; priceChange is { from, to, pct } when the latest charge went up
  */
 export function detectSubscriptions(transactions, today) {
+  const series = declaredSeries(transactions, today);
+  // A payee already shown as a recurring bill is not found a second time from its history
+  const taken = new Set(series.map((s) => s.payee));
   const groups = new Map();
   for (const tx of transactions) {
-    if (tx.type !== 'Expense' || !tx.date || tx.date > today || tx.installmentGroupId || tx.commitmentId || !(tx.amount > 0)) continue;
+    if (skipped(tx) || tx.date > today) continue;
     const key = payeeKey(tx);
-    if (key.length < 2) continue;
+    if (key.length < 2 || taken.has(key)) continue;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(tx);
   }
@@ -90,5 +146,5 @@ export function detectSubscriptions(transactions, today) {
       priceChange: rising ? { from: round2(previous), to: round2(latest.amount), pct: Math.round(pct * 1000) / 10 } : null,
     });
   }
-  return found.sort((a, b) => b.monthlyCost - a.monthlyCost);
+  return [...series.map(({ payee, ...s }) => s), ...found].sort((a, b) => b.monthlyCost - a.monthlyCost);
 }

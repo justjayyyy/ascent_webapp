@@ -382,6 +382,7 @@ export default async function handler(req, res) {
           if (!isManagerRole(actor?.role) && !isSame(workspace.ownerId, user._id)) return forbidden(res, 'Only owners and admins can change household settings');
           const next = { ...(workspace.settings?.toObject?.() ?? workspace.settings ?? {}) };
           if (body.aiAssistant !== undefined) next.aiAssistant = body.aiAssistant === true;
+          if (body.splitExpenses !== undefined) next.splitExpenses = body.splitExpenses !== false;
           if (body.largeExpenseAlert !== undefined) {
             const amount = Number(body.largeExpenseAlert);
             next.largeExpenseAlert = body.largeExpenseAlert === null || !(amount > 0) ? null : Math.min(amount, 1e9);

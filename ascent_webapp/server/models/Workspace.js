@@ -72,6 +72,8 @@ const workspaceSchema = new mongoose.Schema({
   // it sends summaries of the workspace's spending to an outside service.
   settings: {
     aiAssistant: { type: Boolean, default: false },
+    // Off for households that pool everything: no splitting expenses and no "who owes whom"
+    splitExpenses: { type: Boolean, default: true },
     largeExpenseAlert: { type: Number, default: null, min: 0 }, // notify the others at or above this amount
     largeExpenseCurrency: { type: String, default: null }
   }
