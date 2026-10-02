@@ -5,6 +5,7 @@ import ExpenseTransaction from '../models/ExpenseTransaction.js';
 import { sendEmail } from './email-helper.js';
 import { appUrl } from './links.js';
 import { getRates } from './rates.js';
+import { reportError } from './monitoring.js';
 import { periodFor, periodSummary, renderSummaryEmail } from './summaryEmail.js';
 import { isSame } from '../../shared/workspaceAccess.js';
 
@@ -86,6 +87,7 @@ export function summaryHandler(kind, { authorized, connect }) {
       return res.status(200).json({ success: true, ...(await runSummaryJob(kind)) });
     } catch (err) {
       console.error(`[Summary ${kind}] failed:`, err?.message);
+      await reportError(err, { req });
       return res.status(500).json({ success: false, error: 'Internal server error' });
     }
   };

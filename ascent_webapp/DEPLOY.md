@@ -30,6 +30,8 @@ Set these for Production (and Preview if previews should work). The README has t
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Invitations, password reset, email confirmation, summaries |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Push notifications |
 | `ANTHROPIC_API_KEY` | The AI assistant (off until a workspace owner turns it on) |
+| `SENTRY_DSN`, `VITE_SENTRY_DSN` | Error tracking: the DSN of a Sentry project, the same value in both |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Optional: readable stack traces (source maps uploaded at build time) |
 
 MongoDB Atlas must accept connections from Vercel (Network Access).
 

@@ -4,6 +4,7 @@ import cors from 'cors';
 import { rateLimit } from './lib/rateLimit.js';
 import { isAllowedOrigin } from './lib/cors.js';
 import { trackChanges } from './lib/live.js';
+import { reportError, tunnelEnvelope } from './lib/monitoring.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -45,6 +46,7 @@ export function route(load, { live = false } = {}) {
       await settled();
     } catch (err) {
       console.error(`[API] ${req.method} ${req.path}:`, err?.message);
+      await reportError(err, { req });
       await settled();
       if (!res.headersSent) res.status(500).json({ success: false, error: 'Internal server error' });
     }
@@ -60,6 +62,11 @@ const jsonError = (limit) => (req, res, next) =>
 
 // Automation ingest (phone Shortcuts). Registered ahead of the general parser so it gets its own small limit.
 app.post('/api/ingest/:kind', jsonError('8kb'), route(() => import('./api/ingest.js'), { live: true }));
+// The app's error reports (Sentry envelopes), passed on to this app's Sentry project only
+app.post('/api/monitoring', express.text({ type: () => true, limit: '200kb' }), async (req, res) => {
+  await tunnelEnvelope(typeof req.body === 'string' ? req.body : '');
+  res.status(200).end();
+});
 app.all('/api/ingest/:kind', (req, res) => res.status(405).json({ success: false, error: 'method_not_allowed' }));
 
 // Note attachments travel as base64 inside JSON, so the general limit is generous

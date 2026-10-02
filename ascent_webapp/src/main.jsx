@@ -6,7 +6,9 @@ import '@/index.css'
 import { ensureStandaloneTopInset } from '@/lib/safeArea'
 import { trackVisualViewport } from '@/lib/viewport'
 import { registerSW } from 'virtual:pwa-register'
+import { startMonitoring } from '@/lib/monitoring'
 
+startMonitoring();
 ensureStandaloneTopInset();
 trackVisualViewport();
 

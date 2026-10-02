@@ -2,10 +2,19 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
+
+// Readable stack traces in Sentry: with these set (Vercel build settings), source maps are uploaded to
+// Sentry and then deleted, so they are never served to browsers
+const uploadSourceMaps = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT)
 
 // https://vite.dev/config/
 export default defineConfig({
   logLevel: 'error', // Suppress warnings, only show errors
+  define: {
+    // Ties error reports to the deployed commit
+    'import.meta.env.VITE_RELEASE': JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || ''),
+  },
   plugins: [
     react({
       // Ensure React is properly handled
@@ -83,6 +92,14 @@ export default defineConfig({
         clientsClaim: true,
       },
     }),
+    uploadSourceMaps && sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      release: { name: process.env.VERCEL_GIT_COMMIT_SHA || undefined },
+      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+      telemetry: false,
+    }),
   ],
   resolve: {
     alias: {
@@ -111,8 +128,8 @@ export default defineConfig({
     },
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
-    // Disable source maps in production for smaller bundle size
-    sourcemap: false,
+    // Source maps only for Sentry (uploaded, then removed from the build); never served
+    sourcemap: uploadSourceMaps ? 'hidden' : false,
     // Minify with esbuild (built-in, faster than terser)
     minify: 'esbuild',
     // Enable CSS code splitting

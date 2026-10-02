@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/ThemeProvider';
+import { reportError } from '@/lib/monitoring';
 
 /**
  * Catches a crash in the page below it and offers a way out. `resetKey` (the page name) clears the
@@ -17,6 +18,7 @@ class Boundary extends React.Component {
   componentDidCatch(error, info) {
     this.setState({ componentStack: info?.componentStack || null });
     console.error('[ErrorBoundary]', error, info?.componentStack);
+    reportError(error, { componentStack: info?.componentStack });
   }
 
   componentDidUpdate(prev) {

@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, use
 import { ascent, systemPrefs } from '@/api/client';
 import { isNetworkError } from '@/lib/offline/network';
 import { markUnlocked } from '@/lib/appLock';
+import { setMonitoringUser } from '@/lib/monitoring';
 import { rememberInvite, rememberJoined, takePendingInvite } from '@/lib/pendingInvite';
 import {
   findMember, permissionsOf, hasPermissionIn, sameId, workspaceIdOf, sessionState,
@@ -240,6 +241,9 @@ export const AuthProvider = ({ children }) => {
     setCurrentWorkspace(ws);
     setPermissions(permissionsOf(findMember(ws, user)));
   }, [workspaces, user]);
+
+  // Error reports say which account hit a problem by id only (lib/monitoring.js)
+  useEffect(() => { setMonitoringUser(user?.id || user?._id); }, [user]);
 
   const currentMember = useMemo(() => findMember(currentWorkspace, user), [currentWorkspace, user]);
   const isWorkspaceOwner = currentMember?.role === 'owner' || sameId(currentWorkspace?.ownerId, user?.id || user?._id);
