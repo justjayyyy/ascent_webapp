@@ -52,9 +52,10 @@ function GoToLogin() {
 }
 
 function AuthenticatedApp() {
-  const { isLoadingAuth, isAuthenticated } = useAuth();
-  // First sign-in check on a device with no saved session (a saved one opens the app at once)
-  if (isLoadingAuth) return <AppSplash />;
+  const { isLoadingAuth, isAuthenticated, isSigningOut } = useAuth();
+  // First sign-in check on a device with no saved session (a saved one opens the app at once), or signing out
+  // (which goes to /login itself once the session has ended)
+  if (isLoadingAuth || isSigningOut) return <AppSplash />;
   if (!isAuthenticated) return <GoToLogin />;
 
   const page = (name, Page) => (

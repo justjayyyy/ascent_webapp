@@ -43,3 +43,5 @@ yarn-error.log*
 # Testing
 coverage
 
+# Browser test reports from CI shards
+blob-report

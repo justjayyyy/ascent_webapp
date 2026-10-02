@@ -1,5 +1,6 @@
 # Lint, tests (API, shared logic and web app) and the production build on every push and pull request,
-# then the browser tests: the built app in Chromium against the real API on a throwaway database.
+# then the browser tests: the app built once, in Chromium, against the real API on a throwaway database, split
+# across machines, with one merged report. Pull requests also run new or changed browser tests five times.
 name: Check
 
 on:
@@ -29,14 +30,43 @@ jobs:
       - name: No known vulnerabilities in what ships
         run: npm audit --omit=dev --audit-level=high
 
+  # The app is built once for the browser tests (with the test settings, e2e/build-app.mjs); every shard serves it
+  e2e-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ascent_webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ascent_webapp/package-lock.json
+      - run: npm ci
+      - run: node e2e/build-app.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-dist
+          path: ascent_webapp/dist
+          retention-days: 1
+
+  # The browser tests, split across machines; each runs its own API, database and workers (e2e/TEST_PLAN.md §5)
   e2e:
+    needs: e2e-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     defaults:
       run:
         working-directory: ascent_webapp
     env:
       CI: 'true'
+      E2E_PREBUILT: '1'
       # Where the throwaway database's MongoDB program is downloaded, so it can be cached between runs
       MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
     steps:
@@ -47,6 +77,10 @@ jobs:
           cache: npm
           cache-dependency-path: ascent_webapp/package-lock.json
       - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-dist
+          path: ascent_webapp/dist
       - name: Chromium for Playwright
         run: npx playwright install --with-deps chromium
       - name: MongoDB binary cache
@@ -54,13 +88,98 @@ jobs:
         with:
           path: ${{ github.workspace }}/.mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
-      - run: npm run test:e2e
-      - name: Report and traces of failed tests
-        if: failure()
+      - run: npx playwright test --shard=${{ matrix.shard }}/2
+      - name: This shard's results, for the merged report
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: |
-            ascent_webapp/playwright-report
-            ascent_webapp/test-results
+          name: e2e-blob-${{ matrix.shard }}
+          path: ascent_webapp/blob-report
           retention-days: 7
+
+  # One HTML report for the whole run (traces, videos and screenshots of anything that failed or needed a retry),
+  # kept for every run, not only failed ones, so tests that passed on a retry can be looked at too
+  e2e-report:
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ascent_webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ascent_webapp/package-lock.json
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-blob-*
+          path: ascent_webapp/all-blob-reports
+          merge-multiple: true
+      - run: npx playwright merge-reports --reporter html,list ./all-blob-reports
+      - name: Flaky tests (passed only on a retry) in the job summary
+        run: |
+          npx playwright merge-reports --reporter json ./all-blob-reports > results.json
+          node -e "
+            const r = require('./results.json'); const flaky = [];
+            const walk = (s) => { (s.suites || []).forEach(walk); (s.specs || []).forEach((sp) => sp.tests.forEach((t) => { if (t.status === 'flaky') flaky.push(sp.file + ' › ' + sp.title + ' [' + t.projectName + ']'); })); };
+            r.suites.forEach(walk);
+            const st = r.stats; const lines = ['### Browser tests', '', 'Passed ' + st.expected + ' · failed ' + st.unexpected + ' · flaky ' + st.flaky + ' · skipped ' + st.skipped, ''];
+            if (flaky.length) lines.push('**Flaky** (passed on a retry, needs a look):', '', ...flaky.map((f) => '- ' + f));
+            require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ascent_webapp/playwright-report
+          retention-days: 14
+
+  # New or changed browser tests run five times in a row with no retries before they can merge, so a flaky test is
+  # caught by the pull request that adds it
+  e2e-burn-in:
+    if: github.event_name == 'pull_request'
+    needs: e2e-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ascent_webapp
+    env:
+      CI: 'true'
+      E2E_PREBUILT: '1'
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Changed specs
+        id: changed
+        run: |
+          specs=$(git diff --name-only --diff-filter=d "origin/${{ github.base_ref }}...HEAD" -- 'e2e/specs/*.spec.js' | sed 's#^ascent_webapp/##' | tr '\n' ' ')
+          echo "specs=$specs" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.specs != ''
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ascent_webapp/package-lock.json
+      - if: steps.changed.outputs.specs != ''
+        run: npm ci
+      - if: steps.changed.outputs.specs != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-dist
+          path: ascent_webapp/dist
+      - if: steps.changed.outputs.specs != ''
+        run: npx playwright install --with-deps chromium
+      - if: steps.changed.outputs.specs != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
+      - if: steps.changed.outputs.specs != ''
+        run: npx playwright test ${{ steps.changed.outputs.specs }} --repeat-each=5 --retries=0 --reporter=list,github

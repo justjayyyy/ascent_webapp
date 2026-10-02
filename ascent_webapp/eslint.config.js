@@ -3,6 +3,7 @@ import pluginJs from "@eslint/js";
 import pluginReact from "eslint-plugin-react";
 import pluginReactHooks from "eslint-plugin-react-hooks";
 import pluginUnusedImports from "eslint-plugin-unused-imports";
+import pluginPlaywright from "eslint-plugin-playwright";
 
 const unused = {
   "no-unused-vars": "off",
@@ -53,11 +54,20 @@ export default [
   {
     files: ["e2e/**/*.{js,mjs}"],
     languageOptions: { globals: { ...globals.node, ...globals.browser }, ecmaVersion: 2022, sourceType: "module" },
-    plugins: { "unused-imports": pluginUnusedImports },
+    plugins: { "unused-imports": pluginUnusedImports, playwright: pluginPlaywright },
     rules: {
       ...pluginJs.configs.recommended.rules,
+      ...pluginPlaywright.configs["flat/recommended"].rules,
       ...unused,
       "no-empty": ["error", { allowEmptyCatch: true }],
+      // Lint runs with --quiet, so what keeps the suite steady is an error, not a warning: no sleeping, no
+      // forcing clicks past what a person could do, nothing left paused, focused or skipped without a reason
+      "playwright/no-wait-for-timeout": "error",
+      "playwright/no-wait-for-selector": "error",
+      "playwright/no-force-option": "error",
+      "playwright/no-page-pause": "error",
+      "playwright/no-element-handle": "error",
+      "playwright/no-skipped-test": ["error", { allowConditional: true }],
     },
   },
 ];

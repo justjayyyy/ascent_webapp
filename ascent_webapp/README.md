@@ -61,14 +61,21 @@ npm run check      # all three
   translations (every key in en/he/ru, every key the app uses exists), components and helpers, and
   `src/test/pages.test.jsx`, which renders every main screen in every language against an in-memory API
   (`src/test/fakeApi.js`).
-- `npm run test:e2e`: Playwright in Chromium (`e2e/`). The production build, service worker included, against
-  the real API on a throwaway in-memory MongoDB (`e2e/serve-api.mjs`; no real database or email is touched):
-  signing up, out and in with the session cookie, passkeys with a virtual authenticator, an expense added
-  offline reaching the server, and every main screen at iPhone size. The first run downloads Chromium
+- `npm run test:e2e`: Playwright in Chromium (`e2e/specs/`), in parallel. The production build, service worker
+  included, against the real API on a throwaway in-memory MongoDB (`e2e/serve-api.mjs`). Nothing real is
+  touched: third-party calls are stubbed and any other request leaving the machine fails the test, and email
+  goes to a local sink the tests read links from. Tests import `test` from `e2e/fixtures.js`, which seeds a
+  fresh household per test (`owner`, `member(role)`, `openDevice`, `mail`, `stubs`), and find controls by the
+  app's own words (`L('addExpense')`, `e2e/support/i18n.js`). The first run downloads Chromium
   (`npx playwright install chromium`) and MongoDB once. Not part of `npm run check`.
+  `npm run test:e2e:ui` opens Playwright's UI mode. If the default ports are taken (a dev server already on
+  3102), run beside it: `E2E_API_PORT=3302 E2E_APP_PORT=4390 npm run test:e2e`. Plan and conventions:
+  `e2e/TEST_PLAN.md`.
 
-GitHub Actions (`.github/workflows/check.yml`) runs `npm run check` and a production `npm audit` on every push,
-and the browser tests as a separate job (a failed run uploads the report and traces).
+GitHub Actions (`.github/workflows/check.yml`) runs `npm run check` and a production `npm audit` on every push.
+The browser tests build the app once and run split across two machines, with one merged HTML report kept for
+every run and flaky tests (passed only on a retry) listed in the job summary. Pull requests also run new or
+changed browser tests five times in a row with no retries.
 
 ## Layout
 

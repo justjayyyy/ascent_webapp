@@ -21,6 +21,9 @@ export const AuthProvider = ({ children }) => {
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
+  // Signing out ends with a full page load to /login once the session is ended and this device's data is
+  // cleared. Until then the app holds on the splash: sending the page to /login sooner would cut off both.
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const authenticatedRef = useRef(false);
   authenticatedRef.current = isAuthenticated;
 
@@ -218,6 +221,7 @@ export const AuthProvider = ({ children }) => {
   }, [loadWorkspaces]);
 
   const logout = useCallback((shouldRedirect = true) => {
+    setIsSigningOut(true);
     setUser(null);
     setIsAuthenticated(false);
     ascent.auth.logout(shouldRedirect ? window.location.href : undefined);
@@ -225,6 +229,7 @@ export const AuthProvider = ({ children }) => {
 
   const deleteAccount = useCallback(async (confirm) => {
     await ascent.auth.deleteAccount(confirm);
+    setIsSigningOut(true);
     setUser(null);
     setIsAuthenticated(false);
     ascent.auth.logout(undefined, { reason: 'account_deleted' });
@@ -251,12 +256,12 @@ export const AuthProvider = ({ children }) => {
   const value = useMemo(() => ({
     currentMember, isWorkspaceOwner, user, setUser, isAuthenticated, permissions, hasPermission,
     workspaces, currentWorkspace, setCurrentWorkspace, switchWorkspace, refreshWorkspaces,
-    isLoadingAuth, authError, login, register, loginWithGoogle, loginWithPasskey, logout,
+    isLoadingAuth, isSigningOut, authError, login, register, loginWithGoogle, loginWithPasskey, logout,
     navigateToLogin, checkAppState, saveUserPrefs, resetPassword, deleteAccount,
   }), [
     currentMember, isWorkspaceOwner, user, isAuthenticated, permissions, hasPermission,
     workspaces, currentWorkspace, switchWorkspace, refreshWorkspaces,
-    isLoadingAuth, authError, login, register, loginWithGoogle, loginWithPasskey, logout,
+    isLoadingAuth, isSigningOut, authError, login, register, loginWithGoogle, loginWithPasskey, logout,
     navigateToLogin, checkAppState, saveUserPrefs, resetPassword, deleteAccount,
   ]);
 
