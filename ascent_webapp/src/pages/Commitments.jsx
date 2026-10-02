@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { AnimatePresence, LayoutGroup, motion } from '@/lib/motion';
 import { ChevronDown, CreditCard, HandCoins, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { applyEntryChange, restoreEntry } from '@/lib/listEntries';

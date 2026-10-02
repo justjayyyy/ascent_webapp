@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Reorder, useDragControls } from 'motion/react';
+import { Reorder, useDragControls } from '@/lib/motion';
 import { ChevronRight, GripVertical, Plus, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';

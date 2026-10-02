@@ -1,5 +1,9 @@
 import { afterEach } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
+import { LANGUAGES, loadLanguage } from '@/lib/translations';
+
+// The app loads its language before the first render (main.jsx); tests have every language ready
+await Promise.all(LANGUAGES.map(loadLanguage));
 
 // Whole screens load lazily; on a busy machine (CI) that can take longer than the 1s default
 configure({ asyncUtilTimeout: 5000 });

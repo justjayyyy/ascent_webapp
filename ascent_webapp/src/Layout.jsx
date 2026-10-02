@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccounts, useCategories, usePlans } from '@/hooks/useWorkspaceData';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '@/lib/motion';
 import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { ascent } from '@/api/client';

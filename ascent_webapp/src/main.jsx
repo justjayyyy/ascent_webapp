@@ -7,12 +7,18 @@ import { ensureStandaloneTopInset } from '@/lib/safeArea'
 import { trackVisualViewport } from '@/lib/viewport'
 import { registerSW } from 'virtual:pwa-register'
 import { startMonitoring } from '@/lib/monitoring'
+import { loadLanguage } from '@/lib/translations'
+import { likelyLanguage } from '@/lib/startLanguage'
 
 startMonitoring();
 ensureStandaloneTopInset();
 trackVisualViewport();
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+// The first screen is drawn in the right language: its strings come before the render (a small file,
+// and cached by the service worker after the first visit)
+loadLanguage(likelyLanguage()).catch(() => {}).finally(() => {
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+})
 
 // Keep installed PWAs on the latest build. A new service worker installs in the background;
 // it takes over the next time the app goes to the background (or right away if the page has

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useAssistStatus, useCategories } from '@/hooks/useWorkspaceData';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from '@/lib/motion';
 import { Sparkles, ArrowUp, Loader2, X, Check, Pencil } from 'lucide-react';
 import { ascent } from '@/api/client';
 import { useTheme } from '@/components/ThemeProvider';

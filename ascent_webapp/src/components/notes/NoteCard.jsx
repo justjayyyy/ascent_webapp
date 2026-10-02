@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useRef } from 'react';
-import { motion, useMotionValue, useTransform } from 'motion/react';
+import { motion, useMotionValue, useTransform } from '@/lib/motion';
 import {
   Archive, ArchiveRestore, BellRing, Check, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Repeat, Share2, Trash2, Undo2, Users, XCircle,
 } from 'lucide-react';

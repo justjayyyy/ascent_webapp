@@ -1,6 +1,10 @@
 // Every UI string must exist in English, Hebrew and Russian (see PRODUCT.md).
 import { describe, expect, test } from 'vitest';
-import { translations } from './translations';
+import en from './i18n/en';
+import he from './i18n/he';
+import ru from './i18n/ru';
+
+const translations = { en, he, ru };
 
 const LANGS = ['en', 'he', 'ru'];
 const keysOf = (lang) => new Set(Object.keys(translations[lang]));

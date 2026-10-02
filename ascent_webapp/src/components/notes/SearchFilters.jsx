@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { Bell, FileText, Image as ImageIcon, Link2, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NOTE_FILTERS } from './noteUtils';

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from '@/lib/motion';
 import {
   ArrowLeft, CheckCircle2, ChevronDown, Flag, HandCoins, MoreVertical, Pencil, Percent, Plus, Receipt, Repeat, RotateCcw, Rocket, Trash2, X,
 } from 'lucide-react';

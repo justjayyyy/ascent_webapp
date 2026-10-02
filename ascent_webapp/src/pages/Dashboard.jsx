@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import NumberFlow from '@number-flow/react';
 import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
 import { Share, X, Download } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
 import { ScanFace, Fingerprint, KeyRound, Loader2, CloudOff } from 'lucide-react';
 import AscentLogo from '@/components/AscentLogo';
 import { useTheme } from '@/components/ThemeProvider';

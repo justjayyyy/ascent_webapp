@@ -101,5 +101,6 @@ Conventions worth knowing:
   first to keep it becomes the owner, and when the last member leaves it is deleted with its data.
 - CSV export (`src/lib/exportData.js`) fetches everything on demand and neutralises spreadsheet formulas.
 - Money in another currency: `shared/money.js` (`amountInCurrency`, `conversionFields`).
-- Every UI string lives in `src/lib/translations*.js` in all three languages (a test enforces it).
+- Every UI string lives in `src/lib/i18n/{en,he,ru}.js`, one file per language (a test checks all three have every key). A device downloads only the language it uses.
+- Animations import from `@/lib/motion`, not `motion/react`: its `motion` is the lightweight `m`, whose animation code loads after start-up.
 - Portfolio pages are hidden (`src/lib/features.js`) but kept; they are not linted for translations.

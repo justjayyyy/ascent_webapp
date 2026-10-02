@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { ArrowUpRight, CalendarClock, Flag, HandCoins, Landmark, Plus, Repeat } from 'lucide-react';
 import BlurValue from '@/components/BlurValue';
 import { useTheme } from '@/components/ThemeProvider';

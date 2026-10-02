@@ -8,15 +8,15 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { rememberWorkspace } from '@/lib/session';
 import { forgetInvite, forgetJoined, joinedThrough, rememberInvite } from '@/lib/pendingInvite';
-import { translations } from '@/lib/translations';
+import { isLanguage, translate, useLanguage } from '@/lib/translations';
 import { fmt, roleLabel } from '@/components/workspace/utils';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const pickLanguage = (userLanguage) => {
-  if (translations[userLanguage]) return userLanguage;
+  if (isLanguage(userLanguage)) return userLanguage;
   const browser = (navigator.language || 'en').slice(0, 2);
-  return translations[browser] ? browser : 'en';
+  return isLanguage(browser) ? browser : 'en';
 };
 
 export default function AcceptInvitation() {
@@ -29,7 +29,8 @@ export default function AcceptInvitation() {
   const [busy, setBusy] = useState(false);
 
   const language = pickLanguage(user?.language);
-  const t = useMemo(() => (key) => translations[language]?.[key] || translations.en[key] || key, [language]);
+  const strings = useLanguage(language);
+  const t = useMemo(() => (key) => translate(language, key), [language, strings]);
 
   useEffect(() => {
     let cancelled = false;

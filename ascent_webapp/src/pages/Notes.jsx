@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AnimatePresence, LayoutGroup, MotionConfig } from 'motion/react';
+import { AnimatePresence, LayoutGroup, MotionConfig } from '@/lib/motion';
 import {
   Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, Plus, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
   ListChecks, Image as ImageIcon, StickyNote as NoteIcon,

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { translations } from '../lib/translations';
+import { useLanguage } from '@/lib/translations';
+import { likelyLanguage } from '@/lib/startLanguage';
 import { setAppLanguage } from '@/lib/documentLanguage';
 
 export const PALETTES = ['indigo', 'gold', 'graphite', 'ivory', 'burgundy', 'slate', 'twilight'];
@@ -27,8 +28,8 @@ export function ThemeProvider({ children }) {
 
   const theme = user?.theme || 'dark';
 
-  // Language: user preference > default 'he'
-  const language = user?.language || 'he';
+  // Language: the person's preference; signed out, the one the start-up loaded (sign-in choice, device, else Hebrew)
+  const language = user?.language || likelyLanguage();
   const isRTL = language === 'he';
 
   // Keep <html lang/dir> in sync with the selected language
@@ -54,7 +55,8 @@ export function ThemeProvider({ children }) {
     else delete document.documentElement.dataset.palette;
   }, [palette]);
 
-  const t = useCallback((key) => translations[language]?.[key] || translations.en[key] || key, [language]);
+  const strings = useLanguage(language);
+  const t = useCallback((key) => strings[key] || key, [strings]);
 
   // Apply theme to <html> so shadcn CSS variable tokens switch
   useLayoutEffect(() => {

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from '@/lib/motion';
 import {
   ArrowLeft, Archive, ArchiveRestore, Check, CheckCircle2, Circle, Clock, MoreVertical, Pencil, Plus, Receipt, RotateCcw, Trash2,
 } from 'lucide-react';

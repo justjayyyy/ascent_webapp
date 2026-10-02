@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
 import { SplashScene, SplashGlow } from '@/components/AppSplash';
 
 // The moment between signing in and the app: the login page hands off to this overlay, the route

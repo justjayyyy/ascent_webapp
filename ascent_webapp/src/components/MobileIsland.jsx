@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, useTransform } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, useTransform } from '@/lib/motion';
 import { CalendarDays } from 'lucide-react';
 import AscentLogo from '@/components/AscentLogo';
 import { cn } from '@/lib/utils';

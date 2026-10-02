@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import {
   Archive, ArchiveRestore, CheckCheck, Copy, Palette, Pin, PinOff, Tag, Trash2, Undo2, X, XCircle,
 } from 'lucide-react';

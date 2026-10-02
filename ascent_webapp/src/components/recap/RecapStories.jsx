@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useMotionValue, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useMotionValue, useReducedMotion } from '@/lib/motion';
 import NumberFlow from '@number-flow/react';
 import { X, Pause, Play, Share2, RotateCcw, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import AscentLogo from '@/components/AscentLogo';

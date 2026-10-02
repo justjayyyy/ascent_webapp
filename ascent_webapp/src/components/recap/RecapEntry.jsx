@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '@/lib/motion';
 import { Play, X } from 'lucide-react';
 import BlurValue from '@/components/BlurValue';
 import { cn } from '@/lib/utils';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '@/lib/motion';
 import { ScanFace, Fingerprint, KeyRound, Zap, ShieldCheck, CloudOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';

@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '@/lib/motion';
 import NumberFlow from '@number-flow/react';
 import { CalendarClock, Flag, Percent, Repeat, HandCoins, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';

@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { ChevronDown, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';

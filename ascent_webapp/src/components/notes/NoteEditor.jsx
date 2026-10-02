@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '@/lib/motion';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, ListChecks, LogOut, MoreVertical,
   Palette, Paperclip, Pin, Share2, Tag, Trash2, Type, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,

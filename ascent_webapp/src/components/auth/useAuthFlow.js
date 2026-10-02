@@ -4,13 +4,14 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { ascent } from '@/api/client';
 import { setPageLanguage } from '@/lib/documentLanguage';
-import { translations } from '@/lib/translations';
+import { isLanguage, loadLanguage, stringsFor, translate, useLanguage } from '@/lib/translations';
 import { startEntry } from '@/components/EntryTransition';
+import { LOGIN_LANG_KEY } from '@/lib/storageKeys';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 const LANGS = ['he', 'en', 'ru'];
-const LANG_KEY = 'ascent_login_lang';
+const LANG_KEY = LOGIN_LANG_KEY;
 const PUBLIC_PAGES = ['/terms-of-service', '/privacy-policy', '/login'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 // The login page fades under the opening overlay before the route changes
@@ -65,11 +66,8 @@ export function useAuthFlow() {
     setLangState(next);
     try { localStorage.setItem(LANG_KEY, next); } catch { /* storage unavailable */ }
   }, []);
-  const t = useCallback((key, vars) => {
-    let s = translations[lang]?.[key] || translations.en[key] || key;
-    if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, v); });
-    return s;
-  }, [lang]);
+  const strings = useLanguage(lang);
+  const t = useCallback((key, vars) => translate(lang, key, vars), [lang, strings]);
   const isRTL = lang === 'he';
 
   // This page reads in its own picker's language; leaving it hands <html lang dir> back to the app,
@@ -99,9 +97,11 @@ export function useAuthFlow() {
   const enter = useCallback((user, { isNew = false } = {}) => {
     enteringRef.current = true;
     setEntering(true);
-    const dict = translations[user?.language] || translations[lang] || translations.en;
+    // Their language if it is already here (the app loads it meanwhile), else this page's
+    const own = isLanguage(user?.language) ? user.language : lang;
+    loadLanguage(own).catch(() => {});
     const first = (user?.full_name || '').trim().split(/\s+/)[0];
-    const pick = (key) => dict[key] || translations.en[key];
+    const pick = (key) => stringsFor(own)[key] || key;
     const greeting = first
       ? pick(isNew ? 'authWelcomeNew' : 'authWelcomeBackName').replace('{name}', first)
       : pick(isNew ? 'welcomeToAscent' : 'welcomeBack');

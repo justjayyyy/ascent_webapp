@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, memo } from 'react';
 import { Loader2, Search, X, ChevronDown, ShoppingBag } from 'lucide-react';
 import NumberFlow from '@number-flow/react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { useDonutPalette } from '@/components/charts/DonutChart';
 import TransactionList from './TransactionList';
 import BudgetProgress from './BudgetProgress';

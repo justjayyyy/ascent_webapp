@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';

@@ -13,6 +13,7 @@ import { SkeletonPage } from '@/components/ui/skeleton-card';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider';
 import { pagesConfig } from './pages.config';
+import { LazyMotion } from '@/lib/motion';
 import PageNotFound from './lib/PageNotFound';
 import { firstAllowedPage, PAGE_PERMISSIONS } from './lib/pageAccess';
 
@@ -84,6 +85,9 @@ function AppSonnerToaster() {
   );
 }
 
+// Animation code arrives after start-up, so the first screen does not wait for it
+const motionFeatures = () => import('@/lib/motionFeatures').then((m) => m.default);
+
 const lazyPage = (Page, fallback = <SkeletonPage />) => <Suspense fallback={fallback}><Page /></Suspense>;
 
 export default function App() {
@@ -96,21 +100,23 @@ export default function App() {
         onSuccess={() => queryClientInstance.invalidateQueries()}
       >
         <ThemeProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={lazyPage(Login, <AppSplash />)} />
-              <Route path="/privacy-policy" element={lazyPage(PrivacyPolicy)} />
-              <Route path="/terms-of-service" element={lazyPage(TermsOfService)} />
-              <Route path="/accept-invitation/:token" element={lazyPage(AcceptInvitation)} />
-              <Route path="/reset-password/:token" element={lazyPage(ResetPassword)} />
-              <Route path="/verify-email/:token" element={lazyPage(VerifyEmail)} />
-              <Route path="/*" element={<AuthenticatedApp />} />
-            </Routes>
-          </Router>
-          <AppSonnerToaster />
-          <EntryTransition />
-          <Analytics />
-          <SpeedInsights />
+          <LazyMotion features={motionFeatures}>
+            <Router>
+              <Routes>
+                <Route path="/login" element={lazyPage(Login, <AppSplash />)} />
+                <Route path="/privacy-policy" element={lazyPage(PrivacyPolicy)} />
+                <Route path="/terms-of-service" element={lazyPage(TermsOfService)} />
+                <Route path="/accept-invitation/:token" element={lazyPage(AcceptInvitation)} />
+                <Route path="/reset-password/:token" element={lazyPage(ResetPassword)} />
+                <Route path="/verify-email/:token" element={lazyPage(VerifyEmail)} />
+                <Route path="/*" element={<AuthenticatedApp />} />
+              </Routes>
+            </Router>
+            <AppSonnerToaster />
+            <EntryTransition />
+            <Analytics />
+            <SpeedInsights />
+          </LazyMotion>
         </ThemeProvider>
       </PersistQueryClientProvider>
     </AuthProvider>

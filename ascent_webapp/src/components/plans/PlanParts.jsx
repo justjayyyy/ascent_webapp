@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BlurValue from '../BlurValue';

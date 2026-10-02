@@ -1,28 +1,26 @@
 import React, { useLayoutEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { setPageLanguage } from '@/lib/documentLanguage';
-import { translations } from '@/lib/translations';
+import { isLanguage, translate, useLanguage } from '@/lib/translations';
+import { LOGIN_LANG_KEY } from '@/lib/storageKeys';
 
-const LANG_KEY = 'ascent_login_lang';
+const LANG_KEY = LOGIN_LANG_KEY;
 
 /** The language for a page someone may open signed out: theirs if known, else the sign-in page's, else the device's. */
 export function usePublicLanguage(userLanguage) {
   const language = useMemo(() => {
-    if (translations[userLanguage]) return userLanguage;
+    if (isLanguage(userLanguage)) return userLanguage;
     try {
       const saved = localStorage.getItem(LANG_KEY);
-      if (translations[saved]) return saved;
+      if (isLanguage(saved)) return saved;
     } catch { /* storage unavailable */ }
     const device = (navigator.language || 'en').slice(0, 2);
-    return translations[device] ? device : 'en';
+    return isLanguage(device) ? device : 'en';
   }, [userLanguage]);
   useLayoutEffect(() => { setPageLanguage(language); }, [language]);
   useLayoutEffect(() => () => setPageLanguage(null), []);
-  const t = useMemo(() => (key, vars) => {
-    let s = translations[language]?.[key] || translations.en[key] || key;
-    if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, v); });
-    return s;
-  }, [language]);
+  const strings = useLanguage(language);
+  const t = useMemo(() => (key, vars) => translate(language, key, vars), [language, strings]);
   return { language, t };
 }
 

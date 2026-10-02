@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useMotionValue, useTransform, animate, useReducedMotion } from 'motion/react';
+import { motion, useMotionValue, useTransform, animate, useReducedMotion } from '@/lib/motion';
 import { ArrowDown, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { haptic } from '@/lib/haptics';

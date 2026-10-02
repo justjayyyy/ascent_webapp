@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag, Users, CloudUpload, AlertCircle } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
