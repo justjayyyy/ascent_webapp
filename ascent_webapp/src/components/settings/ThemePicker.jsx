@@ -43,6 +43,25 @@ function Preview({ look }) {
   );
 }
 
+/** The current look as a small chip with its name, for the collapsed Theme row. */
+export function CurrentLook() {
+  const { theme, palette, t } = useTheme();
+  const look = LOOKS.find((l) => l.id === (theme === 'light' ? 'light' : palette)) || LOOKS[0];
+  return (
+    <>
+      <span
+        className="flex h-6 w-9 shrink-0 items-center justify-center gap-0.5 rounded-md"
+        style={{ background: look.canvas, boxShadow: `inset 0 0 0 1px ${look.line}` }}
+        aria-hidden="true"
+      >
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: look.accent }} />
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: look.second }} />
+      </span>
+      <span className="truncate">{t(look.labelKey)}</span>
+    </>
+  );
+}
+
 /**
  * All looks in one control: the dark palettes (palette is per device, the logo follows it),
  * plus Light, which is the light theme (theme is stored on the user).

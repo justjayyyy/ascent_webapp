@@ -13,10 +13,10 @@ import { roleLabel as memberRoleLabel } from '../components/workspace/utils';
 import CardManagement from '../components/settings/CardManagement';
 import ApplePaySection from '../components/settings/ApplePaySection';
 import HouseholdSmartSettings from '../components/settings/HouseholdSmartSettings';
-import ThemePicker from '../components/settings/ThemePicker';
+import ThemePicker, { CurrentLook } from '../components/settings/ThemePicker';
 import SecuritySection from '../components/settings/SecuritySection';
 import SettingsNav, { useActiveSection } from '../components/settings/SettingsNav';
-import { Section, Group, Row, Segmented, EditableField } from '../components/settings/SettingsShell';
+import { Section, Group, Row, Segmented, EditableField, Disclosure } from '../components/settings/SettingsShell';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
@@ -120,10 +120,11 @@ export default function Settings() {
     { key: 'emailNotifications', label: t('emailNotifications'), desc: t('receiveImportantUpdates'), checked: user?.emailNotifications !== false },
   ].filter(Boolean);
 
+  const themeHit = !!q && hit(t('setThemeLabel'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark'));
   const roleLabel = memberRoleLabel(t, isOwner ? 'owner' : currentMember?.role);
   const show = {
     profile: hit(t('setNavProfile'), t('fullName'), t('email'), roleLabel),
-    appearance: hit(t('setNavAppearance'), t('setThemeLabel'), t('language'), t('defaultCurrency'), t('blurValues'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark')),
+    appearance: hit(t('setNavAppearance'), t('language'), t('defaultCurrency'), t('blurValues')) || themeHit,
     notifications: hit(t('setNavNotifications'), ...notificationRows.flatMap((r) => [r.label, r.desc])),
     household: hit(t('setNavHousehold'), t('workspaceName'), t('wsMembers'), t('wsInviteMember')),
     cards: hasPermission('manageCards') && hit(t('setNavCards'), t('paymentCards'), t('addCard')),
@@ -265,12 +266,11 @@ export default function Settings() {
           {show.appearance && (
             <Section id="appearance" index={order++} icon={Palette} title={t('setNavAppearance')} description={t('setAppearanceDesc')}>
               <Group>
-                {(sectionHit(t('setNavAppearance')) || hit(t('setThemeLabel'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark'))) && (
-                  <div className="px-4 py-4 sm:px-5">
-                    <p className="text-sm font-medium text-foreground">{t('setThemeLabel')}</p>
-                    <p className="mb-3 mt-0.5 text-sm text-muted-foreground">{t('setThemeDesc')}</p>
+                {(sectionHit(t('setNavAppearance')) || themeHit) && (
+                  <Disclosure label={t('setThemeLabel')} summary={<CurrentLook />} open={!!q && themeHit}>
+                    <p className="mb-3 text-sm text-muted-foreground">{t('setThemeDesc')}</p>
                     <ThemePicker onSelect={selectLook} />
-                  </div>
+                  </Disclosure>
                 )}
                 {(sectionHit(t('setNavAppearance')) || hit(t('language'))) && (
                   <Row label={t('language')} description={t('displayLanguage')} wide>

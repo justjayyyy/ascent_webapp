@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, KeyRound, Loader2, Smartphone } from 'lucide-react';
+import { Check, Copy, History, KeyRound, ListOrdered, Loader2, MessageSquareText, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { ascent } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useTheme } from '../ThemeProvider';
-import { Section, Group, Row } from './SettingsShell';
+import { Section, Group, Row, Disclosure } from './SettingsShell';
 import PushToggle from './PushToggle';
 
 function CopyField({ label, value, t, mono = true }) {
@@ -108,41 +108,28 @@ export default function ApplePaySection({ index }) {
           <div className="px-4 py-4 sm:px-5"><CopyField label={t('apUrl')} value={url} t={t} /></div>
         )}
 
-        <div className="px-4 py-4 sm:px-5">
-          <h3 className="text-sm font-medium text-foreground">{t('apHowTitle')}</h3>
-          <ol className="mt-3 space-y-3">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <li key={n} className="flex gap-3 text-sm text-muted-foreground">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{n}</span>
-                <span className="pt-0.5 text-pretty">{t(`apStep${n}`)}</span>
-              </li>
-            ))}
-          </ol>
+        <Disclosure label={t('apHowTitle')} icon={ListOrdered}>
+          <Steps n={5} prefix="apStep" t={t} />
           <p className="mt-4 text-sm text-muted-foreground text-pretty">{t('apCategoryNote')}</p>
-        </div>
+        </Disclosure>
 
         {/* Card company SMS alerts: the same device keys, a different address */}
-        <div className="px-4 py-4 sm:px-5">
-          <h3 className="text-sm font-medium text-foreground">{t('smsTitle')}</h3>
-          <p className="mt-1 text-sm text-muted-foreground text-pretty">{t('smsDesc')}</p>
+        <Disclosure label={t('smsTitle')} icon={MessageSquareText}>
+          <p className="text-sm text-muted-foreground text-pretty">{t('smsDesc')}</p>
           {tokens.length > 0 && <div className="mt-3"><CopyField label={t('smsUrl')} value={smsUrl} t={t} /></div>}
-          <ol className="mt-3 space-y-3">
-            {[1, 2, 3, 4].map((n) => (
-              <li key={n} className="flex gap-3 text-sm text-muted-foreground">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{n}</span>
-                <span className="pt-0.5 text-pretty">{t(`smsStep${n}`)}</span>
-              </li>
-            ))}
-          </ol>
+          <Steps n={4} prefix="smsStep" t={t} />
           <p className="mt-4 text-sm text-muted-foreground text-pretty">{t('smsNote')}</p>
-        </div>
+        </Disclosure>
 
-        <div className="px-4 py-4 sm:px-5">
-          <h3 className="text-sm font-medium text-foreground">{t('apActivity')}</h3>
+        <Disclosure
+          label={t('apActivity')}
+          icon={History}
+          summary={activity.length > 0 && <span className="tabular-nums">{Math.min(activity.length, 10)}</span>}
+        >
           {activity.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">{t('apActivityEmpty')}</p>
+            <p className="text-sm text-muted-foreground">{t('apActivityEmpty')}</p>
           ) : (
-            <ul className="mt-2 divide-y divide-border/60">
+            <ul className="divide-y divide-border/60">
               {activity.slice(0, 10).map((ev) => (
                 <li key={ev.id} className="py-2 text-sm">
                   <p className="truncate text-foreground">
@@ -154,7 +141,7 @@ export default function ApplePaySection({ index }) {
               ))}
             </ul>
           )}
-        </div>
+        </Disclosure>
       </Group>
 
       <AlertDialog open={!!toRemove} onOpenChange={(o) => !o && setToRemove(null)}>
@@ -170,6 +157,19 @@ export default function ApplePaySection({ index }) {
         </AlertDialogContent>
       </AlertDialog>
     </Section>
+  );
+}
+
+function Steps({ n, prefix, t }) {
+  return (
+    <ol className="mt-3 space-y-3 first:mt-0">
+      {Array.from({ length: n }, (_, i) => i + 1).map((k) => (
+        <li key={k} className="flex gap-3 text-sm text-muted-foreground">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{k}</span>
+          <span className="pt-0.5 text-pretty">{t(`${prefix}${k}`)}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

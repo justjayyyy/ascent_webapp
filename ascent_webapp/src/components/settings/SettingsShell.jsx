@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import * as RadioGroup from '@radix-ui/react-radio-group';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ export function Section({ id, icon: Icon, title, description, action, index = 0,
             {Icon && <Icon className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden="true" />}
             {title}
           </h2>
-          {description && <p className="mt-0.5 text-sm text-muted-foreground text-pretty">{description}</p>}
+          {description && <p className="mt-0.5 text-sm text-muted-foreground text-pretty max-sm:hidden">{description}</p>}
         </div>
         {action}
       </div>
@@ -54,6 +54,52 @@ export function Row({ label, description, htmlFor, wide = false, children, class
         {description && <p className="mt-0.5 text-sm text-muted-foreground text-pretty">{description}</p>}
       </div>
       <div className={cn('shrink-0', wide && 'max-sm:w-full')}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * A row that folds its content away: label + hint + `summary` (what is set now) on the button,
+ * the full control or long text underneath once opened. `open` forces it open (e.g. while a search matches).
+ */
+export function Disclosure({ label, description, summary, icon: Icon, defaultOpen = false, open: forced, children, className }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+  const expanded = open || !!forced;
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={id}
+        onClick={() => setOpen(!expanded)}
+        className="flex min-h-14 w-full items-center gap-3 px-4 py-3.5 text-start outline-none transition-colors hover:bg-foreground/[0.03] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+            {Icon && <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+            {label}
+          </span>
+          {description && <span className="mt-0.5 block text-sm text-muted-foreground text-pretty">{description}</span>}
+        </span>
+        {summary != null && <span className="flex min-w-0 shrink items-center gap-2 text-sm text-muted-foreground">{summary}</span>}
+        <ChevronDown
+          className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', expanded && 'rotate-180')}
+          aria-hidden="true"
+        />
+      </button>
+      <div
+        id={id}
+        className={cn(
+          'grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none',
+          expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        )}
+        inert={expanded ? undefined : ''}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="px-4 pb-4 sm:px-5">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
