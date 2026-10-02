@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, Loader2, PenLine, RotateCcw, Sparkles } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Archive, Camera, Check, Loader2, PenLine, RotateCcw, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/ThemeProvider';
@@ -21,6 +22,7 @@ const groceriesCategory = (categories) =>
 /**
  * After the shop: the items are already counted as bought today. Snap the receipt and the assistant
  * reads the total, shop and date into an expense, and each line's price onto its item for next time.
+ * The photo is kept in the receipts vault too.
  */
 export default function FinishTrip({ trip, list, onClose }) {
   const { t, language, user } = useTheme();
@@ -37,9 +39,11 @@ export default function FinishTrip({ trip, list, onClose }) {
   const [preview, setPreview] = useState(null);
   const [read, setRead] = useState(null);
   const [expense, setExpense] = useState(null);
+  const [kept, setKept] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (trip) { setStage('choose'); setPreview(null); setRead(null); setExpense(null); }
+    if (trip) { setStage('choose'); setPreview(null); setRead(null); setExpense(null); setKept(false); }
   }, [trip]);
 
   if (!trip) return null;
@@ -80,6 +84,10 @@ export default function FinishTrip({ trip, list, onClose }) {
       result.items.forEach((line) => { if (line.matchId && line.price !== null && prices[line.matchId] === undefined) prices[line.matchId] = line.price; });
       const fresh = trip.items.map((i) => list.items.find((x) => x.id === i.id) || i);
       list.addPrices(fresh, prices, { currency: result.currency || currency, date: trip.date, store: trip.store ? '' : result.store || '' });
+      ascent.entities.Receipt.create({
+        type: 'image/jpeg', data: photo.image, thumb: photo.thumb, name: `receipt-${result.date || trip.date}.jpg`,
+        store: result.store || trip.store || '', date: result.date || trip.date, total: result.total, currency: result.currency || currency, read: true,
+      }).then(() => { setKept(true); queryClient.invalidateQueries({ queryKey: ['receipts'] }); }).catch(() => {});
     } catch {
       setStage('failed');
     }
@@ -125,6 +133,9 @@ export default function FinishTrip({ trip, list, onClose }) {
                 <p className="inline-flex items-center gap-1.5 rounded-full bg-success/[0.12] px-3 py-1.5 text-sm font-medium text-success">
                   <Check className="h-4 w-4" />{t('grPricesSaved', { n: matched, total: trip.items.length })}
                 </p>
+              )}
+              {kept && (
+                <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><Archive className="h-4 w-4" />{t('rcptKeptAfterShop')}</p>
               )}
             </div>
           )}

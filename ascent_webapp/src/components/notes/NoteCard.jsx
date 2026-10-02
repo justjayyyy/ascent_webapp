@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { LinkChips, PeopleStack, PersonDot } from './NoteParts';
-import { extractLinks, fmt, formatReminder, highlight, isOverdue, isTicked, lastEditor, lineKind, resolveColor, textDir, timeAgo } from './noteUtils';
+import { CardPhotos } from './NoteExtras';
+import { extractLinks, fmt, formatReminder, highlight, isOverdue, isPreviewable, isTicked, lastEditor, lineKind, resolveColor, textDir, timeAgo } from './noteUtils';
 
 const PREVIEW_ITEMS = 5;
 // A long note shows a short preview; open it to read the rest
@@ -19,7 +20,7 @@ const LONG_PRESS = 450;
 const SWIPE = 110;
 const isCoarse = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
-function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect }) {
+function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true }) {
   const color = resolveColor(note.color);
   const isOwner = note.myAccess === 'owner';
   const canEdit = isOwner || note.myAccess === 'edit';
@@ -42,6 +43,9 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   const hasBody = note.type === 'checklist' ? (note.items || []).length > 0 : !!note.content?.trim();
   const text = note.content?.trim() || '';
   const longText = text.length > LONG_TEXT || text.split(/\r?\n/).length > 6;
+
+  const photoCount = (note.attachments || []).filter(a => isPreviewable(a.type)).length;
+  const fileCount = (note.attachments || []).length - photoCount;
 
   const toggleItem = (id, done) =>
     actions.patch(note.id, { items: note.items.map(i => (i.id === id ? { ...i, done } : i)) });
@@ -144,7 +148,8 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
       )}
 
       <div className="pointer-events-none relative z-[1] space-y-2">
-        {(note.title || !hasBody) && (
+        <CardPhotos note={note} online={online} />
+        {(note.title || (!hasBody && !photoCount)) && (
           <h3 dir={textDir(note.title)} className={cn('pe-8 text-[15px] [@media(pointer:coarse)]:pe-11 font-semibold leading-snug tracking-tight break-words line-clamp-3', !note.title && 'text-muted-foreground')}>
             {note.title ? highlight(note.title, query) : (hasBody ? '' : t('ntEmptyNote'))}
           </h3>
@@ -214,7 +219,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
           </div>
         )}
 
-        {(note.reminder || note.attachments?.length > 0) && (
+        {(note.reminder || fileCount > 0) && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
             {note.reminder && (
               <span className={cn('inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium', isOverdue(note.reminder) ? 'text-danger' : 'text-foreground/80')}>
@@ -222,9 +227,9 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                 {note.reminderRepeat && note.reminderRepeat !== 'none' && <Repeat className="h-3 w-3" aria-label={t(`ntRepeat_${note.reminderRepeat}`)} />}
               </span>
             )}
-            {note.attachments?.length > 0 && (
+            {fileCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-foreground/10 px-2 py-0.5 font-medium text-foreground/80">
-                <Paperclip className="h-3 w-3" /> {note.attachments.length}
+                <Paperclip className="h-3 w-3" /> {fileCount}
               </span>
             )}
           </div>
@@ -256,7 +261,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
       </div>
 
       {/* Pin + menu: on hover / focus with a mouse, always visible on touch */}
-      <div className={cn('pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5', selecting && 'hidden')}>
+      <div className={cn('pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5', photoCount > 0 && 'rounded-full bg-background/70 backdrop-blur', selecting && 'hidden')}>
         {!trashed && note.isPinned && (
           <Pin aria-hidden="true" className="hidden h-4 w-4 fill-current text-foreground/80 [@media(pointer:coarse)]:block" />
         )}

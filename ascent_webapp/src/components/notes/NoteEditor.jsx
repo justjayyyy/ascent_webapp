@@ -3,7 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, useReducedMotion } from '@/lib/motion';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, ListChecks, LogOut, MoreVertical,
-  Palette, Paperclip, Pin, Share2, Tag, Trash2, Type, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,
+  Camera, ImagePlus, Images, Palette, Paperclip, Pin, Share2, Tag, Trash2, Type, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -60,6 +60,8 @@ export default function NoteEditor({
   const [hasDirty, setHasDirty] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
+  const photosRef = useRef(null);
   const dirty = useRef({});
   const timer = useRef(null);
   const bodyRef = useRef(null);
@@ -304,6 +306,15 @@ export default function NoteEditor({
 
             {/* Content */}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3 pt-3 sm:px-6">
+              <AttachmentPanel
+                kind="photos"
+                note={note}
+                canEdit={canEdit}
+                online={online}
+                uploading={uploading}
+                onRemove={(fileId) => actions.removeFile(noteId, fileId)}
+                t={t}
+              />
               <AutoTextarea
                 value={draft.title}
                 readOnly={!canEdit}
@@ -360,6 +371,7 @@ export default function NoteEditor({
               )}
 
               <AttachmentPanel
+                kind="files"
                 note={note}
                 canEdit={canEdit}
                 online={online}
@@ -445,12 +457,29 @@ export default function NoteEditor({
               </Popover>
 
               {canEdit && (
-                <Button variant="ghost" size="icon" className={ib} onClick={() => fileRef.current?.click()} aria-label={t('ntAttachFile')} title={t('ntAttachFile')}>
-                  <Paperclip />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className={ib} aria-label={t('ntAddPhotoOrFile')} title={t('ntAddPhotoOrFile')}>
+                      <ImagePlus />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[12rem]">
+                    <DropdownMenuItem onSelect={() => cameraRef.current?.click()}>
+                      <Camera className="me-2 h-4 w-4" /> {t('ntTakePhoto')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => photosRef.current?.click()}>
+                      <Images className="me-2 h-4 w-4" /> {t('ntChoosePhotos')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                      <Paperclip className="me-2 h-4 w-4" /> {t('ntAttachFile')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               {canEdit && <DictateButton dictation={dictation} t={t} className={ib} />}
-              <input ref={fileRef} type="file" multiple className="hidden" onChange={pickFiles} />
+              <input ref={fileRef} type="file" multiple className="hidden" tabIndex={-1} aria-hidden onChange={pickFiles} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" tabIndex={-1} aria-hidden onChange={pickFiles} />
+              <input ref={photosRef} type="file" accept="image/*" multiple className="hidden" tabIndex={-1} aria-hidden onChange={pickFiles} />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

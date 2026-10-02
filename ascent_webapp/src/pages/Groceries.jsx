@@ -1,6 +1,6 @@
 import React, { memo, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LayoutGrid, ListChecks, Loader2, Tag } from 'lucide-react';
+import { LayoutGrid, ListChecks, Loader2, Receipt, Tag } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
@@ -11,13 +11,15 @@ import AddBar from '@/components/groceries/AddBar';
 import WallView from '@/components/groceries/WallView';
 import CheckView from '@/components/groceries/CheckView';
 import PricesView from '@/components/groceries/PricesView';
+import ReceiptsView from '@/components/groceries/ReceiptsView';
 import { checkQueue } from '@/components/groceries/groceryUtils';
 
-// The Wall is the default; the Check and Prices are one tap away and kept in the address (?view=check)
+// The Wall is the default; the Check, Prices and Receipts are one tap away and kept in the address (?view=check)
 const VIEWS = [
   { key: 'wall', icon: LayoutGrid, label: 'grViewWall' },
   { key: 'check', icon: ListChecks, label: 'grViewCheck' },
   { key: 'prices', icon: Tag, label: 'grViewPrices' },
+  { key: 'receipts', icon: Receipt, label: 'grViewReceipts' },
 ];
 
 /** Wall | Check, as tabs: arrow keys move between them, the pill slides to the one chosen. */
@@ -35,7 +37,7 @@ function ViewSwitch({ view, onChange, t, reduce }) {
     refs.current[next.key]?.focus();
   };
   return (
-    <div role="tablist" aria-label={t('grViews')} onKeyDown={onKey} className="flex h-10 items-center gap-0.5 rounded-full bg-foreground/[0.06] p-1">
+    <div role="tablist" aria-label={t('grViews')} onKeyDown={onKey} className="flex h-10 w-full items-center gap-0.5 rounded-full bg-foreground/[0.06] p-1 sm:w-auto">
       {VIEWS.map(({ key, icon: Icon, label }) => {
         const on = key === view;
         return (
@@ -51,7 +53,7 @@ function ViewSwitch({ view, onChange, t, reduce }) {
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(key)}
             className={cn(
-              'relative flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors sm:flex-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
@@ -76,7 +78,7 @@ function Groceries() {
   const { t } = useTheme();
   const reduce = useReducedMotion();
   const [params, setParams] = useSearchParams();
-  const view = ['check', 'prices'].includes(params.get('view')) ? params.get('view') : 'wall';
+  const view = ['check', 'prices', 'receipts'].includes(params.get('view')) ? params.get('view') : 'wall';
   const list = useGroceryList();
   const shell = useGroceryShell(list);
   const { items, isLoading, low, onList, today } = list;
@@ -90,11 +92,12 @@ function Groceries() {
   };
 
   const toCheck = useMemo(() => (view === 'check' ? checkQueue(items, today).length : 0), [view, items, today]);
-  const subtitle = !items.length ? t('grSubtitle')
+  const subtitle = view === 'receipts' ? t('rcptSubtitle')
+    : !items.length ? t('grSubtitle')
     : view === 'check' && toCheck ? t('grCheckToGo', { n: toCheck })
       : [t('grToBuyCount', { n: onList.length }), low.length ? t('grRunningLowCount', { n: low.length }) : null].filter(Boolean).join(' · ');
 
-  const View = view === 'check' ? CheckView : view === 'prices' ? PricesView : WallView;
+  const View = view === 'check' ? CheckView : view === 'prices' ? PricesView : view === 'receipts' ? ReceiptsView : WallView;
 
   return (
     <div className="relative mx-auto flex w-full max-w-5xl flex-col p-3 pb-40 sm:p-4 sm:pb-24 md:p-8">
@@ -104,12 +107,12 @@ function Groceries() {
         subtitle={subtitle}
         count={onList.length}
         onShop={shell.startShopping}
-        toggle={items.length > 0 && <ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} />}
+        toggle={<ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} />}
       />
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && view !== 'receipts' ? (
         <>
           <AddBar inputRef={shell.addRef} items={items} onAddText={list.addText} onPick={(i) => list.putOnList(i)} className="mb-5" />
           <GroceriesEmpty onAddText={list.addText} />

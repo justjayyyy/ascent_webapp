@@ -260,6 +260,14 @@ const entities = {
   Commitment: createEntity('commitments'),
   GroceryItem: createEntity('groceries'),
   HouseTask: createEntity('tasks'),
+  // The receipts vault: the list carries no files; fetch one with getFile (part: 'file' | 'thumb')
+  Receipt: {
+    list: (opts = {}) => request('/entities/receipts', opts),
+    create: (data) => request('/entities/receipts', json('POST', data, { timeout: 60000 })),
+    update: (id, data) => request(`/entities/receipts?id=${enc(id)}`, json('PATCH', data)),
+    delete: (id) => request(`/entities/receipts?id=${enc(id)}`, { method: 'DELETE' }),
+    getFile: (id, part = 'file') => request(`/entities/receipts?id=${enc(id)}&part=${enc(part)}`),
+  },
   Note: {
     ...createEntity('notes'),
     // Permanently delete everything the caller has in the trash

@@ -21,12 +21,13 @@ import Plan from '../models/Plan.js';
 import PortfolioSnapshot from '../models/PortfolioSnapshot.js';
 import PortfolioTransaction from '../models/PortfolioTransaction.js';
 import Position from '../models/Position.js';
+import Receipt from '../models/Receipt.js';
 import User from '../models/User.js';
 
 export const WORKSPACE_MODELS = [
   Account, Budget, Card, Category, Commitment, DashboardWidget, DayTrade, ExpenseTransaction,
   FinancialGoal, GroceryItem, HouseTask, IngestEvent, IngestToken, MerchantRule, Note, NoteFile, PageLayout, Plan,
-  PortfolioSnapshot, PortfolioTransaction, Position,
+  PortfolioSnapshot, PortfolioTransaction, Position, Receipt,
 ];
 
 /** Removes every row that belongs to the workspace and clears users' pointers to it. */

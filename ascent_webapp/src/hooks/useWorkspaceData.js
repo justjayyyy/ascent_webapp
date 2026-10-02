@@ -25,6 +25,7 @@ const LISTS = {
   groceries: { load: (ws) => ascent.entities.GroceryItem.list('-created_date', 2000, pinned(ws)), staleTime: MINUTE },
   goals: { load: (ws) => ascent.entities.FinancialGoal.list('created_date', 1000, pinned(ws)), staleTime: 3 * MINUTE },
   tasks: { load: (ws) => ascent.entities.HouseTask.list('dueDate', 1000, pinned(ws)), staleTime: 2 * MINUTE },
+  receipts: { load: (ws) => ascent.entities.Receipt.list(pinned(ws)), staleTime: 2 * MINUTE },
 };
 
 /**
@@ -53,6 +54,7 @@ export const useCommitments = (opts) => useWorkspaceList('commitments', opts);
 export const useGroceries = (opts) => useWorkspaceList('groceries', opts);
 export const useGoals = (opts) => useWorkspaceList('goals', opts);
 export const useTasks = (opts) => useWorkspaceList('tasks', opts);
+export const useReceipts = (opts) => useWorkspaceList('receipts', opts);
 
 /** Whether the AI assistant is set up on the server and switched on for this workspace. */
 export function useAssistStatus() {

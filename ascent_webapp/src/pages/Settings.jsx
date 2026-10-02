@@ -115,9 +115,9 @@ export default function Settings() {
   const hit = (...texts) => !q || texts.some((x) => x && String(x).toLowerCase().includes(q));
 
   const notificationRows = [
-    { key: 'dailySummary', label: t('dailySummary'), desc: t('receiveDailyReports'), checked: user?.dailySummary !== false },
-    { key: 'weeklyReports', label: t('weeklySummary'), desc: t('receiveWeeklyReports'), checked: user?.weeklyReports !== false },
-    { key: 'emailNotifications', label: t('emailNotifications'), desc: t('receiveImportantUpdates'), checked: user?.emailNotifications !== false },
+    { key: 'dailySummary', label: t('dailySummary'), desc: t('receiveDailyReports'), checked: user?.dailySummary === true },
+    { key: 'weeklyReports', label: t('weeklySummary'), desc: t('receiveWeeklyReports'), checked: user?.weeklyReports === true },
+    { key: 'emailNotifications', label: t('emailNotifications'), desc: t('receiveImportantUpdates'), checked: user?.emailNotifications === true },
   ].filter(Boolean);
 
   const themeHit = !!q && hit(t('setThemeLabel'), t('paletteIndigo'), t('paletteGold'), t('paletteGraphite'), t('paletteIvory'), t('paletteBurgundy'), t('paletteSlate'), t('paletteTwilight'), t('light'), t('dark'));

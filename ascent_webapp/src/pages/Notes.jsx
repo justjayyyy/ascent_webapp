@@ -446,6 +446,7 @@ function Notes() {
                 selected={selected.has(n.id)}
                 selecting={selecting}
                 onToggleSelect={toggleSelect}
+                online={online}
               />
             ))}
           </div>

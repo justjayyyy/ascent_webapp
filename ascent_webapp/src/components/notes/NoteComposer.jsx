@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
-import { Image as ImageIcon, ListChecks, Palette, Plus, Tag, Type } from 'lucide-react';
+import { Camera, Image as ImageIcon, Images, ListChecks, Palette, Plus, Tag, Type } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
@@ -20,6 +21,7 @@ export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, o
   const rootRef = useRef(null);
   const bodyRef = useRef(null);
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -101,9 +103,31 @@ export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, o
             </Button>
             {onImage && (
               <>
-                <Button variant="ghost" size="icon" onClick={() => fileRef.current?.click()} aria-label={t('ntNewImageNote')} title={t('ntNewImageNote')}>
-                  <ImageIcon />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label={t('ntNewImageNote')} title={t('ntNewImageNote')}>
+                      <ImageIcon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[12rem]">
+                    <DropdownMenuItem onSelect={() => cameraRef.current?.click()}>
+                      <Camera className="me-2 h-4 w-4" /> {t('ntTakePhoto')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                      <Images className="me-2 h-4 w-4" /> {t('ntChoosePhotos')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  aria-hidden
+                  tabIndex={-1}
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files?.length) onImage(e.target.files); e.target.value = ''; }}
+                />
                 <input
                   ref={fileRef}
                   type="file"

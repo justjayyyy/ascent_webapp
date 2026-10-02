@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BellOff, Download, File as FileIcon, FileText, Image as ImageIcon, Loader2, Repeat, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,7 +15,7 @@ async function fetchBlob(noteId, att) {
   return base64ToBlob(file.data, file.type);
 }
 
-function useThumb(noteId, att, enabled) {
+export function useThumb(noteId, att, enabled) {
   return useQuery({
     queryKey: ['note-file', noteId, att.id],
     enabled,
@@ -26,7 +26,7 @@ function useThumb(noteId, att, enabled) {
   });
 }
 
-function Tile({ noteId, att, canEdit, online, onRemove, onPreview, t }) {
+function Tile({ noteId, att, canEdit, online, onRemove, onPreview, t, wide }) {
   const image = isPreviewable(att.type);
   const thumb = useThumb(noteId, att, image && online);
   const Icon = image ? ImageIcon : /pdf|text|word|sheet/.test(att.type || '') ? FileText : FileIcon;
@@ -49,14 +49,14 @@ function Tile({ noteId, att, canEdit, online, onRemove, onPreview, t }) {
   };
 
   return (
-    <li className="group/att relative">
+    <li className={cn('group/att relative', wide && 'col-span-2')}>
       <button
         type="button"
         onClick={open}
         aria-label={`${att.name}, ${formatBytes(att.size)}`}
         className={cn(
           'flex w-full items-center gap-3 overflow-hidden rounded-xl bg-foreground/[0.06] text-start transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          image && thumb.data ? 'h-24 sm:h-28' : cn('min-h-12 p-2.5', canEdit ? 'pe-12' : 'pe-2.5')
+          image && thumb.data ? (wide ? 'h-56 sm:h-64' : 'h-36 sm:h-44') : cn('min-h-12 p-2.5', canEdit ? 'pe-12' : 'pe-2.5')
         )}
       >
         {image && thumb.data ? (
@@ -88,13 +88,71 @@ function Tile({ noteId, att, canEdit, online, onRemove, onPreview, t }) {
   );
 }
 
-/** Files attached to a note: image previews and downloadable file rows. */
-export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t }) {
-  const [preview, setPreview] = useState(null);
-  const list = note.attachments || [];
-  if (!list.length && !uploading) return null;
+/** True once the element has come near the screen (photos on note cards load as you scroll). */
+function useNearView(ref) {
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    if (near || !ref.current) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { setNear(true); return undefined; }
+    const io = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: '400px' });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [near, ref]);
+  return near;
+}
+
+function CardPhoto({ noteId, att, load, className, more }) {
+  const thumb = useThumb(noteId, att, load);
   return (
-    <section className="mt-4" aria-label={t('ntAttachments')}>
+    <span className={cn('relative block overflow-hidden bg-foreground/[0.06]', className)}>
+      {thumb.data && <img src={thumb.data} alt="" draggable={false} className="h-full w-full object-cover" />}
+      {more > 0 && (
+        <span className="absolute inset-0 grid place-items-center bg-black/45 text-lg font-semibold text-white">+{more}</span>
+      )}
+    </span>
+  );
+}
+
+/** The photos on a note card, edge to edge across its top: one large, or a small mosaic of three. */
+export function CardPhotos({ note, online }) {
+  const ref = useRef(null);
+  const near = useNearView(ref);
+  const photos = (note.attachments || []).filter(a => isPreviewable(a.type));
+  if (!photos.length) return null;
+  const load = near && online;
+  const shown = photos.slice(0, 3);
+  const more = photos.length - shown.length;
+  return (
+    <div ref={ref} aria-hidden className={cn('-mx-4 -mt-4 mb-1 grid gap-0.5', shown.length > 1 && 'grid-cols-2')}>
+      {shown.map((att, i) => (
+        <CardPhoto
+          key={att.id}
+          noteId={note.id}
+          att={att}
+          load={load}
+          more={i === shown.length - 1 ? more : 0}
+          className={cn(
+            shown.length === 1 ? 'h-44 sm:h-48' : shown.length === 3 && i === 0 ? 'col-span-2 h-32' : 'h-24',
+            shown.length === 2 && 'h-32'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * What is attached to a note. `kind="photos"` is the photos, large, at the top of the note (with the
+ * upload in progress); `kind="files"` is every other file as a row to download, below the text.
+ */
+export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t, kind = 'files' }) {
+  const [preview, setPreview] = useState(null);
+  const photos = kind === 'photos';
+  const list = (note.attachments || []).filter(a => isPreviewable(a.type) === photos);
+  const busy = photos && uploading > 0;
+  if (!list.length && !busy) return null;
+  return (
+    <section className={photos ? 'mb-4' : 'mt-4'} aria-label={photos ? t('ntPhotos') : t('ntAttachments')}>
       <ul className="grid grid-cols-2 gap-2">
         {list.map(att => (
           <Tile
@@ -106,10 +164,11 @@ export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t 
             onRemove={() => onRemove(att.id)}
             onPreview={setPreview}
             t={t}
+            wide={photos && list.length === 1}
           />
         ))}
-        {uploading > 0 && (
-          <li className="flex min-h-12 items-center gap-2 rounded-xl bg-foreground/[0.06] p-2.5 text-sm text-muted-foreground">
+        {busy && (
+          <li className={cn('flex min-h-12 items-center gap-2 rounded-xl bg-foreground/[0.06] p-2.5 text-sm text-muted-foreground', !list.length && 'col-span-2')}>
             <Loader2 className="h-4 w-4 animate-spin" /> {t('ntUploading')}
           </li>
         )}

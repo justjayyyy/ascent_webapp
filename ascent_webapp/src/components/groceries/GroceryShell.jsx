@@ -62,15 +62,16 @@ export function GroceryHeader({ title, subtitle, count, onShop, toggle }) {
   const { t } = useTheme();
   const { members, isShared } = useHousehold();
   return (
-    <header className="mb-4 flex items-center justify-between gap-3 sm:mb-6">
-      <div className="min-w-0">
+    // On phones the view switch takes its own row under the title, so neither squeezes the other
+    <header className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-3 sm:mb-6 sm:flex-nowrap">
+      <div className="min-w-0 flex-1">
         <h1 className="truncate text-3xl font-bold tracking-tight text-foreground md:text-4xl">{title}</h1>
         {subtitle && <p className="mt-1 truncate text-sm text-muted-foreground md:text-base">{subtitle}</p>}
       </div>
-      <div className="flex shrink-0 items-center gap-3">
-        {toggle}
+      {toggle && <div className="order-last w-full sm:order-none sm:w-auto sm:shrink-0">{toggle}</div>}
+      <div className="flex shrink-0 items-center gap-3 empty:hidden">
         {isShared && (
-          <span className={cn('flex', toggle && 'hidden sm:flex')} aria-label={t('grSharedWith', { names: members.map((m) => m.name).join(', ') })}>
+          <span className="flex" aria-label={t('grSharedWith', { names: members.map((m) => m.name).join(', ') })}>
             {members.slice(0, 4).map((m) => (
               <span key={m.email} title={m.name} className="-ms-2 grid h-8 w-8 place-items-center rounded-full border-2 border-background text-xs font-bold text-background first:ms-0" style={{ background: m.color }}>
                 {m.initials.slice(0, 1)}
