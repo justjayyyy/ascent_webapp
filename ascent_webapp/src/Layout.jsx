@@ -4,11 +4,11 @@ import { useAccounts, useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from '@/lib/motion';
 import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
-import { ascent } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
+import { useSignOut } from './hooks/useSignOut';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
 import InvitationsBanner from '@/components/workspace/InvitationsBanner';
 import { OwnerLeftPrompt, VerifyEmailBanner } from '@/components/account/AccountPrompts';
@@ -143,7 +143,12 @@ function LayoutContent({ children, currentPageName }) {
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
 
   // Idle sign-out, unless this device uses the Face ID lock (which locks instead of signing out)
-  useSessionTimeout(!!user && !lockEnabled, t);
+  // ...and never while changes are still waiting to sync, which signing out would throw away
+  const { pending: unsynced } = useOutbox();
+  const unsyncedRef = useRef(unsynced);
+  unsyncedRef.current = unsynced;
+  const hasUnsynced = useCallback(() => unsyncedRef.current > 0, []);
+  useSessionTimeout(!!user && !lockEnabled, t, hasUnsynced);
   useWorkspaceSync();
 
   // Check for first login welcome message
@@ -155,11 +160,7 @@ function LayoutContent({ children, currentPageName }) {
   }, [user]);
 
   // Signing out forgets this device's copy of the data, including changes that never synced: say so first
-  const { pending: unsynced } = useOutbox();
-  const handleLogout = useCallback(async () => {
-    if (unsynced > 0 && !window.confirm(t('offLogoutWarning').replace('{count}', unsynced))) return;
-    await ascent.auth.logout();
-  }, [unsynced, t]);
+  const handleLogout = useSignOut();
 
   const handleThemeChange = useCallback(async (checked) => {
     const newTheme = checked ? 'dark' : 'light';

@@ -40,7 +40,8 @@ export function buildRecap({ rows, month, today = new Date(), members = [] }) {
   // have not happened yet
   const happened = (x) => !running || parseInt(x.date.slice(8, 10), 10) <= elapsed;
   const cur = rows.filter((x) => inMonth(key)(x) && happened(x));
-  const prev = rows.filter(inMonth(prevKey));
+  // While the month runs it is compared with the same days of last month, not all of it
+  const prev = rows.filter((x) => inMonth(prevKey)(x) && (!running || parseInt(x.date.slice(8, 10), 10) <= elapsed));
   const spend = cur.filter((x) => x.type === 'Expense');
   const earn = cur.filter((x) => x.type === 'Income');
   const prevSpend = prev.filter((x) => x.type === 'Expense');

@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import AscentLogo from '@/components/AscentLogo';
 import DeleteAccountRow from '@/components/account/DeleteAccount';
 import SignOutOthersRow from '@/components/account/SignOutOthers';
+import { useSignOut } from '@/hooks/useSignOut';
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -40,7 +41,8 @@ const CURRENCIES = [
 
 export default function Settings() {
   const { user: themeUser, theme, setPalette, t, loading: themeLoading, saveUserPrefs, refreshUser } = useTheme();
-  const { currentWorkspace, setCurrentWorkspace, currentMember, isWorkspaceOwner: isOwner, hasPermission, refreshWorkspaces, logout } = useAuth();
+  const { currentWorkspace, setCurrentWorkspace, currentMember, isWorkspaceOwner: isOwner, hasPermission, refreshWorkspaces } = useAuth();
+  const signOut = useSignOut();
   const [user, setUser] = useState(null);
   const [query, setQuery] = useState('');
   const searchRef = useRef(null);
@@ -369,7 +371,7 @@ export default function Settings() {
                 <Row label={t('logout')} description={t('setSignOutDesc')}>
                   <Button
                     variant="outline"
-                    onClick={() => logout()}
+                    onClick={() => signOut()}
                     className="h-11 rounded-xl border-danger/40 text-danger hover:bg-danger/10 hover:text-danger sm:h-9"
                   >
                     <LogOut className="me-1.5 h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />

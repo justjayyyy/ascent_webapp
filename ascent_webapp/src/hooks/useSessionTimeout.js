@@ -5,7 +5,11 @@ import { toast } from 'sonner';
 const SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 const WARNING_BEFORE_LOGOUT = 60 * 1000; // Show warning 1 minute before logout
 
-export function useSessionTimeout(isAuthenticated, t = (key) => key) {
+/**
+ * Signs out after SESSION_TIMEOUT without activity. `mustWait()` true (changes on this device not synced
+ * yet) puts it off: signing out would throw those changes away.
+ */
+export function useSessionTimeout(isAuthenticated, t = (key) => key, mustWait = () => false) {
   const timeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
   const warningShownRef = useRef(false);
@@ -44,11 +48,13 @@ export function useSessionTimeout(isAuthenticated, t = (key) => key) {
       }, SESSION_TIMEOUT - WARNING_BEFORE_LOGOUT);
 
       // Set logout timeout
-      timeoutRef.current = setTimeout(() => {
+      const expire = () => {
+        if (mustWait()) { timeoutRef.current = setTimeout(expire, WARNING_BEFORE_LOGOUT); return; }
         logout();
-      }, SESSION_TIMEOUT);
+      };
+      timeoutRef.current = setTimeout(expire, SESSION_TIMEOUT);
     }
-  }, [isAuthenticated, logout, showWarning]);
+  }, [isAuthenticated, logout, showWarning, mustWait]);
 
   useEffect(() => {
     if (!isAuthenticated) {

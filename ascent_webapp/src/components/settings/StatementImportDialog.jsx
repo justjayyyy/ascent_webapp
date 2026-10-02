@@ -155,9 +155,9 @@ export default function StatementImportDialog({ open, onOpenChange }) {
 
             {sheets.length > 1 && (
               <div className="space-y-1.5">
-                <Label>{t('impSheet')}</Label>
+                <Label htmlFor="imp-sheet">{t('impSheet')}</Label>
                 <Select value={String(sheetIndex)} onValueChange={(v) => applySheet(sheets, Number(v))}>
-                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="imp-sheet" className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>{sheets.map((s, i) => <SelectItem key={s.name} value={String(i)}>{s.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -168,9 +168,9 @@ export default function StatementImportDialog({ open, onOpenChange }) {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {FIELDS.map((field) => (
                   <div key={field} className="flex items-center gap-2">
-                    <Label className="w-24 shrink-0 text-xs text-muted-foreground">{t(LABEL[field])}</Label>
+                    <Label htmlFor={`imp-col-${field}`} className="w-24 shrink-0 text-xs text-muted-foreground">{t(LABEL[field])}</Label>
                     <Select value={mapping.columns[field] === undefined ? 'none' : String(mapping.columns[field])} onValueChange={(v) => setColumn(field, v)}>
-                      <SelectTrigger className="h-10 min-w-0 flex-1 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id={`imp-col-${field}`} className="h-10 min-w-0 flex-1 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {field !== 'date' && field !== 'amount' && <SelectItem value="none">{t('impNone')}</SelectItem>}
                         {header.map((h, i) => (
@@ -212,6 +212,9 @@ export default function StatementImportDialog({ open, onOpenChange }) {
                   {parsed.skipped > 0 && ` · ${fill(t('impSkipped'), { count: parsed.skipped })}`}
                 </p>
               </div>
+              {parsed.rows.length > MAX_ROWS && (
+                <p className="mt-2 text-sm text-yellow-600 text-pretty dark:text-yellow-400">{fill(t('impTooMany'), { max: MAX_ROWS })}</p>
+              )}
               {parsed.rows.length === 0 ? (
                 <p className="mt-2 text-sm text-danger">{t('impNoRows')}</p>
               ) : (

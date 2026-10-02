@@ -61,7 +61,7 @@ export default function InviteMemberDialog({ open, onOpenChange, workspaceName, 
         open={open}
         onOpenChange={onOpenChange}
         title={sent.qr ? t('wsQrReady') : t('wsInviteSent')}
-        footer={<Button className="h-11 rounded-xl sm:h-10" onClick={() => onOpenChange(false)}>OK</Button>}
+        footer={<Button className="h-11 rounded-xl sm:h-10" onClick={() => onOpenChange(false)}>{t('done')}</Button>}
       >
         {!sent.qr && !sent.emailSent && (
           <p className="mb-4 flex items-start gap-2 text-sm text-danger text-pretty">

@@ -60,6 +60,14 @@ test('a month still running only counts the days so far', () => {
   assert.equal(r.perDayAverage, 160);
 });
 
+test('a month still running is compared with the same days of last month', () => {
+  // Sept 1-10: 1600 spent. Aug 1-10: 1250 (both rows). Aug 1-5: only the 1000 on the 3rd.
+  assert.equal(buildRecap({ rows, month: new Date(2026, 8, 1), today: new Date(2026, 8, 10) }).prevSpent, 1250);
+  const early = buildRecap({ rows, month: new Date(2026, 8, 1), today: new Date(2026, 8, 5) });
+  assert.equal(early.prevSpent, 1000);
+  assert.equal(early.spentChange, 0.6);
+});
+
 test('who paid, in a shared household (paidBy wins over who typed it in)', () => {
   const members = [{ email: 'a@x.com', name: 'Ana' }, { email: 'b@x.com', name: 'Ben' }];
   const r = buildRecap({ rows, month: new Date(2026, 8, 1), today: new Date(2026, 9, 2), members });

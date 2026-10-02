@@ -16,6 +16,7 @@ import MiniMonth from './MiniMonth';
 import AgendaPanel from './AgendaPanel';
 import EventComposer from './EventComposer';
 import { LOCALES, weekStartsOnFor, normalizeItem, buildDayMap, dayKey } from './calendarUtils';
+import { CALENDAR_EXPIRY_KEY, CALENDAR_TOKEN_KEY } from '@/lib/storageKeys';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
@@ -112,16 +113,16 @@ export default function CalendarModal({ open, onOpenChange }) {
   // Restore a still-valid token
   useEffect(() => {
     try {
-      const token = localStorage.getItem('googleCalendarToken');
-      const expiry = localStorage.getItem('googleCalendarTokenExpiry');
+      const token = localStorage.getItem(CALENDAR_TOKEN_KEY);
+      const expiry = localStorage.getItem(CALENDAR_EXPIRY_KEY);
       if (token && expiry && Date.now() < parseInt(expiry, 10)) setAccessToken(token);
     } catch { /* storage unavailable */ }
   }, []);
 
   const clearSession = useCallback(() => {
     try {
-      localStorage.removeItem('googleCalendarToken');
-      localStorage.removeItem('googleCalendarTokenExpiry');
+      localStorage.removeItem(CALENDAR_TOKEN_KEY);
+      localStorage.removeItem(CALENDAR_EXPIRY_KEY);
     } catch { /* storage unavailable */ }
     loadedRange.current = null;
     setAccessToken(null);
@@ -155,8 +156,8 @@ export default function CalendarModal({ open, onOpenChange }) {
         if (response.access_token) {
           setAccessToken(response.access_token);
           try {
-            localStorage.setItem('googleCalendarToken', response.access_token);
-            localStorage.setItem('googleCalendarTokenExpiry', String(Date.now() + 3600000));
+            localStorage.setItem(CALENDAR_TOKEN_KEY, response.access_token);
+            localStorage.setItem(CALENDAR_EXPIRY_KEY, String(Date.now() + 3600000));
           } catch { /* storage unavailable */ }
           toast.success(t('calendarConnected'));
         } else if (response.error) {

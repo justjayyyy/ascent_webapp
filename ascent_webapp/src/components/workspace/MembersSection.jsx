@@ -280,7 +280,7 @@ export default function MembersSection() {
         open={!!qrFor}
         onOpenChange={(o) => !o && setQrFor(null)}
         title={t('wsShowQr')}
-        footer={<Button className="h-11 rounded-xl sm:h-10" onClick={() => setQrFor(null)}>OK</Button>}
+        footer={<Button className="h-11 rounded-xl sm:h-10" onClick={() => setQrFor(null)}>{t('done')}</Button>}
       >
         {qrFor && <InviteShare link={inviteLinkFor(qrFor)} email={qrFor.inviteKind === 'link' ? '' : qrFor.email} expiresAt={qrFor.expiresAt} />}
       </ResponsiveModal>

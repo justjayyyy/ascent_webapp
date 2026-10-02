@@ -79,8 +79,9 @@ export default function CategoryManager({
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('categoryName')} *</Label>
+              <Label htmlFor="category-name" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('categoryName')} *</Label>
               <Input
+                id="category-name"
                 type="text"
                 placeholder={t('categoryPlaceholder')}
                 value={formData.name}
@@ -93,12 +94,12 @@ export default function CategoryManager({
             </div>
 
             <div className="space-y-1.5 sm:space-y-2">
-              <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
+              <Label htmlFor="category-type" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('type')} *</Label>
               <Select 
                 value={formData.type} 
                 onValueChange={(value) => setFormData({ ...formData, type: value })}
               >
-                <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                <SelectTrigger id="category-type" className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -156,7 +157,7 @@ export default function CategoryManager({
                           style={{ backgroundColor: category.color || 'hsl(var(--primary))' }}
                         />
                         <span className={cn("text-xs px-1.5 sm:px-2 py-0.5 rounded flex-shrink-0", colors.textTertiary, colors.bgTertiary)}>
-                          {category.type === 'Expense' ? t('expense') : category.type === 'Income' ? t('income') : category.type}
+                          {category.type === 'Expense' ? t('expense') : category.type === 'Income' ? t('income') : t('both')}
                         </span>
                       </div>
                       {canEdit && (

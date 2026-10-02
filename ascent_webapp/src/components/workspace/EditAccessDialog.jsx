@@ -23,6 +23,8 @@ export default function EditAccessDialog({ member, open, onOpenChange, canGrantA
     try {
       await onSave(member, access);
       onOpenChange(false);
+    } catch {
+      // The caller already said what went wrong; the dialog stays open to try again
     } finally {
       setSaving(false);
     }

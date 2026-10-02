@@ -297,7 +297,7 @@ function Player({ onClose, month, rows, members, t, language, isRTL, currency, b
     ),
     compare: (
       <div className="flex h-full flex-col justify-center">
-        <motion.p {...rise(0)} className="text-lg font-medium text-foreground/80">{t('rcCompareLead').replace('{month}', prevName)}</motion.p>
+        <motion.p {...rise(0)} className="text-lg font-medium text-foreground/80">{(recap.running ? t('rcCompareLeadSoFar') : t('rcCompareLead')).replace('{month}', prevName).replace('{days}', recap.elapsed)}</motion.p>
         <motion.div {...rise(1)} className={cn('mt-2 flex items-center gap-3 text-6xl font-bold tabular-nums tracking-tight', recap.spentChange > 0 ? 'text-danger' : 'text-success')}>
           {recap.spentChange > 0 ? <TrendingUp className="h-12 w-12" aria-hidden="true" /> : <TrendingDown className="h-12 w-12" aria-hidden="true" />}
           <span dir="ltr">{pct(Math.abs(recap.spentChange))}</span>

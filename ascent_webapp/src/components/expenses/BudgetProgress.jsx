@@ -64,13 +64,12 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       }
     });
 
+    // Per category and month: with several months selected, each month's budget is held against that
+    // month's spending only
     const spending = {};
     periodTransactions.forEach(t => {
-      if (!spending[t.category]) {
-        spending[t.category] = 0;
-      }
-
-      spending[t.category] += amountOf(t);
+      const key = `${t.category}|${String(t.date).slice(0, 7)}`;
+      spending[key] = (spending[key] || 0) + amountOf(t);
     });
 
     return spending;
@@ -81,7 +80,12 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       // Convert budget limit to user's currency if needed
       const budgetLimit = convert(budget.monthlyLimit, budget.currency) ?? budget.monthlyLimit;
 
-      const spent = spendingByCategory[budget.category] || 0;
+      // Budgets from before months existed count against the current month
+      const now = new Date();
+      const month = budget.year && budget.month
+        ? `${budget.year}-${String(budget.month).padStart(2, '0')}`
+        : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const spent = spendingByCategory[`${budget.category}|${month}`] || 0;
       const percentage = budgetLimit > 0 ? (spent / budgetLimit) * 100 : 0;
       const remaining = budgetLimit - spent;
       const threshold = Number(budget.alertThreshold) || 80;
@@ -106,7 +110,6 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
   }, [filteredBudgets, spendingByCategory, convert]);
 
   // Don't show the module if there are no budgets for the selected period
-  // Debug: Log to help troubleshoot
   if (filteredBudgets.length === 0) {
     return null;
   }

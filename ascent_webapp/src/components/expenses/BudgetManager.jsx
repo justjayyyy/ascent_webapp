@@ -50,20 +50,21 @@ export default function BudgetManager({
   const displayYear = selectedYear ? parseInt(selectedYear) : currentYear;
   const displayMonth = selectedMonths && selectedMonths.length === 1 ? parseInt(selectedMonths[0]) : currentMonth;
 
-  // Calculate available categories (filter by selected period)
-  const usedCategories = useMemo(() => {
-    if (selectedMonths && selectedMonths.length > 0) {
-      // Filter budgets by selected year and months
-      return budgets
-        .filter(b => b.year === displayYear && selectedMonths.includes(b.month?.toString()))
-        .map(b => b.category);
-    } else {
-      // If no months selected, show all budgets for the year
-      return budgets
-        .filter(b => b.year === displayYear)
-        .map(b => b.category);
-    }
-  }, [budgets, displayYear, selectedMonths]);
+  const [formData, setFormData] = useState({
+    category: '',
+    monthlyLimit: '',
+    alertThreshold: 80,
+    currency: user?.currency || 'ILS',
+    year: displayYear,
+    month: displayMonth,
+    isShared: true,
+  });
+
+  // A category can have one budget per month: the categories still free are those of the month the
+  // form is set to (not the months shown on the page)
+  const usedCategories = useMemo(() => budgets
+    .filter(b => Number(b.year) === Number(formData.year) && Number(b.month) === Number(formData.month))
+    .map(b => b.category), [budgets, formData.year, formData.month]);
 
   const expenseCategories = useMemo(() =>
     categories.filter(cat => cat.type === 'Expense' || cat.type === 'Both'),
@@ -75,28 +76,13 @@ export default function BudgetManager({
     [expenseCategories, usedCategories]
   );
 
-  const [formData, setFormData] = useState({
-    category: '',
-    monthlyLimit: '',
-    alertThreshold: 80,
-    currency: user?.currency || 'ILS',
-    year: displayYear,
-    month: displayMonth,
-    isShared: true,
-  });
-
-  // Set initial category and period when available categories change or dialog opens
+  // Keep the chosen category one that is free in the chosen month
   useEffect(() => {
-    if (open && !editingBudget && availableCategories.length > 0 && !formData.category) {
-      setFormData(prev => ({
-        ...prev,
-        category: availableCategories[0].name,
-        currency: user?.currency || 'ILS',
-        year: displayYear,
-        month: displayMonth,
-      }));
-    }
-  }, [open, availableCategories, editingBudget, user?.currency, displayYear, displayMonth]);
+    if (!open || editingBudget) return;
+    if (formData.category && availableCategories.some(c => c.name === formData.category)) return;
+    const next = availableCategories[0]?.name || '';
+    if (next !== formData.category) setFormData(prev => ({ ...prev, category: next }));
+  }, [open, availableCategories, editingBudget, formData.category]);
 
   // Update form data when selected period changes
   useEffect(() => {
@@ -126,7 +112,7 @@ export default function BudgetManager({
       monthlyLimit: parseFloat(formData.monthlyLimit),
       alertThreshold: validThreshold,
       // Ensure year and month are always set
-      year: formData.year || displayYear,
+      year: parseInt(formData.year) || displayYear,
       month: formData.month || displayMonth,
     };
 
@@ -205,13 +191,13 @@ export default function BudgetManager({
               {/* ... form fields ... */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
+                  <Label htmlFor="budget-category" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('category')} *</Label>
                   <Select
                     value={formData.category}
                     onValueChange={(value) => setFormData({ ...formData, category: value })}
                     disabled={editingBudget !== null}
                   >
-                    <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                    <SelectTrigger id="budget-category" className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                       <SelectValue placeholder={t('selectCategory')} />
                     </SelectTrigger>
                     <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -225,8 +211,9 @@ export default function BudgetManager({
                 </div>
 
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
+                  <Label htmlFor="budget-limit" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('monthlyLimit')} *</Label>
                   <Input
+                    id="budget-limit"
                     type="number"
                     step="0.01"
                     min="0.01"
@@ -240,25 +227,27 @@ export default function BudgetManager({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
+                  <Label htmlFor="budget-year" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('year')} *</Label>
                   <Input
+                    id="budget-year"
                     type="number"
                     min="2000"
                     max="2100"
                     placeholder={currentYear.toString()}
                     value={formData.year}
-                    onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || currentYear })}
+                    // Kept as typed (it may be empty halfway through typing); read as a number on save
+                    onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                     className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}
                   />
                 </div>
 
                 <div className="space-y-1.5 sm:space-y-2">
-                  <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
+                  <Label htmlFor="budget-month" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('month')} *</Label>
                   <Select
                     value={formData.month?.toString()}
                     onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}
                   >
-                    <SelectTrigger className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
+                    <SelectTrigger id="budget-month" className={cn("h-9 sm:h-10 text-sm", colors.bgTertiary, colors.border, colors.textPrimary)}>
                       <SelectValue placeholder={t('selectMonth')} />
                     </SelectTrigger>
                     <SelectContent className={cn(colors.cardBg, colors.cardBorder)}>
@@ -273,8 +262,9 @@ export default function BudgetManager({
               </div>
 
               <div className="space-y-1.5 sm:space-y-2">
-                <Label className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
+                <Label htmlFor="budget-threshold" className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('alertThreshold')} (%) *</Label>
                 <Input
+                  id="budget-threshold"
                   type="number"
                   min="1"
                   max="100"
