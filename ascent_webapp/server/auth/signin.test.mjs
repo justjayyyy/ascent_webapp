@@ -74,7 +74,7 @@ const { default: login } = await import('./login.js');
 const { profileChanges } = await import('./me.js');
 
 const call = async (handler, body, method = 'POST') => {
-  const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
+  const res = { code: 200, headers: {}, setHeader(k, v) { this.headers[k] = v; }, getHeader(k) { return this.headers[k]; }, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
   await handler({ method, body, headers: {}, query: {} }, res);
   return res;
 };
@@ -93,6 +93,9 @@ const NOW = Date.parse('2026-10-01T12:00:00Z');
 const google200 = (payload) => async () => ({ ok: true, json: async () => payload });
 const good = { aud: 'our-client.apps.googleusercontent.com', iss: 'https://accounts.google.com', exp: String(NOW / 1000 + 600), email: 'Dana@Gmail.com', email_verified: 'true', sub: 'g-1', name: 'Dana' };
 const verify = (payload, opts = {}) => verifyGoogleIdToken('x'.repeat(40), { fetchImpl: google200(payload), now: NOW, clientIds: ['our-client.apps.googleusercontent.com'], ...opts });
+
+// The session token the response stores in the cookie (the last Set-Cookie wins)
+const sessionCookieOf = (r) => /ascent_session=([^;]*)/.exec([].concat(r.headers['Set-Cookie'] || []).at(-1) || '')?.[1];
 
 test('a valid Google token gives the verified, normalised identity', async () => {
   assert.deepEqual(await verify(good), { email: 'dana@gmail.com', name: 'Dana', picture: null, googleId: 'g-1' });
@@ -143,7 +146,8 @@ test('a refused token is answered with Google\'s reason and creates nothing', as
 test('a first Google sign-in creates the account, its workspace and an unusable password', async () => {
   const r = await call(google, { credential: 'tok', language: 'ru', theme: 'nope' });
   assert.equal(r.body.data.isFirstLogin, true);
-  assert.equal(r.body.data.token, 'token-for-u1');
+  assert.equal(sessionCookieOf(r), 'token-for-u1');
+  assert.equal(r.body.data.token, undefined, 'the token never reaches page scripts');
   const [u] = users;
   assert.equal(u.language, 'ru');
   assert.equal(u.theme, undefined);

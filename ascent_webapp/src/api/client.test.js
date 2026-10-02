@@ -25,14 +25,14 @@ async function settle(promise) {
 }
 
 describe('requests', () => {
-  test('answers with data, sending the token and the current workspace', async () => {
-    localStorage.setItem('ascent_access_token', 'tok');
+  test('answers with data, sending the current workspace (the session goes as a cookie)', async () => {
+    localStorage.setItem('ascent_signed_in', '1');
     localStorage.setItem('ascent_current_workspace_id', 'ws1');
     fetchMock.mockResolvedValue(ok([{ id: 1 }]));
     expect(await request('/entities/cards')).toEqual([{ id: 1 }]);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/entities/cards');
-    expect(init.headers.Authorization).toBe('Bearer tok');
+    expect(init.headers.Authorization).toBeUndefined();
     expect(init.headers['x-workspace-id']).toBe('ws1');
     expect(init.headers['Content-Type']).toBeUndefined(); // no body, no content type
   });
@@ -107,10 +107,11 @@ describe('retries', () => {
 });
 
 describe('sessions', () => {
-  test('signing in stores the token and returns the user and first-login flag', async () => {
-    fetchMock.mockResolvedValue(ok({ token: 'new', user: { id: 'u1' }, isFirstLogin: true }));
+  test('signing in keeps no token on the device, only that it is signed in', async () => {
+    fetchMock.mockResolvedValue(ok({ user: { id: 'u1' }, isFirstLogin: true }));
     expect(await ascent.auth.login('a@b.c', 'pw')).toEqual({ user: { id: 'u1' }, isFirstLogin: true });
-    expect(localStorage.getItem('ascent_access_token')).toBe('new');
+    expect(ascent.auth.isAuthenticated()).toBe(true);
+    expect(JSON.stringify({ ...localStorage })).not.toMatch(/token/i);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: 'a@b.c', password: 'pw' });
   });
 
@@ -123,39 +124,44 @@ describe('sessions', () => {
     expect(body).not.toHaveProperty('accessToken');
   });
 
-  test('an answer without a token is not a sign-in', async () => {
-    fetchMock.mockResolvedValue(ok({ user: { id: 'u1' } }));
+  test('an answer without the user is not a sign-in', async () => {
+    fetchMock.mockResolvedValue(ok({ token: 'x' }));
     await expect(ascent.auth.login('a@b.c', 'pw')).rejects.toThrow();
-    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+    expect(ascent.auth.isAuthenticated()).toBe(false);
   });
 
-  test('being signed in elsewhere drops the token and goes to the sign-in page', async () => {
+  test('a device holding a token from before the cookie sends it once, then forgets it', async () => {
     localStorage.setItem('ascent_access_token', 'old');
+    expect(ascent.auth.isAuthenticated()).toBe(true);
+    fetchMock.mockImplementation(async () => ok({ id: 'u1' }));
+    await ascent.auth.me();
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer old');
+    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+    expect(ascent.auth.isAuthenticated()).toBe(true);
+    await ascent.auth.me();
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBeUndefined();
+  });
+
+  test('being signed in elsewhere forgets the session and goes to the sign-in page', async () => {
+    localStorage.setItem('ascent_signed_in', '1');
     const location = { pathname: '/Expenses', href: '/Expenses' };
     vi.stubGlobal('location', location);
     fetchMock.mockResolvedValue(json(401, { success: false, error: 'Signed in on another device', code: 'SESSION_REPLACED' }));
     await expect(request('/auth/me')).rejects.toMatchObject({ status: 401 });
-    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+    expect(ascent.auth.isAuthenticated()).toBe(false);
     expect(location.href).toBe('/login?reason=session_replaced');
   });
 });
 
 describe('signing out', () => {
-  test('ends this device\'s session on the server and forgets the token', async () => {
-    localStorage.setItem('ascent_access_token', 'tok');
+  test("ends this device's session on the server, which removes the cookie", async () => {
+    localStorage.setItem('ascent_signed_in', '1');
     fetchMock.mockResolvedValue(ok({ signedOut: true }));
     ascent.auth.logout();
-    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+    expect(ascent.auth.isAuthenticated()).toBe(false);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/auth/logout');
     expect(init.method).toBe('POST');
-    expect(init.headers.Authorization).toBe('Bearer tok');
-  });
-
-  test('after deleting the account there is no session to end', () => {
-    localStorage.setItem('ascent_access_token', 'tok');
-    ascent.auth.logout(undefined, { endSession: false });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(localStorage.getItem('ascent_access_token')).toBeNull();
+    expect(init.headers.Authorization).toBeUndefined();
   });
 });

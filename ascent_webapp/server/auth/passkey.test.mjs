@@ -67,7 +67,7 @@ function makeUser() {
 }
 
 async function call(action, { body, origin = 'https://ascentwebapp.vercel.app', token } = {}) {
-  const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
+  const res = { code: 200, headers: {}, setHeader(k, v) { this.headers[k] = v; }, getHeader(k) { return this.headers[k]; }, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
   const headers = { origin, 'x-forwarded-for': `t-${Math.random()}` };
   if (token) headers.authorization = `Bearer ${token}`;
   await handler({ method: 'POST', query: { action }, headers, body }, res);
@@ -80,6 +80,9 @@ beforeEach(() => {
   issued = 0;
   verifyResult = { verified: true, authenticationInfo: { newCounter: 4, credentialBackedUp: true } };
 });
+
+// The session token the response stores in the cookie (the last Set-Cookie wins)
+const sessionCookieOf = (r) => /ascent_session=([^;]*)/.exec([].concat(r.headers['Set-Cookie'] || []).at(-1) || '')?.[1];
 
 test('a page we do not serve cannot ask for a challenge', async () => {
   const r = await call('login-options', { origin: 'https://evil.example' });
@@ -110,7 +113,8 @@ test('unlocking the device that holds the live session keeps it', async () => {
   const r = await call('login-verify', { token, body: { response: { id: 'cred-1', response: { clientDataJSON: clientData('auth-ch') } } } });
   assert.equal(r.code, 200);
   assert.equal(r.body.data.unlocked, true);
-  assert.equal(r.body.data.token, token);
+  assert.equal(sessionCookieOf(r), token);
+  assert.equal(r.body.data.token, undefined, 'the token never reaches page scripts');
   assert.equal(issued, 0);
   assert.equal(users[0].passkeys[0].counter, 4);
 });
@@ -121,7 +125,8 @@ test('signing in without the live session starts a new one', async () => {
   const r = await call('login-verify', { token: stale, body: { response: { id: 'cred-1', response: { clientDataJSON: clientData('auth-ch') } } } });
   assert.equal(r.code, 200);
   assert.equal(r.body.data.unlocked, false);
-  assert.equal(r.body.data.token, 'new-token');
+  assert.equal(sessionCookieOf(r), 'new-token');
+  assert.equal(r.body.data.token, undefined, 'the token never reaches page scripts');
   assert.equal(issued, 1);
 });
 

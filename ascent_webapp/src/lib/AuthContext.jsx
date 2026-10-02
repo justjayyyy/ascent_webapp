@@ -227,7 +227,7 @@ export const AuthProvider = ({ children }) => {
     await ascent.auth.deleteAccount(confirm);
     setUser(null);
     setIsAuthenticated(false);
-    ascent.auth.logout(undefined, { reason: 'account_deleted', endSession: false });
+    ascent.auth.logout(undefined, { reason: 'account_deleted' });
   }, []);
 
   const navigateToLogin = useCallback(() => ascent.auth.redirectToLogin(window.location.href), []);

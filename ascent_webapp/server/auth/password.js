@@ -3,6 +3,7 @@
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
 import { issueSession } from '../lib/session.js';
+import { setSessionCookie } from '../lib/sessionCookie.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
 import { clearFailedPasswords, limitAuth, mayEmailReset } from '../lib/authLimit.js';
@@ -54,8 +55,8 @@ export default async function handler(req, res) {
       await user.save();
       await clearFailedPasswords(user.email); // a new password lifts a lock from wrong guesses at the old one
       // A new password ends every other session: whoever knew the old one is signed out
-      const session = await issueSession(user, { userAgent: req.headers?.['user-agent'], only: true });
-      return success(res, { user: user.toJSON(), token: session });
+      setSessionCookie(req, res, await issueSession(user, { userAgent: req.headers?.['user-agent'], only: true }));
+      return success(res, { user: user.toJSON() });
     }
 
     return error(res, 'Unknown action', 400);

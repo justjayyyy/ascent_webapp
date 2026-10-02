@@ -47,7 +47,7 @@ const { linkOrigin } = await import('../lib/links.js');
 const { renderAccountEmail } = await import('../lib/accountEmails.js');
 
 const call = async (handler, { method = 'POST', query = {}, body = {}, headers = {} } = {}) => {
-  const res = { code: 200, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
+  const res = { code: 200, headers: {}, setHeader(k, v) { this.headers[k] = v; }, getHeader(k) { return this.headers[k]; }, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
   await handler({ method, body, headers, query }, res);
   return res;
 };
@@ -59,6 +59,9 @@ beforeEach(() => {
   signedIn = null;
   deleted = [];
 });
+
+// The session token the response stores in the cookie (the last Set-Cookie wins)
+const sessionCookieOf = (r) => /ascent_session=([^;]*)/.exec([].concat(r.headers['Set-Cookie'] || []).at(-1) || '')?.[1];
 
 test('tokens are long, random and stored only as a hash', () => {
   const a = newAccountToken(1000, 0);
@@ -92,7 +95,8 @@ test('a reset link sets the new password once, confirms the email and signs in',
   assert.equal((await call(password, { query: { action: 'reset' }, body: { token, password: '123' } })).code, 400);
   const r = await call(password, { query: { action: 'reset' }, body: { token, password: 'new-pass' } });
   assert.equal(r.code, 200);
-  assert.equal(r.body.data.token, 'token-for-u1');
+  assert.equal(sessionCookieOf(r), 'token-for-u1');
+  assert.equal(r.body.data.token, undefined, 'the token never reaches page scripts');
   assert.equal(r.body.data.user.password, undefined);
   assert.equal(users[0].password, 'new-pass');
   assert.equal(users[0].emailVerified, true);

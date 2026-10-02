@@ -44,7 +44,7 @@ function openApp(path, { signedIn = true, change } = {}) {
   change?.(data);
   api = fakeFetch(data);
   vi.stubGlobal('fetch', vi.fn(api.fetchImpl));
-  if (signedIn) localStorage.setItem('ascent_access_token', 'test-token');
+  if (signedIn) localStorage.setItem('ascent_signed_in', '1');
   window.history.pushState({}, '', path);
   return render(<App />);
 }
@@ -77,7 +77,7 @@ test('a reset link sets the new password and opens the app signed in', async () 
   await user.click(screen.getByRole('button', { name: en.resetSave }));
   await waitFor(() => expect(window.location.pathname).toBe('/Dashboard'));
   expect(callTo('/api/auth/password', 'reset').body).toEqual({ token, password: '1234567' });
-  expect(localStorage.getItem('ascent_access_token')).toBe('fresh-token');
+  expect(localStorage.getItem('ascent_signed_in')).toBe('1');
 }, 20000);
 
 test('an expired reset link says so and points back to sign in', async () => {
@@ -144,7 +144,7 @@ test('deleting the account needs the email typed, then signs out', async () => {
   await user.click(confirm);
   await waitFor(() => expect(api.calls.some((c) => c.method === 'DELETE' && c.path === '/api/auth/me')).toBe(true));
   expect(api.calls.find((c) => c.method === 'DELETE' && c.path === '/api/auth/me').body).toEqual({ confirm: 'dana@x.test' });
-  await waitFor(() => expect(localStorage.getItem('ascent_access_token')).toBeNull());
+  await waitFor(() => expect(localStorage.getItem('ascent_signed_in')).toBeNull());
 }, 20000);
 
 test('signing out of the other devices keeps this one signed in', async () => {
@@ -154,7 +154,7 @@ test('signing out of the other devices keeps this one signed in', async () => {
   await user.click(screen.getByRole('button', { name: en.setSignOutOthers }));
   expect(await screen.findByText(en.setSignedOutOthers)).toBeTruthy();
   expect(callTo('/api/auth/logout').query.scope).toBe('others');
-  expect(localStorage.getItem('ascent_access_token')).toBe('test-token');
+  expect(localStorage.getItem('ascent_signed_in')).toBe('1');
 }, 20000);
 
 test('a locked sign-in says why, in the page language', async () => {

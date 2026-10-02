@@ -1,4 +1,6 @@
-import { verifyToken, getTokenFromHeader } from '../lib/jwt.js';
+import { verifyToken } from '../lib/jwt.js';
+import { clearSessionCookie, sessionToken, setSessionCookie } from '../lib/sessionCookie.js';
+import { isAllowedOrigin } from '../lib/cors.js';
 import { unauthorized } from '../lib/response.js';
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
@@ -8,7 +10,8 @@ import Workspace from '../models/Workspace.js';
 // `signedInElsewhere` = the token was valid but has been superseded by a newer sign-in; the client
 // uses the code to tell the user why they were signed out. Tokens from before this check existed
 // (no sid) just get a plain expiry.
-function replaced(res, signedInElsewhere) {
+function replaced(req, res, signedInElsewhere) {
+  clearSessionCookie(req, res);
   return res.status(401).json({
     success: false,
     error: signedInElsewhere ? 'Signed in on another device' : 'Session expired',
@@ -16,9 +19,21 @@ function replaced(res, signedInElsewhere) {
   });
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/** A change sent with the cookie from a page that is not ours (cross-site request forgery). */
+export function isForeignChange(req) {
+  const origin = req.headers?.origin;
+  return !SAFE_METHODS.has(req.method) && !!origin && !isAllowedOrigin(origin, { host: req.headers?.host });
+}
+
 export async function authMiddleware(req, res) {
   try {
-    const token = getTokenFromHeader(req);
+    const { token, fromCookie } = sessionToken(req);
+    if (fromCookie && isForeignChange(req)) {
+      res.status(403).json({ success: false, error: 'Request from another site' });
+      return null;
+    }
     
     if (!token) {
       unauthorized(res, 'No token provided');
@@ -49,10 +64,12 @@ export async function authMiddleware(req, res) {
 
     // The token's session must still be live (it ends on sign-out, "sign out other devices" or a password reset)
     if (!isLiveSession(user, decoded.sid)) {
-      replaced(res, !!decoded.sid);
+      replaced(req, res, !!decoded.sid);
       return null;
     }
     req.sessionId = decoded.sid;
+    // A device still on the old header-based session moves to the cookie
+    if (!fromCookie) setSessionCookie(req, res, token);
     delete user.sessionId;
     delete user.sessions;
 
@@ -88,7 +105,7 @@ export async function authMiddleware(req, res) {
 }
 
 export async function optionalAuth(req) {
-  const token = getTokenFromHeader(req);
+  const { token } = sessionToken(req);
   
   if (!token) {
     return null;

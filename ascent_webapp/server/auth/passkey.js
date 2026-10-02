@@ -3,7 +3,7 @@
 //   POST ?action=register-options   (signed in)  -> options for navigator.credentials.create
 //   POST ?action=register-verify    (signed in)  { response, name? } -> saves the passkey
 //   POST ?action=login-options      (public)     -> options for navigator.credentials.get
-//   POST ?action=login-verify       (public)     { response } -> { user, token, unlocked }
+//   POST ?action=login-verify       (public)     { response } -> { user, unlocked }, session in a cookie
 //   GET  ?action=list               (signed in)  -> this account's passkeys (no key material)
 //   PUT  ?action=rename&id=...      (signed in)  { name }
 //   DELETE ?action=remove&id=...    (signed in)
@@ -22,7 +22,8 @@ import User from '../models/User.js';
 import AuthChallenge from '../models/AuthChallenge.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { issueSession, isLiveSession } from '../lib/session.js';
-import { verifyToken, getTokenFromHeader } from '../lib/jwt.js';
+import { verifyToken } from '../lib/jwt.js';
+import { sessionToken, setSessionCookie } from '../lib/sessionCookie.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
 import { limitAuth } from '../lib/authLimit.js';
@@ -152,13 +153,14 @@ async function loginVerify(req, res, rp) {
   if (user.isFirstLogin) user.isFirstLogin = false;
 
   // Unlocking a device whose session is still live keeps that session instead of starting another
-  const current = getTokenFromHeader(req);
+  const { token: current } = sessionToken(req);
   const decoded = current ? verifyToken(current) : null;
   const unlocked = !!(decoded && String(decoded.userId) === String(user._id) && isLiveSession(user, decoded.sid));
   const token = unlocked ? current : await issueSession(user, { userAgent: req.headers?.['user-agent'] });
   await user.save();
+  setSessionCookie(req, res, token);
 
-  return success(res, { user: user.toJSON(), token, unlocked });
+  return success(res, { user: user.toJSON(), unlocked });
 }
 
 export default async function handler(req, res) {

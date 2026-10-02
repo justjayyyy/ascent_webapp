@@ -1,4 +1,4 @@
-import { TOKEN_KEY, WORKSPACE_KEY, SESSION_CACHE_KEY } from '@/lib/storageKeys';
+import { LEGACY_TOKEN_KEY, SIGNED_IN_KEY, WORKSPACE_KEY, SESSION_CACHE_KEY } from '@/lib/storageKeys';
 import { localDay } from '@/lib/localDay';
 
 // The Ascent API client. Every call answers with the `data` of `{ success, data }`, or throws an Error
@@ -16,9 +16,11 @@ const storage = {
   remove: (key) => { try { localStorage.removeItem(key); } catch { /* storage unavailable */ } },
 };
 
-export const getToken = () => storage.get(TOKEN_KEY);
-const setToken = (token) => storage.set(TOKEN_KEY, token);
-const removeToken = () => storage.remove(TOKEN_KEY);
+// The session is an HttpOnly cookie the server sets at sign-in: page scripts never see it, and the browser
+// sends it with every same-origin request. This device only remembers that it is signed in.
+const legacyToken = () => storage.get(LEGACY_TOKEN_KEY);
+const markSignedIn = () => { storage.set(SIGNED_IN_KEY, '1'); storage.remove(LEGACY_TOKEN_KEY); };
+const forgetSession = () => { storage.remove(SIGNED_IN_KEY); storage.remove(LEGACY_TOKEN_KEY); };
 
 const enc = encodeURIComponent;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,8 +47,9 @@ export async function request(endpoint, options = {}) {
 
 async function send(endpoint, { method, body, extraHeaders, timeout, ...init }) {
   const headers = { Accept: 'application/json', ...(body !== undefined && { 'Content-Type': 'application/json' }), ...extraHeaders };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // A device still holding a token from before the cookie sends it once more; the server answers with the cookie
+  const legacy = legacyToken();
+  if (legacy) headers.Authorization = `Bearer ${legacy}`;
   const workspaceId = storage.get(WORKSPACE_KEY);
   if (workspaceId && !headers['x-workspace-id']) headers['x-workspace-id'] = workspaceId;
 
@@ -69,7 +72,7 @@ async function send(endpoint, { method, body, extraHeaders, timeout, ...init }) 
 
   if (response.status === 401 && (data?.code === 'SESSION_REPLACED' || data?.code === 'SESSION_INVALID')) {
     // Signed in on another device (or an old token): this device has to sign in again
-    removeToken();
+    forgetSession();
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
       window.location.href = `/login?reason=${data.code === 'SESSION_REPLACED' ? 'session_replaced' : 'session_expired'}`;
     }
@@ -102,8 +105,8 @@ export function systemPrefs() {
 }
 
 const signedIn = (result) => {
-  if (!result?.token || !result?.user) throw apiError('The server sent an unexpected answer.', 200, { data: result });
-  setToken(result.token);
+  if (!result?.user) throw apiError('The server sent an unexpected answer.', 200, { data: result });
+  markSignedIn();
   return { user: result.user, isFirstLogin: result.isFirstLogin === true };
 };
 
@@ -128,11 +131,16 @@ const auth = {
     const optionsJSON = await request('/auth/passkey?action=login-options', json('POST', {}));
     const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
     const result = await request('/auth/passkey?action=login-verify', json('POST', { response }));
-    setToken(result.token);
+    markSignedIn();
     return { ...result, credentialId: response.id };
   },
 
-  me: () => request('/auth/me'),
+  // Confirms the session; a device that signed in before the cookie has been moved over by now
+  me: async () => {
+    const user = await request('/auth/me');
+    markSignedIn();
+    return user;
+  },
   updateMe: (data) => request('/auth/me', json('PUT', data)),
   // `confirm` is the account's email, typed by the person
   deleteAccount: (confirm) => request('/auth/me', json('DELETE', { confirm })),
@@ -148,16 +156,18 @@ const auth = {
   signOutOtherDevices: () => request('/auth/logout?scope=others', { method: 'POST' }),
 
   /**
-   * Signs out on this device: the server ends this session (other devices stay signed in), then what this
-   * device kept for offline use is forgotten. `endSession: false` when there is no session left to end.
+   * Signs out on this device: the server ends this session (other devices stay signed in) and removes the
+   * cookie, then what this device kept for offline use is forgotten.
    */
-  logout(redirectUrl, { reason, endSession = true } = {}) {
-    const token = getToken();
-    // Plain fetch: a session that already ended must not send this page to the sign-in screen itself
-    const ending = endSession && token
-      ? fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
-      : Promise.resolve();
-    removeToken();
+  logout(redirectUrl, { reason } = {}) {
+    const legacy = legacyToken();
+    // Plain fetch: a session that already ended must not send this page to the sign-in screen itself.
+    // Sent even without a session to end, so the server also removes the cookie.
+    const ending = fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      headers: legacy ? { Authorization: `Bearer ${legacy}` } : {},
+    }).catch(() => {});
+    forgetSession();
     storage.remove(SESSION_CACHE_KEY);
     // Bounded, so sign-out never hangs on a slow connection
     Promise.race([
@@ -171,9 +181,9 @@ const auth = {
   },
 
   redirectToLogin: toLogin,
-  // The token was refused: drop it without leaving the page
-  forgetToken: removeToken,
-  isAuthenticated: () => !!getToken(),
+  // The session was refused: forget it without leaving the page
+  forgetToken: forgetSession,
+  isAuthenticated: () => !!(storage.get(SIGNED_IN_KEY) || legacyToken()),
 };
 
 /**

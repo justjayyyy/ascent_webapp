@@ -1,6 +1,7 @@
 import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
 import { issueSession } from '../lib/session.js';
+import { setSessionCookie } from '../lib/sessionCookie.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
 import { accountLocked, clearFailedPasswords, limitAuth, recordFailedPassword } from '../lib/authLimit.js';
@@ -54,11 +55,10 @@ export default async function handler(req, res) {
     user.isFirstLogin = false;
     await user.save();
 
-    const token = await issueSession(user, { userAgent: req.headers?.['user-agent'] });
+    setSessionCookie(req, res, await issueSession(user, { userAgent: req.headers?.['user-agent'] }));
 
     return success(res, {
       user: user.toJSON(),
-      token,
       isFirstLogin
     });
 

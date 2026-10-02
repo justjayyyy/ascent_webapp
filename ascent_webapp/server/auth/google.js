@@ -2,6 +2,7 @@ import connectDB from '../lib/mongodb.js';
 import User from '../models/User.js';
 import Workspace from '../models/Workspace.js';
 import { issueSession } from '../lib/session.js';
+import { setSessionCookie } from '../lib/sessionCookie.js';
 import { handleCors } from '../lib/cors.js';
 import { success, error, serverError } from '../lib/response.js';
 import { limitAuth } from '../lib/authLimit.js';
@@ -74,8 +75,8 @@ export default async function handler(req, res) {
       console.error('[Google Auth] accepting invitations failed:', err?.message); // never blocks sign-in
     }
 
-    const token = await issueSession(user, { userAgent: req.headers?.['user-agent'] });
-    return success(res, { user: user.toJSON(), token, isFirstLogin });
+    setSessionCookie(req, res, await issueSession(user, { userAgent: req.headers?.['user-agent'] }));
+    return success(res, { user: user.toJSON(), isFirstLogin });
   } catch (err) {
     return serverError(res, err);
   }
