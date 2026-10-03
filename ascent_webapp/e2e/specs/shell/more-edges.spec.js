@@ -1,19 +1,11 @@
 // More edges (P1/P2: NT-H16, NT-N05, NT-E07, GR-E02, LN-E01, RV-N02, RC-E02, OFF-E07): dictation and a blocked
 // microphone, a note deleted for good, quantities in Hebrew and with units, a loan with no interest, a review with
 // nothing before it, an overspent month's recap, and the app working when the browser's database refuses.
-import { format, startOfMonth, subMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { test, expect } from '../../fixtures.js';
 import { openApp } from '../../support/app.js';
 import { day, expense, income } from '../../support/factories.js';
-import { L, Lre } from '../../support/i18n.js';
-
-/** One story forward unless `target` already shows; true once it does */
-async function stepUntil(page, target) {
-  if (await target.isVisible()) return true;
-  await page.keyboard.press('ArrowRight');
-  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 400); }));
-  return target.isVisible();
-}
+import { L } from '../../support/i18n.js';
 
 // The browser's speech recognition, replaced by one the test drives (window.__rec)
 function fakeSpeech() {
@@ -80,15 +72,13 @@ test('a first month on record says there is nothing to compare with yet @critica
 });
 
 test('the recap of a month that spent more than came in says so @critical', async ({ page, api }) => {
-  const lastMonth = (d) => format(new Date(startOfMonth(subMonths(new Date(), 1)).setDate(d)), 'yyyy-MM-dd');
-  await api.create('transactions', income({ amount: 1000, category: 'freelance', date: lastMonth(3) }));
-  await api.create('transactions', expense({ amount: 1600, date: lastMonth(10) }));
-  await openApp(page, `/Review?month=${format(subMonths(new Date(), 1), 'yyyy-MM')}`);
-  await page.getByRole('button', { name: Lre('rvWatchRecap') }).click();
-  const story = page.getByRole('dialog', { name: Lre('rcTitle') });
-  await story.getByRole('button', { name: L('rcPause') }).click();
-  // Story by story until the one about the month's balance
-  await expect.poll(() => stepUntil(page, story.getByText(L('rcOverspent')).first()), { timeout: 30_000 }).toBe(true);
+  // The first days of July, with June's recap ready on the Dashboard
+  await page.clock.setFixedTime(new Date('2026-07-02T09:00:00'));
+  await api.create('transactions', income({ amount: 1000, category: 'freelance', date: '2026-06-03' }));
+  await api.create('transactions', expense({ amount: 1600, date: '2026-06-10' }));
+  await openApp(page, '/Dashboard');
+  await expect(page.getByText(L('rcReady').replace('{month}', 'June'))).toBeVisible();
+  await expect(page.getByText(L('rcBannerOver')).first()).toContainText('$600');
 });
 
 test('when the browser’s database refuses, the app still works online @critical', async ({ page, api }) => {
