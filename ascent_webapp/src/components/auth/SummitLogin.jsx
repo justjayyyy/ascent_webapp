@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useTransform } from '@/lib/motion';
+import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from '@/lib/motion';
 import { ArrowLeft, ArrowRight, Loader2, ScanFace } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AscentLogo from '@/components/AscentLogo';
@@ -428,7 +428,12 @@ function jointsOf(p) {
   };
 }
 
+// With reduced motion the climber holds still: standing, or the V after landing when celebrating
+const STILL_CHEER = JUMP_AT + JUMP_TIME + 0.35;
+
 function Champion({ celebrating }) {
+  const reduce = useReducedMotion();
+  const still = reduce ? (celebrating ? 'cheer' : 'rest') : null;
   const refs = useRef({});
   const since = useRef(-1);
   const clock = useRef(0);
@@ -441,19 +446,7 @@ function Champion({ celebrating }) {
     let pose = targetPose(0, -1);
     const attr = (key, name, value) => refs.current[key]?.setAttribute(name, value);
     const line = (pts) => `M${pts.map((q) => `${f2(q[0])} ${f2(q[1])}`).join(' L')}`;
-    const draw = (now) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      clock.current += dt;
-      const t = clock.current;
-      const cs = since.current < 0 ? -1 : t - since.current;
-      const target = targetPose(t, cs);
-      const next = {};
-      Object.keys(target).forEach((k) => {
-        const follow = 1 - Math.exp(-dt * (FOLLOW[k] || 10));
-        next[k] = pose[k] + (target[k] - pose[k]) * follow;
-      });
-      pose = next;
+    const paint = (age) => {
       const j = jointsOf(pose);
       attr('torso', 'd', line(j.torso));
       attr('head', 'cx', f2(j.head[0]));
@@ -468,8 +461,6 @@ function Champion({ celebrating }) {
       const shadow = Math.max(0.4, 1 - pose.lift / 12);
       attr('shadow', 'rx', f2(3.8 * shadow));
       attr('shadow', 'fill-opacity', f2(0.5 * shadow));
-      // Confetti from the top of each jump
-      const age = cs < 0 ? -1 : (cs % JUMP_LOOP) - (JUMP_AT + JUMP_TIME / 2);
       CONFETTI.forEach((c, i) => {
         const el = refs.current[`c${i}`];
         if (!el) return;
@@ -477,11 +468,32 @@ function Champion({ celebrating }) {
         el.setAttribute('opacity', f2(Math.min(1, (1.4 - age) * 2)));
         el.setAttribute('transform', `translate(${f2(c.vx * age)} ${f2(-14 - c.vy * age + 16 * age * age)}) rotate(${f2(c.spin * age)})`);
       });
+    };
+    if (still) {
+      pose = targetPose(0, still === 'cheer' ? STILL_CHEER : -1);
+      paint(-1);
+      return undefined;
+    }
+    const draw = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      clock.current += dt;
+      const t = clock.current;
+      const cs = since.current < 0 ? -1 : t - since.current;
+      const target = targetPose(t, cs);
+      const next = {};
+      Object.keys(target).forEach((k) => {
+        const follow = 1 - Math.exp(-dt * (FOLLOW[k] || 10));
+        next[k] = pose[k] + (target[k] - pose[k]) * follow;
+      });
+      pose = next;
+      // Confetti from the top of each jump
+      paint(cs < 0 ? -1 : (cs % JUMP_LOOP) - (JUMP_AT + JUMP_TIME / 2));
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [still]);
 
   const suit = 'color-mix(in oklch, hsl(var(--foreground)) 78%, hsl(var(--primary)))';
   const skin = 'hsl(var(--foreground))';

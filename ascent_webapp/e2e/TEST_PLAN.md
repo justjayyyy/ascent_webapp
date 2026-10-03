@@ -135,10 +135,12 @@ Done so far:
 | Phone, every language | `specs/shell/layout.phone.spec.js` | all 11 pages × en/he/ru: no sideways overflow, 44px tap areas (§4.1.3), `dir`/`lang`, no untranslated key; sign-in in each language |
 | Hebrew | `specs/cross/rtl.spec.js` | I18N-H01: mirrored layout, an expense added through the Hebrew screens, numbers left-to-right inside, translated categories and months |
 | In-between sizes | `specs/shell/layout.sizes.spec.js` | every page at 768, 1024 and 1280 px |
+| Keyboard alone | `specs/cross/keyboard.spec.js` | §4.3.3: signing in, adding an expense (focus kept inside the dialog, back on the button after), Escape returning focus, visible focus on the Dashboard's first 40 Tab stops |
+| Reduced motion | `specs/cross/motion.spec.js` | §4.3.6: sign-in and Dashboard hold still (no drawn shape changes, no looping animation but spinners), with a control that the check sees motion when the setting is off |
+| WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: the calendar (§3.16, needs Google's OAuth code flow and the Calendar API stubbed), Recap sharing with
-blurred values (RC-E01), keyboard-only journeys and reduced motion (§4.3.3, 4.3.6), visual regression (§4.4).
-| WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
+blurred values (RC-E01), visual regression (§4.4).
 
 Harness: Anthropic (`api.anthropic.com`, per-test `ai` scenario: ok / refusal / overloaded / not-a-receipt) and Google
 tokeninfo stubbed in the e2e API; `support/google.js` crafts Sign-In credentials; `settleAnimations()` before axe.
@@ -168,6 +170,15 @@ Found while writing them:
   larger tap area), the Notes search and filter buttons (40px) and the Groceries view tabs (32px). Each got an
   invisible tap area on touch screens, as the design system prescribes for small buttons; nothing looks different.
   The check counts tap areas, not drawn boxes (`smallTouchTargets()` in `support/layout.js`).
+- **Fixed — closing a dialog dropped keyboard focus on the page body** (WCAG 2.4.3). Radix returns focus only to its
+  own `Trigger`; the app opens nearly every dialog from an ordinary button with controlled state, so after Save,
+  Cancel or Escape a keyboard or screen-reader user started again from the top of the page. `useReturnFocus` (in
+  `components/ui`) remembers what had focus when the content mounted and returns there, in the shared dialog, drawer
+  and alert dialog. A field with `autoFocus` takes focus before Radix's open event (which Radix then skips), so the
+  opener comes from a short focus history, not `document.activeElement`.
+- **Fixed — reduced motion was ignored by the two drawn animations:** the climber on the sign-in page and the
+  animated logo (sidebar, phone island, splash, Settings) kept moving with the setting on. Both now hold a still pose
+  (the climber in the V after landing when celebrating, without confetti).
 - **Open (minor) — a refusal reads as a failure.** `messages.parse()` parses the empty answer before
   `assistant.js` checks `stop_reason`, so a declined request shows "something went wrong" instead of the declined
   message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.

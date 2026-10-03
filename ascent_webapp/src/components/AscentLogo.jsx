@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { useReducedMotion } from '@/lib/motion';
 import './AscentLogo.css';
 
 // Layered 3D Ascent hiker logo, coloured from the active palette (--logo-* / --primary).
@@ -237,7 +238,9 @@ function pose(t, motion, hovered) {
   return { hip, ground, near, far, opacity, theta, lean, pole, farArm, drawn, pulse, arrowAlpha, tip };
 }
 
-export default function AscentLogo({ motion = 'full', className = '', alt = '' }) {
+export default function AscentLogo({ motion: wanted = 'full', className = '', alt = '' }) {
+  // Reduced motion: the flat logo, hiker at rest, wherever it's used
+  const motion = useReducedMotion() ? 'none' : wanted;
   const rootRef = useRef(null);
   const svgRef = useRef(null);
   const trailRef = useRef(null);

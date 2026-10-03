@@ -7,6 +7,7 @@ import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSheetDrag } from "./useSheetDrag"
 import { keepKeyboardDown } from "@/lib/pointer"
+import { useReturnFocus } from "./useReturnFocus"
 
 const Dialog = DialogPrimitive.Root
 
@@ -31,14 +32,15 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 // On phones every dialog is a bottom sheet (index.css, [data-sheet]): it rises from the bottom, sits
 // above the keyboard and can be dragged down to close. `sheet={false}` keeps the centred dialog for
 // the few that lay themselves out edge to edge (the calendar, the image viewer).
-const DialogContent = React.forwardRef(({ className, children, sheet = true, onOpenAutoFocus = keepKeyboardDown, ...props }, ref) => {
+const DialogContent = React.forwardRef(({ className, children, sheet = true, onOpenAutoFocus = keepKeyboardDown, onCloseAutoFocus, ...props }, ref) => {
+  const focus = useReturnFocus(ref, onCloseAutoFocus)
   const [node, setNode] = React.useState(null)
   const closeRef = React.useRef(null)
+  const trackRef = focus.ref
   const setRef = React.useCallback((el) => {
     setNode(el)
-    if (typeof ref === "function") ref(el)
-    else if (ref) ref.current = el
-  }, [ref])
+    trackRef(el)
+  }, [trackRef])
   useSheetDrag(node, closeRef, sheet)
   return (
   <DialogPortal>
@@ -47,6 +49,7 @@ const DialogContent = React.forwardRef(({ className, children, sheet = true, onO
       ref={setRef}
       data-sheet={sheet ? "" : undefined}
       onOpenAutoFocus={onOpenAutoFocus}
+      onCloseAutoFocus={focus.onCloseAutoFocus}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-border/60 bg-popover p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-3xl",
         className
