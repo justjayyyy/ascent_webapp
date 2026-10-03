@@ -144,6 +144,7 @@ Done so far:
 | Hardening | `specs/security/hardening.spec.js` | SEC-N03, N06, N07 (owner and household come from the session), N08 (cron secret), N09 (bad ids), E01 (code-like text on 8 screens and in the invitation email) |
 | Offline sync | `specs/offline/outbox.spec.js` | OFF-H04 (edit and delete offline, applied in order), H05 (a task ticked offline), N01 (a change refused after losing permission: "could not sync", Try again refused again, Throw away), E02 (a dropping connection sends five changes exactly once), E04 (an edit to a row deleted meanwhile is dropped, not stuck) |
 | Failure states | `specs/shell/failures.spec.js` | DSH-N02, NAV-N02-N04: a server error, a broken answer, too many requests and the database down each say the numbers are not complete; Try again recovers; Expenses and Review too |
+| Ingest edges | `specs/money/ingest-edges.spec.js` | ING-H02 (texts: a purchase in; codes, refunds, declines out), H03 (Apple Pay and the bank text merge into one row), N02 (five devices), N03 (405, 413, bad JSON, unknown kind), N04 (absurd amount), N05 (a demoted member's key refused), the same tap sent twice |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -200,6 +201,9 @@ Found while writing them:
 - **Fixed — the invitation email's text part showed HTML entities.** It was the HTML with its tags removed, so a
   household called "Levi & Sons" read "Levi &amp; Sons" in mail apps that show the text version. The escaped
   characters are now turned back. (The HTML version was, and is, escaped: no markup from a name gets through.)
+- **Harness — in WebKit, `page.route` does not see requests from a page the service worker controls.** A failure staged
+  with a route reached the page only when it won the race against the worker taking over. Specs that stage API
+  failures run with `serviceWorkers: 'block'` (`specs/shell/failures.spec.js`).
 - **Harness — WebKit once fetched Google's real script past the network guard.** One run in 24 loaded the real
   `gsi/client` (Google's own response headers in the trace) although the route serves a fake; the real script then
   opened Google's real sign-in popup, which the guard caught and failed. The fake is now installed before the app
