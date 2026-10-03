@@ -6,6 +6,7 @@
 // AsyncLocalStorage context carrying it, and the stub looks up that test's scenario (default otherwise).
 import http from 'node:http';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { clearGoogle, googleCalendar, googleOAuth, googleTasks } from './googleApis.mjs';
 
 export const TEST_HEADER = 'x-e2e-test';
 
@@ -77,7 +78,10 @@ const STUBS = [
     },
   },
   { host: 'api.anthropic.com', answer: anthropic },
-  { host: 'oauth2.googleapis.com', answer: (scenario, url) => (url.pathname === '/tokeninfo' ? tokeninfo(scenario, url) : json({ error: 'not stubbed' }, 404)) },
+  { host: 'oauth2.googleapis.com', answer: (scenario, url, init, test) => (url.pathname === '/tokeninfo' ? tokeninfo(scenario, url) : googleOAuth(scenario, url, init, test)) },
+  // Calendar and Tasks: a fake Google account per test (harness/googleApis.mjs)
+  { host: 'www.googleapis.com', answer: googleCalendar },
+  { host: 'tasks.googleapis.com', answer: googleTasks },
 ];
 
 const isLocal = (url) => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname);
@@ -100,7 +104,7 @@ export function stubOutbound() {
     if (isLocal(url)) return realFetch(input, init);
     const test = requestContext.getStore()?.test;
     const stub = STUBS.find((s) => s.host === url.hostname);
-    if (stub) return stub.answer(scenarios.get(test) || {}, url, init);
+    if (stub) return stub.answer(scenarios.get(test) || {}, url, init, test);
     const method = init?.method || (typeof input === 'object' && input.method) || 'GET';
     unexpected.push({ test: test || null, method, url: url.href });
     console.warn(`[e2e] refused an outbound call: ${method} ${url.href}`);
@@ -109,5 +113,5 @@ export function stubOutbound() {
 }
 
 export const setScenario = (test, scenario) => scenarios.set(test, { ...scenarios.get(test), ...scenario });
-export const clearScenario = (test) => scenarios.delete(test);
+export const clearScenario = (test) => { scenarios.delete(test); clearGoogle(test); };
 export const unexpectedCalls = (test) => (test ? unexpected.filter((c) => c.test === test) : [...unexpected]);

@@ -33,3 +33,6 @@ export const mailTo = (to) => control('GET', `/mail?to=${encodeURIComponent(to)}
 export const setStubs = (test, scenario) => control('PUT', '/stubs', { test, ...scenario });
 export const clearStubs = (test) => control('DELETE', `/stubs?test=${encodeURIComponent(test)}`);
 export const refusedCalls = (test) => control('GET', `/outbound?test=${encodeURIComponent(test)}`);
+/** The test's fake Google account: seed { events, tasks }, or read { events, tasks, codes, revoked, refreshToken } */
+export const seedGoogle = (test, data) => control('PUT', '/google', { test, ...data });
+export const googleAccount = (test) => control('GET', `/google?test=${encodeURIComponent(test)}`);

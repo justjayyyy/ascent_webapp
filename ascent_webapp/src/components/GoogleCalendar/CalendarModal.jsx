@@ -18,6 +18,7 @@ import EventComposer from './EventComposer';
 import { LOCALES, weekStartsOnFor, normalizeItem, buildDayMap, dayKey } from './calendarUtils';
 import { CALENDAR_EXPIRY_KEY, CALENDAR_TOKEN_KEY } from '@/lib/storageKeys';
 import { loadGoogleIdentity } from '@/lib/googleIdentity';
+import { GoogleMark } from '@/components/auth/AuthParts';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
@@ -60,7 +61,7 @@ function ConnectScreen({ t, onConnect, gis }) {
           >
             {gis === 'loading'
               ? <RefreshCw className="h-5 w-5 animate-spin text-slate-500" aria-hidden />
-              : <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" className="h-5 w-5" />}
+              : <GoogleMark />}
             {t('connectWithGoogle')}
           </button>
           {gis === 'failed' && <p className="mt-3 max-w-sm text-sm text-muted-foreground" role="status">{t('calGoogleOffline')}</p>}

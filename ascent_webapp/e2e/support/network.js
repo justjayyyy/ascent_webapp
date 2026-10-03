@@ -47,6 +47,9 @@ export async function guardContext(context) {
   const refused = [];
   // Vercel Analytics and Speed Insights scripts only exist on Vercel
   await context.route(/\/_vercel\//, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
+  // The fake Google is there before the app runs, so the app never asks for Google's script at all: in WebKit a
+  // request for it once slipped past the route below and brought the real one, which opened Google's real popup
+  await context.addInitScript({ content: FAKE_GSI });
   await context.route((url) => !isLocal(url), (route) => {
     const url = new URL(route.request().url());
     if (url.hostname === 'api.exchangerate-api.com') {

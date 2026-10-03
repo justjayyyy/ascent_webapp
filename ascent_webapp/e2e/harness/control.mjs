@@ -12,6 +12,7 @@ import { issueSession } from '../../server/lib/session.js';
 import { ASSIGNABLE_ROLES, buildPermissions } from '../../shared/workspaceAccess.js';
 import { clearMail, mailTo } from './mailSink.mjs';
 import { clearScenario, setScenario, unexpectedCalls } from './outbound.mjs';
+import { googleAccount, seedGoogle } from './googleApis.mjs';
 
 // The password every seeded account has; generated for tests, never a real one
 export const SEED_PASSWORD = 'e2e-pass-123';
@@ -73,6 +74,10 @@ const routes = {
   'PUT /stubs': ({ test, ...scenario }) => { setScenario(test, scenario); return { ok: true }; },
   'DELETE /stubs': (body, query) => { clearScenario(query.get('test')); return { ok: true }; },
   'GET /outbound': (body, query) => unexpectedCalls(query.get('test')),
+
+  // The test's fake Google account (harness/googleApis.mjs): seed events and tasks, read what the API did there
+  'PUT /google': ({ test, ...data }) => seedGoogle(test, data),
+  'GET /google': (body, query) => googleAccount(query.get('test')),
 };
 
 const readBody = (req) => new Promise((resolve, reject) => {

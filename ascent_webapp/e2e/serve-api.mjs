@@ -27,6 +27,8 @@ Object.assign(process.env, {
   CRON_SECRET: 'e2e-cron',
   // The test build's client id (e2e/support/network.js); Google's token check is stubbed
   GOOGLE_CLIENT_ID: 'e2e-client.apps.googleusercontent.com',
+  // With a secret the calendar connects for the account (a refresh token kept on the server); Google is faked
+  GOOGLE_CLIENT_SECRET: 'e2e-client-secret',
   // The assistant is available (each workspace still has it off until an owner turns it on); Anthropic is stubbed
   ANTHROPIC_API_KEY: 'e2e-fake-key',
   SMTP_HOST: '127.0.0.1',

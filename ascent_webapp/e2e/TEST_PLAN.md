@@ -128,7 +128,7 @@ Done so far:
 | Members | `specs/household/members.spec.js` | WS-H05 (live), H07, H08, H09, WS-N01, N02, N07, N08, N10, TX-N08 |
 | Assistant | `specs/dashboard/assistant.spec.js` | AI-H01, H02, H04, AI-N01, N03, overloaded; refusal (test.fail, below) |
 | Groceries | `specs/groceries/groceries.spec.js` | AI-H06 / GR-H06: receipt photo read, saved as the expense, prices kept |
-| Review | `specs/review/review.spec.js` | RV-H01, H02, RV-N01, RC-H01 |
+| Review | `specs/review/review.spec.js` | RV-H01, H02, RV-N01, RC-H01, RC-H02 (the card downloaded, with the month's figures), RC-E01 (blurred: the card handed to the share sheet holds percentages only; read from what is drawn on the canvas) |
 | Account security | `specs/account/security.spec.js` | AUTH-H11 (reset ends other sessions), N09, H12, H14, N05 (lockout), N15 (open redirect), E01 (session replaced, told why), E02 (expired) |
 | Google | `specs/auth/google.spec.js` | AUTH-H07, H08, N11 (wrong audience, unverified email) |
 | Your data | `specs/account/data.spec.js` | EXP-H01, EXP-E01 (formula injection, BOM), CRD-H01, N01, ACC-H08, N01 |
@@ -137,12 +137,14 @@ Done so far:
 | In-between sizes | `specs/shell/layout.sizes.spec.js` | every page at 768, 1024 and 1280 px |
 | Keyboard alone | `specs/cross/keyboard.spec.js` | §4.3.3: signing in, adding an expense (focus kept inside the dialog, back on the button after), Escape returning focus, visible focus on the Dashboard's first 40 Tab stops |
 | Reduced motion | `specs/cross/motion.spec.js` | §4.3.6: sign-in and Dashboard hold still (no drawn shape changes, no looping animation but spinners), with a control that the check sees motion when the setting is off |
+| Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), Google granting no refresh token → "connect once more" |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
-Not yet: the calendar (§3.16, needs Google's OAuth code flow and the Calendar API stubbed), Recap sharing with
-blurred values (RC-E01), visual regression (§4.4).
+Not yet: visual regression (§4.4); in the calendar, dragging events (CAL-H04), the views and layers (H05), Google unreachable (N03) and the edge cases (E01).
 
-Harness: Anthropic (`api.anthropic.com`, per-test `ai` scenario: ok / refusal / overloaded / not-a-receipt) and Google
+Harness: Google's OAuth token endpoint, Calendar and Tasks are faked in memory per test (`harness/googleApis.mjs`, seeded and read through the control server; `calendar` scenario: ok / revoked / no-refresh / down), and the e2e API runs with a client secret so the calendar connects for the account. The fake Google script is installed before the app runs (see the WebKit note below).
+
+Anthropic (`api.anthropic.com`, per-test `ai` scenario: ok / refusal / overloaded / not-a-receipt) and Google
 tokeninfo stubbed in the e2e API; `support/google.js` crafts Sign-In credentials; `settleAnimations()` before axe.
 
 Found while writing them:
@@ -179,6 +181,13 @@ Found while writing them:
 - **Fixed — reduced motion was ignored by the two drawn animations:** the climber on the sign-in page and the
   animated logo (sidebar, phone island, splash, Settings) kept moving with the setting on. Both now hold a still pose
   (the climber in the V after landing when celebrating, without confetti).
+- **Fixed — the calendar asked Google for its logo.** The Connect button loaded Google's "G" from gstatic.com, a
+  request to Google each time someone opened the calendar unconnected, and a broken image offline. It now uses the
+  mark the sign-in page already draws.
+- **Harness — WebKit once fetched Google's real script past the network guard.** One run in 24 loaded the real
+  `gsi/client` (Google's own response headers in the trace) although the route serves a fake; the real script then
+  opened Google's real sign-in popup, which the guard caught and failed. The fake is now installed before the app
+  runs, so the app never requests the script.
 - **Open (minor) — a refusal reads as a failure.** `messages.parse()` parses the empty answer before
   `assistant.js` checks `stop_reason`, so a declined request shows "something went wrong" instead of the declined
   message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.
