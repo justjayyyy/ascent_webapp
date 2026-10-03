@@ -338,9 +338,10 @@ export default function Dashboard() {
   const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const muted = 'text-muted-foreground';
-  const empty = (
-    <div className={cn('flex h-full min-h-[200px] items-center justify-center text-sm', muted)}>{t('dashNoDataMonth')}</div>
-  );
+  // While the month is still loading, a placeholder: "No transactions this month" then would read as an empty month
+  const empty = isLoading
+    ? <div aria-hidden="true" className="h-full min-h-[200px] animate-pulse rounded-2xl bg-foreground/[0.04]" />
+    : <div className={cn('flex h-full min-h-[200px] items-center justify-center text-sm', muted)}>{t('dashNoDataMonth')}</div>;
 
   const stat = (label, value, Icon, tone) => (
     <Tile className="p-5" i={2}>

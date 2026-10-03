@@ -199,9 +199,8 @@ Found while writing them:
 - **Fixed — one server error could sign you out.** When the app re-checked the session behind an open page (after
   saving a setting, say) and that request got a 500 or an unreadable answer, it treated the session as over and
   went to sign in. Only a 401/403 ends a session now; other errors during a background check keep it.
-- **Open (minor) — the Dashboard's chart says "No transactions this month" while the month is still loading**, next
-  to a Net Amount showing "…". It goes once the data arrives, but under load it can read as an empty month for a
-  few seconds.
+- **Fixed (minor) — the Dashboard's chart said "No transactions this month" while the month was still loading**, next
+  to a Net Amount showing "…"; under load it read as an empty month for a few seconds. It shows a placeholder now.
 - **Fixed — a failed load looked like an empty month.** When the transactions could not be loaded (a server
   error, a broken answer, too many requests, the database down), the Dashboard said "No transactions this month" and
   "All clear. This week: $0", Expenses showed an empty year, and nothing said anything had failed. With nothing
