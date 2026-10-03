@@ -1,0 +1,61 @@
+// The monthly review: a whole month's figures, set against the months before it, and the month as a story.
+import { format, startOfMonth, subMonths } from 'date-fns';
+import { test, expect } from '../../fixtures.js';
+import { openApp } from '../../support/app.js';
+import { expense, income } from '../../support/factories.js';
+import { L, Lre } from '../../support/i18n.js';
+
+const monthDay = (monthsBack, dayOfMonth) => format(new Date(startOfMonth(subMonths(new Date(), monthsBack)).setDate(dayOfMonth)), 'yyyy-MM-dd');
+const monthKey = (monthsBack) => format(subMonths(new Date(), monthsBack), 'yyyy-MM');
+// The month is in the address (in the first week of a month the review opens on the month just finished)
+const openMonth = (page, monthsBack) => openApp(page, `/Review?month=${monthKey(monthsBack)}`);
+const figure = (page, label) => page.locator('dt', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=following-sibling::dd[1]');
+
+async function lastMonthOnRecord(api) {
+  // Last month: 6,000 in, 1,500 out. The month before: 1,000 out
+  await api.create('transactions', income({ amount: 6000, category: 'freelance', date: monthDay(1, 10) }));
+  await api.create('transactions', expense({ amount: 1200, category: 'rent_housing', date: monthDay(1, 5) }));
+  await api.create('transactions', expense({ amount: 300, category: 'food_dining', date: monthDay(1, 12) }));
+  await api.create('transactions', expense({ amount: 1000, category: 'rent_housing', date: monthDay(2, 5) }));
+}
+
+test('a past month in full: spent, earned and kept, against the month before @critical', async ({ page, api }) => {
+  await lastMonthOnRecord(api);
+  await openMonth(page, 1);
+
+  await expect(figure(page, L('rvSpent'))).toHaveText('$1,500');
+  await expect(figure(page, L('rvEarned'))).toHaveText('$6,000');
+  await expect(figure(page, L('rvKept'))).toHaveText('$4,500');
+  // Against last month by default: what was spent then
+  await expect(page.getByText(L('rvWas', { amount: '$1,000' })).first()).toBeVisible();
+});
+
+test('the comparison can be changed: last month, the same month last year, or an average @critical', async ({ page, api }) => {
+  await lastMonthOnRecord(api);
+  await openMonth(page, 1);
+  const compare = page.getByRole('radiogroup', { name: L('rvCompareWith') });
+  for (const key of ['rvCompare_avg3', 'rvCompare_lastYear', 'rvCompare_prev']) {
+    const option = compare.getByRole('radio', { name: L(key) });
+    await option.click();
+    await expect(option).toHaveAttribute('aria-checked', 'true');
+    await expect(page).toHaveURL(/vs=/);
+  }
+});
+
+test('a month with nothing on record says so @critical', async ({ page, owner: _owner }) => {
+  await openMonth(page, 0);
+  await expect(page.getByText(L('rvEmptyTitle'))).toBeVisible();
+});
+
+test('the month as a story: it plays, pauses and closes @critical', async ({ page, api }) => {
+  await lastMonthOnRecord(api);
+  await openMonth(page, 1);
+  await page.getByRole('button', { name: Lre('rvWatchRecap') }).click();
+
+  const story = page.getByRole('dialog', { name: Lre('rcTitle') });
+  await expect(story).toBeVisible();
+  await story.getByRole('button', { name: L('rcPause') }).click();
+  await expect(story.getByRole('button', { name: L('rcPlay') })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(story).toBeHidden();
+});

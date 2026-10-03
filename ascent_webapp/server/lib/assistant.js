@@ -2,7 +2,9 @@
 // receipt photos, and answers questions about the household's spending from an aggregated summary.
 // Needs ANTHROPIC_API_KEY.
 import Anthropic from '@anthropic-ai/sdk';
-import { z } from 'zod';
+// The SDK's structured-output helper reads Zod 4 schemas; the zod 3 package ships them at 'zod/v4' (with zod 3's
+// own `z`, every parse and receipt call failed before reaching the API: "Cannot read properties of undefined")
+import { z } from 'zod/v4';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 
 const MODEL = 'claude-opus-5-5';

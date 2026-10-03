@@ -117,6 +117,42 @@ Found while writing them:
 - **Noted — refusal codes differ by route** for someone outside the household: 404 for most lists, 403 from some,
   400 ("Workspace context required") from categories. All refuse with no data; the test accepts any 4xx without data.
 
+### 0.2.3 Phase 2 status (in progress)
+
+Done so far:
+
+| Area | Spec | Rows |
+| --- | --- | --- |
+| Accessibility | `specs/cross/a11y.spec.js` | WCAG 2.2 A/AA with axe in the browser (contrast included): Dashboard, Expenses, Plans, Notes, Settings and the expense dialog, in all 7 palettes × light/dark |
+| Permissions | `specs/household/permissions.spec.js` | §3.4 matrix: viewer, editor, notes-only, no-goals; UI hidden and API refused |
+| Members | `specs/household/members.spec.js` | WS-H05 (live), H07, H08, H09, WS-N01, N02, N07, N08, N10, TX-N08 |
+| Assistant | `specs/dashboard/assistant.spec.js` | AI-H01, H02, H04, AI-N01, N03, overloaded; refusal (test.fail, below) |
+| Groceries | `specs/groceries/groceries.spec.js` | AI-H06 / GR-H06: receipt photo read, saved as the expense, prices kept |
+| Review | `specs/review/review.spec.js` | RV-H01, H02, RV-N01, RC-H01 |
+| WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
+
+Harness: Anthropic (`api.anthropic.com`, per-test `ai` scenario: ok / refusal / overloaded / not-a-receipt) and Google
+tokeninfo stubbed in the e2e API; `support/google.js` crafts Sign-In credentials; `settleAnimations()` before axe.
+
+Found while writing them:
+- **Fixed — the assistant could never log an expense or read a receipt.** `server/lib/assistant.js` built its
+  structured-output schemas with zod 3's `z`, but the Anthropic SDK's helper reads Zod 4 schemas, so every parse and
+  receipt call threw ("Cannot read properties of undefined (reading 'def')") before reaching the API; only questions
+  worked. The unit tests mock the SDK, so they could not see it. Now `zod/v4` (shipped inside zod 3.25).
+- **Fixed — editors could add, change and remove cards through the API.** The cards endpoint required
+  `editExpenses`; the app reserves cards for the `manageCards` permission (owners, admins, or members given it). Now
+  writes need `manageCards`; reading stays with `viewExpenses`.
+- **Fixed — accessibility:** Groceries' view tabs pointed `aria-controls` at a panel that is not there while loading or
+  on an empty list (critical); four colours were under 4.5:1 as text (success green on light cards; the gold, graphite
+  light and indigo dark primaries), nudged a few points of lightness.
+- **Open (minor) — a refusal reads as a failure.** `messages.parse()` parses the empty answer before
+  `assistant.js` checks `stop_reason`, so a declined request shows "something went wrong" instead of the declined
+  message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.
+- **Open (minor) — leaving a household loses its confirmation.** "You left the workspace" is shown, then the app
+  reloads on its home page and the toast goes with it.
+- **WebKit on Windows:** Playwright's Windows WebKit build stalls `requestAnimationFrame` on some screens (Settings), so
+  clicks never see a stable element there. Linux WebKit in CI is the reference; local runs on Windows are not.
+
 ### 0.3 Guiding principles
 
 1. **Test the product, not the plumbing.** E2E owns what only a real browser + real API + real DB can prove: cross-layer journeys, cookies/sessions, the service worker and offline queue, two people on one household, layout and real-render accessibility. Math (forecast, interest, budgets) is already unit-tested; E2E checks one representative figure per screen.

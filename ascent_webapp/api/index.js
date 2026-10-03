@@ -12,7 +12,7 @@ import 'web-push';
 import '@simplewebauthn/server';
 import '@anthropic-ai/sdk';
 import '@anthropic-ai/sdk/helpers/beta/zod';
-import 'zod';
+import 'zod/v4';
 import app from '../server/server.js';
 
 export default app;

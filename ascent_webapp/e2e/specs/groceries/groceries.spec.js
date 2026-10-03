@@ -24,6 +24,31 @@ test('typing several things at once adds each, with its quantity @critical', asy
   await expect.poll(() => onList(api)).toEqual([['bread', ''], ['eggs', '2'], ['milk', '']]);
 });
 
+// A real image (1×1 PNG): the app draws the photo onto a canvas before sending it, so it has to decode
+const RECEIPT_PHOTO = { name: 'receipt.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') };
+
+test('after a shop, a receipt photo is read and saved as the expense, and prices are kept for next time @critical', async ({ page, owner, api }) => {
+  await api.call('PUT', `/workspaces?id=${owner.workspaceId}&action=settings`, { aiAssistant: true });
+  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  await page.getByRole('button', { name: L('grStartShopping') }).click();
+  const shopping = page.getByRole('dialog', { name: L('grShopping') });
+  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
+  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
+
+  const finish = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: L('grShopDone') }) });
+  await finish.locator('input[type=file]').setInputFiles(RECEIPT_PHOTO);
+  // What the assistant read (stubbed: Rami Levy, 87.40, the milk at 6.90)
+  await expect(finish.getByText('Rami Levy')).toBeVisible();
+  await expect(finish.getByText('87.40').or(finish.getByText('87.4'))).toBeVisible();
+  await finish.getByRole('button', { name: L('grSaveExpense') }).click();
+  await expect(page.getByLabel(new RegExp(`^${L('amount')}`))).toHaveValue('87.4');
+  await page.getByRole('button', { name: L('addTransaction'), exact: true }).click();
+
+  await expect.poll(async () => (await api.list('transactions')).map((t) => [t.amount, t.description])).toEqual([[87.4, 'Rami Levy']]);
+  await expect.poll(async () => (await api.list('groceries'))[0].purchases?.at(-1)?.price).toBe(6.9);
+});
+
 test('a shopping trip: pick the shop, tick what goes in the cart, finish @smoke @critical', async ({ page, api }) => {
   for (const name of ['Milk', 'Eggs', 'Coffee']) {
     await api.create('groceries', { name, onList: true, listedAt: new Date().toISOString() });
