@@ -100,6 +100,9 @@ export const AuthProvider = ({ children }) => {
       // No signal (or the server is unreachable): carry on with what this device knows
       if (isNetworkError(error) && cached) return;
       const wasSignedIn = authenticatedRef.current;
+      // Signed out elsewhere or expired: the API client is already taking this device to the sign-in page with the
+      // reason to show. Hold on the splash rather than send it there again without one (the later address wins)
+      if (error.status === 401 && ['SESSION_REPLACED', 'SESSION_INVALID'].includes(error.data?.code)) setIsSigningOut(true);
       setIsAuthenticated(false);
       clearCachedSession();
       if (error.status === 401 || error.status === 403) {

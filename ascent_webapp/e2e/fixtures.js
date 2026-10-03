@@ -108,7 +108,8 @@ export const test = base.extend({
       await expect.poll(async () => {
         found = (await mailTo(to)).filter((m) => !subject || (subject instanceof RegExp ? subject.test(m.subject) : m.subject === subject)).at(-1);
         return !!found;
-      }, { message: `an email to ${to}` }).toBe(true);
+        // Sending is asynchronous on the API; with many tests at once it can take a while
+      }, { message: `an email to ${to}`, timeout: 20_000 }).toBe(true);
       return found;
     };
     /** The path of the newest link in the newest email to `to` whose path starts with `prefix` */

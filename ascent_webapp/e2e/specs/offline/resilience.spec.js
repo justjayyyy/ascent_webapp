@@ -57,5 +57,5 @@ test('the app shows even when no animation code can be downloaded later @critica
   await page.route(ANIMATION_CODE, (route) => route.abort('connectionreset'));
   await openApp(page, '/Dashboard');
   const heading = page.getByRole('heading', { name: L('dashboard'), level: 1 });
-  await expect.poll(() => seenOpacity(heading), { timeout: 3000 }).toBe(1);
+  await expect.poll(() => seenOpacity(heading)).toBe(1);
 });

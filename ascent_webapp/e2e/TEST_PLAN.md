@@ -129,6 +129,9 @@ Done so far:
 | Assistant | `specs/dashboard/assistant.spec.js` | AI-H01, H02, H04, AI-N01, N03, overloaded; refusal (test.fail, below) |
 | Groceries | `specs/groceries/groceries.spec.js` | AI-H06 / GR-H06: receipt photo read, saved as the expense, prices kept |
 | Review | `specs/review/review.spec.js` | RV-H01, H02, RV-N01, RC-H01 |
+| Account security | `specs/account/security.spec.js` | AUTH-H11 (reset ends other sessions), N09, H12, H14, N05 (lockout), N15 (open redirect), E01 (session replaced, told why), E02 (expired) |
+| Google | `specs/auth/google.spec.js` | AUTH-H07, H08, N11 (wrong audience, unverified email) |
+| Your data | `specs/account/data.spec.js` | EXP-H01, EXP-E01 (formula injection, BOM), CRD-H01, N01, ACC-H08, N01 |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Harness: Anthropic (`api.anthropic.com`, per-test `ai` scenario: ok / refusal / overloaded / not-a-receipt) and Google
@@ -145,6 +148,15 @@ Found while writing them:
 - **Fixed — accessibility:** Groceries' view tabs pointed `aria-controls` at a panel that is not there while loading or
   on an empty list (critical); four colours were under 4.5:1 as text (success green on light cards; the gold, graphite
   light and indigo dark primaries), nudged a few points of lightness.
+- **Fixed — a device signed out from elsewhere bounced back into the app and lost the reason.** On a 401 with a
+  reason (signed in on too many devices, signed out remotely) the API client went to `/login?reason=…` but left the
+  saved session on the device, so the sign-in page reopened the app on it; and `AuthContext` sent the page to
+  `/login` a second time without the reason (the later address wins). Depending on timing the device stayed on the
+  Dashboard with the household's numbers. Now the saved session is cleared on that path and the app holds on the
+  splash while the client navigates.
+- **Fixed — an open app never noticed a session that ended without a reason** (no cookie any more, e.g. it
+  expired while the app stayed open): the 4-second check swallowed the 401 and the screen kept showing old numbers.
+  A 401 there now re-checks the session, which goes to sign in.
 - **Open (minor) — a refusal reads as a failure.** `messages.parse()` parses the empty answer before
   `assistant.js` checks `stop_reason`, so a declined request shows "something went wrong" instead of the declined
   message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.

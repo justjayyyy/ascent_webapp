@@ -3,6 +3,7 @@ import { test, expect } from '../../fixtures.js';
 import { openApp } from '../../support/app.js';
 import { expense } from '../../support/factories.js';
 import { L } from '../../support/i18n.js';
+import { ExpensesScreen } from '../../screens/ExpensesScreen.js';
 
 const nav = (page) => page.getByRole('navigation', { name: L('mainNavigation') });
 
@@ -34,9 +35,7 @@ test('a viewer sees the money but cannot change it, on screen or through the API
 test('an editor adds and changes money but does not manage people or cards @critical', async ({ api, member }) => {
   const editor = await member('editor');
   await openApp(editor.page, '/Expenses');
-  await editor.page.getByRole('button', { name: L('addExpense') }).first().click();
-  await editor.page.getByLabel(new RegExp(`^${L('amount')}`)).fill('12');
-  await editor.page.getByRole('button', { name: L('addTransaction'), exact: true }).click();
+  await new ExpensesScreen(editor.page).addExpense({ amount: 12, description: 'By the editor' });
   await expect.poll(async () => (await api.list('transactions')).length).toBe(1);
 
   await openApp(editor.page, '/Settings');

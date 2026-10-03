@@ -12,10 +12,12 @@ const MIN_GAP_MS = 1500;
 // and a cheap "pulse" poll of the workspace's change counters. When someone else adds an expense,
 // edits a note, joins or changes permissions, the on-screen data refetches within a few seconds.
 export function useWorkspaceSync() {
-  const { user, currentWorkspace, refreshWorkspaces } = useAuth();
+  const { user, currentWorkspace, refreshWorkspaces, checkAppState } = useAuth();
   const queryClient = useQueryClient();
   const refreshRef = useRef(refreshWorkspaces);
   refreshRef.current = refreshWorkspaces;
+  const recheckRef = useRef(checkAppState);
+  recheckRef.current = checkAppState;
 
   const signedIn = !!user;
   const workspaceId = currentWorkspace?.id || currentWorkspace?._id;
@@ -63,8 +65,12 @@ export function useWorkspaceSync() {
           refreshRef.current?.();
         }
         seen = { dataRev: pulse.dataRev, updated: pulse.updated };
-      } catch {
-        // Offline or removed from the workspace: the members refresh handles removal, polling continues
+      } catch (err) {
+        // Offline or removed from the workspace: the members refresh handles removal, polling continues.
+        // Refused as signed out (the session ended elsewhere, or its cookie expired while the app stayed open):
+        // check the session, which takes this device to sign in instead of showing old numbers indefinitely. Not when
+        // the refusal names a reason: the API client is already taking the device there with it (src/api/client.js)
+        if (err?.status === 401 && !err.data?.code) recheckRef.current?.({ silent: true });
       } finally {
         inFlight = false;
       }

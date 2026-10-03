@@ -71,8 +71,10 @@ async function send(endpoint, { method, body, extraHeaders, timeout, ...init }) 
   }
 
   if (response.status === 401 && (data?.code === 'SESSION_REPLACED' || data?.code === 'SESSION_INVALID')) {
-    // Signed in on another device (or an old token): this device has to sign in again
+    // Signed in on another device (or an old token): this device has to sign in again. The saved session goes
+    // too: left in place, the sign-in page opened the app again on it and the reason to show was lost
     forgetSession();
+    storage.remove(SESSION_CACHE_KEY);
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
       window.location.href = `/login?reason=${data.code === 'SESSION_REPLACED' ? 'session_replaced' : 'session_expired'}`;
     }
