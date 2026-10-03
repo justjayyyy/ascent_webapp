@@ -184,7 +184,12 @@ Found while writing them:
 - **Offline is not testable in Playwright's WebKit:** any page load made offline under the service worker fails with
   "WebKit encountered an internal error". Offline specs run in Chromium only (`WEBKIT_UNSUPPORTED`).
 - **WebKit result:** the other 54 tests (money, dashboard, plans, loans, savings, tasks, notes, groceries, review,
-  security, navigation, phone layout) pass in WebKit, 2 minutes for both projects.
+  security, navigation, phone layout) pass in WebKit **on Windows**, 2 minutes for both projects
+  (`npm run test:e2e:webkit`).
+- **Open — WebKit on GitHub's Linux runners loads no page.** Every test fails with `page.goto` timing out (the page's
+  load never completes), including the ones that pass on Windows; the job ran 30 minutes and was cancelled. Not
+  reproduced locally (no Linux WebKit here). Until it is understood the `e2e-webkit` job runs only by hand
+  (Actions → Check → Run workflow). Next step: run it with `--trace on` and read which request never finishes.
 - **Fixed in the harness — "offline" did not wait for the app to be cached.** `installOffline` waited only for the
   service worker to control the page, so a page's code still being cached was missing offline (WebKit caches more
   slowly than Chromium). It now waits until the precache holds every file in `sw.js` (the list names five icons

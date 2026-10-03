@@ -6,6 +6,8 @@ name: Check
 on:
   push:
   pull_request:
+  # By hand, for the WebKit job below
+  workflow_dispatch:
 
 concurrency:
   group: check-${{ github.ref }}
@@ -138,10 +140,11 @@ jobs:
           path: ascent_webapp/playwright-report
           retention-days: 14
 
-  # The same browser tests in WebKit, the engine of Safari on the iPhone, on every push to main. Not required yet:
-  # its results are triaged first (real Safari differences get fixed, engine limits get a test.skip with a reason)
+  # The browser tests in WebKit, the engine of Safari on the iPhone. Run by hand (Actions > Check > Run workflow):
+  # on GitHub's Linux runners every page load in Playwright's WebKit times out (page.goto never finishes), while the
+  # same specs pass in WebKit on Windows; see e2e/TEST_PLAN.md §0.2.3. Back on every push once that is solved
   e2e-webkit:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     needs: e2e-build
     runs-on: ubuntu-latest
     timeout-minutes: 30
