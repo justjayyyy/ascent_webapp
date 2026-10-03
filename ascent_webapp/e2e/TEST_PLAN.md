@@ -148,6 +148,7 @@ Done so far:
 | Budgets | `specs/money/budgets.spec.js` | BUD-H02 (approaching, over by $100), H03 (on pace to pass it around a date), Dashboard over and all on pace, N02 (0 and negative limits refused by the form and the server); the clock fixed at 10 June 2026 |
 | Month edges | `specs/dashboard/month-edges.spec.js` | DSH-E01 (first and last day: no broken numbers; no "a day for" line on the last day), H03 (a past month is closed, with its net), H04 (repeating payments found, the raised one says "up from"); the clock fixed per test |
 | Settings | `specs/account/settings.spec.js` | ACC-H03 (currency re-totals the Dashboard at the stubbed rate), H07 ("/", Escape, nothing found), N03 (a failed save says so and shows what is saved), a server error on the background session check keeps you signed in |
+| Idle cost | `specs/shell/idle.spec.js` | §4.5: an idle Dashboard stays within its 18 requests a minute, each kind within its rate; a hidden tab asks nothing and catches up when back |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -1281,7 +1282,9 @@ screenshots are in `e2e/screenshots/` and come from Linux, in CI, since text ren
 
 - Dashboard and Expenses with `big-data`: LCP < 2.5 s, INP < 200 ms, CLS < 0.1 under 4× CPU throttle + Fast 3G (CDP), measured with `PerformanceObserver` in-page and attached to the report.
 - Route chunk sizes already guarded by `server/bundle.test.mjs`; E2E checks no route fetches more than its chunk set on first navigation.
-- Pulse polling: an idle open app makes ≤ 16 requests/min (pulse every 4 s + heartbeat), stops when the tab is hidden.
+- Pulse polling: an idle open app makes at most 18 requests/min (a pulse every 4 s, a heartbeat a minute, the household
+  list every 30 s for who is online), and none while the tab is hidden. **Built:** `specs/shell/idle.spec.js`, with the
+  browser clock installed and stepped 4 s at a time.
 
 ---
 
