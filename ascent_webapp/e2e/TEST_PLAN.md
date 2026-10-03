@@ -275,7 +275,7 @@ people?* If not, push it down a layer.
    │  each test: fresh BrowserContext(s) = clean cookies, IndexedDB, SW caches, localStorage
    │  extraHTTPHeaders: X-Forwarded-For: 10.0.<shard>.<worker>   ← partitions rate limits
    ▼
- vite preview :4190  (production build, real service worker)
+ vite preview :4180  (production build, real service worker)
    │  /api/* proxied (API_PROXY_TARGET)
    ▼
  e2e/serve-api.mjs :3102  ── the real Express app (server/server.js)
@@ -296,7 +296,7 @@ and points `MONGODB_URI` at an in-memory server. Extend it to:
 
 - Start Mongo as a **replica set** (`MongoMemoryReplSet`) so anything that uses sessions/transactions behaves like Atlas.
 - Write `{ mongoUri, jwtSecret, apiPort, controlPort }` to `e2e/.state/api.json` for the seeding helpers.
-- Set `CRON_SECRET=e2e-cron`, `FRONTEND_URL=http://localhost:4190`, fake `VAPID_*` keys (push routes become testable; delivery goes to the stub), and — per scenario — `ANTHROPIC_API_KEY=e2e-fake`, `GOOGLE_CLIENT_ID=e2e-client`.
+- Set `CRON_SECRET=e2e-cron`, `FRONTEND_URL=http://localhost:4180`, fake `VAPID_*` keys (push routes become testable; delivery goes to the stub), and — per scenario — `ANTHROPIC_API_KEY=e2e-fake`, `GOOGLE_CLIENT_ID=e2e-client`.
 - Expose a **control server on a separate port that only the test runner knows** (never mounted on the app, never in production code): `POST /stubs` (set scenario), `GET /mail?to=`, `DELETE /mail`, `POST /clock` (optional, see §1.4.5).
 
 #### 1.3.3 Third-party stubs (makes the suite hermetic)
