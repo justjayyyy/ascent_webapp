@@ -24,7 +24,10 @@ import {
   isValidEmail,
 } from '../../shared/workspaceAccess.js';
 
-const strip = (html) => html.replace(/<[^>]*>/g, '');
+// The plain-text email from its HTML: tags dropped and the escaped characters turned back, so a household called
+// "Levi & Sons" reads as that, not "Levi &amp; Sons"
+const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" };
+const strip = (html) => html.replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, (m, e) => HTML_ENTITIES[e]);
 
 const inviteCopy = (language, inviter, workspaceName) => {
   const w = escapeHtml(workspaceName);

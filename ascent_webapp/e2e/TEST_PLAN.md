@@ -141,6 +141,7 @@ Done so far:
 | Reduced motion | `specs/cross/motion.spec.js` | §4.3.6: sign-in and Dashboard hold still (no drawn shape changes, no looping animation but spinners), with a control that the check sees motion when the setting is off |
 | Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), H05 (day/week/month, Next and Today, a layer off and remembered), N03 (Google's script unreachable), Google granting no refresh token → "connect once more" |
 | Visual | `specs/visual/screens.visual.spec.js` (project `visual`) | §4.4, first set: sign-in (en, he), Dashboard (dark, light, phone), Expenses, the add-expense dialog, Settings; approved screenshots from Linux in CI |
+| Hardening | `specs/security/hardening.spec.js` | SEC-N03, N06, N07 (owner and household come from the session), N08 (cron secret), N09 (bad ids), E01 (code-like text on 8 screens and in the invitation email) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -189,6 +190,9 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — the invitation email's text part showed HTML entities.** It was the HTML with its tags removed, so a
+  household called "Levi & Sons" read "Levi &amp; Sons" in mail apps that show the text version. The escaped
+  characters are now turned back. (The HTML version was, and is, escaped: no markup from a name gets through.)
 - **Harness — WebKit once fetched Google's real script past the network guard.** One run in 24 loaded the real
   `gsi/client` (Google's own response headers in the trace) although the route serves a fake; the real script then
   opened Google's real sign-in popup, which the guard caught and failed. The fake is now installed before the app
