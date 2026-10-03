@@ -208,3 +208,69 @@ test('when Google cannot be reached, the calendar says so, and Connect tries aga
   await calendar.getByRole('button', { name: L('connectWithGoogle') }).click();
   await expect(toast(page, 'calGoogleLoading')).toBeVisible();
 });
+
+test('an event dragged to a later time, and stretched, is rescheduled in Google; Escape cancels a drag @critical', async ({ page, testKey, owner: _owner }) => {
+  await seedGoogle(testKey, { events: [{ summary: 'Dentist', start: { dateTime: at(10) }, end: { dateTime: at(11) } }] });
+  const calendar = await openCalendar(page);
+  await connect(page, calendar);
+  await calendar.getByRole('tablist', { name: L('calView') }).getByRole('tab', { name: L('day') }).click();
+  const event = calendar.locator('main').getByRole('button', { name: /^Dentist,/ });
+  await expect(event).toBeVisible();
+  // The grid opens scrolled to the time of day now; bring the event into view
+  await event.scrollIntoViewIfNeeded();
+  const box = await event.boundingBox();
+  const hourPx = 56; // HOUR_HEIGHT in calendarUtils.js
+  const stored = async () => (await googleAccount(testKey)).events.map((e) => [new Date(e.start.dateTime).getHours(), new Date(e.end.dateTime).getMinutes() + new Date(e.end.dateTime).getHours() * 60]);
+
+  // Move: grab the middle, down an hour
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3 + hourPx, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(stored).toEqual([[11, 12 * 60]]);
+
+  // Resize: the bottom edge, down half an hour
+  await event.scrollIntoViewIfNeeded();
+  const moved = await event.boundingBox();
+  await page.mouse.move(moved.x + moved.width / 2, moved.y + moved.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(moved.x + moved.width / 2, moved.y + moved.height - 3 + hourPx / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(stored).toEqual([[11, 12 * 60 + 30]]);
+
+  // Escape during a drag leaves it where it was
+  await event.scrollIntoViewIfNeeded();
+  const now = await event.boundingBox();
+  await page.mouse.move(now.x + now.width / 2, now.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(now.x + now.width / 2, now.y + 10 + hourPx * 2, { steps: 8 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 800); }));
+  expect(await stored()).toEqual([[11, 12 * 60 + 30]]);
+});
+
+test('a trip over several days shows on each of them, and a crowded day offers the rest @critical', async ({ page, testKey, owner: _owner }) => {
+  const ym = format(new Date(), 'yyyy-MM');
+  const on = (d, h) => new Date(`${ym}-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:00:00`).toISOString();
+  await seedGoogle(testKey, {
+    events: [
+      // All day, the 10th to the 12th (Google's end date is the day after)
+      { summary: 'Family trip', start: { date: `${ym}-10` }, end: { date: `${ym}-13` } },
+      // Across midnight
+      { summary: 'Night flight', start: { dateTime: on(14, 23) }, end: { dateTime: on(15, 2) } },
+      // Seven on one day
+      ...Array.from({ length: 7 }, (_, i) => ({ summary: `Meeting ${i + 1}`, start: { dateTime: on(20, 8 + i) }, end: { dateTime: on(20, 9 + i) } })),
+    ],
+  });
+  const calendar = await openCalendar(page);
+  await connect(page, calendar);
+  const month = calendar.locator('main');
+  await expect(month.getByText('Family trip')).toHaveCount(3);
+  await expect(month.getByText('Night flight')).toHaveCount(1);
+
+  // Three chips, then the rest behind "4 more", which opens that day with all seven
+  await expect(month.getByText(/^Meeting \d$/)).toHaveCount(3);
+  await month.getByRole('button', { name: L('calMoreCount').replace('{n}', 4) }).click();
+  await expect(calendar.getByText('Meeting 7').first()).toBeVisible();
+});

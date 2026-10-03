@@ -139,7 +139,7 @@ Done so far:
 | In-between sizes | `specs/shell/layout.sizes.spec.js` | every page at 768, 1024 and 1280 px |
 | Keyboard alone | `specs/cross/keyboard.spec.js` | §4.3.3: signing in, adding an expense (focus kept inside the dialog, back on the button after), Escape returning focus, visible focus on the Dashboard's first 40 Tab stops |
 | Reduced motion | `specs/cross/motion.spec.js` | §4.3.6: sign-in and Dashboard hold still (no drawn shape changes, no looping animation but spinners), with a control that the check sees motion when the setting is off |
-| Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), H05 (day/week/month, Next and Today, a layer off and remembered), N03 (Google's script unreachable), Google granting no refresh token → "connect once more" |
+| Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), H05 (day/week/month, Next and Today, a layer off and remembered), N03 (Google's script unreachable), H04 (dragged an hour later, stretched half an hour, Escape cancels), E01 (a three-day trip on each day, an overnight event on its start day, a crowded day's "4 more"), Google granting no refresh token → "connect once more" |
 | Visual | `specs/visual/screens.visual.spec.js` (project `visual`) | §4.4, first set: sign-in (en, he), Dashboard (dark, light, phone), Expenses, the add-expense dialog, Settings; approved screenshots from Linux in CI |
 | Hardening | `specs/security/hardening.spec.js` | SEC-N03, N06, N07 (owner and household come from the session), N08 (cron secret), N09 (bad ids), E01 (code-like text on 8 screens and in the invitation email) |
 | Offline sync | `specs/offline/outbox.spec.js` | OFF-H04 (edit and delete offline, applied in order), H05 (a task ticked offline), N01 (a change refused after losing permission: "could not sync", Try again refused again, Throw away), E02 (a dropping connection sends five changes exactly once), E04 (an edit to a row deleted meanwhile is dropped, not stuck) |
@@ -153,7 +153,7 @@ Done so far:
 | Gestures | `specs/shell/gestures.phone.spec.js` | NAV-H07: a full pull from the top refreshes (with the change pulse silenced, so only the pull can), a short pull does not; NAV-H03/H04 obsolete (no dock) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
-Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
+Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
 
 Harness: Google's OAuth token endpoint, Calendar and Tasks are faked in memory per test (`harness/googleApis.mjs`, seeded and read through the control server; `calendar` scenario: ok / revoked / no-refresh / down), and the e2e API runs with a client secret so the calendar connects for the account. The fake Google script is installed before the app runs (see the WebKit note below).
 
