@@ -22,7 +22,9 @@
     "backfill:ingest": "node --env-file=.env server/scripts/backfill-ingest-fields.mjs",
     "test:node": "node --test --experimental-test-module-mocks \"server/**/*.test.mjs\" \"shared/**/*.test.mjs\" \"src/lib/**/*.test.mjs\"",
     "test:web": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=desktop --project=phone",
+    "test:e2e:webkit": "playwright test --project=desktop-webkit --project=phone-webkit",
+    "test:e2e:all": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test": "npm run test:node && npm run test:web",
     "check": "npm run lint && npm test && npm run build"
@@ -80,6 +82,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.19.0",
     "@playwright/test": "^1.63.0",
     "@sentry/vite-plugin": "^5.4.0",

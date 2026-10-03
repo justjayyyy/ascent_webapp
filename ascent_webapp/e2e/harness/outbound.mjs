@@ -17,6 +17,56 @@ export const RATES = { USD: 1, ILS: 3.7, EUR: 0.92, RUB: 90, GBP: 0.79 };
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
+// --- Anthropic: the assistant's three calls, told apart by their system prompt (server/lib/assistant.js) ---
+const message = (text, stop = 'end_turn') => json({
+  id: 'msg_e2e', type: 'message', role: 'assistant', model: 'claude-opus-5-5', stop_reason: stop, stop_sequence: null,
+  content: [{ type: 'text', text }], usage: { input_tokens: 1, output_tokens: 1 },
+});
+
+/** A note like "coffee 18 with Max" read the simple way: the number is the amount, the rest the description. */
+function draftFrom(note) {
+  const text = String(note.match(/Note: ([\s\S]*)$/)?.[1] || '').trim();
+  const amount = Number(text.match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.')) || null;
+  const question = /\?\s*$|^(how|what|when|why|כמה|сколько)/i.test(text);
+  const card = text.match(/\bwith (\w+)/i)?.[1] || null;
+  const description = text.replace(/\d+(?:[.,]\d+)?/g, '').replace(/\bwith \w+/i, '').replace(/\s+/g, ' ').trim();
+  return question
+    ? { kind: 'question', type: 'Expense', amount: null, currency: null, category: null, description: '', date: null, paymentMethod: null, cardName: null }
+    : { kind: 'transaction', type: 'Expense', amount, currency: null, category: /coffee|café|קפה|кофе/i.test(text) ? 'food_dining' : null,
+      description, date: null, paymentMethod: card ? 'Card' : null, cardName: card };
+}
+
+export const ASSISTANT_ANSWER = 'Food and dining is your biggest category this month.';
+
+function anthropic({ ai = 'ok' }, url, init) {
+  if (ai === 'overloaded') return json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, 529);
+  if (ai === 'refusal') return message('', 'refusal');
+  const body = JSON.parse(init?.body || '{}');
+  const system = Array.isArray(body.system) ? body.system.map((b) => b.text).join('') : String(body.system || '');
+  const userText = (body.messages || []).flatMap((m) => (typeof m.content === 'string' ? [m.content] : m.content.map((c) => c.text || ''))).join('\n');
+  if (system.startsWith('You read short notes')) return message(JSON.stringify(draftFrom(userText)));
+  if (system.startsWith('You read photos of shop receipts')) {
+    const firstItem = userText.match(/^- ([^:]+): /m)?.[1] || null;
+    return message(JSON.stringify({
+      isReceipt: ai !== 'not-a-receipt', store: 'Rami Levy', date: new Date().toISOString().slice(0, 10), total: 87.4, currency: 'USD',
+      items: firstItem ? [{ text: 'Milk 3%', price: 6.9, matchId: firstItem }] : [],
+    }));
+  }
+  return message(ASSISTANT_ANSWER);
+}
+
+// --- Google: Sign-In ID tokens checked at tokeninfo. A test's credential is "e2e." + base64url(JSON of the
+// person, plus any field to override: aud, email_verified, exp...), see e2e/support/google.js ---
+function tokeninfo(scenario, url) {
+  const token = url.searchParams.get('id_token') || '';
+  if (!token.startsWith('e2e.')) return json({ error: 'invalid_token' }, 400);
+  const claims = JSON.parse(Buffer.from(token.slice(4), 'base64url').toString('utf8'));
+  return json({
+    iss: 'https://accounts.google.com', aud: process.env.GOOGLE_CLIENT_ID, email_verified: 'true',
+    exp: String(Math.floor(Date.now() / 1000) + 3600), sub: `google-${claims.email}`, ...claims,
+  });
+}
+
 const STUBS = [
   {
     host: 'api.exchangerate-api.com',
@@ -26,6 +76,8 @@ const STUBS = [
       return json({ base: 'USD', date: new Date().toISOString().slice(0, 10), rates: RATES });
     },
   },
+  { host: 'api.anthropic.com', answer: anthropic },
+  { host: 'oauth2.googleapis.com', answer: (scenario, url) => (url.pathname === '/tokeninfo' ? tokeninfo(scenario, url) : json({ error: 'not stubbed' }, 404)) },
 ];
 
 const isLocal = (url) => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname);

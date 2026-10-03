@@ -23,7 +23,7 @@ const VIEWS = [
 ];
 
 /** Wall | Check, as tabs: arrow keys move between them, the pill slides to the one chosen. */
-function ViewSwitch({ view, onChange, t, reduce }) {
+function ViewSwitch({ view, onChange, t, reduce, controls }) {
   const refs = useRef({});
   const onKey = (e) => {
     const at = VIEWS.findIndex((v) => v.key === view);
@@ -49,7 +49,7 @@ function ViewSwitch({ view, onChange, t, reduce }) {
             id={`gr-tab-${key}`}
             aria-selected={on}
             aria-label={t(label)}
-            aria-controls="gr-view"
+            aria-controls={controls}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(key)}
             className={cn(
@@ -98,6 +98,8 @@ function Groceries() {
       : [t('grToBuyCount', { n: onList.length }), low.length ? t('grRunningLowCount', { n: low.length }) : null].filter(Boolean).join(' · ');
 
   const View = view === 'check' ? CheckView : view === 'prices' ? PricesView : view === 'receipts' ? ReceiptsView : WallView;
+  const empty = items.length === 0 && view !== 'receipts';
+  const showsPanel = !isLoading && !empty;
 
   return (
     <div className="relative mx-auto flex w-full max-w-5xl flex-col p-3 pb-40 sm:p-4 sm:pb-24 md:p-8">
@@ -107,12 +109,13 @@ function Groceries() {
         subtitle={subtitle}
         count={onList.length}
         onShop={shell.startShopping}
-        toggle={<ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} />}
+        // The tabs point at the panel only while it is there (not while loading or on the empty list)
+        toggle={<ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} controls={showsPanel ? 'gr-view' : undefined} />}
       />
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-      ) : items.length === 0 && view !== 'receipts' ? (
+      ) : empty ? (
         <>
           <AddBar inputRef={shell.addRef} items={items} onAddText={list.addText} onPick={(i) => list.putOnList(i)} className="mb-5" />
           <GroceriesEmpty onAddText={list.addText} />

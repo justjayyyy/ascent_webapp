@@ -5,12 +5,18 @@ import { expect } from '@playwright/test';
  * Waits until the page on screen has its content rather than loading placeholders. Not 'networkidle': open
  * apps poll the workspace for changes every few seconds, so the network is never idle for long.
  */
-export async function waitForPageReady(page) {
+export async function waitForPageReady(page, { timeout } = {}) {
   const main = page.locator('main');
-  await expect(main).toBeVisible();
-  await expect(main.locator('.animate-pulse')).toHaveCount(0);
-  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await expect(main).toBeVisible({ timeout });
+  await expect(main.locator('.animate-pulse')).toHaveCount(0, { timeout });
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout });
   await page.evaluate(() => document.fonts.ready);
+}
+
+/** Waits until nothing on the page is mid-animation (fades and slides done; endless ones like the logo ignored). */
+export async function settleAnimations(page) {
+  await expect.poll(() => page.evaluate(() => document.getAnimations()
+    .filter((a) => a.playState === 'running' && a.effect?.getComputedTiming?.().iterations !== Infinity).length)).toBe(0);
 }
 
 /**

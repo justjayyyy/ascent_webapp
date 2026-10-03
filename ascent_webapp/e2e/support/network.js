@@ -62,9 +62,18 @@ export async function guardContext(context) {
 }
 
 /** Collects uncaught errors from every page in the context. */
+// WebKit reports a request to the app's own address cut off by leaving the page as "...due to access control
+// checks"; a same-origin request cannot fail access control, so it is the navigation, not an error
+const navigationNoise = (page, message) => {
+  const own = new URL(page.url()).host;
+  return /due to access control checks/.test(message) && message.includes(own);
+};
+
 export function watchPageErrors(context) {
   const errors = [];
-  const watch = (page) => page.on('pageerror', (err) => errors.push(`${page.url()}: ${err.message}`));
+  const watch = (page) => page.on('pageerror', (err) => {
+    if (!navigationNoise(page, err.message)) errors.push(`${page.url()}: ${err.message}`);
+  });
   context.pages().forEach(watch);
   context.on('page', watch);
   return errors;

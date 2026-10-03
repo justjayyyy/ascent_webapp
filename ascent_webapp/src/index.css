@@ -94,7 +94,7 @@ button:focus-visible {
     --accent-foreground: 252 60% 30%;
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
-    --success: 152 65% 32%;
+    --success: 152 65% 29%; /* AA 4.5:1 as text on the light cards */
     --danger: 350 75% 48%;
     /* Running low, nearly due: calm amber, the same meaning in every palette */
     --warning: 30 92% 36%;
@@ -127,7 +127,7 @@ button:focus-visible {
     --card-foreground: 228 30% 96%;
     --popover: 234 26% 12%;
     --popover-foreground: 228 30% 96%;
-    --primary: 252 92% 70%;
+    --primary: 252 92% 73%; /* AA 4.5:1 as text on the dark cards, dark text on it 5.9:1 */
     --primary-foreground: 234 40% 8%;
     --secondary: 234 22% 15%;
     --secondary-foreground: 228 30% 96%;
@@ -198,7 +198,7 @@ button:focus-visible {
   :root[data-palette="gold"]:not(.dark) {
     --warning: 20 88% 42%;
     /* 34% keeps white text on gold buttons at WCAG AA (4.6:1); 40% was 3.5:1 */
-    --primary: 36 92% 34%;
+    --primary: 36 92% 28%; /* AA 4.5:1 as text on its own tint and the cards, white on it 6.2:1 */
     --ring: 36 92% 40%;
     --accent: 42 70% 93%;
     --accent-foreground: 36 80% 24%;
@@ -247,7 +247,7 @@ button:focus-visible {
     --sidebar-ring: 42 62% 68%;
   }
   :root[data-palette="graphite"]:not(.dark) {
-    --primary: 38 62% 36%;
+    --primary: 38 62% 31%; /* AA 4.5:1 as text on its own tint, white on it 6:1 */
     --ring: 38 62% 36%;
     --accent: 42 70% 92%;
     --accent-foreground: 38 70% 22%;

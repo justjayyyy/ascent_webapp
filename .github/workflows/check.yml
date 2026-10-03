@@ -88,7 +88,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/.mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
-      - run: npx playwright test --shard=${{ matrix.shard }}/2
+      - run: npx playwright test --project=desktop --project=phone --shard=${{ matrix.shard }}/2
       - name: This shard's results, for the merged report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -138,6 +138,48 @@ jobs:
           path: ascent_webapp/playwright-report
           retention-days: 14
 
+  # The same browser tests in WebKit, the engine of Safari on the iPhone, on every push to main. Not required yet:
+  # its results are triaged first (real Safari differences get fixed, engine limits get a test.skip with a reason)
+  e2e-webkit:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: e2e-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ascent_webapp
+    env:
+      CI: 'true'
+      E2E_PREBUILT: '1'
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ascent_webapp/package-lock.json
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-dist
+          path: ascent_webapp/dist
+      - name: WebKit for Playwright
+        run: npx playwright install --with-deps webkit
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
+      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html
+      - name: WebKit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-webkit
+          path: ascent_webapp/playwright-report
+          retention-days: 14
+
   # New or changed browser tests run five times in a row with no retries before they can merge, so a flaky test is
   # caught by the pull request that adds it
   e2e-burn-in:
@@ -182,4 +224,4 @@ jobs:
           path: ${{ github.workspace }}/.mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
       - if: steps.changed.outputs.specs != ''
-        run: npx playwright test ${{ steps.changed.outputs.specs }} --repeat-each=5 --retries=0 --reporter=list,github
+        run: npx playwright test ${{ steps.changed.outputs.specs }} --project=desktop --project=phone --repeat-each=5 --retries=0 --reporter=list,github

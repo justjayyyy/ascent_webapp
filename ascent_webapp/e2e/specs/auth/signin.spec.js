@@ -11,13 +11,20 @@ test('sign up, sign out and sign back in @smoke @critical', async ({ page, conte
   const login = new LoginScreen(page);
   await login.open();
 
+  const registered = page.waitForResponse((r) => r.url().includes('/api/auth/register'));
   await login.signUp({ email, name: 'Dana Test', password: PASSWORD });
   await expect(page).not.toHaveURL(/\/login/);
   await expect(page.getByRole('heading', { name: L('welcomeToAscent') })).toBeVisible();
   await dismissWelcome(page);
 
-  // The session is a cookie scripts cannot read; nothing like a token is left in storage
-  expect(await sessionCookie(context)).toMatchObject({ httpOnly: true, sameSite: 'Strict', path: '/api' });
+  // The session is a cookie scripts cannot read, kept to the API and this site; nothing like a token is left in
+  // storage. The flags are read from what the server sent (WebKit's cookie store misreports SameSite)
+  const setCookie = await (await registered).headerValue('set-cookie');
+  expect(setCookie).toMatch(/ascent_session=[^;]+;/);
+  expect(setCookie).toMatch(/HttpOnly/i);
+  expect(setCookie).toMatch(/SameSite=Strict/i);
+  expect(setCookie).toMatch(/Path=\/api/);
+  expect(await sessionCookie(context)).toMatchObject({ httpOnly: true, path: '/api' });
   expect(await page.evaluate(() => document.cookie)).not.toContain('ascent_session');
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toMatch(/token/i);
 

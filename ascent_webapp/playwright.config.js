@@ -30,9 +30,13 @@ export default defineConfig({
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  // Chromium is the everyday run (npm run test:e2e); WebKit is the engine of Safari on the iPhone, where most of
+  // the household uses the app (npm run test:e2e:webkit, and on every push to main)
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /\.phone\.spec\.js$/ },
     { name: 'phone', use: { ...devices['iPhone 13'], browserName: 'chromium' }, testMatch: /\.phone\.spec\.js$/ },
+    { name: 'desktop-webkit', use: { ...devices['Desktop Safari'] }, testIgnore: /\.phone\.spec\.js$/ },
+    { name: 'phone-webkit', use: { ...devices['iPhone 13'] }, testMatch: /\.phone\.spec\.js$/ },
   ],
   webServer: [
     {

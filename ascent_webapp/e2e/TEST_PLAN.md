@@ -105,8 +105,8 @@ Found while writing them:
   opacity 0 through Motion, and its animation code used to be imported after start-up; if that download failed (a
   weak connection on a first visit or right after an update) everything stayed at opacity 0, and while it was slow
   everything was invisible. Retrying the import cannot help (browsers cache a failed dynamic import). The features
-  () now come with the first download: +18 KB gzipped on the 244 KB entry. Regression test: "the app shows
-  even when no animation code can be downloaded later" ().
+  (`domMax`) now come with the first download: +18 KB gzipped on the 244 KB entry. Regression test: "the app shows
+  even when no animation code can be downloaded later" (`specs/offline/resilience.spec.js`).
 - **Open (minor) — "Select a category" can stay on screen next to a selected category.** On a brand-new account the
   dialog can open before the categories have loaded; saving then says "Select a category", and when the categories
   arrive one is chosen but the message stays until the next save.
