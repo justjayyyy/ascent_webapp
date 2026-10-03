@@ -156,6 +156,7 @@ Done so far:
 | Tasks | `specs/tasks/tasks.spec.js` | TK-H03 (no cost: done in one tap; tapping it in Done reopens), N01 (a title is needed), N02 (a viewer ticks it off, cannot log the expense, nor through the API), N03 (an outsider as assignee: 400), E01 ("3 days late", "Today"). TK-H04 as built: deleting asks to confirm (no Undo) |
 | Account edges | `specs/account/account-edges.spec.js` | ACC-H05 (blur on: no money figure on Dashboard, Expenses, Income, Review, Plans), N02 (invalid currency, theme, flag, language: 400, nothing changes), E01 (an owner deletes the account: a member keeps the household and owns it; the next is too late) |
 | Categories | `specs/money/categories-budgets.spec.js` | CAT-N01: no name, no adding; a default typed as shown ("Food & Dining", any case) and a second "dog FOOD" from another phone are refused |
+| Groceries | `specs/groceries/groceries.spec.js` | GR-N01 ("milk" and "MILK" when Milk is on the list: one row), H08 (shopping together: the partner's pick shows, "Sam Partner got the Milk") |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).

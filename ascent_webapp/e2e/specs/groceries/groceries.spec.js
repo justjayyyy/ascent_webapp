@@ -71,3 +71,32 @@ test('a shopping trip: pick the shop, tick what goes in the cart, finish @smoke 
   await expect.poll(async () => (await api.list('groceries')).map((i) => [i.name, i.onList, i.purchases?.at(-1)?.store]).sort())
     .toEqual([['Coffee', false, 'Rami Levy'], ['Eggs', false, 'Rami Levy'], ['Milk', false, 'Rami Levy']]);
 });
+
+test('adding something already on the list does not add it twice @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  const add = page.getByRole('textbox', { name: L('grAddLabel') }).first();
+  await add.fill('milk');
+  await add.press('Enter');
+  await add.fill('MILK, bread');
+  await add.press('Enter');
+  await expect.poll(() => onList(api)).toEqual([['bread', ''], ['milk', '']]);
+  expect((await api.list('groceries')).filter((i) => i.name.toLowerCase() === 'milk')).toHaveLength(1);
+});
+
+test('shopping together: what one puts in the cart shows on the other’s phone, by name @critical @multiuser', async ({ page, api, member }) => {
+  const sam = await member('editor', { name: 'Sam Partner' });
+  for (const name of ['Milk', 'Eggs']) await api.create('groceries', { name, onList: true, listedAt: new Date().toISOString() });
+  const shop = async (p) => {
+    await openApp(p, '/Groceries');
+    await p.getByRole('button', { name: L('grStartShopping') }).click();
+    return p.getByRole('dialog', { name: L('grShopping') });
+  };
+  const mine = await shop(page);
+  const samsCart = await shop(sam.page);
+
+  await samsCart.getByRole('checkbox', { name: 'Milk', exact: true }).click();
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: L('grPartnerGot', { name: 'Sam Partner', item: 'Milk' }) })).toBeVisible({ timeout: 15_000 });
+  await expect(mine.getByRole('checkbox', { name: 'Milk', exact: true })).toBeChecked();
+  await expect(mine.getByRole('checkbox', { name: 'Eggs', exact: true })).not.toBeChecked();
+});
