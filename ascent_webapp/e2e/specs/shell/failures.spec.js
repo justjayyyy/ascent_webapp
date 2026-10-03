@@ -5,6 +5,10 @@ import { openApp } from '../../support/app.js';
 import { expense } from '../../support/factories.js';
 import { L } from '../../support/i18n.js';
 
+// No service worker: in WebKit, requests from a page it controls are not seen by page.route, so the failure
+// could not be staged. This is about what the page does with an error, not about working offline
+test.use({ serviceWorkers: 'block' });
+
 const FAILURES = {
   'a server error': { status: 500, json: { success: false, error: 'Internal server error' } },
   'a broken answer': { status: 200, contentType: 'application/json', body: '{"success": tr' },
