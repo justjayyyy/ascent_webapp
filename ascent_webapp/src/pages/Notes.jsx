@@ -554,7 +554,7 @@ function Notes() {
                   type="button"
                   onClick={() => { clearSearch(); searchRef.current?.focus(); }}
                   aria-label={t('ntClearSearch')}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10"
+                  className="relative flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-0.5 [@media(pointer:coarse)]:before:content-['']"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -566,7 +566,7 @@ function Notes() {
                 aria-label={t('ntFilterBy')}
                 title={t('ntFilterBy')}
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-foreground/10 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10',
+                  'relative flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-foreground/10 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10 [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-0.5 [@media(pointer:coarse)]:before:content-[\'\']',
                   showFilters ? 'text-primary' : 'text-muted-foreground'
                 )}
               >

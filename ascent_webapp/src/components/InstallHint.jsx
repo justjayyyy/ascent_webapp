@@ -100,7 +100,7 @@ export default function InstallHint() {
             type="button"
             onClick={dismiss}
             aria-label={t('installDismiss')}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground outline-none hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring"
+            className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground outline-none hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-0.5 [@media(pointer:coarse)]:before:content-['']"
           >
             <X className="h-4 w-4" />
           </button>

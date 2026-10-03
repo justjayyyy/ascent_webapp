@@ -2,6 +2,9 @@ import React from 'react';
 import { Archive, Bell, Lightbulb, Pencil, Tag, Trash2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// A chip in the phone's bar: 40px tall, with an invisible 4px above and below on touch screens (44px and a margin)
+const CHIP = "relative inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-y-1 [@media(pointer:coarse)]:before:inset-x-0 [@media(pointer:coarse)]:before:content-['']";
+
 /**
  * Where you are in your notes: everything, shared, archive, trash, and your labels.
  * A vertical rail on large screens and a scrolling chip bar on phones.
@@ -20,7 +23,9 @@ export default function NotesNav({ view, label, labels, counts, onSelect, onEdit
     return (
       <nav
         aria-label={t('ntFilters')}
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // pt-1/pb-2 (was pb-1): room above and below for the chips' invisible touch area, which a scrolling strip
+        // would otherwise clip; the -my-1 keeps the bar where it was
+        className="-mx-4 -my-1 flex gap-2 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {main.map(({ key, icon: Icon, name }) => (
           <button
@@ -29,7 +34,7 @@ export default function NotesNav({ view, label, labels, counts, onSelect, onEdit
             onClick={() => onSelect(key)}
             aria-current={isActive(key) ? 'page' : undefined}
             className={cn(
-              'inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+              CHIP,
               isActive(key)
                 ? 'border-transparent bg-primary text-primary-foreground'
                 : 'border-border/70 bg-card/60 text-foreground/80 hover:bg-accent'
@@ -45,7 +50,7 @@ export default function NotesNav({ view, label, labels, counts, onSelect, onEdit
             onClick={() => onSelect('label', name)}
             aria-current={label === name ? 'page' : undefined}
             className={cn(
-              'inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+              CHIP,
               label === name
                 ? 'border-transparent bg-primary text-primary-foreground'
                 : 'border-border/70 bg-card/60 text-foreground/80 hover:bg-accent'
@@ -59,7 +64,7 @@ export default function NotesNav({ view, label, labels, counts, onSelect, onEdit
           <button
             type="button"
             onClick={onEditLabels}
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-dashed border-border/70 px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className={cn(CHIP, 'border-dashed border-border/70 text-muted-foreground hover:bg-accent hover:text-foreground')}
           >
             <Pencil className="h-4 w-4" /> {t('ntEditLabels')}
           </button>

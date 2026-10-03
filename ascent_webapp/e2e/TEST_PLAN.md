@@ -132,6 +132,12 @@ Done so far:
 | Account security | `specs/account/security.spec.js` | AUTH-H11 (reset ends other sessions), N09, H12, H14, N05 (lockout), N15 (open redirect), E01 (session replaced, told why), E02 (expired) |
 | Google | `specs/auth/google.spec.js` | AUTH-H07, H08, N11 (wrong audience, unverified email) |
 | Your data | `specs/account/data.spec.js` | EXP-H01, EXP-E01 (formula injection, BOM), CRD-H01, N01, ACC-H08, N01 |
+| Phone, every language | `specs/shell/layout.phone.spec.js` | all 11 pages × en/he/ru: no sideways overflow, 44px tap areas (§4.1.3), `dir`/`lang`, no untranslated key; sign-in in each language |
+| Hebrew | `specs/cross/rtl.spec.js` | I18N-H01: mirrored layout, an expense added through the Hebrew screens, numbers left-to-right inside, translated categories and months |
+| In-between sizes | `specs/shell/layout.sizes.spec.js` | every page at 768, 1024 and 1280 px |
+
+Not yet: the calendar (§3.16, needs Google's OAuth code flow and the Calendar API stubbed), Recap sharing with
+blurred values (RC-E01), keyboard-only journeys and reduced motion (§4.3.3, 4.3.6), visual regression (§4.4).
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Harness: Anthropic (`api.anthropic.com`, per-test `ai` scenario: ok / refusal / overloaded / not-a-receipt) and Google
@@ -157,6 +163,11 @@ Found while writing them:
 - **Fixed — an open app never noticed a session that ended without a reason** (no cookie any more, e.g. it
   expired while the app stayed open): the 4-second check swallowed the 401 and the screen kept showing old numbers.
   A 401 there now re-checks the session, which goes to sign in.
+- **Fixed — controls under 44px to tap on phones** (DESIGN.md asks for 44px on coarse pointers): the install hint's
+  dismiss button (40px, on every page), the Notes section chips (40px tall, and their scrolling strip clipped any
+  larger tap area), the Notes search and filter buttons (40px) and the Groceries view tabs (32px). Each got an
+  invisible tap area on touch screens, as the design system prescribes for small buttons; nothing looks different.
+  The check counts tap areas, not drawn boxes (`smallTouchTargets()` in `support/layout.js`).
 - **Open (minor) — a refusal reads as a failure.** `messages.parse()` parses the empty answer before
   `assistant.js` checks `stop_reason`, so a declined request shows "something went wrong" instead of the declined
   message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.

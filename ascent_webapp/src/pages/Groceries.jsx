@@ -53,7 +53,8 @@ function ViewSwitch({ view, onChange, t, reduce, controls }) {
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(key)}
             className={cn(
-              'relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors sm:flex-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              // 32px tall, with an invisible 6px above and below on touch screens to reach 44px (DESIGN.md)
+              'relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors sm:flex-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-y-1.5 [@media(pointer:coarse)]:before:inset-x-0 [@media(pointer:coarse)]:before:content-[\'\']',
               on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
