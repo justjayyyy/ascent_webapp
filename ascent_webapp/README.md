@@ -115,5 +115,5 @@ Conventions worth knowing:
 - CSV export (`src/lib/exportData.js`) fetches everything on demand and neutralises spreadsheet formulas.
 - Money in another currency: `shared/money.js` (`amountInCurrency`, `conversionFields`).
 - Every UI string lives in `src/lib/i18n/{en,he,ru}.js`, one file per language (a test checks all three have every key). A device downloads only the language it uses.
-- Animations import from `@/lib/motion`, not `motion/react`: its `motion` is the lightweight `m`, whose animation code loads after start-up.
+- Animations import from `@/lib/motion`, not `motion/react`: its `motion` is the lightweight `m`, with its features given once in App.jsx. They come with the first download on purpose: pages fade in from opacity 0, so loading them later left the app invisible whenever that download failed.
 - Portfolio pages are hidden (`src/lib/features.js`) but kept; they are not linted for translations.

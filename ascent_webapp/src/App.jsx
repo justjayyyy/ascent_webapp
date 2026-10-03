@@ -13,7 +13,7 @@ import { SkeletonPage } from '@/components/ui/skeleton-card';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider, useTheme } from '@/components/ThemeProvider';
 import { pagesConfig } from './pages.config';
-import { LazyMotion } from '@/lib/motion';
+import { LazyMotion, domMax } from '@/lib/motion';
 import PageNotFound from './lib/PageNotFound';
 import { firstAllowedPage, PAGE_PERMISSIONS } from './lib/pageAccess';
 
@@ -86,8 +86,9 @@ function AppSonnerToaster() {
   );
 }
 
-// Animation code arrives after start-up, so the first screen does not wait for it
-const motionFeatures = () => import('@/lib/motionFeatures').then((m) => m.default);
+// Animation code is part of the first download (~18 KB gzipped). Loaded after start-up it saved that, but
+// pages fade in from opacity 0, so a failed or slow download of it left the whole app invisible
+const motionFeatures = domMax;
 
 const lazyPage = (Page, fallback = <SkeletonPage />) => <Suspense fallback={fallback}><Page /></Suspense>;
 

@@ -101,16 +101,12 @@ Found while writing them:
   (most of them: pages load lazily). A partner's expenses stayed invisible until something else changed. Now
   `refetchOnMount: true`, which still skips fresh data. Regression test: `specs/offline/reopen.spec.js` (failed 4/4
   before); it also made the budget-on-Dashboard test pass, which was failing for the same reason.
-- **Open — needs a decision: without the lazily loaded animation code the app is invisible.** Pages and most
-  content fade in from opacity 0 through Motion (`m` components under `LazyMotion`), and the animation code is
-  imported after start-up (`App.jsx` → `src/lib/motionFeatures.js`). If that download fails (a weak connection on
-  a first visit or right after an update, before the service worker has the new files), everything stays at
-  opacity 0; while it is slow, everything is invisible until it lands. Retrying the import does not help (a failed
-  dynamic import is cached by the browser), and making only the page wrapper skip its entrance is not enough
-  (content inside fades in too). Measured options: load `domMax` up front (+18 KB gzipped on the 244 KB entry,
-  simplest, fixes it everywhere); load the smaller `domAnimation` up front (+5 KB) and keep drag/layout (notes,
-  groceries, sign-in) lazy with extra wiring; or a CSS fallback that un-hides content when the code never arrives.
-  Tracked by the `test.fail` test in `specs/offline/resilience.spec.js` (remove `test.fail` once fixed).
+- **Fixed — without the lazily loaded animation code the app was invisible.** Pages and most content fade in from
+  opacity 0 through Motion, and its animation code used to be imported after start-up; if that download failed (a
+  weak connection on a first visit or right after an update) everything stayed at opacity 0, and while it was slow
+  everything was invisible. Retrying the import cannot help (browsers cache a failed dynamic import). The features
+  () now come with the first download: +18 KB gzipped on the 244 KB entry. Regression test: "the app shows
+  even when no animation code can be downloaded later" ().
 - **Open (minor) — "Select a category" can stay on screen next to a selected category.** On a brand-new account the
   dialog can open before the categories have loaded; saving then says "Select a category", and when the categories
   arrive one is chosen but the message stays until the next save.

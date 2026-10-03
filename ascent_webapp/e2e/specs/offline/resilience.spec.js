@@ -48,15 +48,14 @@ const seenOpacity = (locator) => locator.evaluate((el) => {
   for (let node = el; node; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
   return opacity;
 });
-const ANIMATION_CODE = /\/assets\/motionFeatures-[^/]+\.js$/;
+const ANIMATION_CODE = /\/assets\/[^/]*(motion|features)[^/]*\.js$/i;
 
-// Open bug: every page fades in from opacity 0 through Motion, whose animation code loads after start-up. If that
-// download fails (a weak connection on the first visit, before the service worker has the app), everything stays
-// invisible. Marked as failing until it is fixed; when it starts passing, remove test.fail. See TEST_PLAN.md §0.2.2.
-test('when the animation code cannot be downloaded, the app still shows @critical', async ({ page, owner: _owner }) => {
-  test.fail(true, 'known bug: content stays at opacity 0 without the lazily loaded animation code');
+// Pages fade in from opacity 0 through Motion. Its animation code used to be downloaded after start-up, and when
+// that download failed (a weak connection on a first visit) everything stayed invisible. It now comes with the
+// first download; any chunk that looks like animation code is refused here to keep it that way.
+test('the app shows even when no animation code can be downloaded later @critical', async ({ page, owner: _owner }) => {
   await page.route(ANIMATION_CODE, (route) => route.abort('connectionreset'));
   await openApp(page, '/Dashboard');
   const heading = page.getByRole('heading', { name: L('dashboard'), level: 1 });
-  await expect.poll(() => seenOpacity(heading), { timeout: 8000 }).toBe(1);
+  await expect.poll(() => seenOpacity(heading), { timeout: 3000 }).toBe(1);
 });
