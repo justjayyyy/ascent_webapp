@@ -143,6 +143,7 @@ Done so far:
 | Visual | `specs/visual/screens.visual.spec.js` (project `visual`) | §4.4, first set: sign-in (en, he), Dashboard (dark, light, phone), Expenses, the add-expense dialog, Settings; approved screenshots from Linux in CI |
 | Hardening | `specs/security/hardening.spec.js` | SEC-N03, N06, N07 (owner and household come from the session), N08 (cron secret), N09 (bad ids), E01 (code-like text on 8 screens and in the invitation email) |
 | Offline sync | `specs/offline/outbox.spec.js` | OFF-H04 (edit and delete offline, applied in order), H05 (a task ticked offline), N01 (a change refused after losing permission: "could not sync", Try again refused again, Throw away), E02 (a dropping connection sends five changes exactly once), E04 (an edit to a row deleted meanwhile is dropped, not stuck) |
+| Failure states | `specs/shell/failures.spec.js` | DSH-N02, NAV-N02-N04: a server error, a broken answer, too many requests and the database down each say the numbers are not complete; Try again recovers; Expenses and Review too |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -191,6 +192,11 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — a failed load looked like an empty month.** When the transactions could not be loaded (a server
+  error, a broken answer, too many requests, the database down), the Dashboard said "No transactions this month" and
+  "All clear. This week: $0", Expenses showed an empty year, and nothing said anything had failed. With nothing
+  cached, Dashboard, Expenses/Income and Review now say "Your transactions could not be loaded, so the numbers here
+  are not complete" with Try again. (Rows already on the device still show during a later failure, as offline.)
 - **Fixed — the invitation email's text part showed HTML entities.** It was the HTML with its tags removed, so a
   household called "Levi & Sons" read "Levi &amp; Sons" in mail apps that show the text version. The escaped
   characters are now turned back. (The HTML version was, and is, escaped: no markup from a name gets through.)

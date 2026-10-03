@@ -8,6 +8,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { useBudgets, useCards, useMoney } from '@/hooks/useWorkspaceData';
 import { useHousehold } from '@/hooks/useHousehold';
 import { useTransactions, useOldestTransactionDate } from '@/lib/offline/txOutbox';
+import LoadFailed from '@/components/shell/LoadFailed';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { COMPARISONS, buildMonthReview } from '@/lib/monthReview';
@@ -45,7 +46,7 @@ function Review() {
     const lastJanuary = new Date(month.getFullYear() - 1, 0, 1);
     return `${keyOf(yearBack < lastJanuary ? yearBack : lastJanuary)}-01`;
   }, [month]);
-  const { data: transactions = [], isLoading } = useTransactions({ from });
+  const { data: transactions = [], isLoading, loadFailed, refetch: retryTransactions, isFetching: retryingTransactions } = useTransactions({ from });
   const oldest = useOldestTransactionDate();
   const { data: budgets = [] } = useBudgets();
   const { data: cards = [] } = useCards();
@@ -221,6 +222,8 @@ function Review() {
             </button>
           ))}
         </div>
+
+        {loadFailed && <LoadFailed onRetry={() => retryTransactions()} retrying={retryingTransactions} />}
 
         {isLoading && !rows.length ? (
           <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>

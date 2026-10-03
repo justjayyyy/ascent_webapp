@@ -1811,6 +1811,8 @@ export default {
   verifyFailed: 'קישור האישור לא תקין או שפג תוקפו.',
   verifyOpenApp: 'פתיחת Ascent',
   verifyBanner: 'אשרו את כתובת המייל ({email}) כדי שהזמנות ואיפוס סיסמה יגיעו אליכם.',
+  loadFailedTransactions: 'לא הצלחנו לטעון את התנועות, ולכן המספרים כאן אינם מלאים.',
+  loadFailedRetry: 'לנסות שוב',
   verifyResend: 'שליחת הקישור שוב',
   verifySent: 'נשלח. בדקו את תיבת הדואר.',
   verifySendFailed: 'לא הצלחנו לשלוח את המייל. נסו שוב מאוחר יותר.',

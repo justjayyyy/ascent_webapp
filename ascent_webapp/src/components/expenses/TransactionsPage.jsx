@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
 import { parseISO, getYear, getMonth } from 'date-fns';
 import { useTransactions, useLinkedTransactions, useOldestTransactionDate, mergeRows } from '@/lib/offline/txOutbox';
+import LoadFailed from '@/components/shell/LoadFailed';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import AddTransactionDialog from './AddTransactionDialog';
 import BudgetManager from './BudgetManager';
@@ -59,7 +60,7 @@ function TransactionsPage({ kind }) {
 
 
   // The selected year (and the usual recent history); every part of big purchases, whenever it falls
-  const { data: allTransactions = [], isLoading } = useTransactions({ from: `${selectedYear}-01-01` });
+  const { data: allTransactions = [], isLoading, loadFailed, refetch: retryTransactions, isFetching: retryingTransactions } = useTransactions({ from: `${selectedYear}-01-01` });
   const { data: installments = [] } = useLinkedTransactions('installmentGroupId', { enabled: !isIncome });
   // Every row of monthly recurring runs, so a run can be edited or deleted as a whole
   const { data: recurringRows = [] } = useLinkedTransactions('recurringStartDate');
@@ -235,6 +236,8 @@ function TransactionsPage({ kind }) {
             )}
           </div>
         </header>
+
+        {loadFailed && <LoadFailed onRetry={() => retryTransactions()} retrying={retryingTransactions} />}
 
         <div className="flex-shrink-0">
           <PeriodSelector

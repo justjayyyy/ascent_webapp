@@ -333,8 +333,10 @@ function useTransactionView(view, enabled) {
   // Only this workspace's waiting changes to transactions belong in this list
   const here = useMemo(() => opsForEntity(opsForWorkspace(ops, workspaceId), TRANSACTIONS), [ops, workspaceId]);
   const data = useMemo(() => applyOutbox(query.data || [], here, idMap, (row) => inView(row, view)), [query.data, here, idMap, view]);
-  // Offline with nothing cached yet: the query is paused, so show the empty list instead of a spinner
-  return { ...query, data, isLoading: query.isPending && query.fetchStatus !== 'paused' };
+  // Offline with nothing cached yet: the query is paused, so show the empty list instead of a spinner.
+  // loadFailed: the server answered with an error and nothing is cached, so the list is not the household's
+  // (rows saved earlier on this device still show during a later failure, which is the offline promise)
+  return { ...query, data, isLoading: query.isPending && query.fetchStatus !== 'paused', loadFailed: query.isError && query.data === undefined };
 }
 
 /**

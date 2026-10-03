@@ -19,6 +19,7 @@ import { localDay } from '@/lib/localDay';
 import CommitmentsCard from '@/components/insights/CommitmentsCard';
 import AssistantBar from '@/components/insights/AssistantBar';
 import { useTransactions } from '@/lib/offline/txOutbox';
+import LoadFailed from '@/components/shell/LoadFailed';
 import RecapStories from '@/components/recap/RecapStories';
 import { RecapRingButton, RecapBanner, useRecapSeen } from '@/components/recap/RecapEntry';
 import { buildRecap, recapToOffer, monthKeyOf } from '@/lib/recap';
@@ -81,7 +82,7 @@ export default function Dashboard() {
 
   // The selected month and the six before it (trend chart, comparisons, forecast baseline), with changes
   // still waiting on this device drawn in
-  const { data: transactions = [], isLoading } = useTransactions({
+  const { data: transactions = [], isLoading, loadFailed, refetch: retryTransactions, isFetching: retryingTransactions } = useTransactions({
     from: `${monthKey(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 6, 1))}-01`,
   });
 
@@ -357,6 +358,7 @@ export default function Dashboard() {
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[460px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.20),transparent_70%)]" />
 
       <div className="mx-auto max-w-7xl space-y-5 p-4 pb-28 md:p-8 md:pb-10">
+        {loadFailed && <LoadFailed onRetry={() => retryTransactions()} retrying={retryingTransactions} />}
         <motion.header className="flex flex-wrap items-end justify-between gap-4" variants={rise} initial="hidden" animate="show">
           <div>
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('dashboard')}</h1>

@@ -1829,6 +1829,8 @@ export default {
   verifyFailed: 'This confirmation link is invalid or has expired.',
   verifyOpenApp: 'Open Ascent',
   verifyBanner: 'Confirm your email address ({email}) so invitations and password resets reach you.',
+  loadFailedTransactions: 'Your transactions could not be loaded, so the numbers here are not complete.',
+  loadFailedRetry: 'Try again',
   verifyResend: 'Send the link again',
   verifySent: 'Sent. Check your inbox.',
   verifySendFailed: 'Could not send the email. Try again later.',
