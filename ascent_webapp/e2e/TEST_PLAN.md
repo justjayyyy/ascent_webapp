@@ -166,6 +166,7 @@ Done so far:
 | Notes features | `specs/notes/features.spec.js` | NT-H06 (two selected, archived together; Escape clears), H10 (a reminder due while closed goes off on opening, once; a later one does not), H11 (a file attached), H12 (search; grid/list remembered), H13 ("?" opens the shortcuts), H15 (a label filters; renamed on every note) |
 | Groceries more | `specs/groceries/groceries.spec.js` | GR-H05 (kitchen check to "checked"), H07 (list costed, cheapest shop named), H09 ("~n days left"), N02 (receipts with the assistant off) |
 | Theme, assistant | `specs/account/settings.spec.js`, `specs/dashboard/assistant.spec.js` | ACC-H04 (a palette and light apply at once and stay), AI-H03 ("Edit first" opens the form filled in) |
+| Notes offline | `specs/offline/notes-offline.spec.js` | NT-E02 (one written, one edited offline: both synced), NT-N02 (a file offline: needs the connection), NT-H14 (copied as text, Chromium) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
