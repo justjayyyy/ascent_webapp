@@ -107,14 +107,15 @@ Found while writing them:
   everything was invisible. Retrying the import cannot help (browsers cache a failed dynamic import). The features
   (`domMax`) now come with the first download: +18 KB gzipped on the 244 KB entry. Regression test: "the app shows
   even when no animation code can be downloaded later" (`specs/offline/resilience.spec.js`).
-- **Open (minor) — "Select a category" can stay on screen next to a selected category.** On a brand-new account the
-  dialog can open before the categories have loaded; saving then says "Select a category", and when the categories
-  arrive one is chosen but the message stays until the next save.
+- **Fixed — "Select a category" could stay on screen next to a selected category.** On a brand-new account the
+  dialog can open before the categories have loaded; saving then said "Select a category", and when the categories
+  arrived one was chosen but the message stayed until the next save. It now goes as soon as there is a category.
 - **Fixed — the invite dialog kept its spinner after "Invitation sent".** The toast showed when the invitation was
   made, but the dialog waited for a full workspace refresh before showing its "sent" view; the refresh now runs
   behind it.
-- **Not testable — TX-N02.** The category picker always starts with one chosen once categories have loaded, so
-  "Select a category" is reachable only in the race above.
+- **TX-N02 through the race above:** the picker always starts with a category once they have loaded, so the test
+  holds the categories response back (`specs/money/categories-budgets.spec.js`), saves, sees "Select a category",
+  then lets them arrive and sees it go.
 - **Noted — refusal codes differ by route** for someone outside the household: 404 for most lists, 403 from some,
   400 ("Workspace context required") from categories. All refuse with no data; the test accepts any 4xx without data.
 

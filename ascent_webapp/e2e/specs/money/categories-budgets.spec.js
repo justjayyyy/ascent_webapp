@@ -34,3 +34,20 @@ test('a budget set on Expenses is measured on the Dashboard @critical', async ({
   await openApp(page, '/Dashboard');
   await expect(page.getByText(L('stsSpentOf', { spent: '$250', limit: '$1,000' }))).toBeVisible();
 });
+
+test('saving before the categories have loaded asks for one, and the message goes once one is chosen @critical', async ({ page, owner: _owner }) => {
+  // A new account's first load, slow: the categories arrive after the dialog is open
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  await page.route(/\/api\/entities\/categories/, async (route) => { await held; await route.continue(); });
+  await openApp(page, '/Expenses');
+  await page.getByRole('button', { name: L('addExpense') }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(new RegExp(`^${L('amount')}`)).fill('12');
+  await dialog.getByRole('button', { name: L('addTransaction') }).click();
+  await expect(dialog.getByText(L('selectCategory'))).toBeVisible();
+
+  release();
+  await expect(dialog.getByRole('radio', { checked: true })).toBeVisible();
+  await expect(dialog.getByText(L('selectCategory'))).toBeHidden();
+});

@@ -125,6 +125,11 @@ export default function AddTransactionDialog({
     if (fallback) setFormData((f) => (f.category ? f : { ...f, category: fallback.name }));
   }, [open, categories, formData.type, formData.category]);
 
+  // Once there is a category, however it was chosen, "Select a category" goes
+  useEffect(() => {
+    if (formData.category) setErrors((e) => (e.category ? { ...e, category: undefined } : e));
+  }, [formData.category]);
+
   // What gets stored next to the amount: its value in the person's own currency at today's rate,
   // or nothing when there is no rate yet (never the unconverted amount)
   // An edit that keeps the amount and currency keeps the rate the row was saved with
