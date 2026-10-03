@@ -23,11 +23,22 @@ export async function openApp(page, path = '/Dashboard') {
   await dismissWelcome(page);
 }
 
-/** Waits until the service worker controls the page, so the app opens without a connection. */
+/**
+ * Waits until the service worker controls the page and has every file of the app in its cache, so the app opens
+ * and every page loads without a connection. (Controlling the page is not enough: a page's code that is still
+ * being cached is missing offline. Chromium caches fast enough not to notice; WebKit does not.)
+ */
 export async function installOffline(page) {
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await expect.poll(() => page.evaluate(async () => {
+    // Distinct files (the list names a few icons twice; they are stored once)
+    const wanted = new Set([...(await (await fetch('/sw.js')).text()).matchAll(/url:"([^"]+)"/g)].map((m) => m[1])).size;
+    const name = (await caches.keys()).find((k) => k.includes('precache'));
+    const have = name ? (await (await caches.open(name)).keys()).length : 0;
+    return wanted > 0 && have >= wanted;
+  }), { timeout: 30_000, message: 'the service worker has cached the whole app' }).toBe(true);
 }
 
 /** One of the signed-in person's lists ('transactions', 'plans'...), as the server has it. */

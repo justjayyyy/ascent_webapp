@@ -162,8 +162,22 @@ Found while writing them:
   message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.
 - **Open (minor) — leaving a household loses its confirmation.** "You left the workspace" is shown, then the app
   reloads on its home page and the toast goes with it.
-- **WebKit on Windows:** Playwright's Windows WebKit build stalls `requestAnimationFrame` on some screens (Settings), so
-  clicks never see a stable element there. Linux WebKit in CI is the reference; local runs on Windows are not.
+- **Needs a real iPhone — Settings stops the main thread in Playwright's WebKit.** About a second after Settings opens,
+  WebKit (the Windows and the Linux builds alike) runs no more JavaScript at all: a 250 ms heartbeat stops and even a
+  3 s timer never fires. Ruled out: backdrop blur, `text-wrap: pretty`, and the passkey, notification, permission and
+  service-worker APIs (none is called before it stops). Elsewhere WebKit is slow but alive (Dashboard 9 fps, Expenses
+  19 fps, against 37 and 62 in Chromium). The sign-in screen does not freeze, but in CI its controls never settle
+  for clicks. **Check on an iPhone: open Settings in Safari and in the installed app; does it freeze?** If it does, it
+  is urgent; if not, it is an artefact of the headless engine. Until then the specs that go through Settings or the
+  sign-in screen do not run in WebKit (`WEBKIT_PENDING` in `playwright.config.js`).
+- **Offline is not testable in Playwright's WebKit:** any page load made offline under the service worker fails with
+  "WebKit encountered an internal error". Offline specs run in Chromium only (`WEBKIT_UNSUPPORTED`).
+- **WebKit result:** the other 54 tests (money, dashboard, plans, loans, savings, tasks, notes, groceries, review,
+  security, navigation, phone layout) pass in WebKit, 2 minutes for both projects.
+- **Fixed in the harness — "offline" did not wait for the app to be cached.** `installOffline` waited only for the
+  service worker to control the page, so a page's code still being cached was missing offline (WebKit caches more
+  slowly than Chromium). It now waits until the precache holds every file in `sw.js` (the list names five icons
+  twice; Workbox stores them once).
 
 ### 0.3 Guiding principles
 
