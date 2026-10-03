@@ -30,7 +30,8 @@ const FAKE_GSI = `(() => {
   window.google = { accounts: { id, oauth2 } };
 })();`;
 
-const isLocal = (url) => ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+// The page's own addresses: this machine, and blob:/data: URLs (a file shown before upload) which go nowhere
+const isLocal = (url) => ['blob:', 'data:'].includes(url.protocol) || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 
 /**
  * Headers that say which test a request belongs to. Each test, and each device within it, gets its own client
