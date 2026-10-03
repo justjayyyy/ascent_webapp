@@ -150,6 +150,7 @@ Done so far:
 | Settings | `specs/account/settings.spec.js` | ACC-H03 (currency re-totals the Dashboard at the stubbed rate), H07 ("/", Escape, nothing found), N03 (a failed save says so and shows what is saved), a server error on the background session check keeps you signed in |
 | Idle cost | `specs/shell/idle.spec.js` | §4.5: an idle Dashboard stays within its 18 requests a minute, each kind within its rate; a hidden tab asks nothing and catches up when back |
 | Import edges | `specs/money/import-edges.spec.js` | IMP-H02 (a workbook's purchases sheet found, negative charges read, sent to review), N01 (a picture or a contacts file: nothing to import), N02 (2,001 rows: the screen says so, the server refuses), N03 (a server failure writes nothing), E01 (Hebrew headers, day-first dates, "1,250.00", a zero row skipped) |
+| Gestures | `specs/shell/gestures.phone.spec.js` | NAV-H07: a full pull from the top refreshes (with the change pulse silenced, so only the pull can), a short pull does not; NAV-H03/H04 obsolete (no dock) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -1136,8 +1137,8 @@ Plus cross-workspace isolation (§3.20 SEC-N04/N05).
 | --- | --- | --- | --- |
 | NAV-H01 | P0 | Happy | Desktop: every sidebar item navigates, active state set, page heading correct |
 | NAV-H02 ✅ | P0 | Happy | Phone: Menu opens nav, links navigate, menu closes (`aria-expanded=false`) |
-| NAV-H03 | P1 | Happy | Phone dock `+` on Expenses opens Add expense; on Plans opens New plan; on Notes opens composer |
-| NAV-H04 | P1 | Happy | Long-press `+` (touch hold 600 ms) → quick-action menu; each item routes/opens correctly; viewer sees only allowed ones |
+| NAV-H03 | — | Obsolete | (The phone dock was removed in 099dc1f.) Phone dock `+` on Expenses opens Add expense; on Plans opens New plan; on Notes opens composer |
+| NAV-H04 | — | Obsolete | (The phone dock was removed in 099dc1f.) Long-press `+` (touch hold 600 ms) → quick-action menu; each item routes/opens correctly; viewer sees only allowed ones |
 | NAV-H05 | P1 | Happy | Ctrl/Cmd+B collapses sidebar (tooltips on hover), remembered after reload; ignored while typing in an input |
 | NAV-H06 | P1 | Happy | Bottom sheet swipe-down closes (touch drag); dialog Escape closes; focus returns to trigger |
 | NAV-H07 | P1 | Happy | Pull to refresh on phone → refetch fired (network log) |
