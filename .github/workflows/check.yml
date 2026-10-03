@@ -245,8 +245,9 @@ jobs:
         with:
           path: ${{ github.workspace }}/.mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
-      # With a trace of every test, to see where the page loads stop on Linux
-      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html --trace=on
+      # With a trace of every test, to see where the page loads stop on Linux. While they hang, it stops after a few
+      # failures: a run that reaches the job's time limit uploads nothing
+      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html --trace=on --max-failures=4 --retries=0
       - name: WebKit report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
