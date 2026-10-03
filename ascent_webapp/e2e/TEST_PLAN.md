@@ -149,6 +149,7 @@ Done so far:
 | Month edges | `specs/dashboard/month-edges.spec.js` | DSH-E01 (first and last day: no broken numbers; no "a day for" line on the last day), H03 (a past month is closed, with its net), H04 (repeating payments found, the raised one says "up from"); the clock fixed per test |
 | Settings | `specs/account/settings.spec.js` | ACC-H03 (currency re-totals the Dashboard at the stubbed rate), H07 ("/", Escape, nothing found), N03 (a failed save says so and shows what is saved), a server error on the background session check keeps you signed in |
 | Idle cost | `specs/shell/idle.spec.js` | §4.5: an idle Dashboard stays within its 18 requests a minute, each kind within its rate; a hidden tab asks nothing and catches up when back |
+| Import edges | `specs/money/import-edges.spec.js` | IMP-H02 (a workbook's purchases sheet found, negative charges read, sent to review), N01 (a picture or a contacts file: nothing to import), N02 (2,001 rows: the screen says so, the server refuses), N03 (a server failure writes nothing), E01 (Hebrew headers, day-first dates, "1,250.00", a zero row skipped) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
