@@ -162,6 +162,7 @@ Done so far:
 | Lifecycle | `specs/shell/lifecycle.spec.js` | LN-H06/H07 and PL-H05 (paid off or done, reopened, deleted: recorded expenses stay), SV-H05 (open-ended goal), RV-H03 (a running month, "so far"), ACC-H06 (no-spend days on the Dashboard), CAT-H03 (Hebrew default categories) |
 | Notes organised | `specs/notes/notes.spec.js` | NT-H03 (pin), H04 (archive, Undo), H05 (trash, restore) |
 | Extras | `specs/shell/extras.spec.js` | NAV-H05 (Ctrl+B folds the sidebar, remembered, not while typing), LN-H04 (pay it off faster: sooner by, interest saved), SV-H06 (entry deleted, Undo) |
+| Insights | `specs/review/insights.spec.js` | RV-H04 (a new place marked, who paid), PL-H07 (plan costs on Expenses), PL-E02 (overdue), PL-N03 (a paid cost stays paid), LN-H08 (a purchase in parts on Loans, "1 of 3 paid") |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
@@ -210,6 +211,9 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — purchases paid in parts were hidden on Loans when there was no loan.** The page decided it was empty
+  from loans alone and showed "Keep every loan in one calm place", so a television in three payments never
+  appeared. Purchases in parts now count.
 - **Fixed — a default category could be added again under the name it is shown by.** Defaults are stored by key
   ("food_dining") and translated for display; the duplicate check compared the typed name with the stored one, so
   "Food & Dining" was accepted as a new category beside the default. The server checked nothing, so two phones

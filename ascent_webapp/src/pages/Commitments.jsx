@@ -243,7 +243,8 @@ function Commitments() {
   const money = moneyIn(loc, userCurrency);
   const colors = tokens?.series || ['hsl(var(--primary))'];
   const hasOwe = owe.length > 0;
-  const empty = !isLoading && commitments.length === 0;
+  // Nothing owed at all: no loans and no purchases being paid in parts (those were hidden behind the empty page)
+  const empty = !isLoading && commitments.length === 0 && installments.length === 0;
 
   const renderGrid = (list) => (
     <LayoutGroup>
