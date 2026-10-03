@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { rememberWorkspace } from '@/lib/session';
+import { toastAfterReload } from '@/lib/toastAfterReload';
 import { Copy, Home, KeyRound, LogOut, MoreHorizontal, QrCode, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ascent } from '@/api/client';
@@ -135,7 +136,8 @@ export default function MembersSection() {
       if (result?.inviteLink && !result.emailSent && result.emailSent !== false) {
         // QR invite: the dialog shows the code, no toast needed.
       } else if (result?.emailSent !== false) toast.success(t('wsInviteSent'));
-      await refreshWorkspaces();
+      // Not awaited: the dialog shows "sent" with the toast, and the member list catches up behind it
+      refreshWorkspaces();
     },
   });
 
@@ -166,7 +168,7 @@ export default function MembersSection() {
   const leave = useMutation({
     mutationFn: () => ascent.workspaces.leave(workspaceId),
     onSuccess: () => {
-      toast.success(t('wsLeft'));
+      toastAfterReload(t('wsLeft'));
       rememberWorkspace(null);
       window.location.assign('/');
     },

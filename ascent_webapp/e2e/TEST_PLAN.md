@@ -110,8 +110,9 @@ Found while writing them:
 - **Open (minor) — "Select a category" can stay on screen next to a selected category.** On a brand-new account the
   dialog can open before the categories have loaded; saving then says "Select a category", and when the categories
   arrive one is chosen but the message stays until the next save.
-- **Open (minor) — the invite dialog keeps its spinner after "Invitation sent".** The toast shows when the invitation
-  is made, but the dialog waits for a full workspace refresh before showing its "sent" view.
+- **Fixed — the invite dialog kept its spinner after "Invitation sent".** The toast showed when the invitation was
+  made, but the dialog waited for a full workspace refresh before showing its "sent" view; the refresh now runs
+  behind it.
 - **Not testable — TX-N02.** The category picker always starts with one chosen once categories have loaded, so
   "Select a category" is reachable only in the race above.
 - **Noted — refusal codes differ by route** for someone outside the household: 404 for most lists, 403 from some,
@@ -192,8 +193,9 @@ Found while writing them:
 - **Fixed — a declined request read as a failure.** `messages.parse()` read the empty answer as JSON before
   `assistant.js` checked `stop_reason`, so people saw "something went wrong" instead of the declined message. Notes
   and receipts now go through `create`, the decline is checked first, then the text is parsed with the same schema.
-- **Open (minor) — leaving a household loses its confirmation.** "You left the workspace" is shown, then the app
-  reloads on its home page and the toast goes with it.
+- **Fixed — leaving a household lost its confirmation.** "You left the workspace" was shown, then the app reloaded
+  on its home page and the toast went with it. It is now kept for the tab across the reload and shown once the app
+  is back (`lib/toastAfterReload.js`).
 - **Needs a real iPhone — Settings stops the main thread in Playwright's WebKit.** About a second after Settings opens,
   WebKit (the Windows and the Linux builds alike) runs no more JavaScript at all: a 250 ms heartbeat stops and even a
   3 s timer never fires. Ruled out: backdrop blur, `text-wrap: pretty`, and the passkey, notification, permission and

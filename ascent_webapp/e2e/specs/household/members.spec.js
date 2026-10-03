@@ -52,8 +52,9 @@ test('a member can leave the household; the owner cannot @critical @multiuser', 
   await openApp(sam.page, '/Settings');
   await sam.page.getByRole('button', { name: L('wsLeave') }).click();
   await sam.page.getByRole('alertdialog').getByRole('button', { name: L('wsLeave') }).click();
-  // Leaving reloads the app on its home page (which also loses its own "You left the workspace" toast)
+  // Leaving reloads the app on its home page, and the confirmation comes along
   await expect(sam.page).toHaveURL(/\/(Dashboard)?$/);
+  await expect(sam.page.getByText(L('wsLeft'))).toBeVisible();
   await expect.poll(() => memberRow(api, owner.workspaceId, sam.email)).toBeUndefined();
 
   const ownerLeaves = await api.send('POST', `/workspaces?id=${owner.workspaceId}&action=leave`);

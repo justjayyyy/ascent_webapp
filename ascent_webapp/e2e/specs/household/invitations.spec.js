@@ -15,6 +15,8 @@ test('an emailed invitation: they sign up from the link, join, and see the house
   await dialog.getByLabel(L('wsEmailLabel')).fill(partnerEmail);
   await dialog.getByRole('button', { name: L('wsSendInvite') }).click();
   await expect(page.getByText(L('wsInviteSent')).first()).toBeVisible();
+  // With the toast, the dialog turns to its "sent" view, with the link to share
+  await expect(dialog.getByRole('heading', { name: L('wsInviteSent') })).toBeVisible();
 
   // The partner, on their own phone, opens the link from the email
   const link = await mail.link(partnerEmail, '/accept-invitation/');

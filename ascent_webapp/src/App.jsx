@@ -16,6 +16,7 @@ import { pagesConfig } from './pages.config';
 import { LazyMotion, domMax } from '@/lib/motion';
 import PageNotFound from './lib/PageNotFound';
 import { firstAllowedPage, PAGE_PERMISSIONS } from './lib/pageAccess';
+import { showToastFromBeforeReload } from './lib/toastAfterReload';
 
 const Login = React.lazy(() => import('./pages/Login'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
@@ -75,6 +76,8 @@ function AuthenticatedApp() {
 // Sonner needs the app's theme (it defaults to light, which clashes with dark mode)
 function AppSonnerToaster() {
   const { theme } = useTheme();
+  // After the toaster below has mounted (child effects run first)
+  useEffect(() => { showToastFromBeforeReload(); }, []);
   return (
     <SonnerToaster
       theme={theme === 'light' ? 'light' : 'dark'}
