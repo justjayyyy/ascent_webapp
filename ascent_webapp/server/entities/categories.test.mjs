@@ -19,7 +19,7 @@ mock.module(at('../middleware/auth.js'), {
 });
 mock.module(at('../lib/mongodb.js'), { exports: { default: async () => {}, connectDB: async () => {} } });
 
-const chain = (v) => ({ sort() { return this; }, lean: async () => v });
+const chain = (v) => ({ sort() { return this; }, select() { return this; }, lean: async () => v });
 const Category = {
   find: (q) => chain(db.rows.filter((r) => r.workspaceId === q.workspaceId)),
   async bulkWrite(ops) {
@@ -91,6 +91,15 @@ test('no workspace, no access', async () => {
 test('new categories are never defaults and cannot move workspace', async () => {
   await call('POST', {}, { name: 'Pets', isDefault: true, workspaceId: 'ws2', $set: { x: 1 } });
   assert.deepEqual(db.created[0], { name: 'Pets', isDefault: false, workspaceId: 'ws1', createdBy: 'u1' });
+});
+
+test('a category that already exists is refused, by any case and by the name a default is shown by', async () => {
+  db.rows.push({ _id: 'd1', workspaceId: 'ws1', name: 'food_dining', nameKey: 'food_dining', isDefault: true }, { _id: 'p1', workspaceId: 'ws1', name: 'Pets' });
+  for (const name of ['pets', 'PETS ', 'Food & Dining', 'food & dining', 'אוכל ומסעדות']) {
+    assert.equal((await call('POST', {}, { name, type: 'Expense' })).code, 409, name);
+  }
+  assert.equal(db.created.length, 0);
+  assert.equal((await call('POST', {}, { name: 'Garden', type: 'Expense' })).code, 201);
 });
 
 test('updates and deletes stay inside the workspace; bad ids are refused', async () => {

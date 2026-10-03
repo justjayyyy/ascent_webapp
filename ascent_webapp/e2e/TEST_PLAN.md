@@ -155,6 +155,7 @@ Done so far:
 | Note sharing | `specs/notes/sharing.spec.js` | NT-H07/H08 (view only, then editor; "Edited by" with the person's name), N03 (only the owner shares or trashes), N04 (a reader of a household note cannot delete it), H09 (leaving a privately shared note), E01 for checklists (two ticks at once both kept) |
 | Tasks | `specs/tasks/tasks.spec.js` | TK-H03 (no cost: done in one tap; tapping it in Done reopens), N01 (a title is needed), N02 (a viewer ticks it off, cannot log the expense, nor through the API), N03 (an outsider as assignee: 400), E01 ("3 days late", "Today"). TK-H04 as built: deleting asks to confirm (no Undo) |
 | Account edges | `specs/account/account-edges.spec.js` | ACC-H05 (blur on: no money figure on Dashboard, Expenses, Income, Review, Plans), N02 (invalid currency, theme, flag, language: 400, nothing changes), E01 (an owner deletes the account: a member keeps the household and owns it; the next is too late) |
+| Categories | `specs/money/categories-budgets.spec.js` | CAT-N01: no name, no adding; a default typed as shown ("Food & Dining", any case) and a second "dog FOOD" from another phone are refused |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
@@ -203,6 +204,11 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — a default category could be added again under the name it is shown by.** Defaults are stored by key
+  ("food_dining") and translated for display; the duplicate check compared the typed name with the stored one, so
+  "Food & Dining" was accepted as a new category beside the default. The server checked nothing, so two phones
+  adding "Dog food" at once both succeeded. Both now compare every name a category goes by (stored, and as shown in
+  each language), ignoring case; the server answers 409.
 - **Fixed — Notes showed people as the start of their email address.** "Edited by user-2e5ea348", "From dana.levi":
   Notes built its list of people from email addresses and ignored the names the server sends with each member,
   which the rest of the app shows. Now it uses the name, and the address only when there is none.

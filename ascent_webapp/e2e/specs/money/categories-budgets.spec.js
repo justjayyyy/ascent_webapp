@@ -51,3 +51,30 @@ test('saving before the categories have loaded asks for one, and the message goe
   await expect(dialog.getByRole('radio', { checked: true })).toBeVisible();
   await expect(dialog.getByText(L('selectCategory'))).toBeHidden();
 });
+
+test('a category needs a name, and one that already exists is refused, also by its translated name and from another phone @critical', async ({ page, api }) => {
+  await openApp(page, '/Expenses');
+  await page.getByRole('button', { name: L('categories'), exact: true }).click();
+  const manager = page.getByRole('dialog');
+  const name = manager.getByLabel(new RegExp(`^${L('categoryName')}`));
+  const add = manager.getByRole('button', { name: L('addCategory') });
+  const count = async () => (await api.list('categories')).length;
+  const before = await count();
+
+  // No name, no adding
+  await name.fill('   ');
+  await expect(add).toBeDisabled();
+
+  // A default category is stored by key and shown translated: typing what is shown is the same category
+  for (const typed of [L('foodDining'), L('foodDining').toLowerCase()]) {
+    await name.fill(typed);
+    await add.click();
+    await expect(manager.getByText(L('categoryExists'))).toBeVisible();
+  }
+  expect(await count()).toBe(before);
+
+  // The server refuses a second one with the same name, whatever the case (two phones adding it at once)
+  expect((await api.send('POST', '/entities/categories', { name: 'Dog food', type: 'Expense' })).status()).toBe(201);
+  expect((await api.send('POST', '/entities/categories', { name: 'dog FOOD', type: 'Expense' })).status()).toBe(409);
+  expect(await count()).toBe(before + 1);
+});

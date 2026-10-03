@@ -5,6 +5,14 @@ import { success, error, notFound, forbidden, serverError } from '../lib/respons
 import { authMiddleware } from '../middleware/auth.js';
 import { memberMay, toPlain } from '../lib/entityHandler.js';
 import { isValidObjectId } from '../lib/validate.js';
+import { categoryTranslations } from '../lib/categoryTranslations.js';
+
+// Every name a category goes by, lowercased: as stored (a default is stored by its key) and in each language
+function namesOf(name) {
+  const n = String(name || '').trim();
+  const t = categoryTranslations[n] || Object.values(categoryTranslations).find((tr) => Object.values(tr).some((v) => v.toLowerCase() === n.toLowerCase()));
+  return new Set([n, ...(t ? Object.values(t) : [])].map((v) => v.toLowerCase()));
+}
 
 // Default categories with translation keys and colors
 export const DEFAULT_CATEGORIES = [
@@ -96,6 +104,10 @@ export default async function handler(req, res) {
       }
 
       case 'POST': {
+        // The same category twice (two phones adding it at once, or a default typed as it is shown) is refused
+        const wanted = namesOf(req.body?.name);
+        const existing = await Category.find(scope).select('name').lean();
+        if (existing.some((c) => [...namesOf(c.name)].some((n) => wanted.has(n)))) return error(res, 'Category already exists', 409);
         const category = await Category.create({ ...clean(req.body), isDefault: false, ...scope, createdBy: user._id });
         return success(res, toPlain(category), 201);
       }

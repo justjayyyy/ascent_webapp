@@ -8,6 +8,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Plus, Trash2, Tag, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
+import { LANGUAGES, translateCategory } from '@/lib/translations';
+
+// Every name a category goes by: as stored (a default is stored by key) and as shown in each language
+const namesOf = (name) => new Set([name, ...LANGUAGES.map((l) => translateCategory(name, l))].map((n) => String(n || '').trim().toLowerCase()));
 import { translateCategoryName } from '@/lib/categoryTranslations';
 
 export default function CategoryManager({ 
@@ -35,9 +39,8 @@ export default function CategoryManager({
       return;
     }
 
-    const exists = categories.some(
-      c => c.name.toLowerCase() === formData.name.trim().toLowerCase()
-    );
+    const typed = formData.name.trim().toLowerCase();
+    const exists = categories.some((c) => namesOf(c.name).has(typed));
 
     if (exists) {
       setError(t('categoryExists'));
