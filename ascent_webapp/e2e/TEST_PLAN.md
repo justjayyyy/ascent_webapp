@@ -159,6 +159,9 @@ Done so far:
 | Groceries | `specs/groceries/groceries.spec.js` | GR-N01 ("milk" and "MILK" when Milk is on the list: one row), H08 (shopping together: the partner's pick shows, "Sam Partner got the Milk") |
 | Check-in | `specs/dashboard/checkin.spec.js` | CHK-H02 (charged twice: delete the copy, or keep both confirmed), H03 (nothing to look at: straight to the week) |
 | Forms | `specs/shell/forms.spec.js` | PL-N01 (an "Other" plan needs a name; an end before the start is stopped, by the browser or the app), LN-N01 (amount and next payment date), SV-N01 (an "Other" goal needs a name; 0 is not an amount). Other kinds take their kind's name |
+| Lifecycle | `specs/shell/lifecycle.spec.js` | LN-H06/H07 and PL-H05 (paid off or done, reopened, deleted: recorded expenses stay), SV-H05 (open-ended goal), RV-H03 (a running month, "so far"), ACC-H06 (no-spend days on the Dashboard), CAT-H03 (Hebrew default categories) |
+| Notes organised | `specs/notes/notes.spec.js` | NT-H03 (pin), H04 (archive, Undo), H05 (trash, restore) |
+| Extras | `specs/shell/extras.spec.js` | NAV-H05 (Ctrl+B folds the sidebar, remembered, not while typing), LN-H04 (pay it off faster: sooner by, interest saved), SV-H06 (entry deleted, Undo) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
