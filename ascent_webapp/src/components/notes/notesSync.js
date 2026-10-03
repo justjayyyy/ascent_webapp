@@ -1,4 +1,4 @@
-import { get, set, del, keys } from 'idb-keyval';
+import { get, set, del, keys } from '@/lib/offline/deviceStore';
 import { ascent } from '@/api/client';
 
 // Offline-first sync for notes.

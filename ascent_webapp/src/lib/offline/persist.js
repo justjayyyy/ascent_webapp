@@ -1,4 +1,4 @@
-import { get, set, del } from 'idb-keyval';
+import { get, set, del } from '@/lib/offline/deviceStore';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 
 // The query cache is kept in IndexedDB, so the app opens straight onto the last numbers it saw

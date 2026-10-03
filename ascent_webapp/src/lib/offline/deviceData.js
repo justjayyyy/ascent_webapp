@@ -1,4 +1,4 @@
-import { del } from 'idb-keyval';
+import { del } from '@/lib/offline/deviceStore';
 import { PERSIST_KEY } from './persist';
 import { clearOutboxes } from './txOutbox';
 import { queryClientInstance } from '@/lib/query-client';

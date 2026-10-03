@@ -167,6 +167,7 @@ Done so far:
 | Groceries more | `specs/groceries/groceries.spec.js` | GR-H05 (kitchen check to "checked"), H07 (list costed, cheapest shop named), H09 ("~n days left"), N02 (receipts with the assistant off) |
 | Theme, assistant | `specs/account/settings.spec.js`, `specs/dashboard/assistant.spec.js` | ACC-H04 (a palette and light apply at once and stay), AI-H03 ("Edit first" opens the form filled in) |
 | Notes offline | `specs/offline/notes-offline.spec.js` | NT-E02 (one written, one edited offline: both synced), NT-N02 (a file offline: needs the connection), NT-H14 (copied as text, Chromium) |
+| P2 edges | `specs/money/edges.spec.js`, `specs/shell/edges.spec.js`, `specs/shell/more-edges.spec.js` | TK-E02, GR-E01, LN-E03 (two at once, both kept), TX-E10 (100 in 3 sums exactly), BUD-E02, ING-E02 (other currencies), AUTH-E08, E09, ACC-E03, WS-N12 (20 members), TX-E11, NAV-E02, CHK-N01 (a server error queues the delete), AI-N06, AUTH-E11, E13, RC-E04, ACC-E02, NT-H16, NT-N05 (dictation, blocked microphone), NT-E07, GR-E02, LN-E01, RV-N02, RC-E02, OFF-E07 (storage refused: works online) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
@@ -215,6 +216,10 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — the app did not start at all where the browser refuses its database.** Some private modes and privacy
+  settings make opening IndexedDB throw; idb-keyval opens it on first use and the throw stopped the app (a black
+  screen). The device store now turns that into a failed promise, which the offline code already treats as "nothing
+  kept on this device", so the app runs online (`src/lib/offline/deviceStore.js`).
 - **Fixed — purchases paid in parts were hidden on Loans when there was no loan.** The page decided it was empty
   from loans alone and showed "Keep every loan in one calm place", so a television in three payments never
   appeared. Purchases in parts now count.
