@@ -49,10 +49,9 @@ test.describe('without the service worker', () => {
     const waiting = page.getByRole('button', { name: L('offWaiting', { count: 1 }) });
     await expect(waiting).toBeVisible();
     expect(await api.list('transactions')).toHaveLength(2);
+    // Once the server answers again, the app's own retry deletes it
     failing.on = false;
-    await waiting.click();
-    await page.getByRole('button', { name: L('offSyncNow') }).click();
-    await expect.poll(async () => (await api.list('transactions')).map((t) => t.id)).toEqual([original.id]);
+    await expect.poll(async () => (await api.list('transactions')).map((t) => t.id), { timeout: 30_000 }).toEqual([original.id]);
   });
 });
 

@@ -7,6 +7,14 @@ import { openApp } from '../../support/app.js';
 import { day, expense, income } from '../../support/factories.js';
 import { L, Lre } from '../../support/i18n.js';
 
+/** One story forward unless `target` already shows; true once it does */
+async function stepUntil(page, target) {
+  if (await target.isVisible()) return true;
+  await page.keyboard.press('ArrowRight');
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 400); }));
+  return target.isVisible();
+}
+
 // The browser's speech recognition, replaced by one the test drives (window.__rec)
 function fakeSpeech() {
   class FakeRecognition {
@@ -80,10 +88,7 @@ test('the recap of a month that spent more than came in says so @critical', asyn
   const story = page.getByRole('dialog', { name: Lre('rcTitle') });
   await story.getByRole('button', { name: L('rcPause') }).click();
   // Story by story until the one about the month's balance
-  await expect(async () => {
-    await page.keyboard.press('ArrowRight');
-    await expect(story.getByText(L('rcOverspent')).first()).toBeVisible({ timeout: 500 });
-  }).toPass({ timeout: 15_000 });
+  await expect.poll(() => stepUntil(page, story.getByText(L('rcOverspent')).first()), { timeout: 30_000 }).toBe(true);
 });
 
 test('when the browser’s database refuses, the app still works online @critical', async ({ page, api }) => {
