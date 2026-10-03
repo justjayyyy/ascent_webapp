@@ -162,3 +162,49 @@ test('when Google grants no lasting access, the calendar asks to connect once mo
   // The half-grant was dropped, so the next try is a first time again and brings a refresh token
   await expect.poll(async () => (await googleAccount(testKey)).revoked.length).toBe(1);
 });
+
+test('day, week and month, moving through time, and a layer switched off @critical', async ({ page, testKey, owner: _owner }) => {
+  await seedGoogle(testKey, {
+    events: [{ summary: 'Dentist', start: { dateTime: at(10) }, end: { dateTime: at(11) } }],
+    tasks: [{ title: 'Renew passport', due: `${format(new Date(), 'yyyy-MM-dd')}T00:00:00.000Z` }],
+  });
+  const calendar = await openCalendar(page);
+  await connect(page, calendar);
+  const view = calendar.locator('main');
+  await expect(view.getByText('Dentist').first()).toBeVisible();
+
+  const tabs = calendar.getByRole('tablist', { name: L('calView') });
+  for (const key of ['week', 'day', 'month']) {
+    await tabs.getByRole('tab', { name: L(key) }).click();
+    await expect(tabs.getByRole('tab', { name: L(key) })).toHaveAttribute('aria-selected', 'true');
+    await expect(view.getByText('Dentist').first()).toBeVisible();
+  }
+  // The next day has nothing; Today comes back to it
+  await tabs.getByRole('tab', { name: L('day') }).click();
+  await calendar.getByRole('button', { name: L('calNext'), exact: true }).click();
+  await expect(view.getByText('Dentist')).toHaveCount(0);
+  await calendar.getByRole('button', { name: L('today'), exact: true }).first().click();
+  await expect(view.getByText('Dentist').first()).toBeVisible();
+
+  // Tasks off: the task goes, the event stays, and the choice is kept for next time
+  await tabs.getByRole('tab', { name: L('month') }).click();
+  await expect(view.getByText('Renew passport').first()).toBeVisible();
+  const tasks = calendar.getByRole('switch', { name: L('calTasks') });
+  await tasks.click();
+  await expect(tasks).toHaveAttribute('aria-checked', 'false');
+  await expect(view.getByText('Renew passport')).toHaveCount(0);
+  await expect(view.getByText('Dentist').first()).toBeVisible();
+  await page.reload();
+  const again = await openCalendar(page);
+  await expect(again.getByRole('switch', { name: L('calTasks') })).toHaveAttribute('aria-checked', 'false');
+});
+
+test('when Google cannot be reached, the calendar says so, and Connect tries again @critical', async ({ page, owner: _owner }) => {
+  // No Google script: neither the stand-in the tests install nor Google's own
+  await page.addInitScript(() => { Object.defineProperty(window, 'google', { get: () => undefined, set: () => {}, configurable: false }); });
+  await page.route(/accounts\.google\.com\/gsi\/client/, (route) => route.abort('internetdisconnected'));
+  const calendar = await openCalendar(page);
+  await expect(calendar.getByText(L('calGoogleOffline'))).toBeVisible();
+  await calendar.getByRole('button', { name: L('connectWithGoogle') }).click();
+  await expect(toast(page, 'calGoogleLoading')).toBeVisible();
+});

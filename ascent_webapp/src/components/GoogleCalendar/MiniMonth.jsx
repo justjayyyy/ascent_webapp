@@ -25,8 +25,8 @@ export default function MiniMonth({ currentDate, selectedDate, dayMap, locale, w
       <div className="mb-2 flex items-center justify-between px-1">
         <p className="text-sm font-semibold capitalize text-foreground">{format(shown, 'LLLL yyyy', { locale })}</p>
         <div className="flex">
-          <button type="button" className={navBtn} aria-label={t('calPrev')} onClick={() => setShown(subMonths(shown, 1))}><Prev className="h-4 w-4" /></button>
-          <button type="button" className={navBtn} aria-label={t('calNext')} onClick={() => setShown(addMonths(shown, 1))}><Next className="h-4 w-4" /></button>
+          <button type="button" className={navBtn} aria-label={t('dashPrevMonth')} onClick={() => setShown(subMonths(shown, 1))}><Prev className="h-4 w-4" /></button>
+          <button type="button" className={navBtn} aria-label={t('dashNextMonth')} onClick={() => setShown(addMonths(shown, 1))}><Next className="h-4 w-4" /></button>
         </div>
       </div>
       <div className="grid grid-cols-7 text-center" role="grid">

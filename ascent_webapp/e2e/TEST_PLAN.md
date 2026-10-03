@@ -139,11 +139,11 @@ Done so far:
 | In-between sizes | `specs/shell/layout.sizes.spec.js` | every page at 768, 1024 and 1280 px |
 | Keyboard alone | `specs/cross/keyboard.spec.js` | §4.3.3: signing in, adding an expense (focus kept inside the dialog, back on the button after), Escape returning focus, visible focus on the Dashboard's first 40 Tab stops |
 | Reduced motion | `specs/cross/motion.spec.js` | §4.3.6: sign-in and Dashboard hold still (no drawn shape changes, no looping animation but spinners), with a control that the check sees motion when the setting is off |
-| Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), Google granting no refresh token → "connect once more" |
+| Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), H05 (day/week/month, Next and Today, a layer off and remembered), N03 (Google's script unreachable), Google granting no refresh token → "connect once more" |
 | Visual | `specs/visual/screens.visual.spec.js` (project `visual`) | §4.4, first set: sign-in (en, he), Dashboard (dark, light, phone), Expenses, the add-expense dialog, Settings; approved screenshots from Linux in CI |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
-Not yet: in the calendar, dragging events (CAL-H04), the views and layers (H05), Google unreachable (N03) and the edge cases (E01).
+Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
 
 Harness: Google's OAuth token endpoint, Calendar and Tasks are faked in memory per test (`harness/googleApis.mjs`, seeded and read through the control server; `calendar` scenario: ok / revoked / no-refresh / down), and the e2e API runs with a client secret so the calendar connects for the account. The fake Google script is installed before the app runs (see the WebKit note below).
 
@@ -187,6 +187,8 @@ Found while writing them:
 - **Fixed — the calendar asked Google for its logo.** The Connect button loaded Google's "G" from gstatic.com, a
   request to Google each time someone opened the calendar unconnected, and a broken image offline. It now uses the
   mark the sign-in page already draws.
+- **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
+  view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
 - **Harness — WebKit once fetched Google's real script past the network guard.** One run in 24 loaded the real
   `gsi/client` (Google's own response headers in the trace) although the route serves a fake; the real script then
   opened Google's real sign-in popup, which the guard caught and failed. The fake is now installed before the app
