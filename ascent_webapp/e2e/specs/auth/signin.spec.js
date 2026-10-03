@@ -66,6 +66,46 @@ test('signing out on a slow connection still ends the session and removes the co
   await oldDevice.dispose();
 });
 
+test('a page opened while signed out asks to sign in, then opens that page @critical', async ({ page }) => {
+  const person = await seedUser();
+  await page.goto('/Plans');
+  await expect(page).toHaveURL(/\/login\?redirect=/);
+
+  const login = new LoginScreen(page);
+  await login.chooseLanguage('en');
+  await login.signIn(person);
+  await expect(page).toHaveURL(/\/Plans$/);
+});
+
+test('an empty or malformed email is caught before anything is sent @critical', async ({ page }) => {
+  const login = new LoginScreen(page);
+  await login.open();
+  let authCalls = 0;
+  // Sign-in and sign-up calls only (the page fetches passkey options by itself)
+  page.on('request', (r) => { if (/\/api\/auth\/(login|register)/.test(r.url())) authCalls += 1; });
+
+  await login.continue();
+  await expect(page.getByText(L('authEmailRequired'))).toBeVisible();
+
+  for (const bad of ['dana', 'dana@', 'dana@example', 'dana smith@example.com']) {
+    await login.email.fill(bad);
+    await login.continue();
+    await expect(page.getByText(L('authInvalidEmail'))).toBeVisible();
+  }
+  expect(authCalls).toBe(0);
+});
+
+test('signing up with an email that already has an account is refused @critical', async ({ page, context }) => {
+  const person = await seedUser();
+  const login = new LoginScreen(page);
+  await login.open();
+  await login.signUp({ email: person.email, name: 'Someone Else', password: PASSWORD });
+
+  await expect(page.getByText('Email already registered')).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  expect(await sessionCookie(context)).toBeUndefined();
+});
+
 test('a wrong password is refused and leaves no session @critical', async ({ page, context }) => {
   const login = new LoginScreen(page);
   await login.open();

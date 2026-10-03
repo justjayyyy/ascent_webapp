@@ -6,13 +6,15 @@
 // address, and only the sign-up tests need to go through it.
 //
 //   owner       a new account with its own household, signed in on `page`
-//   member      (role, permissions?) → another account in the owner's household, on a device of its own
+//   api         the owner's API (support/api.js), for setup and for checking what the server has
+//   member      (role, permissions?) → another account in the owner's household, on a device of its own (.page, .api)
 //   openDevice  (person) → a new page for an existing account, signed in on another device
 //   mail        the emails the API sent: mail.waitFor(to), mail.link(to, '/reset-password/')
 //   stubs       third-party scenarios for this test only: await stubs.set({ rates: 'down' })
 import { test as base, expect } from '@playwright/test';
 import { clearStubs, mailTo, refusedCalls, seedMember, seedSession, seedUser, setStubs } from './support/control.js';
 import { guardContext, identityHeaders, watchPageErrors } from './support/network.js';
+import { apiFor } from './support/api.js';
 
 export { expect };
 
@@ -59,27 +61,44 @@ export const test = base.extend({
     await use(person);
   },
 
-  openDevice: async ({ browser, testKey }, use) => {
+  openDevice: async ({ browser, testKey }, use, testInfo) => {
     const opened = [];
+    // `person` null: a device nobody has signed in on yet (someone opening an invitation, say)
     await use(async (person, { token, ...options } = {}) => {
       const context = await browser.newContext({ ...options, extraHTTPHeaders: identityHeaders(testKey, opened.length + 1) });
       const refused = await guardContext(context);
       const pageErrors = watchPageErrors(context);
-      opened.push({ context, refused, pageErrors });
-      await signIn(context, person, token || (await seedSession(person.userId)).token);
+      const consoleLog = [];
+      context.on('console', (m) => { if (['error', 'warning'].includes(m.type())) consoleLog.push(`[${m.type()}] ${m.text()}`.slice(0, 500)); });
+      opened.push({ context, refused, pageErrors, consoleLog });
+      if (person) await signIn(context, person, token || (await seedSession(person.userId)).token);
       return context.newPage();
     });
-    for (const { context, refused, pageErrors } of opened) {
+    for (const [i, { context, refused, pageErrors, consoleLog }] of opened.entries()) {
+      // What another device was showing when the test failed: its console, address and the page's main area
+      if (testInfo.status !== testInfo.expectedStatus) {
+        for (const [p, page] of context.pages().entries()) {
+          const main = await page.evaluate(() => document.querySelector('main')?.outerHTML.slice(0, 20_000) || document.body.innerHTML.slice(0, 20_000)).catch((e) => String(e));
+          await testInfo.attach(`device ${i + 1} page ${p + 1}`, { body: `${page.url()}\n\n${main}`, contentType: 'text/plain' });
+        }
+        await testInfo.attach(`device ${i + 1} console`, { body: consoleLog.join('\n') || '(nothing)', contentType: 'text/plain' });
+      }
       await context.close();
       expect(refused, 'requests from another device that tried to leave the machine').toEqual([]);
       expect(pageErrors, 'uncaught errors on another device').toEqual([]);
     }
   },
 
+  // The owner's API, for setting up a test and checking what the server has: api.create('transactions', expense())
+  api: async ({ page, owner }, use) => {
+    await use(apiFor(page.request, owner.workspaceId));
+  },
+
   member: async ({ owner, openDevice }, use) => {
     await use(async (role = 'editor', { permissions, name = `Sam ${role}`, ...account } = {}) => {
       const person = await seedMember(owner.workspaceId, { role, permissions, name, ...account });
-      return { ...person, page: await openDevice(person, { token: person.token }) };
+      const page = await openDevice(person, { token: person.token });
+      return { ...person, page, api: apiFor(page.request, person.workspaceId) };
     });
   },
 

@@ -48,9 +48,10 @@ await startMailSink(SMTP_PORT);
 const { warmUp, watchEventLoop } = await import('./harness/warmup.mjs');
 await warmUp();
 watchEventLoop();
+await import('../server/server.js');
+// Last: its health check is what says the whole e2e API is ready
 const { startControl } = await import('./harness/control.mjs');
 await startControl(CONTROL_PORT);
-await import('../server/server.js');
 console.log(`[e2e] API :${API_PORT} · control :${CONTROL_PORT} · mail :${SMTP_PORT}`);
 
 const stop = async () => { await mongo.stop(); process.exit(0); };

@@ -216,7 +216,10 @@ export default function AddTransactionDialog({
     timeTouched.current = isEditing;
     autoCardRef.current = !editTransaction;
     setErrors({});
-  }, [editTransaction, open, user?.currency, categories, startType]);
+    // Only when the dialog opens or turns to another row. Not when the categories or the currency change: lists
+    // refresh while it is open (someone else in the household adds something), and that wiped what was being
+    // typed. Categories that arrive late fill an empty choice (the effect above).
+  }, [editTransaction, open, startType]);
 
   // Prevent date input from auto-focusing on mobile when dialog opens
   useEffect(() => {

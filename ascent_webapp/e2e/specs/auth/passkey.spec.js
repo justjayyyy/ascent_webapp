@@ -12,6 +12,10 @@ async function virtualAuthenticator(context, page) {
   const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
     options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
+  // Settings asks once, as it opens, whether the device has Face ID or a fingerprint reader; a phone always has
+  // its own, but the virtual one can take a moment to be reported, so wait until the browser says so
+  await page.goto('/login');
+  await expect.poll(() => page.evaluate(() => PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())).toBe(true);
   return { cdp, authenticatorId };
 }
 

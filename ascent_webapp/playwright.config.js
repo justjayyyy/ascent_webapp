@@ -5,7 +5,7 @@
 //   E2E_API_PORT / E2E_APP_PORT  run beside servers already holding the default ports
 //   E2E_PREBUILT=1               serve the dist/ that is already built (CI builds once for every shard)
 import { defineConfig, devices } from '@playwright/test';
-import { API_PORT, APP_PORT, APP_URL } from './e2e/support/env.js';
+import { API_PORT, APP_PORT, APP_URL, CONTROL_URL } from './e2e/support/env.js';
 
 const CI = !!process.env.CI;
 // The test workers read the same ports
@@ -38,9 +38,11 @@ export default defineConfig({
     {
       command: 'node e2e/serve-api.mjs',
       env: { E2E_API_PORT: String(API_PORT), E2E_APP_PORT: String(APP_PORT) },
-      url: `http://localhost:${API_PORT}/api/health`,
+      // The control server answers only once the API is up and warm, and only an e2e API has one, so a dev API
+      // on the same port is never mistaken for it. Locally an e2e API left running is reused (quicker reruns)
+      url: `${CONTROL_URL}/health`,
       timeout: 180_000,
-      reuseExistingServer: false,
+      reuseExistingServer: !CI,
     },
     {
       command: process.env.E2E_PREBUILT ? preview : `node e2e/build-app.mjs && ${preview}`,

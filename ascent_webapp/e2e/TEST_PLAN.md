@@ -70,6 +70,57 @@ Found while building it:
 - **Fixed — signing out could leave the session alive.** `AuthContext.logout` set `isAuthenticated` to false first, so the router's `<GoToLogin/>` did a full page load to `/login?redirect=…` within milliseconds, cutting off the logout request and the clearing of on-device data that `client.logout` waits up to 2.5 s for. On a slow connection the cookie survived and the sign-in page signed the person straight back in. Now the app holds on the splash while signing out. Regression test: `specs/auth/signin.spec.js` "signing out on a slow connection…" (fails on the old code).
 - **Open — the live refresh can miss a change made while a page is still loading.** `useWorkspaceSync` takes its first pulse as the baseline; if a change lands after the page's data fetch but before that first pulse answers, it stays unseen until the next change. Low impact; the fix is to take the baseline before the first data fetch (or invalidate once after the first pulse).
 
+### 0.2.2 Phase 1 status (3 Oct 2026)
+
+Every P0 row of §3 has a test, except TX-N02 (below). Specs by area, all tagged `@critical` (`@smoke` on the
+fastest end-to-end path through each area):
+
+| Area | Spec | Rows |
+| --- | --- | --- |
+| Auth | `specs/auth/signin.spec.js`, `passkey.spec.js` | AUTH-H01–H04, H09, H15, N01–N03, slow-network sign-out |
+| Account | `specs/account/preferences.spec.js` | ACC-H01, ACC-H02 (en → he RTL → ru) |
+| Household | `specs/household/invitations.spec.js`, `specs/harness.spec.js` | WS-H01 (email link → sign-up → joined), WS-H10 (live refresh) |
+| Money | `specs/money/transactions.spec.js`, `categories-budgets.spec.js`, `ingest.spec.js`, `import.spec.js` | TX-H01–H04, H10, N01, typing survives a refresh; CAT-H01, BUD-H01; ING-H01, ING-N01; IMP-H01, IMP-H03 |
+| Dashboard | `specs/dashboard/safe-to-spend.spec.js` | DSH-H01 (exact figures from the bar's label), DSH-N01 |
+| Plans · Loans · Savings · Tasks | `specs/plans`, `specs/loans`, `specs/savings`, `specs/tasks` | PL-H01, H02, E03 (two people, one plan); LN-H01, H02, N02; SV-H01, H02; TK-H01 (assigned to a member), TK-H02 (logs the cost, moves a year on) |
+| Notes · Groceries | `specs/notes`, `specs/groceries` | NT-H01, H02; GR-H01, H02, H06 (shop picked, items ticked, prices kept by shop) |
+| Offline | `specs/offline/offline.spec.js`, `reopen.spec.js`, `resilience.spec.js` | OFF-H01–H03, OFF-E01 (lost answer → no duplicate), reopening shows others' changes |
+| Shell · Security | `specs/shell/navigation.spec.js`, `layout.phone.spec.js`, `specs/security/isolation.spec.js` | NAV-H01, H02, N01; SEC-H01, N01, N02, N04, N05 |
+| Journeys | `specs/journeys/new-household.spec.js`, `apple-pay-week.spec.js` | J-01, J-05 (+ CHK-H01, CHK-H02) |
+
+Test data goes in through the app's own API as the signed-in person (`api` fixture, `support/api.js`,
+`support/factories.js`); the behaviour under test always goes through the screens.
+
+Found while writing them:
+- **Fixed — typing in the expense dialog was wiped by a refresh.** Its set-up effect depended on the categories list
+  and the currency, so whenever the household's lists refreshed while it was open (a partner adding something; a new
+  account's categories arriving) the form reset and lost what was being typed. Now it sets up only when it opens.
+  Regression test: "what you are typing survives a change someone else makes meanwhile" (failed 3/3 before).
+- **Fixed — reopening the app could keep showing old numbers.** The query client had `refetchOnMount: false`, so lists
+  restored from the device and marked stale at start-up were never refetched by pages that mounted after the restore
+  (most of them: pages load lazily). A partner's expenses stayed invisible until something else changed. Now
+  `refetchOnMount: true`, which still skips fresh data. Regression test: `specs/offline/reopen.spec.js` (failed 4/4
+  before); it also made the budget-on-Dashboard test pass, which was failing for the same reason.
+- **Open — needs a decision: without the lazily loaded animation code the app is invisible.** Pages and most
+  content fade in from opacity 0 through Motion (`m` components under `LazyMotion`), and the animation code is
+  imported after start-up (`App.jsx` → `src/lib/motionFeatures.js`). If that download fails (a weak connection on
+  a first visit or right after an update, before the service worker has the new files), everything stays at
+  opacity 0; while it is slow, everything is invisible until it lands. Retrying the import does not help (a failed
+  dynamic import is cached by the browser), and making only the page wrapper skip its entrance is not enough
+  (content inside fades in too). Measured options: load `domMax` up front (+18 KB gzipped on the 244 KB entry,
+  simplest, fixes it everywhere); load the smaller `domAnimation` up front (+5 KB) and keep drag/layout (notes,
+  groceries, sign-in) lazy with extra wiring; or a CSS fallback that un-hides content when the code never arrives.
+  Tracked by the `test.fail` test in `specs/offline/resilience.spec.js` (remove `test.fail` once fixed).
+- **Open (minor) — "Select a category" can stay on screen next to a selected category.** On a brand-new account the
+  dialog can open before the categories have loaded; saving then says "Select a category", and when the categories
+  arrive one is chosen but the message stays until the next save.
+- **Open (minor) — the invite dialog keeps its spinner after "Invitation sent".** The toast shows when the invitation
+  is made, but the dialog waits for a full workspace refresh before showing its "sent" view.
+- **Not testable — TX-N02.** The category picker always starts with one chosen once categories have loaded, so
+  "Select a category" is reachable only in the race above.
+- **Noted — refusal codes differ by route** for someone outside the household: 404 for most lists, 403 from some,
+  400 ("Workspace context required") from categories. All refuse with no data; the test accepts any 4xx without data.
+
 ### 0.3 Guiding principles
 
 1. **Test the product, not the plumbing.** E2E owns what only a real browser + real API + real DB can prove: cross-layer journeys, cookies/sessions, the service worker and offline queue, two people on one household, layout and real-render accessibility. Math (forecast, interest, budgets) is already unit-tested; E2E checks one representative figure per screen.
@@ -1241,7 +1292,7 @@ use: {
 | Phase | Scope | Exit criteria |
 | --- | --- | --- |
 | **0. Harness** ✅ | Fix G1–G5, G7–G8: seeding fixtures, per-test IP, third-party stubs + network guard, SMTP sink, control port, `E2E_PREBUILT`, parallel + sharding, merged reports, ESLint plugin, i18n label helper, screen objects | Existing tests migrated to fixtures, green 20× in a row with `--repeat-each=20` (see §0.2.1) |
-| **1. P0 gate** | All P0 rows: auth core, transactions, installments, plans, loans, savings, tasks, notes, groceries core, ingest, import, offline core, isolation/CSRF, navigation, journeys J-01/J-05 | PR gate < 10 min, required on `main` |
+| **1. P0 gate** ✅ | All P0 rows: auth core, transactions, installments, plans, loans, savings, tasks, notes, groceries core, ingest, import, offline core, isolation/CSRF, navigation, journeys J-01/J-05 | PR gate < 10 min, required on `main` |
 | **2. P1 breadth** | All P1 rows: households & permissions matrix, AI (stubbed), review/recap, calendar, settings sections, RTL journeys, WebKit project, axe in flows, responsive matrix | Full suite < 20 min on 6 shards |
 | **3. P2 depth** | Edge cases, visual regression, perf, flake hunt, preview-deploy smoke, prod synthetic, real-device checklist | Nightly green ≥ 95% of nights for 2 weeks |
 

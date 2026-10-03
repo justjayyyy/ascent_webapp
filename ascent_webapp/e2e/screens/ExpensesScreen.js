@@ -1,21 +1,79 @@
-// Expenses (/Expenses): adding and finding transactions.
+// Expenses (/Expenses) and Income (/Income): the list, a row's drawer, and the add/edit dialog.
+import { expect } from '@playwright/test';
 import { L } from '../support/i18n.js';
 
 export class ExpensesScreen {
   constructor(page) {
     this.page = page;
+    this.dialog = page.getByRole('dialog');
+    this.amount = page.getByLabel(new RegExp(`^${L('amount')}`));
+    this.description = page.getByLabel(new RegExp(`^${L('description')}`));
   }
 
-  /** Opens "Add expense", fills it and saves. Category stays as the dialog picks it unless given. */
-  async addExpense({ amount, description, category }) {
-    await this.page.getByRole('button', { name: L('addExpense') }).first().click();
-    await this.page.getByLabel(L('amount')).fill(String(amount));
-    if (description) await this.page.getByLabel(new RegExp(L('description'))).fill(description);
-    if (category) await this.page.getByRole('button', { name: category }).first().click();
-    await this.page.getByRole('button', { name: L('addTransaction') }).click();
+  /** Opens "Add expense" (or income) and waits for its category chips: until a new account's categories have
+   *  loaded there is no category to save with, and saving says "Select a category". */
+  async openAdd(kind = 'expense') {
+    await this.page.getByRole('button', { name: L(kind === 'income' ? 'addIncome' : 'addExpense') }).first().click();
+    await this.dialog.getByRole('radiogroup', { name: L('category') }).getByRole('radio', { checked: true }).waitFor();
+  }
+
+  /** Picks a category by its name on screen, from the quick chips or the "more" list behind them. */
+  async chooseCategory(name) {
+    const group = this.dialog.getByRole('radiogroup', { name: L('category') });
+    // A category added a moment ago can take a refetch to be offered, so look again until it is
+    await expect(async () => {
+      const chip = group.getByRole('radio', { name, exact: true });
+      if (await chip.count()) { await chip.click(); return; }
+      const more = this.dialog.getByRole('combobox', { name: L('category') });
+      await more.click();
+      const option = this.page.getByRole('option', { name, exact: true });
+      if (await option.isVisible({ timeout: 1000 }).catch(() => false)) { await option.click(); return; }
+      await this.page.keyboard.press('Escape');
+      throw new Error(`"${name}" is not offered yet`);
+    }).toPass({ timeout: 15_000 });
+  }
+
+  /** Opens "Add expense" (or income), fills it and saves. Category stays as the dialog picks it unless given. */
+  async addExpense({ amount, description, category, kind = 'expense' }) {
+    await this.openAdd(kind);
+    await this.amount.fill(String(amount));
+    // Category before description: a description makes the app suggest a category (moving chips around), and
+    // a category picked by hand is never replaced by a suggestion
+    if (category) await this.chooseCategory(category);
+    if (description) await this.description.fill(description);
+    await this.page.getByRole('button', { name: L('addTransaction'), exact: true }).click();
+  }
+
+  /** A big purchase paid in `payments` monthly installments. */
+  async addInstallments({ amount, description, payments }) {
+    await this.openAdd();
+    await this.amount.fill(String(amount));
+    await this.description.fill(description);
+    await this.dialog.getByLabel(L('bigPurchase'), { exact: true }).check();
+    await this.dialog.getByRole('spinbutton', { name: L('installments') }).fill(String(payments));
+    await this.page.getByRole('button', { name: L('addInstallments', { count: payments }) }).click();
   }
 
   row(text) {
     return this.page.getByText(text).first();
+  }
+
+  /** Taps a transaction in the list; its drawer has Edit, Duplicate and Delete. */
+  async openRow(description) {
+    await this.page.getByRole('button', { name: new RegExp(description) }).first().click();
+    return this.page.getByRole('dialog', { name: description });
+  }
+
+  async edit(description, { amount }) {
+    const drawer = await this.openRow(description);
+    await drawer.getByRole('button', { name: L('edit') }).click();
+    await this.amount.fill(String(amount));
+    await this.page.getByRole('button', { name: L('updateTransaction') }).click();
+  }
+
+  async delete(description) {
+    const drawer = await this.openRow(description);
+    await drawer.getByRole('button', { name: L('delete') }).click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: L('delete'), exact: true }).click();
   }
 }
