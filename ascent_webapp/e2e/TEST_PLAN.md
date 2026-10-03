@@ -168,6 +168,8 @@ Done so far:
 | Theme, assistant | `specs/account/settings.spec.js`, `specs/dashboard/assistant.spec.js` | ACC-H04 (a palette and light apply at once and stay), AI-H03 ("Edit first" opens the form filled in) |
 | Notes offline | `specs/offline/notes-offline.spec.js` | NT-E02 (one written, one edited offline: both synced), NT-N02 (a file offline: needs the connection), NT-H14 (copied as text, Chromium) |
 | P2 edges | `specs/money/edges.spec.js`, `specs/shell/edges.spec.js`, `specs/shell/more-edges.spec.js` | TK-E02, GR-E01, LN-E03 (two at once, both kept), TX-E10 (100 in 3 sums exactly), BUD-E02, ING-E02 (other currencies), AUTH-E08, E09, ACC-E03, WS-N12 (20 members), TX-E11, NAV-E02, CHK-N01 (a server error queues the delete), AI-N06, AUTH-E11, E13, RC-E04, ACC-E02, NT-H16, NT-N05 (dictation, blocked microphone), NT-E07, GR-E02, LN-E01, RV-N02, RC-E02, OFF-E07 (storage refused: works online) |
+| Limits | `specs/security/limits.spec.js` | ING-N06 (61st purchase in 10 min: 429, retry after 600 s), AI-N05 (41st question in an hour: 429), AI-E02 (receipt too big or not a photo), NT-N06, NT-E04 (100,000 characters, 30 labels), CAT-E01, BUD-E01, SV-E02 |
+| Last edges | `specs/shell/last-edges.spec.js` | GR-H04 (hold a tile, set Low), AUTH-E10 (connection drops on sign-up: one account after retrying), AUTH-E07 (two tabs sign in at once), CHK-E01 (a partner sorts a payment out meanwhile) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
