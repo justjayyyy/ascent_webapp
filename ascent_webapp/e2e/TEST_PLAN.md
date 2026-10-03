@@ -158,6 +158,7 @@ Done so far:
 | Categories | `specs/money/categories-budgets.spec.js` | CAT-N01: no name, no adding; a default typed as shown ("Food & Dining", any case) and a second "dog FOOD" from another phone are refused |
 | Groceries | `specs/groceries/groceries.spec.js` | GR-N01 ("milk" and "MILK" when Milk is on the list: one row), H08 (shopping together: the partner's pick shows, "Sam Partner got the Milk") |
 | Check-in | `specs/dashboard/checkin.spec.js` | CHK-H02 (charged twice: delete the copy, or keep both confirmed), H03 (nothing to look at: straight to the week) |
+| Forms | `specs/shell/forms.spec.js` | PL-N01 (an "Other" plan needs a name; an end before the start is stopped, by the browser or the app), LN-N01 (amount and next payment date), SV-N01 (an "Other" goal needs a name; 0 is not an amount). Other kinds take their kind's name |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
