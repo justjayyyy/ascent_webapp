@@ -138,9 +138,10 @@ Done so far:
 | Keyboard alone | `specs/cross/keyboard.spec.js` | §4.3.3: signing in, adding an expense (focus kept inside the dialog, back on the button after), Escape returning focus, visible focus on the Dashboard's first 40 Tab stops |
 | Reduced motion | `specs/cross/motion.spec.js` | §4.3.6: sign-in and Dashboard hold still (no drawn shape changes, no looping animation but spinners), with a control that the check sees motion when the setting is off |
 | Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), Google granting no refresh token → "connect once more" |
+| Visual | `specs/visual/screens.visual.spec.js` (project `visual`) | §4.4, first set: sign-in (en, he), Dashboard (dark, light, phone), Expenses, the add-expense dialog, Settings; approved screenshots from Linux in CI |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
-Not yet: visual regression (§4.4); in the calendar, dragging events (CAL-H04), the views and layers (H05), Google unreachable (N03) and the edge cases (E01).
+Not yet: in the calendar, dragging events (CAL-H04), the views and layers (H05), Google unreachable (N03) and the edge cases (E01).
 
 Harness: Google's OAuth token endpoint, Calendar and Tasks are faked in memory per test (`harness/googleApis.mjs`, seeded and read through the control server; `calendar` scenario: ok / revoked / no-refresh / down), and the e2e API runs with a client secret so the calendar connects for the account. The fake Google script is installed before the app runs (see the WebKit note below).
 
@@ -1229,6 +1230,18 @@ Target: **WCAG 2.2 AA** (product commitment). jsdom axe already checks markup; t
 - `expect(page).toHaveScreenshot()` for key screens × {light, midnight, OLED gold} × {en, he} × {desktop, phone}: Login, Dashboard (populated + empty), Expenses, Add-transaction sheet, Plan detail, Loan detail, Savings detail, Notes grid, Groceries wall, Review, Recap card, Settings, locked screen.
 - Determinism: run inside the official Playwright Docker image (same fonts), freeze the clock (`page.clock.setFixedTime`), seed fixed data, `animations: 'disabled'`, mask volatile regions (`mask: [page.getByTestId('relative-time')]`), `maxDiffPixelRatio: 0.01`.
 - Baselines live in the repo (`e2e/__screenshots__`), updated only via a labelled workflow (`npx playwright test --update-snapshots` in CI, PR shows the diff images).
+
+**As built (Phase 2):** `specs/visual/screens.visual.spec.js` in its own `visual` project (1280×800 Chromium; the phone
+screen sets its own viewport). The clock is fixed at 17 June 2026 09:30 UTC, the time zone is UTC, the data is the
+same every run, motion is reduced and animations are off; the account's address and toasts are masked. Approved
+screenshots are in `e2e/screenshots/` and come from Linux, in CI, since text renders differently on each system
+(no Docker here); on Windows the spec runs only with `E2E_VISUAL=1`, against local screenshots git ignores.
+- **Compare:** the `e2e-visual` job on every push and pull request (`--update-snapshots=none`, so a screenshot with
+  no approved one fails); on a difference its report artifact has the expected, actual and diff images.
+- **Approve a change:** Actions › Check › Run workflow with *update screenshots*; download the `visual-screenshots`
+  artifact into `ascent_webapp/e2e/screenshots` and commit it (`gh run download <id> -n visual-screenshots -D ascent_webapp/e2e/screenshots`).
+- Still to add from the list above: the empty Dashboard, Plan, Loan and Savings detail, Notes, Groceries, Review, the
+  recap card and the locked screen, and the other palettes.
 
 ### 4.5 Performance guardrails (nightly)
 

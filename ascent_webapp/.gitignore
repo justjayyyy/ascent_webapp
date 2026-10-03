@@ -19,6 +19,9 @@ build
 # Browser test results
 test-results
 playwright-report
+# Approved screenshots are made on Linux in CI; ones made on other systems stay local
+e2e/screenshots/**/*-win32.png
+e2e/screenshots/**/*-darwin.png
 
 # Logs
 npm-debug.log*

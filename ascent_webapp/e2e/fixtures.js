@@ -5,7 +5,7 @@
 // Accounts are seeded straight into the throwaway database: sign-up through the API is rate limited per
 // address, and only the sign-up tests need to go through it.
 //
-//   owner       a new account with its own household, signed in on `page`
+//   owner       a new account with its own household, signed in on `page` (ownerAccount: how it starts)
 //   api         the owner's API (support/api.js), for setup and for checking what the server has
 //   member      (role, permissions?) → another account in the owner's household, on a device of its own (.page, .api)
 //   openDevice  (person) → a new page for an existing account, signed in on another device
@@ -55,8 +55,11 @@ export const test = base.extend({
     expect(await refusedCalls(testKey), 'third-party calls from the API that have no stub').toEqual([]);
   },
 
-  owner: async ({ context }, use) => {
-    const person = await seedUser({ name: 'Dana Owner' });
+  // How the owner's account starts, for a file to change with test.use({ ownerAccount: { theme: 'dark' } })
+  ownerAccount: [{}, { option: true }],
+
+  owner: async ({ context, ownerAccount }, use) => {
+    const person = await seedUser({ name: 'Dana Owner', ...ownerAccount });
     await signIn(context, person);
     await use(person);
   },

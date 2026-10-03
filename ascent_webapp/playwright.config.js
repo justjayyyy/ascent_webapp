@@ -18,11 +18,19 @@ const WEBKIT_PENDING = /specs[\\/](auth|account|journeys|cross)[\\/]|household[\
 // Offline: Playwright's WebKit fails any page load made offline under a service worker with "WebKit encountered an
 // internal error" (an engine-level failure, not the app's); offline behaviour is covered in Chromium
 const WEBKIT_UNSUPPORTED = /specs[\\/]offline[\\/]/;
+// Screenshots compared with approved ones (specs/visual); only in their own project, see below
+const VISUAL = /\.visual\.spec\.js$/;
 
 export default defineConfig({
   testDir: 'e2e/specs',
   timeout: 60_000,
-  expect: { timeout: 10_000 },
+  expect: {
+    timeout: 10_000,
+    // Visual regression: no animation, no caret, CSS pixels, and a little room for anti-aliasing
+    toHaveScreenshot: { animations: 'disabled', caret: 'hide', scale: 'css', maxDiffPixelRatio: 0.002 },
+  },
+  // The approved screenshots, one set per operating system (they are made on Linux, in CI)
+  snapshotPathTemplate: '{testDir}/../screenshots/{testFileName}/{arg}{-projectName}{-platform}{ext}',
   // Every test seeds its own household, so tests never share data and can run side by side
   fullyParallel: true,
   workers: CI ? 3 : '50%',
@@ -38,14 +46,17 @@ export default defineConfig({
   // Chromium is the everyday run (npm run test:e2e); WebKit is the engine of Safari on the iPhone, where most of
   // the household uses the app (npm run test:e2e:webkit, and on every push to main)
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /\.phone\.spec\.js$/ },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: [/\.phone\.spec\.js$/, VISUAL] },
     { name: 'phone', use: { ...devices['iPhone 13'], browserName: 'chromium' }, testMatch: /\.phone\.spec\.js$/ },
     // Not in WebKit for now: specs that go through Settings or the sign-in screen. In Playwright's WebKit builds
     // (Windows and Linux) the Settings page stops the main thread about a second after it opens, and the sign-in
     // screen's controls never settle; not blur, text-wrap or the passkey/notification APIs. To be checked on a real
     // iPhone (e2e/TEST_PLAN.md §0.2.3) before these come back here
-    { name: 'desktop-webkit', use: { ...devices['Desktop Safari'] }, testIgnore: [/\.phone\.spec\.js$/, WEBKIT_PENDING, WEBKIT_UNSUPPORTED] },
+    { name: 'desktop-webkit', use: { ...devices['Desktop Safari'] }, testIgnore: [/\.phone\.spec\.js$/, VISUAL, WEBKIT_PENDING, WEBKIT_UNSUPPORTED] },
     { name: 'phone-webkit', use: { ...devices['iPhone 13'] }, testMatch: /\.phone\.spec\.js$/, testIgnore: [WEBKIT_PENDING, WEBKIT_UNSUPPORTED] },
+    // Visual regression (npm run test:e2e:visual): key screens against approved screenshots, in Chromium on Linux.
+    // Fonts, the clock, the time zone and the data are fixed in the spec, so a difference is a change to the design
+    { name: 'visual', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } }, testMatch: VISUAL },
   ],
   webServer: [
     {

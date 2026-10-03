@@ -24,6 +24,7 @@
     "test:web": "vitest run",
     "test:e2e": "playwright test --project=desktop --project=phone",
     "test:e2e:webkit": "playwright test --project=desktop-webkit --project=phone-webkit",
+    "test:e2e:visual": "playwright test --project=visual",
     "test:e2e:all": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test": "npm run test:node && npm run test:web",

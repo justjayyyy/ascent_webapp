@@ -6,8 +6,17 @@ name: Check
 on:
   push:
   pull_request:
-  # By hand, for the WebKit job below
+  # By hand: the WebKit job below, and new approved screenshots for the visual tests
   workflow_dispatch:
+    inputs:
+      webkit:
+        description: Run the browser tests in WebKit
+        type: boolean
+        default: true
+      update_screenshots:
+        description: Make new approved screenshots for the visual tests (uploaded as visual-screenshots, to commit)
+        type: boolean
+        default: false
 
 concurrency:
   group: check-${{ github.ref }}
@@ -140,11 +149,73 @@ jobs:
           path: ascent_webapp/playwright-report
           retention-days: 14
 
+  # Key screens compared with approved screenshots (e2e/specs/visual, e2e/screenshots). Text renders differently on
+  # each system, so the approved ones are made here, on Linux: Run workflow with "update screenshots", download the
+  # visual-screenshots artifact into ascent_webapp/e2e/screenshots and commit it. Until there are any, this passes
+  e2e-visual:
+    needs: e2e-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ascent_webapp
+    env:
+      CI: 'true'
+      E2E_PREBUILT: '1'
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+      UPDATE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_screenshots }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Approved screenshots
+        id: approved
+        run: echo "count=$(ls e2e/screenshots/*/*-linux.png 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.approved.outputs.count != '0' || env.UPDATE == 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ascent_webapp/package-lock.json
+      - if: steps.approved.outputs.count != '0' || env.UPDATE == 'true'
+        run: npm ci
+      - if: steps.approved.outputs.count != '0' || env.UPDATE == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-dist
+          path: ascent_webapp/dist
+      - if: steps.approved.outputs.count != '0' || env.UPDATE == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.approved.outputs.count != '0' || env.UPDATE == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
+      - name: Compare with the approved screenshots
+        if: steps.approved.outputs.count != '0' && env.UPDATE != 'true'
+        # A screenshot with no approved one fails here too, rather than being quietly written
+        run: npx playwright test --project=visual --update-snapshots=none --reporter=list,github,html
+      - name: Make new approved screenshots
+        if: env.UPDATE == 'true'
+        run: npx playwright test --project=visual --update-snapshots=all --reporter=list,github
+      - name: The new screenshots, to commit
+        if: env.UPDATE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-screenshots
+          path: ascent_webapp/e2e/screenshots
+          retention-days: 7
+      - name: What differed (expected, actual and diff images)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-visual
+          path: ascent_webapp/playwright-report
+          retention-days: 14
+
   # The browser tests in WebKit, the engine of Safari on the iPhone. Run by hand (Actions > Check > Run workflow):
   # on GitHub's Linux runners every page load in Playwright's WebKit times out (page.goto never finishes), while the
   # same specs pass in WebKit on Windows; see e2e/TEST_PLAN.md §0.2.3. Back on every push once that is solved
   e2e-webkit:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.webkit
     needs: e2e-build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -174,7 +245,8 @@ jobs:
         with:
           path: ${{ github.workspace }}/.mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
-      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html
+      # With a trace of every test, to see where the page loads stop on Linux
+      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html --trace=on
       - name: WebKit report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -204,7 +276,7 @@ jobs:
       - name: Changed specs
         id: changed
         run: |
-          specs=$(git diff --name-only --diff-filter=d "origin/${{ github.base_ref }}...HEAD" -- 'e2e/specs/*.spec.js' | sed 's#^ascent_webapp/##' | tr '\n' ' ')
+          specs=$(git diff --name-only --diff-filter=d "origin/${{ github.base_ref }}...HEAD" -- 'e2e/specs/*.spec.js' | grep -v '\.visual\.spec\.js$' | sed 's#^ascent_webapp/##' | tr '\n' ' ')
           echo "specs=$specs" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         if: steps.changed.outputs.specs != ''
