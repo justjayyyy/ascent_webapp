@@ -68,11 +68,7 @@ test('when the model is overloaded, the assistant says so and nothing is added @
   expect(await api.list('transactions')).toEqual([]);
 });
 
-// Known bug: on a refusal the SDK's messages.parse() tries to read the empty answer as JSON and throws before
-// server/lib/assistant.js looks at stop_reason, so people get "something went wrong" (askFailed), never the
-// declined message. When fixed (check the refusal before parsing), remove test.fail. See TEST_PLAN.md §0.2.3.
 test('when the model declines, the assistant says it cannot help with that @critical', async ({ page, owner, api, stubs }) => {
-  test.fail(true, 'known bug: refusals surface as a generic failure');
   await turnOn(api, owner.workspaceId);
   await openApp(page, '/Dashboard');
   await stubs.set({ ai: 'refusal' });

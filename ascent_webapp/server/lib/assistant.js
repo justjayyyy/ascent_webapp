@@ -19,6 +19,19 @@ export const aiConfigured = () => Boolean(process.env.ANTHROPIC_API_KEY || proce
 
 export class AssistantDeclined extends Error {}
 
+/**
+ * A structured answer, read against `schema`. A decline is checked before the text is read: the SDK's parse() reads
+ * the (empty) text as JSON first and throws, so a decline used to surface as a generic failure.
+ */
+async function structured(params, schema) {
+  const format = betaZodOutputFormat(schema);
+  const response = await getClient().beta.messages.create({ ...params, output_config: { ...params.output_config, format } });
+  if (response.stop_reason === 'refusal') throw new AssistantDeclined('declined');
+  const text = response.content.find((block) => block.type === 'text')?.text;
+  if (!text) throw new Error('unparseable');
+  return format.parse(text);
+}
+
 const DraftSchema = z.object({
   kind: z.enum(['transaction', 'question']),
   type: z.enum(['Expense', 'Income']),
@@ -54,18 +67,15 @@ export async function parseNote({ text, today, currency, categories, cards }) {
     `Note: ${text}`,
   ].join('\n\n');
 
-  const response = await getClient().beta.messages.parse({
+  return structured({
     model: MODEL,
     max_tokens: 4000,
     betas: BETAS,
     fallbacks: 'default',
-    output_config: { effort: 'low', format: betaZodOutputFormat(DraftSchema) },
+    output_config: { effort: 'low' },
     system: PARSE_SYSTEM,
     messages: [{ role: 'user', content: context }],
-  });
-  if (response.stop_reason === 'refusal') throw new AssistantDeclined('declined');
-  if (!response.parsed_output) throw new Error('unparseable');
-  return response.parsed_output;
+  }, DraftSchema);
 }
 
 const ASK_SYSTEM = `You are the money assistant inside Ascent, a household finance app that couples and families use together. You answer questions about their spending from a JSON summary of their own data.
@@ -107,12 +117,12 @@ export async function readReceipt({ image, mediaType, listItems }) {
   const list = listItems.length
     ? listItems.map((i) => `- ${i.id}: ${i.name}`).join('\n')
     : '(empty)';
-  const response = await getClient().beta.messages.parse({
+  return structured({
     model: MODEL,
     max_tokens: 16000,
     betas: BETAS,
     fallbacks: 'default',
-    output_config: { effort: 'low', format: betaZodOutputFormat(ReceiptSchema) },
+    output_config: { effort: 'low' },
     system: RECEIPT_SYSTEM,
     messages: [{
       role: 'user',
@@ -121,10 +131,7 @@ export async function readReceipt({ image, mediaType, listItems }) {
         { type: 'text', text: `Shopping list items (id: name):\n${list}` },
       ],
     }],
-  });
-  if (response.stop_reason === 'refusal') throw new AssistantDeclined('declined');
-  if (!response.parsed_output) throw new Error('unparseable');
-  return response.parsed_output;
+  }, ReceiptSchema);
 }
 
 /** A question about the household's money -> a short answer in the user's language. */

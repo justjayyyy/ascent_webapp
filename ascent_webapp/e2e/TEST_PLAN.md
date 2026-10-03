@@ -126,7 +126,7 @@ Done so far:
 | Accessibility | `specs/cross/a11y.spec.js` | WCAG 2.2 A/AA with axe in the browser (contrast included): Dashboard, Expenses, Plans, Notes, Settings and the expense dialog, in all 7 palettes × light/dark |
 | Permissions | `specs/household/permissions.spec.js` | §3.4 matrix: viewer, editor, notes-only, no-goals; UI hidden and API refused |
 | Members | `specs/household/members.spec.js` | WS-H05 (live), H07, H08, H09, WS-N01, N02, N07, N08, N10, TX-N08 |
-| Assistant | `specs/dashboard/assistant.spec.js` | AI-H01, H02, H04, AI-N01, N03, overloaded; refusal (test.fail, below) |
+| Assistant | `specs/dashboard/assistant.spec.js` | AI-H01, H02, H04, AI-N01, N03, overloaded, declined |
 | Groceries | `specs/groceries/groceries.spec.js` | AI-H06 / GR-H06: receipt photo read, saved as the expense, prices kept |
 | Review | `specs/review/review.spec.js` | RV-H01, H02, RV-N01, RC-H01, RC-H02 (the card downloaded, with the month's figures), RC-E01 (blurred: the card handed to the share sheet holds percentages only; read from what is drawn on the canvas) |
 | Account security | `specs/account/security.spec.js` | AUTH-H11 (reset ends other sessions), N09, H12, H14, N05 (lockout), N15 (open redirect), E01 (session replaced, told why), E02 (expired) |
@@ -189,9 +189,9 @@ Found while writing them:
   `gsi/client` (Google's own response headers in the trace) although the route serves a fake; the real script then
   opened Google's real sign-in popup, which the guard caught and failed. The fake is now installed before the app
   runs, so the app never requests the script.
-- **Open (minor) — a refusal reads as a failure.** `messages.parse()` parses the empty answer before
-  `assistant.js` checks `stop_reason`, so a declined request shows "something went wrong" instead of the declined
-  message. Fix: check the refusal before parsing (`create` + manual parse). Tracked by a `test.fail` test.
+- **Fixed — a declined request read as a failure.** `messages.parse()` read the empty answer as JSON before
+  `assistant.js` checked `stop_reason`, so people saw "something went wrong" instead of the declined message. Notes
+  and receipts now go through `create`, the decline is checked first, then the text is parsed with the same schema.
 - **Open (minor) — leaving a household loses its confirmation.** "You left the workspace" is shown, then the app
   reloads on its home page and the toast goes with it.
 - **Needs a real iPhone — Settings stops the main thread in Playwright's WebKit.** About a second after Settings opens,
