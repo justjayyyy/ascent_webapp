@@ -145,6 +145,7 @@ Done so far:
 | Offline sync | `specs/offline/outbox.spec.js` | OFF-H04 (edit and delete offline, applied in order), H05 (a task ticked offline), N01 (a change refused after losing permission: "could not sync", Try again refused again, Throw away), E02 (a dropping connection sends five changes exactly once), E04 (an edit to a row deleted meanwhile is dropped, not stuck) |
 | Failure states | `specs/shell/failures.spec.js` | DSH-N02, NAV-N02-N04: a server error, a broken answer, too many requests and the database down each say the numbers are not complete; Try again recovers; Expenses and Review too |
 | Ingest edges | `specs/money/ingest-edges.spec.js` | ING-H02 (texts: a purchase in; codes, refunds, declines out), H03 (Apple Pay and the bank text merge into one row), N02 (five devices), N03 (405, 413, bad JSON, unknown kind), N04 (absurd amount), N05 (a demoted member's key refused), the same tap sent twice |
+| Budgets | `specs/money/budgets.spec.js` | BUD-H02 (approaching, over by $100), H03 (on pace to pass it around a date), Dashboard over and all on pace, N02 (0 and negative limits refused by the form and the server); the clock fixed at 10 June 2026 |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -198,6 +199,9 @@ Found while writing them:
   "All clear. This week: $0", Expenses showed an empty year, and nothing said anything had failed. With nothing
   cached, Dashboard, Expenses/Income and Review now say "Your transactions could not be loaded, so the numbers here
   are not complete" with Try again. (Rows already on the device still show during a later failure, as offline.)
+- **Fixed — the API took a budget of zero or less.** The form refuses one (the field allows 0.01 and up), but
+  the server stored any number, so a negative budget sent another way was kept. The model now requires a limit
+  above zero, on create and on change.
 - **Fixed — the invitation email's text part showed HTML entities.** It was the HTML with its tags removed, so a
   household called "Levi & Sons" read "Levi &amp; Sons" in mail apps that show the text version. The escaped
   characters are now turned back. (The HTML version was, and is, escaped: no markup from a name gets through.)

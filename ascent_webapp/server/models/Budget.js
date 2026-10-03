@@ -14,7 +14,9 @@ const budgetSchema = new mongoose.Schema({
   },
   monthlyLimit: {
     type: Number,
-    required: true
+    required: true,
+    // A budget of nothing, or less, measures nothing
+    min: [0.01, 'The monthly limit must be above zero']
   },
   alertThreshold: {
     type: Number,
