@@ -147,6 +147,7 @@ Done so far:
 | Ingest edges | `specs/money/ingest-edges.spec.js` | ING-H02 (texts: a purchase in; codes, refunds, declines out), H03 (Apple Pay and the bank text merge into one row), N02 (five devices), N03 (405, 413, bad JSON, unknown kind), N04 (absurd amount), N05 (a demoted member's key refused), the same tap sent twice |
 | Budgets | `specs/money/budgets.spec.js` | BUD-H02 (approaching, over by $100), H03 (on pace to pass it around a date), Dashboard over and all on pace, N02 (0 and negative limits refused by the form and the server); the clock fixed at 10 June 2026 |
 | Month edges | `specs/dashboard/month-edges.spec.js` | DSH-E01 (first and last day: no broken numbers; no "a day for" line on the last day), H03 (a past month is closed, with its net), H04 (repeating payments found, the raised one says "up from"); the clock fixed per test |
+| Settings | `specs/account/settings.spec.js` | ACC-H03 (currency re-totals the Dashboard at the stubbed rate), H07 ("/", Escape, nothing found), N03 (a failed save says so and shows what is saved), a server error on the background session check keeps you signed in |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
@@ -195,6 +196,12 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — one server error could sign you out.** When the app re-checked the session behind an open page (after
+  saving a setting, say) and that request got a 500 or an unreadable answer, it treated the session as over and
+  went to sign in. Only a 401/403 ends a session now; other errors during a background check keep it.
+- **Open (minor) — the Dashboard's chart says "No transactions this month" while the month is still loading**, next
+  to a Net Amount showing "…". It goes once the data arrives, but under load it can read as an empty month for a
+  few seconds.
 - **Fixed — a failed load looked like an empty month.** When the transactions could not be loaded (a server
   error, a broken answer, too many requests, the database down), the Dashboard said "No transactions this month" and
   "All clear. This week: $0", Expenses showed an empty year, and nothing said anything had failed. With nothing
