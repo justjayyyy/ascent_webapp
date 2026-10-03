@@ -151,6 +151,7 @@ Done so far:
 | Idle cost | `specs/shell/idle.spec.js` | §4.5: an idle Dashboard stays within its 18 requests a minute, each kind within its rate; a hidden tab asks nothing and catches up when back |
 | Import edges | `specs/money/import-edges.spec.js` | IMP-H02 (a workbook's purchases sheet found, negative charges read, sent to review), N01 (a picture or a contacts file: nothing to import), N02 (2,001 rows: the screen says so, the server refuses), N03 (a server failure writes nothing), E01 (Hebrew headers, day-first dates, "1,250.00", a zero row skipped) |
 | Gestures | `specs/shell/gestures.phone.spec.js` | NAV-H07: a full pull from the top refreshes (with the change pulse silenced, so only the pull can), a short pull does not; NAV-H03/H04 obsolete (no dock) |
+| Savings, loans, plans | `specs/savings`, `specs/loans`, `specs/plans` | SV-H03 + N02 (take out; more than saved refused with the amount), H04 (target reached, marked done); LN-H03 (extra payment to the balance), H05 (money lent: repayments until repaid in full); PL-H03 (booked, then paid as a linked expense), H04 (removed cost, Undo), E01 (over budget, unassigned budget) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).

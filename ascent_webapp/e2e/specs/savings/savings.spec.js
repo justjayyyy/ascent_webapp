@@ -32,3 +32,35 @@ test('money put aside shows in the goal and in its history @critical', async ({ 
   await expect.poll(async () => (await api.list('goals'))[0].entries.map((e) => e.amount)).toEqual([2000]);
   await expect(page.getByText('$2,000').first()).toBeVisible();
 });
+
+const entry = (amount, id) => ({ id, date: day(-10), amount, note: '' });
+
+test('taking money out lowers what is saved, and more than is saved is refused with how much there is @critical', async ({ page, api }) => {
+  await api.create('goals', { name: 'Holiday fund', kind: 'vacation', currency: 'USD', targetAmount: 5000, entries: [entry(2000, 'e1')] });
+  await openApp(page, '/Savings');
+  await page.getByRole('button', { name: /Holiday fund/ }).first().click();
+
+  await page.getByRole('button', { name: L('svTakeOut') }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel(new RegExp(`^${L('amount')}`)).fill('2500');
+  await dialog.getByRole('button', { name: L('save'), exact: true }).click();
+  await expect(dialog.getByText(L('svOutTooMuch', { amount: '$2,000' }))).toBeVisible();
+  expect((await api.list('goals'))[0].entries.map((e) => e.amount)).toEqual([2000]);
+
+  await dialog.getByLabel(new RegExp(`^${L('amount')}`)).fill('500');
+  await dialog.getByRole('button', { name: L('save'), exact: true }).click();
+  await expect.poll(async () => (await api.list('goals'))[0].entries.map((e) => e.amount)).toEqual([2000, -500]);
+  await expect(page.getByText('$1,500').first()).toBeVisible();
+  // Both in the history
+  await expect(page.getByRole('region', { name: L('svHistory') }).getByText(L('svWithdrawal')).first()).toBeVisible();
+});
+
+test('a goal that reaches its target says so, and can be marked done @critical', async ({ page, api }) => {
+  await api.create('goals', { name: 'New laptop', kind: 'other', currency: 'USD', targetAmount: 1200, entries: [entry(700, 'e1'), entry(500, 'e2')] });
+  await openApp(page, '/Savings');
+  await page.getByRole('button', { name: /New laptop/ }).first().click();
+  await expect(page.getByText(L('svOutlookReached')).first()).toBeVisible();
+  await page.getByRole('button', { name: L('ntMore') }).click();
+  await page.getByRole('menuitem', { name: L('svMarkDone') }).click();
+  await expect.poll(async () => (await api.list('goals'))[0].status).toBe('done');
+});

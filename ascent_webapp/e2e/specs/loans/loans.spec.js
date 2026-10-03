@@ -55,3 +55,40 @@ test('recording this month’s payment adds it to Expenses, linked to the loan @
     .toEqual([['Expense', 1500, loan.id, 'Mortgage']]);
   await expect(page.getByText(L('cmRecordedThisMonth'))).toBeVisible();
 });
+
+test('money lent to family: each repayment lowers what is still owed, until it is repaid in full @critical', async ({ page, api }) => {
+  await api.create('commitments', { name: 'Loan to Yossi', kind: 'family', direction: 'lent', currency: 'USD', principal: 2000, payments: [] });
+  await openApp(page, '/Commitments');
+  await page.getByRole('button', { name: /Loan to Yossi/ }).first().click();
+
+  const repay = async (amount) => {
+    await page.getByRole('button', { name: L('cmRecordRepaymentLent') }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('#cm-pay-amount').fill(String(amount));
+    await dialog.getByRole('button', { name: L('save'), exact: true }).click();
+    await expect(dialog).toBeHidden();
+  };
+  await repay(500);
+  await expect.poll(async () => (await api.list('commitments'))[0].payments.map((p) => p.amount)).toEqual([500]);
+  await expect(page.getByText(L('cmRepaidOf').replace('{paid}', '$500').replace('{total}', '$2,000'))).toBeVisible();
+
+  await repay(1500);
+  await expect(page.getByText(L('cmRepaidInFull')).first()).toBeVisible();
+});
+
+test('an extra payment on a loan goes straight to the balance @critical', async ({ page, api }) => {
+  await api.create('commitments', {
+    name: 'Car loan', kind: 'car', direction: 'borrowed', currency: 'USD', principal: 12000,
+    annualRate: 0, payment: 500, firstPaymentDate: day(5), category: 'transportation', payments: [],
+  });
+  await openApp(page, '/Commitments');
+  await page.getByRole('button', { name: /Car loan/ }).first().click();
+  await expect(page.getByText(L('cmPaidOf').replace('{paid}', '$0').replace('{total}', '$12,000'))).toBeVisible();
+
+  await page.getByRole('button', { name: L('cmAddExtra') }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('#cm-pay-amount').fill('2000');
+  await dialog.getByRole('button', { name: L('save'), exact: true }).click();
+  await expect.poll(async () => (await api.list('commitments'))[0].payments.map((p) => p.amount)).toEqual([2000]);
+  await expect(page.getByText(L('cmPaidOf').replace('{paid}', '$2,000').replace('{total}', '$12,000'))).toBeVisible();
+});
