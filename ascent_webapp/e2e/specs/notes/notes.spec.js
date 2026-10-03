@@ -35,3 +35,30 @@ test('a checklist: Enter adds the next item, and ticking one is kept @critical',
   await page.getByRole('checkbox', { name: 'Call grandma' }).first().click();
   await expect.poll(async () => (await api.list('notes'))[0].items.filter((i) => i.done).map((i) => i.text)).toEqual(['Call grandma']);
 });
+
+test('a note can be pinned, archived and brought back with Undo, and trashed and restored @critical', async ({ page, api }) => {
+  await api.create('notes', { type: 'text', title: 'Boiler code', content: '4471', isShared: false });
+  await openApp(page, '/Notes');
+  const card = page.locator('article, [role=listitem], div').filter({ has: page.getByRole('button', { name: 'Boiler code', exact: true }) }).last();
+  const stored = async () => (await api.list('notes'))[0];
+
+  await card.hover();
+  await card.getByRole('button', { name: L('ntPin') }).click();
+  await expect.poll(async () => (await stored()).isPinned).toBe(true);
+
+  const fromMenu = async (item) => {
+    await card.hover();
+    await card.getByRole('button', { name: L('ntMore') }).click();
+    await page.getByRole('menuitem', { name: item }).click();
+  };
+  await fromMenu(L('ntArchive'));
+  await expect.poll(async () => (await stored()).isArchived).toBe(true);
+  await page.locator('[data-sonner-toast]').filter({ hasText: L('ntArchived') }).getByRole('button', { name: L('ntUndo') }).click();
+  await expect.poll(async () => (await stored()).isArchived).toBe(false);
+
+  await fromMenu(L('ntMoveToTrash'));
+  await expect.poll(async () => (await stored()).trashedAt).not.toBeNull();
+  await page.getByRole('link', { name: L('ntTrashNav') }).or(page.getByRole('button', { name: L('ntTrashNav') })).first().click();
+  await fromMenu(L('ntRestore'));
+  await expect.poll(async () => (await stored()).trashedAt).toBeNull();
+});
