@@ -100,3 +100,45 @@ test('shopping together: what one puts in the cart shows on the other’s phone,
   await expect(mine.getByRole('checkbox', { name: 'Milk', exact: true })).toBeChecked();
   await expect(mine.getByRole('checkbox', { name: 'Eggs', exact: true })).not.toBeChecked();
 });
+
+const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+const bought = (id, n, store, price) => ({ id, date: daysAgo(n), store, price, currency: 'USD', qty: '' });
+
+test('prices across shops: the cheaper shop is named, and the list is costed @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString(), purchases: [
+    bought('a', 20, 'Shufersal', 7.9), bought('b', 13, 'Rami Levy', 6.5), bought('c', 6, 'Shufersal', 7.9), bought('d', 2, 'Rami Levy', 6.5),
+  ] });
+  await openApp(page, '/Groceries');
+  await page.getByRole('tab', { name: L('grViewPrices') }).click();
+  await expect(page.getByText(L('grListWillCost'))).toBeVisible();
+  await expect(page.getByText(L('grCheapestAt', { store: 'Rami Levy' })).first()).toBeVisible();
+});
+
+test('something bought every week says how long it usually lasts and when it runs out @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Coffee', onList: false, purchases: [bought('a', 15, 'Shufersal', 30), bought('b', 8, 'Shufersal', 30), bought('c', 1, 'Shufersal', 30)] });
+  await openApp(page, '/Groceries');
+  await page.getByRole('tab', { name: L('grViewCheck') }).click();
+  await expect(page.getByText(new RegExp(L('grDaysLeft', { n: '\\d+' }).replace('~', '~?'))).first()).toBeVisible();
+});
+
+test('the kitchen check: going through what is usually bought, "have it" for each, ends checked @critical', async ({ page, api }) => {
+  for (const name of ['Rice', 'Olive oil']) {
+    await api.create('groceries', { name, onList: false, purchases: [bought('a', 30, 'Shufersal', 10), bought('b', 15, 'Shufersal', 10)] });
+  }
+  await openApp(page, '/Groceries');
+  await page.getByRole('tab', { name: L('grViewCheck') }).click();
+  await expect(async () => {
+    await page.getByRole('button', { name: L('grHaveIt'), exact: true }).first().click({ timeout: 1000 });
+    await expect(page.getByText(L('grKitchenChecked'))).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+});
+
+test('with the assistant off, the receipt step says an owner can turn it on @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  await page.getByRole('button', { name: L('grStartShopping') }).click();
+  const shopping = page.getByRole('dialog', { name: L('grShopping') });
+  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
+  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
+  await expect(page.getByText(L('grScanNeedsAssistant'))).toBeVisible();
+});
