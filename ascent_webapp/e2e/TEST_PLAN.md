@@ -153,6 +153,7 @@ Done so far:
 | Gestures | `specs/shell/gestures.phone.spec.js` | NAV-H07: a full pull from the top refreshes (with the change pulse silenced, so only the pull can), a short pull does not; NAV-H03/H04 obsolete (no dock) |
 | Savings, loans, plans | `specs/savings`, `specs/loans`, `specs/plans` | SV-H03 + N02 (take out; more than saved refused with the amount), H04 (target reached, marked done); LN-H03 (extra payment to the balance), H05 (money lent: repayments until repaid in full); PL-H03 (booked, then paid as a linked expense), H04 (removed cost, Undo), E01 (over budget, unassigned budget) |
 | Note sharing | `specs/notes/sharing.spec.js` | NT-H07/H08 (view only, then editor; "Edited by" with the person's name), N03 (only the owner shares or trashes), N04 (a reader of a household note cannot delete it), H09 (leaving a privately shared note), E01 for checklists (two ticks at once both kept) |
+| Tasks | `specs/tasks/tasks.spec.js` | TK-H03 (no cost: done in one tap; tapping it in Done reopens), N01 (a title is needed), N02 (a viewer ticks it off, cannot log the expense, nor through the API), N03 (an outsider as assignee: 400), E01 ("3 days late", "Today"). TK-H04 as built: deleting asks to confirm (no Undo) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).

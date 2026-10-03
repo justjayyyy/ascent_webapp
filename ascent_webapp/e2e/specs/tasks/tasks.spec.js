@@ -46,3 +46,53 @@ test('ticking off a task logs what it cost as an expense and moves it to next ye
   expect(saved.dueDate).toBe(nextDue);
   expect(saved.history.map((h) => [h.amount, h.logged])).toEqual([[3100, true]]);
 });
+
+test('a task with no cost is done in one tap, and tapping it in Done reopens it @critical', async ({ page, api }) => {
+  const task = await api.create('tasks', { title: 'Change the smoke alarm battery', dueDate: today() });
+  await openApp(page, '/Tasks');
+  await page.getByRole('button', { name: L('tkMarkDoneNamed', { name: 'Change the smoke alarm battery' }) }).click();
+  // No dialog: nothing to log
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(async () => (await api.list('tasks')).find((t) => t.id === task.id)).toMatchObject({ status: 'done' });
+  expect((await api.list('tasks')).find((t) => t.id === task.id).history).toHaveLength(1);
+
+  await page.getByRole('button', { name: new RegExp(L('tkGroup_done')) }).click();
+  await page.getByRole('button', { name: /Change the smoke alarm battery/ }).first().click();
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: L('tkReopened') })).toBeVisible();
+  await expect.poll(async () => (await api.list('tasks')).find((t) => t.id === task.id).status).toBe('open');
+});
+
+test('a task needs a title, and can only be given to someone in the household @critical', async ({ page, api }) => {
+  await openApp(page, '/Tasks');
+  await page.getByRole('button', { name: L('tkNewTask') }).filter({ visible: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: L('tkCreate') }).click();
+  await expect(dialog.getByText(L('tkTitleRequired'))).toBeVisible();
+  expect(await api.list('tasks')).toEqual([]);
+
+  const outsider = await api.send('POST', '/entities/tasks', { title: 'Fix the gate', assignee: 'stranger@elsewhere.test' });
+  expect(outsider.status()).toBe(400);
+  expect(await api.list('tasks')).toEqual([]);
+});
+
+test('late tasks say by how many days, and today’s say today @critical', async ({ page, api }) => {
+  await api.create('tasks', { title: 'Renew the parking permit', dueDate: day(-3) });
+  await api.create('tasks', { title: 'Water meter reading', dueDate: today() });
+  await openApp(page, '/Tasks');
+  await expect(page.locator('li, section').filter({ hasText: 'Renew the parking permit' }).getByText(L('tkDaysLate', { n: 3 })).first()).toBeVisible();
+  await expect(page.locator('li, section').filter({ hasText: 'Water meter reading' }).getByText(L('today'), { exact: true }).first()).toBeVisible();
+});
+
+test('a viewer can tick off a task with a cost but not log it as an expense @critical @multiuser', async ({ api, member }) => {
+  const viewer = await member('viewer', { name: 'Grandma' });
+  await api.create('tasks', { title: 'Boiler service', dueDate: today(), amount: 350, currency: 'USD', category: 'utilities' });
+  await openApp(viewer.page, '/Tasks');
+  await viewer.page.getByRole('button', { name: L('tkMarkDoneNamed', { name: 'Boiler service' }) }).click();
+  const dialog = viewer.page.getByRole('dialog');
+  await expect(dialog.getByRole('switch', { name: L('tkLogExpense') })).toHaveCount(0);
+  await dialog.getByRole('button', { name: L('tkMarkDone'), exact: true }).click();
+  await expect.poll(async () => (await api.list('tasks'))[0].history?.length).toBe(1);
+  expect(await api.list('transactions')).toEqual([]);
+  // Nor through the API
+  expect((await viewer.api.send('POST', '/entities/transactions', { type: 'Expense', amount: 350, currency: 'USD', category: 'utilities', description: 'Boiler service', date: today() })).status()).toBe(403);
+});
