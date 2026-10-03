@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
+import { takeOldestDataRev } from '@/lib/dataRev';
 
 const HEARTBEAT_MS = 60 * 1000;
 const PULSE_MS = 4 * 1000;
@@ -55,15 +56,17 @@ export function useWorkspaceSync() {
       inFlight = true;
       lastCheck = Date.now();
       try {
+        // Taken before asking: lists read while this pulse is on its way count for the next one
+        const readAt = takeOldestDataRev(workspaceId);
         const pulse = await ascent.workspaces.pulse(workspaceId);
         if (stopped || !pulse) return;
-        if (seen) {
-          if (pulse.updated !== seen.updated) refreshRef.current?.();
-          if (pulse.dataRev !== seen.dataRev) queryClient.invalidateQueries({ refetchType: 'active' });
-        } else {
-          // Back from the background (or first look): catch up once, cheaply
-          refreshRef.current?.();
-        }
+        // First look (or back from the background): catch up on members and settings once, cheaply
+        if (!seen || pulse.updated !== seen.updated) refreshRef.current?.();
+        // Lists refetch when the data moved since the last check, or since any list on screen was read: a change
+        // made between loading a page and the first check would otherwise wait for the next change to show
+        const moved = seen && pulse.dataRev !== seen.dataRev;
+        const behind = readAt !== undefined && pulse.dataRev > readAt;
+        if (moved || behind) queryClient.invalidateQueries({ refetchType: 'active' });
         seen = { dataRev: pulse.dataRev, updated: pulse.updated };
       } catch (err) {
         // Offline or removed from the workspace: the members refresh handles removal, polling continues.

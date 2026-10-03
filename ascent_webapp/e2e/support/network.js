@@ -74,9 +74,10 @@ const navigationNoise = (page, message) => {
 
 // Likewise, when the page goes (a reload, or the next page.goto), a request to another address (the stubbed
 // exchange rates) gets the same "access control" message, and a page's code still loading is rejected with
-// "Importing a module script failed". Struck off only if the page does navigate within a moment, so a request or
-// a chunk that really fails still fails the test
-const CUT_OFF = /Importing a module script failed|due to access control checks/;
+// "Importing a module script failed" (Chromium: "Failed to fetch dynamically imported module", for the next pages'
+// code it fetches ahead). Struck off only if the page does navigate within a moment, so a request or a chunk that
+// really fails still fails the test
+const CUT_OFF = /Importing a module script failed|Failed to fetch dynamically imported module|due to access control checks/;
 const CUT_OFF_WINDOW_MS = 2000;
 
 export function watchPageErrors(context) {

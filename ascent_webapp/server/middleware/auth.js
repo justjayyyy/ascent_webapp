@@ -85,6 +85,9 @@ export async function authMiddleware(req, res) {
 
         if (workspace) {
           req.workspace = workspace;
+          // Which revision of the household's data a read starts from: the app's first change check compares
+          // against it, so a change made between loading a page and that check is not missed (useWorkspaceSync)
+          if (req.method === 'GET' && typeof res?.setHeader === 'function' && !res.headersSent) res.setHeader('X-Data-Rev', String(workspace.dataRev || 0));
           // Attach the member details for this user (permissions, role)
           req.member = workspace.members.find(
             m => m.status === 'accepted' && m.userId && m.userId.toString() === user._id.toString()

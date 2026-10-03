@@ -68,7 +68,7 @@ What it took to make the suite steady under 8 parallel workers (first 20× runs 
 
 Found while building it:
 - **Fixed — signing out could leave the session alive.** `AuthContext.logout` set `isAuthenticated` to false first, so the router's `<GoToLogin/>` did a full page load to `/login?redirect=…` within milliseconds, cutting off the logout request and the clearing of on-device data that `client.logout` waits up to 2.5 s for. On a slow connection the cookie survived and the sign-in page signed the person straight back in. Now the app holds on the splash while signing out. Regression test: `specs/auth/signin.spec.js` "signing out on a slow connection…" (fails on the old code).
-- **Open — the live refresh can miss a change made while a page is still loading.** `useWorkspaceSync` takes its first pulse as the baseline; if a change lands after the page's data fetch but before that first pulse answers, it stays unseen until the next change. Low impact; the fix is to take the baseline before the first data fetch (or invalidate once after the first pulse).
+- **Fixed — the live refresh could miss a change made while a page was loading.** `useWorkspaceSync` took its first pulse as the baseline, so a change landing after the page read its lists but before that pulse answered stayed unseen until the next change. Reads now carry the household's data revision (`X-Data-Rev`, set by the auth middleware on GETs); a pulse showing the household past the oldest revision on screen refetches once (`src/lib/dataRev.js`). Test: `specs/offline/reopen.spec.js`, "a change made after the page loaded its lists…" (fails without the fix).
 
 ### 0.2.2 Phase 1 status (3 Oct 2026)
 

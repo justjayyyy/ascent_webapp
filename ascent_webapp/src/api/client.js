@@ -1,5 +1,6 @@
 import { LEGACY_TOKEN_KEY, SIGNED_IN_KEY, WORKSPACE_KEY, SESSION_CACHE_KEY } from '@/lib/storageKeys';
 import { localDay } from '@/lib/localDay';
+import { noteDataRev } from '@/lib/dataRev';
 
 // The Ascent API client. Every call answers with the `data` of `{ success, data }`, or throws an Error
 // carrying `status` (0 = never reached the server), `data` (the error body) and `isNetworkError`.
@@ -79,6 +80,9 @@ async function send(endpoint, { method, body, extraHeaders, timeout, ...init }) 
       window.location.href = `/login?reason=${data.code === 'SESSION_REPLACED' ? 'session_replaced' : 'session_expired'}`;
     }
   }
+
+  const rev = method === 'GET' && response.ok ? response.headers.get('x-data-rev') : null;
+  if (rev !== null && headers['x-workspace-id']) noteDataRev(headers['x-workspace-id'], Number(rev));
 
   if (!response.ok) {
     const message = data?.error || (response.status === 429 ? 'Too many requests. Please try again later.' : `Request failed with status ${response.status}`);
