@@ -72,11 +72,33 @@ const navigationNoise = (page, message) => {
   return /due to access control checks/.test(message) && message.includes(own);
 };
 
+// Likewise, when the page goes (a reload, or the next page.goto), a request to another address (the stubbed
+// exchange rates) gets the same "access control" message, and a page's code still loading is rejected with
+// "Importing a module script failed". Struck off only if the page does navigate within a moment, so a request or
+// a chunk that really fails still fails the test
+const CUT_OFF = /Importing a module script failed|due to access control checks/;
+const CUT_OFF_WINDOW_MS = 2000;
+
 export function watchPageErrors(context) {
   const errors = [];
-  const watch = (page) => page.on('pageerror', (err) => {
-    if (!navigationNoise(page, err.message)) errors.push(`${page.url()}: ${err.message}`);
-  });
+  const watch = (page) => {
+    let cutOff = []; // { entry, at } failures that a navigation may yet explain
+    page.on('pageerror', (err) => {
+      if (navigationNoise(page, err.message)) return;
+      const entry = `${page.url()}: ${err.message}`;
+      errors.push(entry);
+      if (CUT_OFF.test(err.message)) cutOff.push({ entry, at: Date.now() });
+    });
+    page.on('framenavigated', (frame) => {
+      if (frame !== page.mainFrame()) return;
+      const now = Date.now();
+      cutOff.filter((c) => now - c.at < CUT_OFF_WINDOW_MS).forEach((c) => {
+        const i = errors.indexOf(c.entry);
+        if (i >= 0) errors.splice(i, 1);
+      });
+      cutOff = [];
+    });
+  };
   context.pages().forEach(watch);
   context.on('page', watch);
   return errors;
