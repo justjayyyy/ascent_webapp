@@ -75,3 +75,14 @@ test('when the model declines, the assistant says it cannot help with that @crit
   await ask(page, 'coffee 18');
   await expect(page.getByText(L('askDeclined'))).toBeVisible({ timeout: 5000 });
 });
+
+test('"Edit first" opens the expense form filled in from the sentence @critical', async ({ page, owner, api }) => {
+  await turnOn(api, owner.workspaceId);
+  await openApp(page, '/Dashboard');
+  await ask(page, 'coffee 18 with Max');
+  await expect(page.getByText(L('askDraft'))).toBeVisible();
+  await page.getByRole('button', { name: L('askEdit'), exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel(new RegExp(`^${L('amount')}`))).toHaveValue('18');
+  expect(await api.list('transactions')).toEqual([]);
+});

@@ -70,3 +70,23 @@ test('a server error while the app re-checks the session in the background keeps
   await expect(currencies(page).getByRole('radio', { name: /EUR/ })).toHaveAttribute('aria-checked', 'true');
   expect((await me(page)).currency).toBe('EUR');
 });
+
+test('a theme applies at once and stays after a reload, and so does light @critical', async ({ page, owner: _owner }) => {
+  await openApp(page, '/Settings');
+  const html = page.locator('html');
+  // The looks sit in a disclosure row, closed when the page opens
+  const openLooks = () => page.getByRole('button', { name: new RegExp(`^${L('setThemeLabel')}`) }).click();
+  const looks = page.getByRole('radiogroup', { name: L('setThemeLabel') });
+  await openLooks();
+  await looks.getByRole('radio', { name: L('paletteSlate') }).click();
+  await expect(html).toHaveAttribute('data-palette', 'slate');
+  await page.reload();
+  await expect(html).toHaveAttribute('data-palette', 'slate');
+
+  await openLooks();
+  await looks.getByRole('radio', { name: /light/i }).click();
+  await expect(html).not.toHaveClass(/(^|\s)dark(\s|$)/);
+  await expect.poll(async () => (await me(page)).theme).toBe('light');
+  await page.reload();
+  await expect(html).not.toHaveClass(/(^|\s)dark(\s|$)/);
+});

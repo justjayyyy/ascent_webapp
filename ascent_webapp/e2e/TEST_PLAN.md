@@ -163,6 +163,9 @@ Done so far:
 | Notes organised | `specs/notes/notes.spec.js` | NT-H03 (pin), H04 (archive, Undo), H05 (trash, restore) |
 | Extras | `specs/shell/extras.spec.js` | NAV-H05 (Ctrl+B folds the sidebar, remembered, not while typing), LN-H04 (pay it off faster: sooner by, interest saved), SV-H06 (entry deleted, Undo) |
 | Insights | `specs/review/insights.spec.js` | RV-H04 (a new place marked, who paid), PL-H07 (plan costs on Expenses), PL-E02 (overdue), PL-N03 (a paid cost stays paid), LN-H08 (a purchase in parts on Loans, "1 of 3 paid") |
+| Notes features | `specs/notes/features.spec.js` | NT-H06 (two selected, archived together; Escape clears), H10 (a reminder due while closed goes off on opening, once; a later one does not), H11 (a file attached), H12 (search; grid/list remembered), H13 ("?" opens the shortcuts), H15 (a label filters; renamed on every note) |
+| Groceries more | `specs/groceries/groceries.spec.js` | GR-H05 (kitchen check to "checked"), H07 (list costed, cheapest shop named), H09 ("~n days left"), N02 (receipts with the assistant off) |
+| Theme, assistant | `specs/account/settings.spec.js`, `specs/dashboard/assistant.spec.js` | ACC-H04 (a palette and light apply at once and stay), AI-H03 ("Edit first" opens the form filled in) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
