@@ -216,8 +216,9 @@ test('an event dragged to a later time, and stretched, is rescheduled in Google;
   await calendar.getByRole('tablist', { name: L('calView') }).getByRole('tab', { name: L('day') }).click();
   const event = calendar.locator('main').getByRole('button', { name: /^Dentist,/ });
   await expect(event).toBeVisible();
-  // The grid opens scrolled to the time of day now; bring the event into view
-  await event.scrollIntoViewIfNeeded();
+  // The grid opens scrolled to the time of day now; bring the event to the middle (the day header sits over the top)
+  const centre = (el) => el.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  await centre(event);
   const box = await event.boundingBox();
   const hourPx = 56; // HOUR_HEIGHT in calendarUtils.js
   const stored = async () => (await googleAccount(testKey)).events.map((e) => [new Date(e.start.dateTime).getHours(), new Date(e.end.dateTime).getMinutes() + new Date(e.end.dateTime).getHours() * 60]);
@@ -230,7 +231,7 @@ test('an event dragged to a later time, and stretched, is rescheduled in Google;
   await expect.poll(stored).toEqual([[11, 12 * 60]]);
 
   // Resize: the bottom edge, down half an hour
-  await event.scrollIntoViewIfNeeded();
+  await centre(event);
   const moved = await event.boundingBox();
   await page.mouse.move(moved.x + moved.width / 2, moved.y + moved.height - 3);
   await page.mouse.down();
@@ -239,7 +240,7 @@ test('an event dragged to a later time, and stretched, is rescheduled in Google;
   await expect.poll(stored).toEqual([[11, 12 * 60 + 30]]);
 
   // Escape during a drag leaves it where it was
-  await event.scrollIntoViewIfNeeded();
+  await centre(event);
   const now = await event.boundingBox();
   await page.mouse.move(now.x + now.width / 2, now.y + 10);
   await page.mouse.down();
