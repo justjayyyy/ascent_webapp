@@ -152,6 +152,7 @@ Done so far:
 | Import edges | `specs/money/import-edges.spec.js` | IMP-H02 (a workbook's purchases sheet found, negative charges read, sent to review), N01 (a picture or a contacts file: nothing to import), N02 (2,001 rows: the screen says so, the server refuses), N03 (a server failure writes nothing), E01 (Hebrew headers, day-first dates, "1,250.00", a zero row skipped) |
 | Gestures | `specs/shell/gestures.phone.spec.js` | NAV-H07: a full pull from the top refreshes (with the change pulse silenced, so only the pull can), a short pull does not; NAV-H03/H04 obsolete (no dock) |
 | Savings, loans, plans | `specs/savings`, `specs/loans`, `specs/plans` | SV-H03 + N02 (take out; more than saved refused with the amount), H04 (target reached, marked done); LN-H03 (extra payment to the balance), H05 (money lent: repayments until repaid in full); PL-H03 (booked, then paid as a linked expense), H04 (removed cost, Undo), E01 (over budget, unassigned budget) |
+| Note sharing | `specs/notes/sharing.spec.js` | NT-H07/H08 (view only, then editor; "Edited by" with the person's name), N03 (only the owner shares or trashes), N04 (a reader of a household note cannot delete it), H09 (leaving a privately shared note), E01 for checklists (two ticks at once both kept) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Every planned calendar row is covered. Note: an event across midnight shows on its start day only, by design (`buildDayMap`).
@@ -200,6 +201,15 @@ Found while writing them:
   mark the sign-in page already draws.
 - **Fixed — two calendar buttons were both called "Next"** (and two "Previous"): the toolbar's, which moves the
   view, and the small month's, which moves only that month. The small month's now say "Next month" / "Previous month".
+- **Fixed — Notes showed people as the start of their email address.** "Edited by user-2e5ea348", "From dana.levi":
+  Notes built its list of people from email addresses and ignored the names the server sends with each member,
+  which the rest of the app shows. Now it uses the name, and the address only when there is none.
+- **Open — leaving a note shared with the whole household does not take it away.** Notes are shared with the
+  household unless set otherwise; "leave" removes you from the named people and reports success, but the household
+  share still shows it to you. Hiding it per person (or offering leave only on privately shared notes) would fix it.
+- **Open — two people editing a note's text at once: the later save wins.** Checklists merge (tested); a note's
+  title and body have no conflict check, so one person's edit can silently replace the other's. A fix needs the
+  editor to send the version it started from and a way to show the conflict; a design decision.
 - **Fixed — one server error could sign you out.** When the app re-checked the session behind an open page (after
   saving a setting, say) and that request got a 500 or an unreadable answer, it treated the session as over and
   went to sign in. Only a 401/403 ends a session now; other errors during a background check keep it.

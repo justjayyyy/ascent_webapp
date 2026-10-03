@@ -20,7 +20,8 @@ export function buildPeople(workspace, me) {
   (workspace?.members || []).forEach((m, i) => {
     if (!m?.email || m.status === 'rejected') return;
     const id = m.userId ? String(m.userId) : null;
-    const name = nameFromEmail(m.email);
+    // The name they go by in the household (sent with each member), else one made from the address
+    const name = m.name?.trim() || nameFromEmail(m.email);
     const person = {
       id,
       email: m.email,
