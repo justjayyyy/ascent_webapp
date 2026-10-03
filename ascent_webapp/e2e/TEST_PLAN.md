@@ -146,6 +146,7 @@ Done so far:
 | Failure states | `specs/shell/failures.spec.js` | DSH-N02, NAV-N02-N04: a server error, a broken answer, too many requests and the database down each say the numbers are not complete; Try again recovers; Expenses and Review too |
 | Ingest edges | `specs/money/ingest-edges.spec.js` | ING-H02 (texts: a purchase in; codes, refunds, declines out), H03 (Apple Pay and the bank text merge into one row), N02 (five devices), N03 (405, 413, bad JSON, unknown kind), N04 (absurd amount), N05 (a demoted member's key refused), the same tap sent twice |
 | Budgets | `specs/money/budgets.spec.js` | BUD-H02 (approaching, over by $100), H03 (on pace to pass it around a date), Dashboard over and all on pace, N02 (0 and negative limits refused by the form and the server); the clock fixed at 10 June 2026 |
+| Month edges | `specs/dashboard/month-edges.spec.js` | DSH-E01 (first and last day: no broken numbers; no "a day for" line on the last day), H03 (a past month is closed, with its net), H04 (repeating payments found, the raised one says "up from"); the clock fixed per test |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
