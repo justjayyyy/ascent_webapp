@@ -142,6 +142,7 @@ Done so far:
 | Calendar | `specs/calendar/calendar.spec.js` | CAL-H01 (connect once, Google's events shown), H02 (create, rename, delete in Google), H03 (task added, marked done), H06 (disconnect revokes the grant), N01, N02 (access taken back → asked to reconnect, still signed in; Google failing → not saved, form kept), E02 (another device opens it connected), H05 (day/week/month, Next and Today, a layer off and remembered), N03 (Google's script unreachable), Google granting no refresh token → "connect once more" |
 | Visual | `specs/visual/screens.visual.spec.js` (project `visual`) | §4.4, first set: sign-in (en, he), Dashboard (dark, light, phone), Expenses, the add-expense dialog, Settings; approved screenshots from Linux in CI |
 | Hardening | `specs/security/hardening.spec.js` | SEC-N03, N06, N07 (owner and household come from the session), N08 (cron secret), N09 (bad ids), E01 (code-like text on 8 screens and in the invitation email) |
+| Offline sync | `specs/offline/outbox.spec.js` | OFF-H04 (edit and delete offline, applied in order), H05 (a task ticked offline), N01 (a change refused after losing permission: "could not sync", Try again refused again, Throw away), E02 (a dropping connection sends five changes exactly once), E04 (an edit to a row deleted meanwhile is dropped, not stuck) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
 Not yet: in the calendar, dragging events (CAL-H04) and the edge cases (E01).
