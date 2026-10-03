@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       webkit:
-        description: Run the browser tests in WebKit
+        description: Run the browser tests in WebKit (they also run on every push)
         type: boolean
         default: true
       update_screenshots:
@@ -211,15 +211,13 @@ jobs:
           path: ascent_webapp/playwright-report
           retention-days: 14
 
-  # The browser tests in WebKit, the engine of Safari on the iPhone. Run by hand (Actions > Check > Run workflow):
-  # on GitHub's Linux runners every page load in Playwright's WebKit times out (page.goto never finishes), while the
-  # same specs pass in WebKit on Windows; see e2e/TEST_PLAN.md §0.2.3. Back on every push once that is solved
+  # The browser tests in WebKit, the engine of Safari on the iPhone, on every push (and by hand). Specs that go
+  # through Settings or the sign-in screen are left out for now (playwright.config.js, TEST_PLAN.md §0.2.3)
   e2e-webkit:
-    if: github.event_name == 'workflow_dispatch' && inputs.webkit
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.webkit)
     needs: e2e-build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    continue-on-error: true
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ascent_webapp
@@ -245,9 +243,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/.mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('ascent_webapp/package-lock.json') }}
-      # With a trace of every test, to see where the page loads stop on Linux. While they hang, it stops after a few
-      # failures: a run that reaches the job's time limit uploads nothing
-      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html --trace=on --max-failures=4 --retries=0
+      - run: npx playwright test --project=desktop-webkit --project=phone-webkit --reporter=list,github,html
       - name: WebKit report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
