@@ -66,3 +66,12 @@ test('finishing a trip with no total typed does not save an expense @critical', 
   await expect(form).toBeVisible();
   expect(await api.list('transactions')).toEqual([]);
 });
+
+test('a loan already being paid off starts from today’s balance and the next payment @critical', async ({ page, api }) => {
+  await api.create('commitments', { name: 'Car loan', kind: 'car', direction: 'borrowed', currency: 'USD', principal: 8000, annualRate: 4, payment: 500, firstPaymentDate: day(5) });
+  await openApp(page, '/Commitments');
+  await page.getByRole('button', { name: /Car loan/ }).first().click();
+  await expect(page.getByText('$8,000').first()).toBeVisible();
+  await expectNoBrokenNumbers(page);
+  expect((await page.locator('body').innerText()).match(/-\$\d/g)).toBeNull();
+});
