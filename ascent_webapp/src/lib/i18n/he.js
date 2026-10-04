@@ -1030,7 +1030,9 @@ export default {
   bdRevertBody: 'ב{month} התקציב של {category} חוזר ל-{amount}, כמו בחודשים שסביבו.',
   bdRemove: 'הסרה',
   bdPerDay: 'נשארו {amount} ליום',
-  bdOfTotal: '{spent} מתוך {limit}',
+  bdOfTotal: '{spent} הוצאו מתוך {limit} בתקציבים',
+  bdComing: '+{amount} עוד צפויים',
+  bdOutside: 'הוצאות מחוץ לתקציבים: {amount}',
   bdSetUpMonth: 'הגדרת {month}',
   bdPaceMark: 'איפה ההוצאה הייתה היום בקצב אחיד: {amount}',
 

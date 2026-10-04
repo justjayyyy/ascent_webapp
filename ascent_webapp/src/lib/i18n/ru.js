@@ -1030,7 +1030,9 @@ export default {
   bdRevertBody: 'Бюджет «{category}» на {month} вернётся к {amount}, как в соседних месяцах.',
   bdRemove: 'Удалить',
   bdPerDay: 'Осталось {amount} в день',
-  bdOfTotal: '{spent} из {limit}',
+  bdOfTotal: 'Потрачено {spent} из {limit} по бюджетам',
+  bdComing: '+{amount} ещё предстоит',
+  bdOutside: 'Потрачено вне бюджетов: {amount}',
   bdSetUpMonth: 'Задать бюджеты на {month}',
   bdPaceMark: 'Сколько было бы потрачено к сегодня при ровном темпе: {amount}',
 

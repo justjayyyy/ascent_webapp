@@ -256,8 +256,13 @@ export function buildMonthReview({
     .map(([k, amount]) => ({ key: k, name: k.startsWith('card:') ? cardName.get(k.slice(5)) : k.startsWith('method:') ? k.slice(7) : '', amount, share: now.spent > 0 ? amount / now.spent : 0 }))
     .sort((a, b) => b.amount - a.amount);
 
-  // Budgets of this month
-  const budgetRows = categories.filter((c) => c.budget).map((c) => ({ category: c.category, ...c.budget }));
+  // Budgets of this month, those with nothing spent yet included
+  const budgetRows = [...budgetOf]
+    .filter(([, limit]) => limit > 0)
+    .map(([category, limit]) => {
+      const used = now.categories.get(category) || 0;
+      return { category, limit, used, ratio: used / limit };
+    });
   const budgetsOf = {
     list: budgetRows.sort((a, b) => b.ratio - a.ratio),
     kept: budgetRows.filter((b) => b.used <= b.limit).length,

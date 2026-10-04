@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useMoney } from '@/hooks/useWorkspaceData';
 import { budgetsForMonth, lastBudgetedBefore, monthKey } from '@shared/budgets';
 import { monthNames } from './budgetMonths';
+import { localDay } from '@/lib/localDay';
 
 /**
  * The months a period covers, 'YYYY-MM': the months picked, or with none picked the year so far (all of a past
@@ -43,43 +44,58 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
     return { share: now.getDate() / days, daysLeft: days - now.getDate() + 1 };
   }, [months]);
 
-  // Per category and month: each month's budget is held against that month's spending only
+  // Per category and month, as the Dashboard counts it: spent is what is dated up to today; what is dated later
+  // (rent on the 25th, the next instalment) is still to come; a payment held as a possible duplicate is neither.
+  // Each month's budget is held against that month's spending only.
   const spending = useMemo(() => {
     const wanted = new Set(months);
-    const out = {};
+    const today = localDay();
+    const spent = {};
+    const coming = {};
     for (const tx of transactions) {
       if (!tx.date || tx.type !== 'Expense') continue;
+      if (tx.status === 'pending' && tx.ingest?.flags?.includes('possibleDuplicate')) continue;
       // Read from the text: new Date('2026-03-01') is UTC midnight, which is still February west of London
       const month = String(tx.date).slice(0, 7);
       if (!wanted.has(month)) continue;
       const key = `${tx.category}|${month}`;
-      out[key] = (out[key] || 0) + amountOf(tx);
+      const into = String(tx.date).slice(0, 10) > today ? coming : spent;
+      into[key] = (into[key] || 0) + amountOf(tx);
     }
-    return out;
+    return { spent, coming };
   }, [transactions, amountOf, months]);
 
-  const rows = useMemo(() => {
+  const { rows, outside } = useMemo(() => {
     const byCategory = new Map();
+    const budgeted = new Set();
     for (const month of months) {
       for (const budget of budgetsForMonth(budgets, month)) {
-        const row = byCategory.get(budget.category) || { id: budget.id, category: budget.category, limit: 0, spent: 0, threshold: 80 };
+        const key = `${budget.category}|${month}`;
+        budgeted.add(key);
+        const row = byCategory.get(budget.category) || { id: budget.id, category: budget.category, limit: 0, spent: 0, coming: 0, threshold: 80 };
         row.limit += convert(budget.monthlyLimit, budget.currency) ?? budget.monthlyLimit;
-        row.spent += spending[`${budget.category}|${month}`] || 0;
+        row.spent += spending.spent[key] || 0;
+        row.coming += spending.coming[key] || 0;
         row.threshold = Number(budget.alertThreshold) || 80; // the latest month's
         byCategory.set(budget.category, row);
       }
     }
-    return [...byCategory.values()].map((row) => {
+    // Spent in categories that had no budget that month
+    const outsideBudgets = Object.entries(spending.spent).reduce((s, [key, amount]) => (budgeted.has(key) ? s : s + amount), 0);
+    const list = [...byCategory.values()].map((row) => {
       const percentage = row.limit > 0 ? (row.spent / row.limit) * 100 : 0;
+      // Warnings look ahead to what is already scheduled
+      const committed = row.limit > 0 ? ((row.spent + row.coming) / row.limit) * 100 : 0;
       return {
         ...row,
-        remaining: row.limit - row.spent,
+        remaining: row.limit - row.spent - row.coming,
         percentage,
         isOverBudget: percentage > 100,
-        isAtLimit: percentage === 100,
-        isNearLimit: percentage >= row.threshold && percentage < 100,
+        isAtLimit: percentage <= 100 && committed === 100,
+        isNearLimit: percentage <= 100 && committed >= row.threshold && committed !== 100,
       };
-    }).sort((a, b) => b.percentage - a.percentage);
+    }).sort((a, b) => (b.spent + b.coming) / (b.limit || 1) - (a.spent + a.coming) / (a.limit || 1));
+    return { rows: list, outside: outsideBudgets };
   }, [months, budgets, spending, convert]);
 
   // A single month with no budgets, after months that had some: offer whoever may edit them to set it up
@@ -106,6 +122,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
 
   const totalLimit = rows.reduce((s, r) => s + r.limit, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spent, 0);
+  const pct = (v, limit) => (limit > 0 ? Math.max(0, Math.min(100, (v / limit) * 100)) : 0);
 
   return (
     <section className="rounded-3xl bg-foreground/[0.04] p-4 sm:p-5">
@@ -144,7 +161,13 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
               <div className="relative mt-2">
                 <div className="h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(row.percentage)} aria-valuemin={0} aria-valuemax={100}
                   aria-label={t('a11yBudgetUsed').replace('{category}', category).replace('{percent}', Math.round(row.percentage))}>
-                  <motion.div className={cn('h-full rounded-full', tone)} initial={{ width: 0 }} animate={{ width: `${Math.min(row.percentage, 100)}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
+                  <div className="flex h-full">
+                    <motion.div className={cn('h-full rounded-full', tone)} initial={{ width: 0 }} animate={{ width: `${pct(row.spent, row.limit)}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
+                    {row.coming > 0 && (
+                      <motion.div className={cn('h-full rounded-full opacity-35', tone)} initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(pct(row.coming, row.limit), 100 - pct(row.spent, row.limit))}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
+                    )}
+                  </div>
                 </div>
                 {pace && (
                   <span
@@ -156,13 +179,14 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                 )}
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span dir="ltr">
-                  <BlurValue blur={blur}>{formatCurrency(row.spent, userCurrency)} / {formatCurrency(row.limit, userCurrency)}</BlurValue>
+                <span className="flex flex-wrap items-center gap-x-1.5">
+                  <span dir="ltr"><BlurValue blur={blur}>{formatCurrency(row.spent, userCurrency)} / {formatCurrency(row.limit, userCurrency)}</BlurValue></span>
+                  {row.coming > 0 && <span><BlurValue blur={blur}>{t('bdComing', { amount: formatCurrency(row.coming, userCurrency) })}</BlurValue></span>}
                 </span>
                 <span className="text-end tabular-nums">
                   <BlurValue blur={blur}>
                     {row.isOverBudget
-                      ? `${t('overBudgetBy')} ${formatCurrency(Math.abs(row.remaining), userCurrency)}`
+                      ? `${t('overBudgetBy')} ${formatCurrency(row.spent - row.limit, userCurrency)}`
                       : row.isAtLimit
                         ? t('reachedLimit')
                         : row.isNearLimit
@@ -177,6 +201,11 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
           );
         })}
       </ul>
+      {outside > 0 && (
+        <p className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground tabular-nums">
+          <BlurValue blur={blur}>{t('bdOutside', { amount: formatCurrency(outside, userCurrency) })}</BlurValue>
+        </p>
+      )}
     </section>
   );
 }

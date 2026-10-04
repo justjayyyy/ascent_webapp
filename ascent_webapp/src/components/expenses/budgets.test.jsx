@@ -1,6 +1,6 @@
 // Budgets are per category from a month, repeating or not: which categories can still get one, what each is held
 // against, and what changing or removing one in a later month does.
-import { describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 const theme = {
@@ -87,7 +87,10 @@ describe('the budget manager', () => {
 });
 
 describe('budget progress', () => {
-  const tx = (month, amount) => ({ type: 'Expense', category: 'food', amount, date: `2026-${String(month).padStart(2, '0')}-10` });
+  // After every month the tests use, unless a test moves it
+  beforeAll(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 11, 1, 12)); });
+  afterAll(() => { vi.useRealTimers(); });
+  const tx = (month, amount, extra = {}) => ({ type: 'Expense', category: 'food', amount, date: `2026-${String(month).padStart(2, '0')}-10`, ...extra });
 
   test('over two months, the limits add up and each counts only its own month', () => {
     render(<BudgetProgress selectedYear="2026" selectedMonths={['9', '10']} formatCurrency={(v) => `$${v}`}
@@ -112,6 +115,30 @@ describe('budget progress', () => {
     expect(screen.getByRole('button', { name: /^bdSetUpMonth/ })).toBeTruthy();
     rerender(<BudgetProgress selectedYear="2026" selectedMonths={['9']} formatCurrency={(v) => `$${v}`} budgets={budgets} transactions={[]} onManage={noop} />);
     expect(screen.queryByRole('button', { name: /^bdSetUpMonth/ })).toBeNull();
+  });
+
+  test('what is dated after today is still to come, not spent, and a possible duplicate is neither', () => {
+    vi.setSystemTime(new Date(2026, 9, 4, 12));
+    render(<BudgetProgress selectedYear="2026" selectedMonths={['10']} formatCurrency={(v) => `$${v}`}
+      budgets={[{ id: 'oct', category: 'food', year: 2026, month: 10, monthlyLimit: 600 }]}
+      transactions={[
+        { ...tx(10, 180), date: '2026-10-02' },
+        { ...tx(10, 300), date: '2026-10-25', isRecurring: true },
+        { ...tx(10, 180), date: '2026-10-03', status: 'pending', ingest: { flags: ['possibleDuplicate'] } },
+      ]} />);
+    expect(screen.getByText('$180 / $600')).toBeTruthy();
+    expect(screen.getByText('bdComing $300')).toBeTruthy();
+    // Left: 600 less what was spent and what is still to come
+    expect(screen.getByText('$120')).toBeTruthy();
+    vi.setSystemTime(new Date(2026, 11, 1, 12));
+  });
+
+  test('the header is the budgeted categories; spending outside them is said apart', () => {
+    render(<BudgetProgress selectedYear="2026" selectedMonths={['9']} formatCurrency={(v) => `$${v}`}
+      budgets={[{ id: 'sep', category: 'food', year: 2026, month: 9, monthlyLimit: 500 }]}
+      transactions={[tx(9, 200), tx(9, 70, { category: 'fun' })]} />);
+    expect(screen.getByText('bdOfTotal $200 $500')).toBeTruthy();
+    expect(screen.getByText('bdOutside $70')).toBeTruthy();
   });
 
   test('the whole year means the year so far', () => {

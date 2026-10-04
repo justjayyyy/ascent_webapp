@@ -52,7 +52,8 @@ export function useInsights({ rows, selectedMonth, convert }) {
   const forecast = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
     const monthBudgets = budgetsForMonth(budgets, month)
-      .map((b) => ({ category: b.category, limit: convert(b.monthlyLimit, b.currency) }));
+      // Until the exchange rates load, a limit counts as written (as on Expenses) rather than dropping out
+      .map((b) => ({ category: b.category, limit: convert(b.monthlyLimit, b.currency) ?? b.monthlyLimit }));
     const planDues = plans
       .filter((p) => p.status !== 'archived' && p.status !== 'done')
       .flatMap((p) => (p.items || [])

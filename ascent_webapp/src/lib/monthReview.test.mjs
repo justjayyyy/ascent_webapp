@@ -93,6 +93,17 @@ test('budgets of the month: kept and over', () => {
   assert.deepEqual(r.budgets.over.map((b) => b.category), ['groceries']);
 });
 
+test('a budget with nothing spent in it is kept, and counted', () => {
+  const budgets = [
+    { category: 'groceries', monthlyLimit: 1500, currency: 'ILS', year: 2026, month: 9 },
+    { category: 'gifts', monthlyLimit: 300, currency: 'ILS', year: 2026, month: 9 },
+  ];
+  const r = buildMonthReview({ rows: year(), month: new Date(2026, 8, 1), today: new Date(2026, 9, 2), budgets });
+  assert.equal(r.budgets.list.length, 2);
+  assert.equal(r.budgets.kept, 1);
+  assert.deepEqual(r.budgets.list.find((b) => b.category === 'gifts'), { category: 'gifts', limit: 300, used: 0, ratio: 0 });
+});
+
 test('the year so far against last year needs last year fully on record', () => {
   const r = buildMonthReview({ rows: year(), month: new Date(2026, 8, 1), today: new Date(2026, 9, 2) });
   assert.equal(r.ytd.months, 9);

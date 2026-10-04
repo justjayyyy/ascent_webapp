@@ -1106,7 +1106,9 @@ export default {
   bdRevertBody: '{category} goes back to {amount} for {month}, like the months around it.',
   bdRemove: 'Remove',
   bdPerDay: '{amount} a day left',
-  bdOfTotal: '{spent} of {limit}',
+  bdOfTotal: '{spent} spent of {limit} budgeted',
+  bdComing: '+{amount} still to come',
+  bdOutside: 'Spent outside your budgets: {amount}',
   bdSetUpMonth: 'Set up {month}',
   bdPaceMark: 'Where spending would be today at an even pace: {amount}',
 
