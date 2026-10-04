@@ -24,8 +24,6 @@ test('accepting with no connection says so and keeps the invitation; accepting a
   await page.goto(link);
   const accept = page.getByRole('button', { name: L('wsAccept'), exact: true });
   await expect(accept).toBeVisible();
-  // The app fetches the rest of its pages when idle; with the connection cut halfway that fails on its own
-  await page.waitForLoadState('networkidle');
 
   await page.context().setOffline(true);
   await accept.click();
