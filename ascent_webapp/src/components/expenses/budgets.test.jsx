@@ -120,7 +120,7 @@ describe('budget progress', () => {
   test('what is dated after today is still to come, not spent, and a possible duplicate is neither', () => {
     vi.setSystemTime(new Date(2026, 9, 4, 12));
     render(<BudgetProgress selectedYear="2026" selectedMonths={['10']} formatCurrency={(v) => `$${v}`}
-      budgets={[{ id: 'oct', category: 'food', year: 2026, month: 10, monthlyLimit: 600 }]}
+      budgets={[{ id: 'oct', category: 'food', year: 2026, month: 10, monthlyLimit: 600, alertThreshold: 90 }]}
       transactions={[
         { ...tx(10, 180), date: '2026-10-02' },
         { ...tx(10, 300), date: '2026-10-25', isRecurring: true },
@@ -128,8 +128,10 @@ describe('budget progress', () => {
       ]} />);
     expect(screen.getByText('$180 / $600')).toBeTruthy();
     expect(screen.getByText('bdComing $300')).toBeTruthy();
-    // Left: 600 less what was spent and what is still to come
+    // Left for the rest of the month: 600 less what was spent and what is still to come
     expect(screen.getByText('$120')).toBeTruthy();
+    expect(screen.getByText('bdLeftMonth $120')).toBeTruthy();
+    expect(screen.getByText('bdLeftOfTotal $120 $600')).toBeTruthy();
     vi.setSystemTime(new Date(2026, 11, 1, 12));
   });
 

@@ -26,7 +26,7 @@ export function periodMonths(selectedYear, selectedMonths = [], now = new Date()
 /**
  * Each budgeted category against what was spent in it. Over several months a category's limits add up, and
  * only spending in months it had a budget counts. In the month under way a tick marks where spending would
- * be at an even pace, with what is left for each remaining day.
+ * be at an even pace, and each says what is left of it for the rest of the month.
  */
 function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [], onManage, canEdit = false }) {
   const { language, user, t } = useTheme();
@@ -41,7 +41,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
     const now = new Date();
     if (months.length !== 1 || months[0] !== monthKey(now.getFullYear(), now.getMonth() + 1)) return null;
     const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    return { share: now.getDate() / days, daysLeft: days - now.getDate() + 1 };
+    return { share: now.getDate() / days };
   }, [months]);
 
   // Per category and month, as the Dashboard counts it: spent is what is dated up to today; what is dated later
@@ -122,6 +122,8 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
 
   const totalLimit = rows.reduce((s, r) => s + r.limit, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spent, 0);
+  // In the month under way: what is left of every budget, less what is still to come
+  const totalLeft = totalLimit - totalSpent - rows.reduce((s, r) => s + r.coming, 0);
   const pct = (v, limit) => (limit > 0 ? Math.max(0, Math.min(100, (v / limit) * 100)) : 0);
 
   return (
@@ -130,7 +132,11 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">{t('budgetTracking')}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground tabular-nums" dir="auto">
-            <BlurValue blur={blur}>{t('bdOfTotal', { spent: formatCurrency(totalSpent, userCurrency), limit: formatCurrency(totalLimit, userCurrency) })}</BlurValue>
+            <BlurValue blur={blur}>
+              {pace && totalLeft >= 0
+                ? t('bdLeftOfTotal', { left: formatCurrency(totalLeft, userCurrency), limit: formatCurrency(totalLimit, userCurrency) })
+                : t('bdOfTotal', { spent: formatCurrency(totalSpent, userCurrency), limit: formatCurrency(totalLimit, userCurrency) })}
+            </BlurValue>
           </p>
         </div>
         {onManage && (
@@ -144,7 +150,6 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
         {rows.map((row) => {
           const tone = row.isOverBudget ? 'bg-danger' : row.isAtLimit ? 'bg-orange-500' : row.isNearLimit ? 'bg-yellow-500' : 'bg-success';
           const category = translateCategory(row.category, language);
-          const perDay = pace && row.remaining > 0 ? row.remaining / pace.daysLeft : null;
           return (
             <li key={row.category}>
               <div className="flex items-baseline justify-between gap-3">
@@ -191,8 +196,8 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                         ? t('reachedLimit')
                         : row.isNearLimit
                           ? t('approachingLimit')
-                          : perDay !== null
-                            ? t('bdPerDay', { amount: formatCurrency(perDay, userCurrency) })
+                          : pace && row.remaining > 0
+                            ? t('bdLeftMonth', { amount: formatCurrency(row.remaining, userCurrency) })
                             : `${row.percentage.toFixed(0)}%`}
                   </BlurValue>
                 </span>
