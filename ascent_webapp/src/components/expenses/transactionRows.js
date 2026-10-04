@@ -12,7 +12,7 @@ export const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toSt
 
 /**
  * The rows one save turns into: a single transaction, one per month for a monthly recurring
- * one, or one per installment for a big purchase paid in parts. Installments split the price
+ * one, or one per installment for an expense paid in parts (a big purchase or not). Installments split the price
  * evenly and the last one absorbs the rounding, so the parts always add up to the total.
  */
 export function expandTransaction(input) {
@@ -24,8 +24,9 @@ export function expandTransaction(input) {
   const count = Math.max(1, Math.min(60, parseInt(data.installmentCount, 10) || 1));
   delete data.installmentCount;
 
-  if (data.type === 'Expense' && data.isBigPurchase && count > 1) {
+  if (data.type === 'Expense' && count > 1) {
     RECURRING.forEach((k) => delete data[k]);
+    if (!data.isBigPurchase) delete data.isBigPurchase;
     const total = round2(data.amount);
     const each = round2(total / count);
     const ratio = data.amountInGlobalCurrency != null && total ? data.amountInGlobalCurrency / total : null;
@@ -38,7 +39,6 @@ export function expandTransaction(input) {
         amount,
         amountInGlobalCurrency: ratio != null ? round2(amount * ratio) : null,
         date: format(addMonths(first, i), 'yyyy-MM-dd'),
-        isBigPurchase: true,
         installmentGroupId: groupId,
         installmentIndex: i + 1,
         installmentCount: count,

@@ -91,8 +91,8 @@ function Stat({ dot, label, value, tone, blur }) {
 }
 
 function ExpenseMonthView({
-  kind = 'Expense', transactions, allTransactions = [], counterpart = [], budgets, cards, categories = [], plans = [],
-  onEdit, onDelete, onDuplicate, onConfirm, isLoading, selectedYear, selectedMonths = [], canEdit = true, onManageBudgets, canEditBudgets = false,
+  kind = 'Expense', transactions, allTransactions = [], counterpart = [], expectedIncome = null, budgets, cards, categories = [], plans = [],
+  onEdit, onDelete, onDuplicate, onConfirm, onSetPayer, isLoading, selectedYear, selectedMonths = [], canEdit = true, onManageBudgets, canEditBudgets = false,
 }) {
   const isIncome = kind === 'Income';
   const { user, colors, t, language } = useTheme();
@@ -132,7 +132,7 @@ function ExpenseMonthView({
         if (!hay.some((v) => v.includes(q))) return false;
       }
       if (categoryFilter !== 'all' && x.category !== categoryFilter) return false;
-      if (personFilter !== 'all' && x.created_by !== personFilter) return false;
+      if (personFilter !== 'all' && (x.paidBy || x.created_by) !== personFilter) return false;
       if (reviewOnly && x.status !== 'pending') return false;
       if (bigOnly && !x.isBigPurchase) return false;
       return true;
@@ -152,10 +152,13 @@ function ExpenseMonthView({
       if (x.isBigPurchase) big += v;
     });
     const other = counterpart.reduce((s, x) => s + toUser(x), 0);
-    const income = isIncome ? total : other;
+    const received = isIncome ? total : other;
+    // A month under way counts on its expected income until more of its own is in
+    const incomeIsExpected = expectedIncome !== null && expectedIncome > received;
+    const income = incomeIsExpected ? expectedIncome : received;
     const expenses = isIncome ? other : total;
-    return { total, big, everyday: total - big, income, expenses, net: income - expenses };
-  }, [transactions, counterpart, toUser, isIncome]);
+    return { total, big, everyday: total - big, income, received, incomeIsExpected, expenses, net: income - expenses };
+  }, [transactions, counterpart, toUser, isIncome, expectedIncome]);
 
   const iconByCategory = useMemo(() => {
     const map = {};
@@ -244,6 +247,7 @@ function ExpenseMonthView({
               {isIncome
                 ? t('keptOfIncome').replace('{pct}', Math.max(0, Math.round(100 - spentShare)))
                 : t('spentOfIncome').replace('{pct}', Math.round((metrics.expenses / metrics.income) * 100))}
+              {metrics.incomeIsExpected && ` · ${t('expectedThisMonth', { amount: blur ? '••••' : money(metrics.income) })}`}
             </p>
           </>
         )}
@@ -264,7 +268,7 @@ function ExpenseMonthView({
               <Stat dot="bg-primary" label={t('everydaySpending')} value={money(metrics.everyday)} blur={blur} />
               {metrics.big > 0
                 ? <Stat dot="bg-chart-4" label={t('bigPurchases')} value={money(metrics.big)} blur={blur} />
-                : <Stat dot="bg-success" label={t('income')} value={money(metrics.income)} blur={blur} />}
+                : <Stat dot="bg-success" label={metrics.incomeIsExpected ? t('expectedIncome') : t('income')} value={`${metrics.incomeIsExpected ? '≈ ' : ''}${money(metrics.income)}`} blur={blur} />}
             </>
           )}
         </dl>
@@ -379,6 +383,7 @@ function ExpenseMonthView({
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             onConfirm={onConfirm}
+            onSetPayer={onSetPayer}
             canEdit={canEdit}
             emptyTitle={isIncome ? t('noIncomeFound') : t('noExpensesFound')}
           />

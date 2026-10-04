@@ -98,3 +98,14 @@ test('a big purchase in 10 payments: ten monthly rows that add up to the price @
   await expect(page.getByLabel(L('installmentOf', { index: 1, count: 10 })).first()).toBeVisible();
   await expect(page.getByText(L('bigPurchases')).first()).toBeVisible();
 });
+
+test('any expense can be paid in a number of payments without being a big purchase @critical', async ({ page, api }) => {
+  await openApp(page, '/Expenses');
+  const expenses = new ExpensesScreen(page);
+  await expenses.addInstallments({ amount: 600, description: 'Winter jacket', payments: 3, big: false });
+
+  await expect.poll(async () => (await api.list('transactions')).length).toBe(3);
+  const rows = await api.list('transactions');
+  expect(rows.every((r) => r.installmentCount === 3 && !r.isBigPurchase && r.amount === 200)).toBe(true);
+  await expect(page.getByLabel(L('installmentOf', { index: 1, count: 3 })).first()).toBeVisible();
+});

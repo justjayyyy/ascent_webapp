@@ -74,6 +74,9 @@ export function spendingSummary({ transactions, budgets = [], today, currency, c
     topMerchantsLastMonth: merchants(past[0]),
     thisMonth: {
       income: forecast.income,
+      // The usual of the last 3 months, standing in until this month's own income is in (salary for a month
+      // is often paid on the 1st of the next and booked to the month it was earned for)
+      expectedIncome: forecast.incomeIsExpected ? forecast.incomeUsed : null,
       spentSoFar: forecast.spent,
       stillCommitted: forecast.committed,
       safeToSpend: forecast.base ? forecast.safeToSpend : null,

@@ -27,6 +27,13 @@ describe('one save, the rows it becomes', () => {
     for (const k of [...STRIP, 'installmentCount', 'isRecurring', 'recurringFrequency', 'isBigPurchase']) expect(rows[0]).not.toHaveProperty(k);
   });
 
+  test('any expense can be paid in parts, without being a big purchase', () => {
+    const rows = expandTransaction({ ...base, isBigPurchase: false, installmentCount: '3' });
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.installmentIndex)).toEqual([1, 2, 3]);
+    expect(rows.every((r) => !('isBigPurchase' in r) && r.installmentCount === 3)).toBe(true);
+  });
+
   test('installments split the price evenly and the last absorbs the rounding', () => {
     const rows = expandTransaction({ ...base, isBigPurchase: true, installmentCount: '3' });
     expect(rows.map((r) => r.amount)).toEqual([33.33, 33.33, 33.34]);

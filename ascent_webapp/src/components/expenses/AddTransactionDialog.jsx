@@ -304,7 +304,7 @@ export default function AddTransactionDialog({
       planId: (isExpense && formData.planId) || null,
       planItemId: (isExpense && formData.planId && formData.planItemId) || null,
       commitmentId: (isExpense && formData.commitmentId) || null,
-      paidBy: (isExpense && formData.paidBy) || null,
+      paidBy: formData.paidBy || null,
     }, { wholeSeries: inSeries && wholeSeries });
   };
 
@@ -316,7 +316,7 @@ export default function AddTransactionDialog({
     : '';
 
   const installments = Math.max(1, Math.min(60, parseInt(formData.installmentCount, 10) || 1));
-  const splitting = formData.type === 'Expense' && formData.isBigPurchase && !isEditing && installments > 1;
+  const splitting = formData.type === 'Expense' && !formData.isRecurring && !isEditing && installments > 1;
   const inCurrency = (n, currency = formData.currency) => new Intl.NumberFormat(loc, {
     style: 'currency', currency: currency || userCurrency, maximumFractionDigits: 2,
   }).format(n || 0);
@@ -607,9 +607,10 @@ export default function AddTransactionDialog({
 
 
 
-          {/* Households: who paid */}
-          {formData.type === 'Expense' && (
+          {/* Households: who paid, or who received the income */}
+          {(formData.type === 'Expense' || formData.type === 'Income') && (
             <HouseholdFields
+              income={formData.type === 'Income'}
               value={{ paidBy: formData.paidBy }}
               onChange={(v) => {
                 // Another payer means another wallet: drop a card that was picked for the previous one
@@ -620,7 +621,55 @@ export default function AddTransactionDialog({
             />
           )}
 
-          {/* Big purchase: kept apart from everyday spending, optionally paid in installments */}
+          {/* Number of payments: any new expense can be split into monthly payments (תשלומים) */}
+          {formData.type === 'Expense' && !isEditing && !formData.isRecurring && (
+            <div className={cn("space-y-2 rounded-2xl border p-2 transition-colors sm:p-3", splitting ? "border-primary/40 bg-primary/[0.06]" : colors.border)}>
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('installments')}</span>
+                <div className="flex items-center gap-1" role="group" aria-label={t('installments')}>
+                  <button type="button" aria-label={t('fewerPayments')} onClick={() => setFormData({ ...formData, installmentCount: String(Math.max(1, installments - 1)) })} className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.06] transition-colors hover:bg-foreground/10 active:scale-95">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="60"
+                    aria-label={t('installments')}
+                    value={formData.installmentCount}
+                    onChange={(e) => setFormData({ ...formData, installmentCount: e.target.value })}
+                    className={cn("h-10 w-14 text-center tabular-nums", colors.bgTertiary, colors.border, colors.textPrimary)}
+                  />
+                  <button type="button" aria-label={t('morePayments')} onClick={() => setFormData({ ...formData, installmentCount: String(Math.min(60, installments + 1)) })} className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.06] transition-colors hover:bg-foreground/10 active:scale-95">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[1, 2, 3, 6, 12, 24, 36].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={installments === n}
+                    onClick={() => setFormData({ ...formData, installmentCount: String(n) })}
+                    className={cn("min-h-9 rounded-full px-3 text-xs font-medium tabular-nums transition-colors", installments === n ? "bg-primary text-primary-foreground" : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10")}
+                  >
+                    {n === 1 ? t('singlePayment') : `×${n}`}
+                  </button>
+                ))}
+              </div>
+              {installmentPreview && <p className="text-xs font-medium text-primary">{installmentPreview}</p>}
+            </div>
+          )}
+          {/* One payment of several: which one, of what total */}
+          {isEditing && editTransaction?.installmentCount > 1 && (
+            <p className={cn("rounded-2xl border px-3 py-2 text-xs font-medium", colors.border, colors.textSecondary)}>
+              {t('installmentOf').replace('{index}', editTransaction.installmentIndex).replace('{count}', editTransaction.installmentCount)}
+              {editTransaction.installmentTotal ? ` · ${t('totalPrice')} ${inCurrency(editTransaction.installmentTotal, editTransaction.currency)}` : ''}
+            </p>
+          )}
+
+          {/* Big purchase: kept apart from everyday spending */}
           {formData.type === 'Expense' && (!formData.isRecurring || isEditing) && (
             <div className={cn("rounded-2xl border p-2 transition-colors sm:p-3", formData.isBigPurchase ? "border-primary/40 bg-primary/[0.06]" : colors.border)}>
               <div className="flex items-center gap-2">
@@ -635,57 +684,7 @@ export default function AddTransactionDialog({
                   <span>{t('bigPurchase')}</span>
                 </Label>
               </div>
-              {formData.isBigPurchase && (
-                <div className="mt-2 space-y-2 ps-6">
-                  <p className={cn("text-xs", colors.textTertiary)}>{t('bigPurchaseHelp')}</p>
-                  {isEditing ? (
-                    editTransaction?.installmentCount > 1 && (
-                      <p className={cn("text-xs font-medium", colors.textSecondary)}>
-                        {t('installmentOf').replace('{index}', editTransaction.installmentIndex).replace('{count}', editTransaction.installmentCount)}
-                        {editTransaction.installmentTotal ? ` · ${t('totalPrice')} ${inCurrency(editTransaction.installmentTotal, editTransaction.currency)}` : ''}
-                      </p>
-                    )
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={cn("text-xs sm:text-sm", colors.textSecondary)}>{t('installments')}</span>
-                        <div className="flex items-center gap-1" role="group" aria-label={t('installments')}>
-                          <button type="button" aria-label={t('fewerPayments')} onClick={() => setFormData({ ...formData, installmentCount: String(Math.max(1, installments - 1)) })} className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.06] transition-colors hover:bg-foreground/10 active:scale-95">
-                            <Minus className="h-4 w-4" />
-                          </button>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            min="1"
-                            max="60"
-                            aria-label={t('installments')}
-                            value={formData.installmentCount}
-                            onChange={(e) => setFormData({ ...formData, installmentCount: e.target.value })}
-                            className={cn("h-10 w-14 text-center tabular-nums", colors.bgTertiary, colors.border, colors.textPrimary)}
-                          />
-                          <button type="button" aria-label={t('morePayments')} onClick={() => setFormData({ ...formData, installmentCount: String(Math.min(60, installments + 1)) })} className="grid h-10 w-10 place-items-center rounded-full bg-foreground/[0.06] transition-colors hover:bg-foreground/10 active:scale-95">
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[1, 3, 6, 12, 24, 36].map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            aria-pressed={installments === n}
-                            onClick={() => setFormData({ ...formData, installmentCount: String(n) })}
-                            className={cn("min-h-9 rounded-full px-3 text-xs font-medium tabular-nums transition-colors", installments === n ? "bg-primary text-primary-foreground" : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10")}
-                          >
-                            {n === 1 ? t('singlePayment') : `×${n}`}
-                          </button>
-                        ))}
-                      </div>
-                      {installmentPreview && <p className="text-xs font-medium text-primary">{installmentPreview}</p>}
-                    </>
-                  )}
-                </div>
-              )}
+              {formData.isBigPurchase && <p className={cn("mt-2 ps-6 text-xs", colors.textTertiary)}>{t('bigPurchaseHelp')}</p>}
             </div>
           )}
 
@@ -713,7 +712,8 @@ export default function AddTransactionDialog({
           )}
 
           {/* Monthly recurring (rent, salary, subscriptions) */}
-          {!(formData.type === 'Expense' && formData.isBigPurchase) && !isEditing && (
+          {/* Not with payments or a big purchase: a run of months is its own kind of row */}
+          {!(formData.type === 'Expense' && (formData.isBigPurchase || installments > 1)) && !isEditing && (
             <div className="flex items-center gap-2 p-2 rounded-md">
               <Checkbox
                 id="isRecurring"

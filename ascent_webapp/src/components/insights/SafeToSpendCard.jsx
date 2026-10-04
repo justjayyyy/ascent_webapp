@@ -68,6 +68,9 @@ export default function SafeToSpendCard({ forecast: f, isShared }) {
               </p>
             )}
             {f.base === 'budgets' && <p className="mt-2 text-xs text-muted-foreground text-pretty">{t('stsBasedOnBudgets')}</p>}
+            {f.base === 'income' && f.incomeIsExpected && (
+              <p className="mt-2 text-xs text-muted-foreground text-pretty">{fill(t('stsBasedOnExpected'), { amount: m(f.incomeUsed) })}</p>
+            )}
           </>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground text-pretty">{t('stsNoBase')}</p>
@@ -100,7 +103,7 @@ export default function SafeToSpendCard({ forecast: f, isShared }) {
         <p className="text-sm text-muted-foreground text-pretty tabular-nums">
           {fill(t('stsProjection'), { amount: m(f.projectedExpenses) })}
           {!blur && f.projectedHigh > f.projectedLow && ` (${fill(t('stsRange'), { low: money(f.projectedLow), high: money(f.projectedHigh) })})`}
-          {f.income > 0 && (
+          {f.incomeUsed > 0 && (
             <>
               {' · '}
               <span className={cn('font-medium', f.projectedNet < 0 ? 'text-danger' : 'text-success')}>

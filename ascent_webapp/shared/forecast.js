@@ -43,6 +43,32 @@ function stdev(values) {
   return Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / (values.length - 1));
 }
 
+/** 'YYYY-MM' `n` months before `month`. */
+const monthBefore = (month, n) => {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 - n, 1));
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+};
+
+/**
+ * The income a month can expect before its own has come in: the median of the 3 months before it. A salary
+ * paid on the 1st is booked to the month it was earned for, so the month under way usually has none of its
+ * own until it is over. Months with nothing recorded at all (before the household started, or outside the
+ * rows given) are left out; null when none are left or they had no income.
+ */
+export function expectedIncome(transactions, month) {
+  const totals = [1, 2, 3].map((n) => {
+    const key = monthBefore(month, n);
+    const rows = transactions.filter((tx) => String(tx.date).startsWith(key));
+    if (!rows.length) return null;
+    return rows.filter((tx) => tx.type === 'Income').reduce((s, tx) => s + (tx.amount || 0), 0);
+  }).filter((v) => v !== null).sort((a, b) => a - b);
+  if (!totals.length) return null;
+  const mid = Math.floor(totals.length / 2);
+  const median = totals.length % 2 ? totals[mid] : (totals[mid - 1] + totals[mid]) / 2;
+  return median > 0 ? round2(median) : null;
+}
+
 /**
  * @param {object} input
  * @param {Array}  input.transactions  rows of any month: { type, date, amount, category, isRecurring, installmentGroupId, isBigPurchase, planId, description }
@@ -100,8 +126,11 @@ export function monthForecast({ transactions, month, today, budgets = [], planDu
 
   const projectedExpenses = spent + committed + expectedVariable;
   const budgetTotal = budgets.reduce((s, b) => s + (b.limit || 0), 0);
-  const base = income > 0 ? 'income' : budgetTotal > 0 ? 'budgets' : null;
-  const baseAmount = base === 'income' ? income : base === 'budgets' ? budgetTotal : 0;
+  // Until this month's own income is in, what the months before brought in stands for it
+  const incomeExpected = phase === 'past' ? null : expectedIncome(transactions, month);
+  const incomeUsed = Math.max(income, incomeExpected || 0);
+  const base = incomeUsed > 0 ? 'income' : budgetTotal > 0 ? 'budgets' : null;
+  const baseAmount = base === 'income' ? incomeUsed : base === 'budgets' ? budgetTotal : 0;
   const safeToSpend = baseAmount - spent - committed;
 
   // Cumulative spending by day: actual up to today, then the expected path with its band
@@ -162,6 +191,9 @@ export function monthForecast({ transactions, month, today, budgets = [], planDu
     elapsed,
     daysLeft,
     income: round2(income),
+    expectedIncome: incomeExpected,
+    incomeUsed: round2(incomeUsed),
+    incomeIsExpected: incomeUsed > income,
     spent: round2(spent),
     committed: round2(committed),
     upcoming,
@@ -169,7 +201,7 @@ export function monthForecast({ transactions, month, today, budgets = [], planDu
     projectedExpenses: round2(projectedExpenses),
     projectedLow: round2(Math.max(spent + committed, projectedExpenses - margin)),
     projectedHigh: round2(projectedExpenses + margin),
-    projectedNet: round2(income - projectedExpenses),
+    projectedNet: round2(incomeUsed - projectedExpenses),
     base,
     baseAmount: round2(baseAmount),
     safeToSpend: round2(safeToSpend),

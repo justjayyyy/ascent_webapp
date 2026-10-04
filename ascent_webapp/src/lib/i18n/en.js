@@ -1191,7 +1191,7 @@ export default {
   bigPurchase: 'Big purchase',
   bigPurchases: 'Big purchases',
   bigPurchaseHelp: 'Kept apart from everyday spending, so one large buy does not skew your month.',
-  installments: 'Payments',
+  installments: 'Number of payments',
   singlePayment: 'One payment',
   fewerPayments: 'Fewer payments',
   morePayments: 'More payments',
@@ -1410,6 +1410,12 @@ export default {
   stsPerDay: '≈ {amount} a day for {days} days',
   stsOver: 'Over by {amount}',
   stsBasedOnBudgets: 'Based on your budgets. Add this month’s income for a truer picture.',
+  expectedIncome: 'Expected income',
+  incomeSoFar: '{amount} in so far',
+  expectedIncomeHint: 'The usual of the last 3 months',
+  withExpectedIncome: 'With the expected income',
+  stsBasedOnExpected: 'Based on {amount} expected this month, the usual of the last 3 months. The real figure takes over once this month’s income is in.',
+  expectedThisMonth: 'Expected this month: ≈ {amount}',
   stsNoBase: 'Add this month’s income or set budgets to see what is safe to spend.',
   stsSpent: 'Spent',
   stsCommitted: 'Still to pay',
@@ -1452,6 +1458,7 @@ export default {
 
   // Transaction dialog: household and suggestions
   paidBy: 'Paid by',
+  receivedBy: 'Received by',
   suggestedCategory: 'Suggested',
 
   // Statement import

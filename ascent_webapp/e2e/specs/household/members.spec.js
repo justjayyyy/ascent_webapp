@@ -105,3 +105,21 @@ test('inviting: a malformed address is caught, and someone already in the househ
   await dialog.getByRole('button', { name: L('wsSendInvite') }).click();
   await expect(dialog.getByText('This person is already a member')).toBeVisible();
 });
+
+test('who paid is changed from the expense itself in one tap, and the person filter follows it @critical', async ({ page, api, member }) => {
+  const sam = await member('editor', { name: 'Sam Partner' });
+  await api.create('transactions', expense({ amount: 95, category: 'food_dining', description: 'Pizza night' }));
+  await openApp(page, '/Expenses');
+  await page.getByRole('button', { name: /Pizza night/ }).click();
+  const payers = page.getByRole('dialog').getByRole('radiogroup', { name: L('paidBy') });
+  await expect(payers.getByRole('radio', { name: L('hhYou') })).toHaveAttribute('aria-checked', 'true');
+  await payers.getByRole('radio', { name: 'Sam Partner' }).click();
+  await expect(payers.getByRole('radio', { name: 'Sam Partner' })).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(async () => (await api.list('transactions')).map((t) => t.paidBy)).toEqual([sam.email]);
+
+  await page.keyboard.press('Escape');
+  await page.getByRole('group', { name: L('filterByPerson') }).getByRole('button', { name: L('me') }).click();
+  await expect(page.getByRole('button', { name: /Pizza night/ })).toHaveCount(0);
+  await page.getByRole('group', { name: L('filterByPerson') }).getByRole('button', { name: /Sam Partner/ }).click();
+  await expect(page.getByRole('button', { name: /Pizza night/ })).toBeVisible();
+});

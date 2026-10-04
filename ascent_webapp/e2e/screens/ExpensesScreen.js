@@ -47,12 +47,12 @@ export class ExpensesScreen {
     await this.page.getByRole('button', { name: this.L('addTransaction'), exact: true }).click();
   }
 
-  /** A big purchase paid in `payments` monthly installments. */
-  async addInstallments({ amount, description, payments }) {
+  /** An expense paid in `payments` monthly installments; a big purchase unless `big` is false. */
+  async addInstallments({ amount, description, payments, big = true }) {
     await this.openAdd();
     await this.amount.fill(String(amount));
     await this.description.fill(description);
-    await this.dialog.getByLabel(this.L('bigPurchase'), { exact: true }).check();
+    if (big) await this.dialog.getByLabel(this.L('bigPurchase'), { exact: true }).check();
     await this.dialog.getByRole('spinbutton', { name: this.L('installments') }).fill(String(payments));
     await this.page.getByRole('button', { name: this.L('addInstallments', { count: payments }) }).click();
   }

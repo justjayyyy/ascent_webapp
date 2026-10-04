@@ -98,6 +98,32 @@ export function useConfirmTransaction() {
   }, [box, workspaceId, t]);
 }
 
+/**
+ * Who paid an expense, or received income, in a shared household (`email`). Cards belong to whoever added
+ * them, so a card of someone else's comes off the row.
+ */
+export function useSetPayer() {
+  const box = useBox();
+  const workspaceId = useWorkspaceId();
+  const { user, currentWorkspace } = useAuth();
+  const { t } = useTheme();
+  return useCallback(async (tx, email, cards = []) => {
+    if (!box || !email || email === (tx.paidBy || tx.created_by)) return;
+    const payerId = email === user?.email
+      ? String(user?.id || user?._id || '')
+      : String(currentWorkspace?.members?.find((m) => m.email === email)?.userId || '');
+    const card = tx.cardId ? cards.find((c) => c.id === tx.cardId) : null;
+    const othersCard = card?.createdBy && String(card.createdBy) !== payerId;
+    try {
+      const outcome = await box.submit(updateOp({ uuid: uuid(), workspaceId, txId: tx.id, data: { paidBy: email, ...(othersCard && { cardId: null }) } }));
+      haptic('success');
+      toast.success(outcome === 'queued' ? t('offSavedOnDevice') : t('transactionUpdatedSuccessfully'));
+    } catch {
+      toast.error(t('failedToUpdateTransaction'));
+    }
+  }, [box, workspaceId, user, currentWorkspace, t]);
+}
+
 /** Delete one transaction, every installment of a big purchase or a whole recurring run. Paid plan items go back to planned. */
 export function useDeleteTransactions() {
   const box = useBox();

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { monthForecast, baselineDaily, addDays } from './forecast.js';
+import { monthForecast, baselineDaily, addDays, expectedIncome } from './forecast.js';
 import { detectSubscriptions } from './subscriptions.js';
 
 const exp = (date, amount, extra = {}) => ({ type: 'Expense', date, amount, category: 'food', ...extra });
@@ -183,4 +183,36 @@ test('a recurring bill is not listed twice when its history also looks like a su
   const series = { isRecurring: true, recurringFrequency: 'monthly', recurringGroupId: 'g2', recurringStartDate: '2026-01-05', recurringEndDate: '2026-12-05' };
   const rows = monthly('netflix', [49.9, 49.9, 49.9, 49.9, 49.9], '2026-01-05', series);
   assert.equal(detectSubscriptions(rows, '2026-04-20').length, 1);
+});
+
+test('expected income: the middle of the 3 months before, months with nothing recorded left out', () => {
+  const rows = [
+    inc('2026-07-31', 12000), exp('2026-07-10', 50),
+    inc('2026-08-31', 12500), inc('2026-08-15', 3000), // a bonus month
+    inc('2026-09-30', 12000),
+  ];
+  assert.equal(expectedIncome(rows, '2026-10'), 12000);
+  // Only two months on record: their average
+  assert.equal(expectedIncome(rows.filter((r) => !r.date.startsWith('2026-07')), '2026-10'), 13750);
+  assert.equal(expectedIncome([exp('2026-09-02', 40)], '2026-10'), null);
+  assert.equal(expectedIncome([], '2026-10'), null);
+});
+
+test('salary paid on the 1st for the month before: this month stands on what is expected until its own is in', () => {
+  const salary = (d) => inc(d, 10000);
+  const rows = [salary('2026-07-31'), salary('2026-08-31'), salary('2026-09-30'), exp('2026-10-03', 1500)];
+  const f = monthForecast({ month: '2026-10', today: '2026-10-04', transactions: rows });
+  assert.equal(f.income, 0);
+  assert.equal(f.expectedIncome, 10000);
+  assert.equal(f.incomeIsExpected, true);
+  assert.equal(f.base, 'income');
+  assert.equal(f.safeToSpend, 8500);
+  // October's own salary, booked on its last day, takes over
+  const done = monthForecast({ month: '2026-10', today: '2026-10-31', transactions: [...rows, salary('2026-10-31')] });
+  assert.equal(done.incomeIsExpected, false);
+  assert.equal(done.incomeUsed, 10000);
+  // A month that is over counts only what came in
+  const past = monthForecast({ month: '2026-10', today: '2026-11-04', transactions: rows });
+  assert.equal(past.incomeIsExpected, false);
+  assert.equal(past.projectedNet, -1500);
 });

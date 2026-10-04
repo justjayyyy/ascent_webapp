@@ -2,7 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ascent } from '@/api/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useBudgets, useCards, useCategories, usePlans } from '@/hooks/useWorkspaceData';
+import { useBudgets, useCards, useCategories, useMoney, usePlans } from '@/hooks/useWorkspaceData';
+import { expectedIncome } from '@shared/forecast';
+import { localMonth } from '@/lib/localDay';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Target, Tag } from 'lucide-react';
 import { parseISO, getYear, getMonth } from 'date-fns';
@@ -14,7 +16,7 @@ import BudgetManager from './BudgetManager';
 import CategoryManager from './CategoryManager';
 import ExpenseMonthView from './ExpenseMonthView';
 import PeriodSelector from './PeriodSelector';
-import { useSaveTransaction, useDeleteTransactions, useConfirmTransaction } from './useTransactionMutations';
+import { useSaveTransaction, useDeleteTransactions, useConfirmTransaction, useSetPayer } from './useTransactionMutations';
 import { seriesOf } from './transactionRows';
 import { useListWrites } from '@/lib/offline/listWrites';
 import { useTheme } from '../ThemeProvider';
@@ -80,6 +82,7 @@ function TransactionsPage({ kind }) {
   );
 
   const confirmTransaction = useConfirmTransaction();
+  const setPayer = useSetPayer();
 
   // Budgets save through the offline queue: they show at once and wait on the device without signal
   const budgetsApi = useListWrites('budgets');
@@ -195,6 +198,14 @@ function TransactionsPage({ kind }) {
   }, [selectedYear, selectedMonths]);
 
   const selectedPeriodTransactions = useMemo(() => transactions.filter(inPeriod), [transactions, inPeriod]);
+  // One month under way (or ahead): the income it can expect until its own is in, as on the Dashboard
+  const { amountOf } = useMoney(user?.currency || 'ILS');
+  const monthExpectedIncome = useMemo(() => {
+    if (selectedMonths.length !== 1) return null;
+    const month = `${selectedYear}-${String(selectedMonths[0]).padStart(2, '0')}`;
+    if (month < localMonth()) return null;
+    return expectedIncome(allTransactions.map((x) => ({ ...x, amount: amountOf(x) })), month);
+  }, [selectedYear, selectedMonths, allTransactions, amountOf]);
   // Income for the same period, so the Expenses page can say how much of it was spent (and vice versa)
   const counterpartTotal = useMemo(
     () => allTransactions.filter((x) => x.type !== kind && inPeriod(x)),
@@ -272,6 +283,7 @@ function TransactionsPage({ kind }) {
               transactions={selectedPeriodTransactions}
               allTransactions={bigPurchaseRows}
               counterpart={counterpartTotal}
+              expectedIncome={monthExpectedIncome}
               budgets={budgets}
               cards={cards}
               categories={kindCategories}
@@ -280,6 +292,7 @@ function TransactionsPage({ kind }) {
               onDelete={handleDeleteTransaction}
               onDuplicate={handleDuplicateTransaction}
               onConfirm={confirmTransaction}
+              onSetPayer={setPayer}
               isLoading={isLoading}
               monthLabel={selectedPeriodLabel}
               selectedYear={selectedYear}

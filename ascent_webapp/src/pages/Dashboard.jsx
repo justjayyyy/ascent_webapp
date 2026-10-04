@@ -129,10 +129,15 @@ export default function Dashboard() {
   const kpis = useMemo(() => {
     const cur = sums(monthTx);
     const prev = sums(normalized.filter((tx) => tx._month === prevKey));
-    const savingsRate = cur.income > 0 ? Math.max(-100, Math.min(100, (cur.net / cur.income) * 100)) : null;
+    // While the month runs, its income is what the months before brought in, until more of its own is in
+    // (a salary paid on the 1st belongs to the month before)
+    const incomeIsExpected = forecast.phase !== 'past' && forecast.incomeIsExpected;
+    const income = incomeIsExpected ? forecast.incomeUsed : cur.income;
+    const net = income - cur.expenses;
+    const savingsRate = income > 0 ? Math.max(-100, Math.min(100, (net / income) * 100)) : null;
     const expenseDelta = prev.expenses > 0 ? ((cur.expenses - prev.expenses) / prev.expenses) * 100 : null;
-    return { ...cur, savingsRate, expenseDelta };
-  }, [monthTx, normalized, prevKey, sums]);
+    return { ...cur, income, received: cur.income, net, incomeIsExpected, savingsRate, expenseDelta };
+  }, [monthTx, normalized, prevKey, sums, forecast.phase, forecast.incomeIsExpected, forecast.incomeUsed]);
 
   const categoryData = useMemo(() => {
     const totals = {};
@@ -163,8 +168,11 @@ export default function Dashboard() {
       if (tx.type === 'Income') m.income += tx._amount;
       else if (tx.type === 'Expense') m.expenses += tx._amount;
     });
+    // The part of the selected month's income that is expected, not yet in
+    const shown = byKey[selectedKey];
+    if (shown && kpis.incomeIsExpected) shown.expected = Math.max(0, kpis.income - shown.income);
     return months;
-  }, [normalized, selectedMonth, locale]);
+  }, [normalized, selectedMonth, locale, selectedKey, kpis.incomeIsExpected, kpis.income]);
 
   const dailyData = useMemo(() => {
     const days = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
@@ -278,12 +286,20 @@ export default function Dashboard() {
       grid: { left: 4, right: 4, top: 16, bottom: 4, containLabel: true },
       tooltip: blur ? { show: false } : {
         ...baseTooltip, trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: tokens.grid } },
-        formatter: (ps) => `${ps[0].axisValueLabel}<br/>${ps.map((p) => `${p.marker} ${p.seriesName}: <b>${fmtMoney(p.value)}</b>`).join('<br/>')}`,
+        formatter: (ps) => `${ps[0].axisValueLabel}<br/>${ps.filter((p) => p.value != null).map((p) => `${p.marker} ${p.seriesName}: <b>${fmtMoney(p.value)}</b>`).join('<br/>')}`,
       },
       xAxis: { type: 'category', data: monthlyData.map((m) => m.label), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: tokens.muted, fontFamily: tokens.fontFamily } },
       yAxis: { type: 'value', show: !blur, axisLabel: { color: tokens.muted, formatter: fmtCompact, fontFamily: tokens.fontFamily }, splitLine: { lineStyle: { color: tokens.grid, type: 'dashed' } } },
       series: [
-        { name: t('income'), type: 'bar', barMaxWidth: 18, itemStyle: { borderRadius: [8, 8, 2, 2], color: grad(tokens.success) }, data: monthlyData.map((m) => m.income) },
+        { name: t('income'), type: 'bar', stack: 'income', barMaxWidth: 18, itemStyle: { borderRadius: [8, 8, 2, 2], color: grad(tokens.success) },
+          // Square on top where the expected part sits on it
+          data: monthlyData.map((m) => (m.expected > 0 ? { value: m.income, itemStyle: { borderRadius: [0, 0, 2, 2] } } : m.income)) },
+        // Expected income on top of what is in so far, lighter and outlined
+        ...(monthlyData.some((m) => m.expected > 0) ? [{
+          name: t('expectedIncome'), type: 'bar', stack: 'income', barMaxWidth: 18,
+          itemStyle: { borderRadius: [8, 8, 2, 2], color: withAlpha(tokens.success, 0.18), borderColor: withAlpha(tokens.success, 0.7), borderWidth: 1, borderType: 'dashed' },
+          data: monthlyData.map((m) => (m.expected > 0 ? m.expected : null)),
+        }] : []),
         { name: t('expenses'), type: 'bar', barMaxWidth: 18, itemStyle: { borderRadius: [8, 8, 2, 2], color: grad(tokens.danger) }, data: monthlyData.map((m) => m.expenses) },
       ],
     };
@@ -423,6 +439,7 @@ export default function Dashboard() {
                 <div className={cn('mt-2 text-4xl font-bold tracking-tight md:text-5xl', kpis.net < 0 && 'text-danger')}>
                   {isLoading ? '…' : <Money value={kpis.net} locale={locale} currency={userCurrency} blur={blur} />}
                 </div>
+                {kpis.incomeIsExpected && <p className={cn('mt-1 text-xs', muted)}>{t('withExpectedIncome')}</p>}
               </div>
               {kpis.expenseDelta !== null && (
                 <span className={cn(
@@ -441,7 +458,18 @@ export default function Dashboard() {
 
           {/* Stat row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:col-span-6 md:gap-5">
-            {stat(t('income'), <Money value={kpis.income} locale={locale} currency={userCurrency} blur={blur} />, TrendingUp, 'text-success')}
+            {stat(
+              kpis.incomeIsExpected ? t('expectedIncome') : t('income'),
+              kpis.incomeIsExpected ? (
+                <>
+                  <span className="inline-flex items-baseline gap-1"><span aria-hidden className={muted}>≈</span><Money value={kpis.income} locale={locale} currency={userCurrency} blur={blur} /></span>
+                  <p className={cn('mt-1 text-xs font-normal', muted)}>
+                    {blur ? t('expectedIncomeHint') : t('incomeSoFar', { amount: fmtMoney(kpis.received) })}
+                  </p>
+                </>
+              ) : <Money value={kpis.income} locale={locale} currency={userCurrency} blur={blur} />,
+              TrendingUp, 'text-success'
+            )}
             {stat(t('expenses'), <Money value={kpis.expenses} locale={locale} currency={userCurrency} blur={blur} />, TrendingDown, 'text-danger')}
             {stat(t('savingsRate'),
               kpis.savingsRate === null ? '—' : <NumberFlow value={kpis.savingsRate / 100} locales={locale} format={{ style: 'percent', maximumFractionDigits: 0 }} trend={0} />,

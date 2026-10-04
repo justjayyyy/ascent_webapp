@@ -8,6 +8,7 @@ import { translateCategory } from '@/lib/translations';
 import { useExchangeRates } from '@/hooks/useWorkspaceData';
 import { amountInCurrency } from '@shared/money';
 import { useHousehold } from '@/hooks/useHousehold';
+import HouseholdFields from './HouseholdFields';
 import BlurValue from '../BlurValue';
 import { formatTxTime, newestFirst } from '@/lib/txOrder';
 
@@ -70,7 +71,7 @@ function ActionRow({ icon: Icon, label, onClick, tone }) {
   );
 }
 
-function TransactionList({ transactions, cards = [], categories = [], plans = {}, onEdit, onDelete, onDuplicate, onConfirm, canEdit = true, emptyTitle }) {
+function TransactionList({ transactions, cards = [], categories = [], plans = {}, onEdit, onDelete, onDuplicate, onConfirm, onSetPayer, canEdit = true, emptyTitle }) {
   const { t, language, user } = useTheme();
   const { byEmail, isShared } = useHousehold();
   const userCurrency = user?.currency || 'ILS';
@@ -144,7 +145,9 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
     );
   }
 
-  const activeAuthor = active && isShared ? byEmail[active.created_by] : null;
+  const activeAuthor = active && isShared ? byEmail[active.paidBy || active.created_by] : null;
+  // Who paid can be changed right here, in a shared household
+  const pickPayer = canEdit && isShared && !!onSetPayer;
   const activeConverted = active ? converted(active) : null;
 
   return (
@@ -251,13 +254,23 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                     isObjectId(active.category) ? '' : translateCategory(active.category, language),
                     new Intl.DateTimeFormat(loc, { dateStyle: 'medium' }).format(new Date(`${dayKey(active.date)}T12:00:00`)) + (formatTxTime(active, loc) ? ` · ${formatTxTime(active, loc)}` : ''),
                     cardText(active),
-                    activeAuthor ? (activeAuthor.isMe ? t('me') : activeAuthor.name) : '',
+                    !pickPayer && activeAuthor ? (activeAuthor.isMe ? t('me') : activeAuthor.name) : '',
                     activeConverted !== null ? money(activeConverted, userCurrency, 0) : '',
                     active.installmentCount > 1 ? `${t('installmentOf').replace('{index}', active.installmentIndex).replace('{count}', active.installmentCount)} · ${t('totalPrice')} ${money(active.installmentTotal, active.currency, 0)}` : (active.isBigPurchase ? t('bigPurchase') : ''),
                     plans[active.planId] ? `${plans[active.planId].emoji || ''} ${plans[active.planId].name}`.trim() : '',
                   ].filter(Boolean).join(' · ')}
                 </DrawerDescription>
               </DrawerHeader>
+              {pickPayer && (
+                <div className="px-4 pt-1">
+                  <HouseholdFields
+                    income={active.type === 'Income'}
+                    value={{ paidBy: active.paidBy }}
+                    creator={active.created_by}
+                    onChange={({ paidBy }) => { onSetPayer(active, paidBy, cards); setActive({ ...active, paidBy }); }}
+                  />
+                </div>
+              )}
               {canEdit && (
                 <div className="space-y-1 px-3 pb-4 pt-2">
                   {onConfirm && active.status === 'pending' && <ActionRow icon={Check} tone="primary" label={t('confirmTransaction')} onClick={run(onConfirm)} />}
