@@ -1035,7 +1035,7 @@ export default {
   bdComing: '+{amount} ещё предстоит',
   bdOutside: 'Потрачено вне бюджетов: {amount}',
   bdSetUpMonth: 'Задать бюджеты на {month}',
-  bdPaceMark: 'Сколько было бы потрачено к сегодня при ровном темпе: {amount}',
+  bdOfLimit: 'из {amount}',
 
   // Period Selector
   year: 'Год',

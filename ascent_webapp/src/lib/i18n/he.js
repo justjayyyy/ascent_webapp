@@ -1035,7 +1035,7 @@ export default {
   bdComing: '+{amount} עוד צפויים',
   bdOutside: 'הוצאות מחוץ לתקציבים: {amount}',
   bdSetUpMonth: 'הגדרת {month}',
-  bdPaceMark: 'איפה ההוצאה הייתה היום בקצב אחיד: {amount}',
+  bdOfLimit: 'מתוך {amount}',
 
   // Period Selector
   year: 'שנה',

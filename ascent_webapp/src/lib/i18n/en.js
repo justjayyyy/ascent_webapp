@@ -1111,7 +1111,7 @@ export default {
   bdComing: '+{amount} still to come',
   bdOutside: 'Spent outside your budgets: {amount}',
   bdSetUpMonth: 'Set up {month}',
-  bdPaceMark: 'Where spending would be today at an even pace: {amount}',
+  bdOfLimit: 'of {amount}',
 
   // Period Selector
   year: 'Year',

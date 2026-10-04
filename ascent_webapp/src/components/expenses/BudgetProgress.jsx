@@ -25,8 +25,8 @@ export function periodMonths(selectedYear, selectedMonths = [], now = new Date()
 
 /**
  * Each budgeted category against what was spent in it. Over several months a category's limits add up, and
- * only spending in months it had a budget counts. In the month under way a tick marks where spending would
- * be at an even pace, and each says what is left of it for the rest of the month.
+ * only spending in months it had a budget counts. In the month under way each says what is left of it for the
+ * rest of the month.
  */
 function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [], onManage, canEdit = false }) {
   const { language, user, t } = useTheme();
@@ -36,12 +36,10 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
 
   const months = useMemo(() => periodMonths(selectedYear, selectedMonths), [selectedYear, selectedMonths]);
 
-  // Today's place in the month, when exactly the month under way is shown
-  const pace = useMemo(() => {
+  // Exactly the month under way: what is left can be said "this month"
+  const thisMonth = useMemo(() => {
     const now = new Date();
-    if (months.length !== 1 || months[0] !== monthKey(now.getFullYear(), now.getMonth() + 1)) return null;
-    const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    return { share: now.getDate() / days };
+    return months.length === 1 && months[0] === monthKey(now.getFullYear(), now.getMonth() + 1);
   }, [months]);
 
   // Per category and month, as the Dashboard counts it: spent is what is dated up to today; what is dated later
@@ -133,7 +131,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
           <h2 className="text-sm font-semibold text-foreground">{t('budgetTracking')}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground tabular-nums" dir="auto">
             <BlurValue blur={blur}>
-              {pace && totalLeft >= 0
+              {thisMonth && totalLeft >= 0
                 ? t('bdLeftOfTotal', { left: formatCurrency(totalLeft, userCurrency), limit: formatCurrency(totalLimit, userCurrency) })
                 : t('bdOfTotal', { spent: formatCurrency(totalSpent, userCurrency), limit: formatCurrency(totalLimit, userCurrency) })}
             </BlurValue>
@@ -160,10 +158,10 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                   {row.isNearLimit && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400" />}
                 </span>
                 <span className={cn('shrink-0 text-sm font-semibold tabular-nums', row.isOverBudget ? 'text-danger' : 'text-foreground')} dir="ltr">
-                  <BlurValue blur={blur}>{formatCurrency(row.remaining, userCurrency)}</BlurValue>
+                  <BlurValue blur={blur}>{formatCurrency(row.spent, userCurrency)}</BlurValue>
                 </span>
               </div>
-              <div className="relative mt-2">
+              <div className="mt-2">
                 <div className="h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(row.percentage)} aria-valuemin={0} aria-valuemax={100}
                   aria-label={t('a11yBudgetUsed').replace('{category}', category).replace('{percent}', Math.round(row.percentage))}>
                   <div className="flex h-full">
@@ -174,18 +172,10 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                     )}
                   </div>
                 </div>
-                {pace && (
-                  <span
-                    className="absolute -top-0.5 h-3 w-0.5 -translate-x-1/2 rounded-full bg-foreground/50 rtl:translate-x-1/2"
-                    style={{ insetInlineStart: `${pace.share * 100}%` }}
-                    title={blur ? undefined : t('bdPaceMark', { amount: formatCurrency(row.limit * pace.share, userCurrency) })}
-                    aria-hidden
-                  />
-                )}
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                 <span className="flex flex-wrap items-center gap-x-1.5">
-                  <span dir="ltr"><BlurValue blur={blur}>{formatCurrency(row.spent, userCurrency)} / {formatCurrency(row.limit, userCurrency)}</BlurValue></span>
+                  <span><BlurValue blur={blur}>{t('bdOfLimit', { amount: formatCurrency(row.limit, userCurrency) })}</BlurValue></span>
                   {row.coming > 0 && <span><BlurValue blur={blur}>{t('bdComing', { amount: formatCurrency(row.coming, userCurrency) })}</BlurValue></span>}
                 </span>
                 <span className="text-end tabular-nums">
@@ -196,7 +186,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                         ? t('reachedLimit')
                         : row.isNearLimit
                           ? t('approachingLimit')
-                          : pace && row.remaining > 0
+                          : thisMonth && row.remaining > 0
                             ? t('bdLeftMonth', { amount: formatCurrency(row.remaining, userCurrency) })
                             : `${row.percentage.toFixed(0)}%`}
                   </BlurValue>
