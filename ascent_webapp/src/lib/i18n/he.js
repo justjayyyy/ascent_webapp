@@ -1029,7 +1029,7 @@ export default {
   bdRemoveOneBody: 'תקציב {category} ל{month} יוסר.',
   bdRevertBody: 'ב{month} התקציב של {category} חוזר ל-{amount}, כמו בחודשים שסביבו.',
   bdRemove: 'הסרה',
-  bdLeftMonth: 'נשארו {amount} החודש',
+  bdLeftOf: 'נשארו {left} מתוך {limit}',
   bdOfTotal: '{spent} הוצאו מתוך {limit} בתקציבים',
   bdLeftOfTotal: 'נשארו {left} מתוך {limit} החודש',
   bdComing: '+{amount} עוד צפויים',

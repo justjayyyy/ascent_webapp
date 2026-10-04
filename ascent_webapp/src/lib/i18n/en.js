@@ -1105,7 +1105,7 @@ export default {
   bdRemoveOneBody: 'The {category} budget for {month} is removed.',
   bdRevertBody: '{category} goes back to {amount} for {month}, like the months around it.',
   bdRemove: 'Remove',
-  bdLeftMonth: '{amount} left this month',
+  bdLeftOf: '{left} left of {limit}',
   bdOfTotal: '{spent} spent of {limit} budgeted',
   bdLeftOfTotal: '{left} left of {limit} this month',
   bdComing: '+{amount} still to come',

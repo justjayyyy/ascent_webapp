@@ -25,8 +25,7 @@ export function periodMonths(selectedYear, selectedMonths = [], now = new Date()
 
 /**
  * Each budgeted category against what was spent in it. Over several months a category's limits add up, and
- * only spending in months it had a budget counts. In the month under way each says what is left of it for the
- * rest of the month.
+ * only spending in months it had a budget counts. Each says what is left of it, less what is still to come.
  */
 function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [], onManage, canEdit = false }) {
   const { language, user, t } = useTheme();
@@ -175,7 +174,13 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                 <span className="flex flex-wrap items-center gap-x-1.5">
-                  <span><BlurValue blur={blur}>{t('bdOfLimit', { amount: formatCurrency(row.limit, userCurrency) })}</BlurValue></span>
+                  <span>
+                    <BlurValue blur={blur}>
+                      {row.remaining > 0
+                        ? t('bdLeftOf', { left: formatCurrency(row.remaining, userCurrency), limit: formatCurrency(row.limit, userCurrency) })
+                        : t('bdOfLimit', { amount: formatCurrency(row.limit, userCurrency) })}
+                    </BlurValue>
+                  </span>
                   {row.coming > 0 && <span><BlurValue blur={blur}>{t('bdComing', { amount: formatCurrency(row.coming, userCurrency) })}</BlurValue></span>}
                 </span>
                 <span className="text-end tabular-nums">
@@ -186,9 +191,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
                         ? t('reachedLimit')
                         : row.isNearLimit
                           ? t('approachingLimit')
-                          : thisMonth && row.remaining > 0
-                            ? t('bdLeftMonth', { amount: formatCurrency(row.remaining, userCurrency) })
-                            : `${row.percentage.toFixed(0)}%`}
+                          : `${row.percentage.toFixed(0)}%`}
                   </BlurValue>
                 </span>
               </div>

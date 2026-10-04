@@ -100,7 +100,7 @@ describe('budget progress', () => {
       ]}
       transactions={[tx(8, 999), tx(9, 80), tx(10, 30)]} />);
     expect(screen.getByText('$110')).toBeTruthy();
-    expect(screen.getByText('bdOfLimit $200')).toBeTruthy();
+    expect(screen.getByText('bdLeftOf $90 $200')).toBeTruthy();
   });
 
   test('a repeating budget counts in the months after it, and spending in an unbudgeted month does not', () => {
@@ -108,7 +108,7 @@ describe('budget progress', () => {
       budgets={[{ id: 'aug', category: 'food', year: 2026, month: 8, monthlyLimit: 100, repeat: true }]}
       transactions={[tx(7, 500), tx(8, 50), tx(9, 70)]} />);
     expect(screen.getByText('$120')).toBeTruthy();
-    expect(screen.getByText('bdOfLimit $200')).toBeTruthy();
+    expect(screen.getByText('bdLeftOf $80 $200')).toBeTruthy();
   });
 
   test('a month with no budgets after one that had some offers to set it up, to those who may', () => {
@@ -130,10 +130,9 @@ describe('budget progress', () => {
       ]} />);
     // Spent on the right: only what is dated up to today
     expect(screen.getByText('$180')).toBeTruthy();
-    expect(screen.getByText('bdOfLimit $600')).toBeTruthy();
     expect(screen.getByText('bdComing $300')).toBeTruthy();
     // Left for the rest of the month: 600 less what was spent and what is still to come
-    expect(screen.getByText('bdLeftMonth $120')).toBeTruthy();
+    expect(screen.getByText('bdLeftOf $120 $600')).toBeTruthy();
     expect(screen.getByText('bdLeftOfTotal $120 $600')).toBeTruthy();
     vi.setSystemTime(new Date(2026, 11, 1, 12));
   });

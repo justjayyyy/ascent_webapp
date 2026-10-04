@@ -76,7 +76,7 @@ test('a budget repeats into the months after it, and changing it from June leave
   await api.create('transactions', expense({ amount: 300, category: 'groceries', date: june(4) }));
   await openApp(page, '/Expenses');
   const tracking = page.locator('section').filter({ has: page.getByRole('heading', { name: L('budgetTracking') }) });
-  await expect(tracking.getByText(L('bdOfLimit', { amount: '$1,000' }), { exact: true })).toBeVisible();
+  await expect(tracking.getByText(L('bdLeftOf', { left: '$700', limit: '$1,000' }), { exact: true })).toBeVisible();
 
   await tracking.getByRole('button', { name: L('manageBudgets') }).click();
   const manager = page.getByRole('dialog');
@@ -89,5 +89,5 @@ test('a budget repeats into the months after it, and changing it from June leave
   await expect.poll(async () => (await api.list('budgets')).map((b) => [b.month, b.monthlyLimit, b.repeat]).sort())
     .toEqual([[5, 1000, true], [6, 1200, true]]);
   await page.keyboard.press('Escape');
-  await expect(tracking.getByText(L('bdOfLimit', { amount: '$1,200' }), { exact: true })).toBeVisible();
+  await expect(tracking.getByText(L('bdLeftOf', { left: '$900', limit: '$1,200' }), { exact: true })).toBeVisible();
 });
