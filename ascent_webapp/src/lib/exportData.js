@@ -39,7 +39,7 @@ export const DATASETS = {
         count: transactions.length,
         csv: sections([
           ['TRANSACTIONS', toCSV(transactions, ['date', 'type', 'category', 'description', 'merchant', 'amount', 'currency', 'amountInGlobalCurrency', 'globalCurrency', 'paymentMethod', 'paidBy', 'created_by', 'status', 'source'])],
-          ['BUDGETS', toCSV(budgets, ['category', 'monthlyLimit', 'alertThreshold', 'currency', 'year', 'month'])],
+          ['BUDGETS', toCSV(budgets, ['category', 'monthlyLimit', 'alertThreshold', 'currency', 'year', 'month', 'repeat', 'until'])],
           ['CATEGORIES', toCSV(categories, ['name', 'color', 'icon', 'type'])],
           ['CARDS', toCSV(cards, ['name', 'type', 'lastFourDigits', 'walletName', 'color', 'isActive'])],
         ]),

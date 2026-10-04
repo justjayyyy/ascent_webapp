@@ -45,6 +45,20 @@ const budgetSchema = new mongoose.Schema({
     enum: ['weekly', 'monthly', 'yearly'],
     default: 'monthly'
   },
+  // Carries on into later months (see shared/budgets.js); budgets from before this only count in their month
+  repeat: {
+    type: Boolean,
+    default: false
+  },
+  // The last month a repeating budget counts in, 'YYYY-MM'; empty while it goes on
+  until: {
+    type: String,
+    default: null,
+    validate: {
+      validator: (v) => v == null || /^\d{4}-(0[1-9]|1[0-2])$/.test(v),
+      message: 'until must be a month, YYYY-MM'
+    }
+  },
   isActive: {
     type: Boolean,
     default: true

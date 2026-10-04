@@ -14,7 +14,9 @@ import { suggestCategory } from '../lib/categorize.js';
 import { categoryTranslations } from '../lib/categoryTranslations.js';
 import { loadRules, ruleKeyFor } from '../lib/merchantRules.js';
 import { spendingSummary } from '../lib/spendingSummary.js';
-import { amountInCurrency } from '../../shared/money.js';
+import { amountInCurrency, convertAmount } from '../../shared/money.js';
+import { budgetsForMonth } from '../../shared/budgets.js';
+import { getRates } from '../lib/rates.js';
 import { aiConfigured, parseNote, answerQuestion, readReceipt, AssistantDeclined } from '../lib/assistant.js';
 import Category from '../models/Category.js';
 import Card from '../models/Card.js';
@@ -157,13 +159,19 @@ export default async function handler(req, res) {
       ExpenseTransaction.find({ workspaceId, date: { $gte: since } })
         .select('type date amount currency amountInGlobalCurrency globalCurrency category description merchant merchantKey isRecurring installmentGroupId isBigPurchase planId')
         .lean(),
-      memberMay(req, user, 'viewBudgets') ? Budget.find({ workspaceId, year, month }).lean() : [],
+      memberMay(req, user, 'viewBudgets') ? Budget.find({ workspaceId }).lean() : [],
     ]);
     const inCurrency = (tx) => amountInCurrency(tx, currency, null);
+    // This month's budgets (repeating ones included), in the person's currency
+    const monthBudgets = budgetsForMonth(budgets, today.slice(0, 7));
+    const rates = monthBudgets.some((b) => b.currency && b.currency !== currency) ? await getRates().catch(() => null) : null;
+    const budgetLimits = monthBudgets
+      .map((b) => ({ category: b.category, limit: convertAmount(b.monthlyLimit, b.currency || currency, currency, rates) }))
+      .filter((b) => b.limit > 0);
     const language = ['he', 'ru'].includes(user.language) ? user.language : 'en';
     const summary = spendingSummary({
       transactions: rows.map((tx) => ({ ...tx, amount: inCurrency(tx) })).filter((tx) => typeof tx.amount === 'number'),
-      budgets: budgets.map((b) => ({ category: b.category, limit: b.monthlyLimit })),
+      budgets: budgetLimits,
       today,
       currency,
       categoryName: (key) => categoryTranslations[key]?.[language] || key,

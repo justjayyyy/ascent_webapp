@@ -70,3 +70,24 @@ test('a limit of nothing, or less, is refused: by the form, and by the server @c
   const ok = await api.create('budgets', budget('groceries', 300));
   expect((await api.send('PUT', `/entities/budgets?id=${ok.id}`, { monthlyLimit: -1 })).status()).toBe(400);
 });
+
+test('a budget repeats into the months after it, and changing it from June leaves May alone @critical', async ({ page, api }) => {
+  await api.create('budgets', { ...budget('groceries', 1000), month: 5, repeat: true });
+  await api.create('transactions', expense({ amount: 300, category: 'groceries', date: june(4) }));
+  await openApp(page, '/Expenses');
+  const tracking = page.locator('section').filter({ has: page.getByRole('heading', { name: L('budgetTracking') }) });
+  await expect(tracking.getByText('$300 / $1,000')).toBeVisible();
+
+  await tracking.getByRole('button', { name: L('manageBudgets') }).click();
+  const manager = page.getByRole('dialog');
+  // Edited in its place in the list (the form for adding one stays below)
+  const groceries = manager.getByRole('listitem').filter({ hasText: L('groceries') });
+  await groceries.getByRole('button', { name: L('edit') }).click();
+  await expect(groceries.getByText(L('bdChangesFrom', { month: 'June 2026', amount: '$1,000' }))).toBeVisible();
+  await groceries.getByLabel(new RegExp(`^${L('monthlyLimit')}`)).fill('1200');
+  await groceries.getByRole('button', { name: L('updateBudget') }).click();
+  await expect.poll(async () => (await api.list('budgets')).map((b) => [b.month, b.monthlyLimit, b.repeat]).sort())
+    .toEqual([[5, 1000, true], [6, 1200, true]]);
+  await page.keyboard.press('Escape');
+  await expect(tracking.getByText('$300 / $1,200')).toBeVisible();
+});

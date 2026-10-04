@@ -92,7 +92,7 @@ function Stat({ dot, label, value, tone, blur }) {
 
 function ExpenseMonthView({
   kind = 'Expense', transactions, allTransactions = [], counterpart = [], budgets, cards, categories = [], plans = [],
-  onEdit, onDelete, onDuplicate, onConfirm, isLoading, selectedYear, selectedMonths = [], canEdit = true,
+  onEdit, onDelete, onDuplicate, onConfirm, isLoading, selectedYear, selectedMonths = [], canEdit = true, onManageBudgets, canEditBudgets = false,
 }) {
   const isIncome = kind === 'Income';
   const { user, colors, t, language } = useTheme();
@@ -278,7 +278,7 @@ function ExpenseMonthView({
 
       {showBudget && (
         <div className="order-2">
-          <BudgetProgress budgets={budgets} transactions={transactions} formatCurrency={money} selectedYear={selectedYear} selectedMonths={selectedMonths} />
+          <BudgetProgress budgets={budgets} transactions={transactions} formatCurrency={money} selectedYear={selectedYear} selectedMonths={selectedMonths} onManage={onManageBudgets} canEdit={canEditBudgets} />
         </div>
       )}
 

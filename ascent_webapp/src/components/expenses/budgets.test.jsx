@@ -1,8 +1,11 @@
-// Budgets are per category and month: which categories can still get one, and what each is held against.
+// Budgets are per category from a month, repeating or not: which categories can still get one, what each is held
+// against, and what changing or removing one in a later month does.
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
-const theme = { t: (k) => k, language: 'en', user: { id: 'u1', currency: 'USD' }, colors: {} };
+const theme = {
+  t: (k, vars) => (vars ? `${k} ${Object.values(vars).join(' ')}` : k), language: 'en', user: { id: 'u1', currency: 'USD' }, colors: {},
+};
 vi.mock('@/components/ThemeProvider', () => ({ useTheme: () => theme }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => ({ currentWorkspace: { ownerId: 'u1' } }) }));
 vi.mock('@/hooks/useWorkspaceData', () => ({
@@ -10,41 +13,112 @@ vi.mock('@/hooks/useWorkspaceData', () => ({
 }));
 
 const { default: BudgetManager } = await import('./BudgetManager');
-const { default: BudgetProgress } = await import('./BudgetProgress');
+const { default: BudgetProgress, periodMonths } = await import('./BudgetProgress');
 
 const now = new Date();
 const year = now.getFullYear();
 const thisMonth = now.getMonth() + 1;
-const otherMonth = thisMonth === 1 ? 2 : thisMonth - 1;
+const lastMonth = new Date(year, now.getMonth() - 1, 1);
 const food = { id: 'c1', name: 'food', type: 'Expense' };
+const fun = { id: 'c2', name: 'fun', type: 'Expense' };
+const noop = () => {};
+const manager = (props) => render(
+  <BudgetManager open onClose={noop} categories={[food]} selectedYear={String(year)} selectedMonths={[String(thisMonth)]}
+    onAdd={noop} onUpdate={noop} onRemove={noop} onCopy={noop} {...props} />
+);
 
-describe('the budget form', () => {
-  test('a category budgeted in another month can still get one for this month', () => {
-    // Showing the whole year ("All"): the form is set to this month, where food has no budget yet
-    render(<BudgetManager open onClose={() => {}} categories={[food]} selectedYear={String(year)} selectedMonths={[]}
-      budgets={[{ id: 'b1', category: 'food', year, month: otherMonth, monthlyLimit: 500 }]} onAdd={() => {}} onUpdate={() => {}} onDelete={() => {}} />);
-    expect(screen.queryByText('allCategoriesHaveBudgets')).toBeNull();
+describe('the budget manager', () => {
+  test('a category budgeted only in another month can still get one for this month', () => {
+    manager({ budgets: [{ id: 'b1', category: 'food', year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1, monthlyLimit: 500 }] });
+    expect(screen.queryByText(/^bdAllBudgeted/)).toBeNull();
     expect(screen.getByLabelText(/monthlyLimit/)).toBeTruthy();
   });
 
-  test('a category already budgeted in the chosen month is not offered again', () => {
-    render(<BudgetManager open onClose={() => {}} categories={[food]} selectedYear={String(year)} selectedMonths={[String(thisMonth)]}
-      budgets={[{ id: 'b1', category: 'food', year, month: thisMonth, monthlyLimit: 500 }]} onAdd={() => {}} onUpdate={() => {}} onDelete={() => {}} />);
-    expect(screen.getByText('allCategoriesHaveBudgets')).toBeTruthy();
+  test('a category with a budget this month, its own or repeating from before, is not offered again', () => {
+    manager({ budgets: [{ id: 'b1', category: 'food', year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1, monthlyLimit: 500, repeat: true }] });
+    expect(screen.getByText(/^bdAllBudgeted/)).toBeTruthy();
+    expect(screen.getByText(/^bdEverySince/)).toBeTruthy();
+  });
+
+  test('a new budget repeats by default and is set for the month on screen', () => {
+    const onAdd = vi.fn();
+    manager({ budgets: [], onAdd });
+    fireEvent.change(screen.getByLabelText(/monthlyLimit/), { target: { value: '400' } });
+    fireEvent.click(screen.getByRole('button', { name: /addBudget/ }));
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ category: 'food', monthlyLimit: 400, repeat: true, year, month: thisMonth, alertThreshold: 80 }));
+  });
+
+  test('changing a budget repeating from an earlier month starts a new one this month, so earlier months keep theirs', () => {
+    const onAdd = vi.fn();
+    const onUpdate = vi.fn();
+    manager({ budgets: [{ id: 'b1', category: 'food', year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1, monthlyLimit: 500, repeat: true, currency: 'USD' }], onAdd, onUpdate });
+    fireEvent.click(screen.getByRole('button', { name: 'edit' }));
+    expect(screen.getByText(/^bdChangesFrom/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/monthlyLimit/), { target: { value: '650' } });
+    fireEvent.click(screen.getByRole('button', { name: /updateBudget/ }));
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ category: 'food', monthlyLimit: 650, repeat: true, year, month: thisMonth }), { edit: true });
+  });
+
+  test('a month without budgets offers to copy the last month that had some', () => {
+    const onCopy = vi.fn();
+    manager({ categories: [food, fun], onCopy, budgets: [
+      { id: 'b1', category: 'food', year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1, monthlyLimit: 500 },
+      { id: 'b2', category: 'fun', year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1, monthlyLimit: 80 },
+    ] });
+    fireEvent.click(screen.getByRole('button', { name: /^bdCopyFrom/ }));
+    expect(onCopy).toHaveBeenCalledWith([
+      expect.objectContaining({ category: 'food', monthlyLimit: 500, year, month: thisMonth, repeat: true }),
+      expect.objectContaining({ category: 'fun', monthlyLimit: 80, year, month: thisMonth, repeat: true }),
+    ]);
+  });
+
+  test('removing asks first, and a repeating budget stops from this month', () => {
+    const onRemove = vi.fn();
+    manager({ onRemove, budgets: [{ id: 'b1', category: 'food', year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1, monthlyLimit: 500, repeat: true }] });
+    fireEvent.click(screen.getByRole('button', { name: 'delete' }));
+    expect(onRemove).not.toHaveBeenCalled();
+    const confirm = screen.getByRole('alertdialog');
+    expect(within(confirm).getByText(/^bdStopBody/)).toBeTruthy();
+    fireEvent.click(within(confirm).getByRole('button', { name: 'bdRemove' }));
+    const until = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+    expect(onRemove).toHaveBeenCalledWith({ updates: [{ id: 'b1', until }], deletes: [] });
   });
 });
 
 describe('budget progress', () => {
-  test("with two months shown, each month's budget counts only that month's spending", () => {
-    const tx = (month, amount) => ({ type: 'Expense', category: 'food', amount, date: `2026-${String(month).padStart(2, '0')}-10` });
+  const tx = (month, amount) => ({ type: 'Expense', category: 'food', amount, date: `2026-${String(month).padStart(2, '0')}-10` });
+
+  test('over two months, the limits add up and each counts only its own month', () => {
     render(<BudgetProgress selectedYear="2026" selectedMonths={['9', '10']} formatCurrency={(v) => `$${v}`}
       budgets={[
         { id: 'sep', category: 'food', year: 2026, month: 9, monthlyLimit: 100 },
         { id: 'oct', category: 'food', year: 2026, month: 10, monthlyLimit: 100 },
       ]}
-      transactions={[tx(9, 80), tx(10, 30)]} />);
-    // Not 110 spent against each
-    expect(screen.getByText('$80 / $100')).toBeTruthy();
-    expect(screen.getByText('$30 / $100')).toBeTruthy();
+      transactions={[tx(8, 999), tx(9, 80), tx(10, 30)]} />);
+    expect(screen.getByText('$110 / $200')).toBeTruthy();
+  });
+
+  test('a repeating budget counts in the months after it, and spending in an unbudgeted month does not', () => {
+    render(<BudgetProgress selectedYear="2026" selectedMonths={['7', '8', '9']} formatCurrency={(v) => `$${v}`}
+      budgets={[{ id: 'aug', category: 'food', year: 2026, month: 8, monthlyLimit: 100, repeat: true }]}
+      transactions={[tx(7, 500), tx(8, 50), tx(9, 70)]} />);
+    expect(screen.getByText('$120 / $200')).toBeTruthy();
+  });
+
+  test('a month with no budgets after one that had some offers to set it up, to those who may', () => {
+    const budgets = [{ id: 'aug', category: 'food', year: 2026, month: 8, monthlyLimit: 100 }];
+    const { rerender } = render(<BudgetProgress selectedYear="2026" selectedMonths={['9']} formatCurrency={(v) => `$${v}`} budgets={budgets} transactions={[]} onManage={noop} canEdit />);
+    expect(screen.getByRole('button', { name: /^bdSetUpMonth/ })).toBeTruthy();
+    rerender(<BudgetProgress selectedYear="2026" selectedMonths={['9']} formatCurrency={(v) => `$${v}`} budgets={budgets} transactions={[]} onManage={noop} />);
+    expect(screen.queryByRole('button', { name: /^bdSetUpMonth/ })).toBeNull();
+  });
+
+  test('the whole year means the year so far', () => {
+    const at = new Date(2026, 9, 4);
+    expect(periodMonths('2026', [], at)).toHaveLength(10);
+    expect(periodMonths('2025', [], at)).toHaveLength(12);
+    expect(periodMonths('2027', [], at)).toEqual([]);
+    expect(periodMonths('2026', ['10', '9'], at)).toEqual(['2026-09', '2026-10']);
   });
 });

@@ -6,6 +6,7 @@
 // viewer's currency, plus optionally category, description, merchant, cardId, paymentMethod, paidBy,
 // created_by, isRecurring, installmentGroupId, commitmentId.
 import { payeeKey } from '../../shared/subscriptions.js';
+import { budgetsForMonth } from '../../shared/budgets.js';
 import { isFixed, monthNoSpend } from './noSpend.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -95,7 +96,7 @@ function totalsOf(m, days) {
  * @param {Date}    input.month      any date inside the month to review
  * @param {string}  [input.compare]  one of COMPARISONS
  * @param {Date}    [input.today]
- * @param {Array}   [input.budgets]  Budget rows ({ category, monthlyLimit, currency, year, month })
+ * @param {Array}   [input.budgets]  Budget rows ({ category, monthlyLimit, currency, year, month, repeat, until })
  * @param {Function} [input.convertBudget] (amount, currency) -> amount in the viewer's currency
  * @param {Array}   [input.cards]    [{ id, name }]
  * @param {Array}   [input.members]  [{ email, name }] of a shared household
@@ -139,7 +140,7 @@ export function buildMonthReview({
   const trendAverage = finished.length ? finished.reduce((s, t) => s + t.spent, 0) / finished.length : null;
 
   // ---- categories, each with its year in a sparkline and its budget ----
-  const monthBudgets = budgets.filter((b) => b.year === start.getFullYear() && b.month === start.getMonth() + 1 && b.isActive !== false);
+  const monthBudgets = budgetsForMonth(budgets, key);
   const budgetOf = new Map(monthBudgets.map((b) => [b.category, convertBudget(b.monthlyLimit || 0, b.currency) || 0]));
   const sparkOf = (category) => trend.map((t) => (t.isCurrent ? now.categories.get(category) || 0 : measure(byMonth.get(t.key) || []).categories.get(category) || 0));
   const categoryKeys = new Set([...now.categories.keys(), ...(base ? base.categories.keys() : [])]);

@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { monthForecast, baselineDaily } from '@shared/forecast';
 import { detectSubscriptions } from '@shared/subscriptions';
 import { duesBetween } from '@shared/commitments';
+import { budgetsForMonth } from '@shared/budgets';
 import { localDay, localMonth } from '@/lib/localDay';
 
 export { localDay };
@@ -50,8 +51,7 @@ export function useInsights({ rows, selectedMonth, convert }) {
 
   const forecast = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
-    const monthBudgets = budgets
-      .filter((b) => Number(b.year) === y && Number(b.month) === m && b.isActive !== false)
+    const monthBudgets = budgetsForMonth(budgets, month)
       .map((b) => ({ category: b.category, limit: convert(b.monthlyLimit, b.currency) }));
     const planDues = plans
       .filter((p) => p.status !== 'archived' && p.status !== 'done')

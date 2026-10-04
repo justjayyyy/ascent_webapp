@@ -89,7 +89,6 @@ function TransactionsPage({ kind }) {
   };
   const createBudgetMutation = useMutation({
     mutationFn: async (budgetData) => (await budgetsApi.create(budgetData)).outcome,
-    onSuccess: budgetSaved('budgetCreatedSuccessfully'),
     onError: () => toast.error(t('failedToCreateBudget')),
   });
 
@@ -99,10 +98,27 @@ function TransactionsPage({ kind }) {
     onError: () => toast.error(t('failedToUpdateBudget')),
   });
 
-  const deleteBudgetMutation = useMutation({
-    mutationFn: (budgetId) => budgetsApi.remove(budgetId),
+  // Removing a budget can end earlier repeating ones as well as delete (see removalFrom in shared/budgets.js)
+  const removeBudgetMutation = useMutation({
+    mutationFn: async ({ updates, deletes }) => {
+      const outcomes = [];
+      for (const { id, until } of updates) outcomes.push(await budgetsApi.update(id, { until }));
+      for (const id of deletes) outcomes.push(await budgetsApi.remove(id));
+      return outcomes.includes('queued') ? 'queued' : 'synced';
+    },
     onSuccess: budgetSaved('budgetDeletedSuccessfully'),
     onError: () => toast.error(t('failedToDeleteBudget')),
+  });
+
+  // Last month's budgets, again for this month
+  const copyBudgetsMutation = useMutation({
+    mutationFn: async (rows) => {
+      const outcomes = [];
+      for (const row of rows) outcomes.push((await budgetsApi.create(row)).outcome);
+      return outcomes.includes('queued') ? 'queued' : 'synced';
+    },
+    onSuccess: budgetSaved('budgetCreatedSuccessfully'),
+    onError: () => toast.error(t('failedToCreateBudget')),
   });
 
   const createCategoryMutation = useMutation({
@@ -269,6 +285,8 @@ function TransactionsPage({ kind }) {
               selectedYear={selectedYear}
               selectedMonths={selectedMonths}
               canEdit={canEdit}
+              onManageBudgets={canViewBudgets ? () => setBudgetDialogOpen(true) : undefined}
+              canEditBudgets={canEditBudgets}
             />
         </div>
 
@@ -290,10 +308,12 @@ function TransactionsPage({ kind }) {
             onClose={() => setBudgetDialogOpen(false)}
             budgets={budgets}
             categories={categories}
-            onAdd={createBudgetMutation.mutate}
+            // A change from an earlier month's budget is saved as a new row, but for the person it is an edit
+            onAdd={(row, { edit = false } = {}) => createBudgetMutation.mutate(row, { onSuccess: budgetSaved(edit ? 'budgetUpdatedSuccessfully' : 'budgetCreatedSuccessfully') })}
             onUpdate={(id, data) => updateBudgetMutation.mutate({ id, data })}
-            onDelete={deleteBudgetMutation.mutate}
-            isLoading={createBudgetMutation.isPending || updateBudgetMutation.isPending || deleteBudgetMutation.isPending}
+            onRemove={removeBudgetMutation.mutate}
+            onCopy={copyBudgetsMutation.mutate}
+            isLoading={createBudgetMutation.isPending || updateBudgetMutation.isPending || removeBudgetMutation.isPending || copyBudgetsMutation.isPending}
             selectedYear={selectedYear}
             selectedMonths={selectedMonths}
             canEdit={canEditBudgets}
