@@ -48,6 +48,7 @@ const fromRead = (read) => ({
   date: read.date || undefined,
   total: read.total ?? null,
   currency: read.currency || undefined,
+  items: (read.items || []).map(({ matchId: _m, ...line }) => line),
   read: true,
 });
 

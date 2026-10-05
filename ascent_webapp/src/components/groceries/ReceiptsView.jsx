@@ -7,7 +7,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { useMoney } from '@/hooks/useWorkspaceData';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
-import { localeOf, money, useWho } from './GroceryParts';
+import { ReceiptLines, localeOf, money, useWho } from './GroceryParts';
 import { openReceiptFile, useReceiptFile, useReceiptVault } from './useReceiptVault';
 
 const card = 'rounded-3xl border border-border/60 bg-card/75 p-4 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-14px_hsl(0_0%_0%/0.45)] sm:p-5';
@@ -180,6 +180,8 @@ function ReceiptSheet({ receipt, vault, stores, onClose }) {
               {reading ? t('rcptReading') : t('rcptReadIt')}
             </Button>
           )}
+
+          <ReceiptLines lines={receipt.items} fmt={money(loc, receipt.currency || user?.currency)} loc={loc} blur={!!user?.blurValues} t={t} />
 
           <form onSubmit={save} className="grid gap-3">
             <label className="grid gap-1.5 text-sm font-medium text-foreground">

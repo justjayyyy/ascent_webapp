@@ -50,7 +50,8 @@ function anthropic({ ai = 'ok' }, url, init) {
     const firstItem = userText.match(/^- ([^:]+): /m)?.[1] || null;
     return message(JSON.stringify({
       isReceipt: ai !== 'not-a-receipt', store: 'Rami Levy', date: new Date().toISOString().slice(0, 10), total: 87.4, currency: 'USD',
-      items: firstItem ? [{ text: 'Milk 3%', price: 6.9, matchId: firstItem }] : [],
+      // Two cartons at 6.90 each
+      items: firstItem ? [{ text: 'Milk 3%', qty: 2, unit: null, unitPrice: 6.9, price: 13.8, matchId: firstItem }] : [],
     }));
   }
   return message(ASSISTANT_ANSWER);

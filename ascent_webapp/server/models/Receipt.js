@@ -11,6 +11,18 @@ const receiptSchema = new mongoose.Schema({
   note: { type: String, default: '', maxlength: 300 },
   // The assistant has read the photo (so it isn't offered again)
   read: { type: Boolean, default: false },
+  // What was bought, line by line, as read from the photo (server/lib/receiptLines.js)
+  items: {
+    type: [{
+      _id: false,
+      text: { type: String, maxlength: 120 },
+      qty: { type: Number, default: null },
+      unit: { type: String, default: null, maxlength: 3 },
+      unitPrice: { type: Number, default: null },
+      price: { type: Number, default: null },
+    }],
+    default: undefined,
+  },
 
   name: { type: String, default: 'receipt', maxlength: 200 },
   type: { type: String, required: true, maxlength: 100 },

@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHousehold } from '@/hooks/useHousehold';
-import { aisleEmoji } from './groceryUtils';
+import { aisleEmoji, lineQty } from './groceryUtils';
 
 export const localeOf = (language) => (language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US');
 
@@ -66,3 +67,41 @@ export function leftLabel(supply, t) {
 export const money = (loc, currency, digits = 2) => (v) => new Intl.NumberFormat(loc, {
   style: 'currency', currency: currency || 'ILS', minimumFractionDigits: digits, maximumFractionDigits: digits,
 }).format(v || 0);
+
+/**
+ * What a receipt says was bought: each line with how many (or how much, by weight) at what price each,
+ * and what the line came to. A line matched to the shopping list is ticked.
+ */
+export function ReceiptLines({ lines, fmt, loc, blur, t, className }) {
+  if (!lines?.length) return null;
+  return (
+    <section aria-labelledby="rc-lines" className={className}>
+      <h3 id="rc-lines" className="mb-1.5 text-sm font-semibold text-foreground">{t('rcptItems', { n: lines.length })}</h3>
+      <ul className="max-h-64 divide-y divide-border/50 overflow-y-auto overscroll-contain rounded-2xl bg-foreground/[0.04] px-3">
+        {lines.map((line, i) => {
+          const each = typeof line.unitPrice === 'number' ? `${fmt(line.unitPrice)}${line.unit ? `/${line.unit}` : ''}` : null;
+          const qty = lineQty(line, loc) || (each ? '1' : null);
+          return (
+            // Lines have no id, and the same product can be on a receipt twice
+            <li key={i} className="flex items-center gap-3 py-2 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="truncate">{line.text}</span>
+                  {line.matchId && <Check className="h-3.5 w-3.5 shrink-0 text-success" aria-label={t('grOnTheList')} />}
+                </span>
+                {qty && (
+                  <span className={cn('block text-xs tabular-nums text-muted-foreground', blur && each && 'blur-sm')}>
+                    <span dir="ltr">{each ? `${qty} × ${each}` : qty}</span>
+                  </span>
+                )}
+              </span>
+              <span className={cn('shrink-0 font-semibold tabular-nums text-foreground', blur && 'blur-sm')} dir="ltr">
+                {typeof line.price === 'number' ? fmt(line.price) : '—'}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

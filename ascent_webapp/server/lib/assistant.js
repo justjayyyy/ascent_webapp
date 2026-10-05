@@ -95,6 +95,9 @@ const ReceiptSchema = z.object({
   currency: z.string().nullable(),
   items: z.array(z.object({
     text: z.string(),
+    qty: z.number().nullable(),
+    unit: z.string().nullable(),
+    unitPrice: z.number().nullable(),
     price: z.number().nullable(),
     matchId: z.string().nullable(),
   })),
@@ -107,7 +110,11 @@ const RECEIPT_SYSTEM = `You read photos of shop receipts (usually supermarket re
 - currency: an ISO 4217 code from the receipt (₪, ש"ח -> ILS; $ -> USD; € -> EUR; руб, ₽ -> RUB), otherwise null.
 - store: the shop's name as printed, short (no address, no branch number). Null if not printed.
 - date: the purchase date as YYYY-MM-DD. Receipts often print DD/MM/YY. Null if not printed.
-- items: every product line, in receipt order. text is the line as printed, cleaned of codes. price is that line's final price after any discount on it, or null. Skip deposit, bag, discount-only and total lines.
+- items: every product line, in receipt order. text is the product as printed, cleaned of codes and of the quantity. Skip deposit, bag, discount-only and total lines.
+  - qty: how many were bought (3 for "3 x 6.90"), or the weight or volume for things sold by weight or volume (1.235 for 1.235 kg); 1 when the line shows no quantity.
+  - unit: "kg", "g", "l" or "ml" when sold by weight or volume, otherwise null.
+  - unitPrice: the price of one (or of one kg, g, l or ml) as printed, or null when not printed.
+  - price: what the line came to, after any discount on it, or null.
 - matchId: when a line is clearly one of the shopping list items you are given (same product, in any language or spelling), that item's id; otherwise null. Never match two lines to one id unless the receipt repeats the product.
 
 Read only what is printed. Never invent a number.`;

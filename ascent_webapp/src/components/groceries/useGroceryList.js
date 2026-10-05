@@ -99,18 +99,19 @@ export function useGroceryList() {
 
   /**
    * Prices read from a receipt after the shop: written onto that day's purchase of each item, with the
-   * shop's name where the purchase does not have one yet.
+   * shop's name and how many were bought (`qtys`: { [itemId]: '3' }) where the purchase does not have them yet.
    */
-  const addPrices = useCallback((list, prices, { currency = null, date, store = '' }) => Promise.all(list
-    .filter((item) => typeof prices[item.id] === 'number' || store)
+  const addPrices = useCallback((list, prices, { currency = null, date, store = '', qtys = {} }) => Promise.all(list
+    .filter((item) => typeof prices[item.id] === 'number' || store || qtys[item.id])
     .map((item) => {
       const purchases = [...(item.purchases || [])];
       const at = purchases.map((p) => p.date).lastIndexOf(date);
       if (at < 0) return null;
       const price = typeof prices[item.id] === 'number' ? { price: prices[item.id], currency } : {};
       const shop = store && !purchases[at].store ? { store: cleanStore(store) } : {};
-      if (!Object.keys(price).length && !Object.keys(shop).length) return null;
-      purchases[at] = { ...purchases[at], ...price, ...shop };
+      const qty = qtys[item.id] && !purchases[at].qty ? { qty: String(qtys[item.id]).slice(0, 40) } : {};
+      if (!Object.keys(price).length && !Object.keys(shop).length && !Object.keys(qty).length) return null;
+      purchases[at] = { ...purchases[at], ...price, ...shop, ...qty };
       return update(item, { purchases });
     })), [update]);
 

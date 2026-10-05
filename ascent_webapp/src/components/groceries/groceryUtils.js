@@ -477,3 +477,35 @@ export function purchasePriceChanges(item, purchaseId, { price, currency, store 
     })),
   };
 }
+
+// ---- receipts: the expense it may already be ----
+
+/**
+ * The expense already logged for this receipt, if there seems to be one (a card or Apple Pay payment that
+ * came in on its own): the same amount, give or take a little, within two days of the receipt's date.
+ * `convert(amount, from)` brings another currency into the receipt's (null when it cannot). Closest day first.
+ */
+export function findLoggedExpense(transactions, { total, currency, date }, convert = () => null) {
+  if (!(total > 0) || !date) return null;
+  const near = Math.max(0.05, total * 0.01);
+  let best = null;
+  for (const tx of transactions || []) {
+    if (tx.type !== 'Expense' || !tx.date) continue;
+    const days = Math.abs(daysBetween(String(tx.date).slice(0, 10), date));
+    if (days > 2) continue;
+    const amount = !tx.currency || tx.currency === currency ? tx.amount : convert(tx.amount, tx.currency);
+    // Another currency is only roughly the same after conversion
+    const slack = !tx.currency || tx.currency === currency ? near : Math.max(near, total * 0.03);
+    if (typeof amount !== 'number' || Math.abs(amount - total) > slack) continue;
+    if (!best || days < best.days) best = { tx, days };
+  }
+  return best?.tx || null;
+}
+
+/** A receipt line's quantity as people say it: "3", "1.25 kg". Null when it was one of something. */
+export function lineQty(line, loc) {
+  if (!line?.qty) return null;
+  if (line.qty === 1 && !line.unit) return null;
+  const n = new Intl.NumberFormat(loc, { maximumFractionDigits: 3 }).format(line.qty);
+  return line.unit ? `${n} ${line.unit}` : n;
+}

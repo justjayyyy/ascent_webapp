@@ -18,6 +18,7 @@ import { amountInCurrency, convertAmount } from '../../shared/money.js';
 import { budgetsForMonth } from '../../shared/budgets.js';
 import { getRates } from '../lib/rates.js';
 import { aiConfigured, parseNote, answerQuestion, readReceipt, AssistantDeclined } from '../lib/assistant.js';
+import { cleanReceiptLines } from '../lib/receiptLines.js';
 import Category from '../models/Category.js';
 import Card from '../models/Card.js';
 import Budget from '../models/Budget.js';
@@ -139,13 +140,7 @@ export default async function handler(req, res) {
         date: /^\d{4}-\d{2}-\d{2}$/.test(read.date || '') && read.date <= today ? read.date : null,
         total: read.total > 0 ? money(read.total) : null,
         currency: /^[A-Z]{3}$/.test(read.currency || '') ? read.currency : null,
-        items: (read.items || []).slice(0, 150)
-          .map((line) => ({
-            text: String(line.text || '').trim().slice(0, 120),
-            price: money(line.price),
-            matchId: line.matchId && ids.has(line.matchId) ? line.matchId : null,
-          }))
-          .filter((line) => line.text),
+        items: cleanReceiptLines(read.items, { ids }),
       });
     }
 

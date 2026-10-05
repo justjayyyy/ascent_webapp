@@ -5,13 +5,15 @@ import { handleCors } from '../lib/cors.js';
 import { success, error, notFound, forbidden, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { fileBytes } from './notes.js';
+import { cleanReceiptLines } from '../lib/receiptLines.js';
 
 // The receipts vault: photos and PDFs of the household's receipts, for returns, warranties and checking
 // what something cost. Like the shopping list, every member of the household can see and add to it.
 //   GET                          the list, without the files
 //   GET    ?id=<id>&part=file    the file itself (base64), or part=thumb for the small preview
-//   POST   { type, data, thumb?, name?, store?, date?, total?, currency?, note?, read? }
-//   PATCH  ?id=<id>  { store?, date?, total?, currency?, note?, read? }
+//   POST   { type, data, thumb?, name?, store?, date?, total?, currency?, note?, read?, items? }
+//   PATCH  ?id=<id>  { store?, date?, total?, currency?, note?, read?, items? }
+// items: what was bought, line by line: [{ text, qty, unit, unitPrice, price }]
 //   DELETE ?id=<id>  whoever added it, or an owner or admin
 
 const MAX_FILE_BYTES = 3 * 1024 * 1024; // base64 in JSON stays under Vercel's 4.5 MB body limit
@@ -43,6 +45,7 @@ function details(body) {
   }
   if (body.currency !== undefined) set.currency = typeof body.currency === 'string' && /^[A-Z]{3}$/.test(body.currency) ? body.currency : null;
   if (typeof body.read === 'boolean') set.read = body.read;
+  if (Array.isArray(body.items)) set.items = cleanReceiptLines(body.items);
   return set;
 }
 

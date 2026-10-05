@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 import {
-  basketEstimate, boughtChanges, findByName, groupByAisle, guessItem, isTracked, knownStores, learnedInterval, parseEntries,
+  basketEstimate, boughtChanges, findByName, findLoggedExpense, lineQty, groupByAisle, guessItem, isTracked, knownStores, learnedInterval, parseEntries,
   priceMovers, priceStats, purchasePriceChanges, runningLow, storeComparison, supplyOf,
 } from './groceryUtils';
 
@@ -177,5 +177,37 @@ describe('prices', () => {
     const changed = purchasePriceChanges(bread, 'x', { price: 9.9, currency: 'ILS', store: ' Victory ' });
     expect(changed.purchases[0]).toMatchObject({ price: 9.9, currency: 'ILS', store: 'Victory' });
     expect(boughtChanges({ purchases: [] }, { date: '2026-10-01', store: 'Osher Ad' }).purchases[0].store).toBe('Osher Ad');
+  });
+});
+
+describe('findLoggedExpense', () => {
+  const receipt = { total: 87.4, currency: 'ILS', date: '2026-10-05' };
+  const tx = (over) => ({ id: 'x', type: 'Expense', amount: 87.4, currency: 'ILS', date: '2026-10-05', ...over });
+
+  it('finds the Apple Pay payment for the same amount on the same day', () => {
+    expect(findLoggedExpense([tx({ id: 'pay' })], receipt)?.id).toBe('pay');
+  });
+  it('allows a day or two either side and a few agorot of difference, preferring the closest day', () => {
+    expect(findLoggedExpense([tx({ id: 'far', date: '2026-10-03' }), tx({ id: 'near', date: '2026-10-06', amount: 87.2 })], receipt)?.id).toBe('near');
+  });
+  it('ignores other amounts, older payments and income', () => {
+    expect(findLoggedExpense([tx({ amount: 90 }), tx({ date: '2026-09-30' }), tx({ type: 'Income' })], receipt)).toBeNull();
+  });
+  it('compares another currency after converting it', () => {
+    const convert = (amount, from) => (from === 'USD' ? amount * 3.7 : null);
+    expect(findLoggedExpense([tx({ id: 'usd', currency: 'USD', amount: 23.6 })], receipt, convert)?.id).toBe('usd');
+    expect(findLoggedExpense([tx({ currency: 'EUR' })], receipt, convert)).toBeNull();
+  });
+  it('has nothing to look for without a total or a date', () => {
+    expect(findLoggedExpense([tx()], { ...receipt, total: null })).toBeNull();
+  });
+});
+
+describe('lineQty', () => {
+  it('says how many, or how much by weight, and nothing for a single one', () => {
+    expect(lineQty({ qty: 3 }, 'en-US')).toBe('3');
+    expect(lineQty({ qty: 1.25, unit: 'kg' }, 'en-US')).toBe('1.25 kg');
+    expect(lineQty({ qty: 1 }, 'en-US')).toBeNull();
+    expect(lineQty({ qty: null }, 'en-US')).toBeNull();
   });
 });
