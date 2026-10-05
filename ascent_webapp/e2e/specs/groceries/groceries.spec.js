@@ -142,3 +142,32 @@ test('with the assistant off, the receipt step says an owner can turn it on @cri
   await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
   await expect(page.getByText(L('grScanNeedsAssistant'))).toBeVisible();
 });
+
+test('on the Wall, things tapped one after another stay put while tapping, then are bought together with one undo @critical', async ({ page, api }) => {
+  for (const name of ['Milk', 'Eggs', 'Bread']) await api.create('groceries', { name, onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  const tile = (name) => page.getByRole('button', { name: new RegExp(`^${name}[,.]`) });
+  await tile('Milk').click();
+  await tile('Eggs').click();
+  // Ticked where they are, so the next tap lands on whatever is under the finger
+  await expect(tile('Milk')).toHaveAttribute('aria-pressed', 'true');
+  await expect(tile('Bread')).toHaveAttribute('aria-pressed', 'false');
+
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: L('grBoughtMany', { n: 2 }) });
+  await expect(toast).toBeVisible();
+  await expect.poll(() => onList(api)).toEqual([['bread', '']]);
+  await toast.getByRole('button', { name: L('ntUndo') }).click();
+  await expect.poll(() => onList(api)).toEqual([['bread', ''], ['eggs', ''], ['milk', '']]);
+});
+
+test('an item’s details are saved as they are changed, with nothing to confirm @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  await page.getByRole('button', { name: /^Milk[,.]/ }).click({ button: 'right' });
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('textbox', { name: L('grQty') }).fill('3');
+  await sheet.getByRole('button', { name: L('grAisle_pantry'), exact: true }).click();
+
+  await expect.poll(async () => (await api.list('groceries')).map((i) => [i.qty, i.aisle])).toEqual([['3', 'pantry']]);
+  await expect(sheet).toBeVisible();
+});

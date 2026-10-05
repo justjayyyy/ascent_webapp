@@ -37,7 +37,7 @@ function ViewSwitch({ view, onChange, t, reduce, controls }) {
     refs.current[next.key]?.focus();
   };
   return (
-    <div role="tablist" aria-label={t('grViews')} onKeyDown={onKey} className="flex h-10 w-full items-center gap-0.5 rounded-full bg-foreground/[0.06] p-1 sm:w-auto">
+    <div role="tablist" aria-label={t('grViews')} onKeyDown={onKey} className="flex h-10 w-full items-center gap-0.5 rounded-full bg-foreground/[0.06] p-1 xl:w-auto">
       {VIEWS.map(({ key, icon: Icon, label }) => {
         const on = key === view;
         return (
@@ -54,7 +54,7 @@ function ViewSwitch({ view, onChange, t, reduce, controls }) {
             onClick={() => onChange(key)}
             className={cn(
               // 32px tall, with an invisible 6px above and below on touch screens to reach 44px (DESIGN.md)
-              'relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors sm:flex-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-y-1.5 [@media(pointer:coarse)]:before:inset-x-0 [@media(pointer:coarse)]:before:content-[\'\']',
+              'relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors xl:flex-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-y-1.5 [@media(pointer:coarse)]:before:inset-x-0 [@media(pointer:coarse)]:before:content-[\'\']',
               on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >

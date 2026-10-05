@@ -106,15 +106,28 @@ function PriceMemory({ item, items, onPrice, t, loc, user }) {
   const needsPrice = lastPurchase && typeof lastPurchase.price !== 'number';
   const [price, setPrice] = useState('');
   const [store, setStore] = useState('');
-  useEffect(() => { setPrice(''); setStore(lastPurchase?.store || ''); }, [item.id, lastPurchase?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The purchase being priced stays open once a price is in, so the shop can still be typed after it
+  const [pricing, setPricing] = useState(null);
+  const saved = useRef('');
+  useEffect(() => {
+    setPrice('');
+    setStore(lastPurchase?.store || '');
+    setPricing(needsPrice ? lastPurchase.id : null);
+    saved.current = '';
+  }, [item.id, lastPurchase?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!stats && !needsPrice) return null;
+  const asking = pricing && lastPurchase?.id === pricing;
+  if (!stats && !asking) return null;
   const move = stats?.changeFromAvg;
+  // Saved as it is typed in: when either field is left, or on Enter
   const savePrice = (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     const value = parseFloat(price);
     if (!(value > 0)) return;
-    onPrice(item, lastPurchase.id, { price: value, currency, store });
+    const key = `${value}|${store.trim()}`;
+    if (key === saved.current) return;
+    saved.current = key;
+    onPrice(item, pricing, { price: value, currency, store });
     haptic('light');
   };
 
@@ -166,47 +179,82 @@ function PriceMemory({ item, items, onPrice, t, loc, user }) {
           )}
         </>
       )}
-      {needsPrice && onPrice && (
-        <form onSubmit={savePrice} className="mt-3 grid grid-cols-[1fr_1.3fr_auto] gap-2">
+      {asking && onPrice && (
+        <form onSubmit={savePrice} className="mt-3 grid grid-cols-[1fr_1.3fr] gap-2">
           <Input
-            type="number" inputMode="decimal" min="0" step="any" value={price} onChange={(e) => setPrice(e.target.value)}
-            placeholder={t('grPricePlaceholder')} aria-label={t('grPriceOn', { date: lastPurchase.date })} className="h-10 rounded-xl tabular-nums"
+            type="number" inputMode="decimal" min="0" step="any" value={price} onChange={(e) => setPrice(e.target.value)} onBlur={() => savePrice()}
+            enterKeyHint="done" placeholder={t('grPricePlaceholder')} aria-label={t('grPriceOn', { date: lastPurchase.date })} className="h-10 rounded-xl tabular-nums"
           />
-          <Input value={store} onChange={(e) => setStore(e.target.value)} list="gr-stores" maxLength={80} placeholder={t('grStore')} aria-label={t('grStore')} className="h-10 rounded-xl" />
+          <Input value={store} onChange={(e) => setStore(e.target.value)} onBlur={() => savePrice()} enterKeyHint="done" list="gr-stores" maxLength={80} placeholder={t('grStore')} aria-label={t('grStore')} className="h-10 rounded-xl" />
           <datalist id="gr-stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
-          <Button type="submit" variant="secondary" disabled={!(parseFloat(price) > 0)} className="h-10 rounded-xl px-3">{t('save')}</Button>
-          <p className="col-span-3 text-xs text-muted-foreground">{t('grPriceOn', { date: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${lastPurchase.date}T12:00:00`)) })}</p>
+          {/* Enter in either field saves (a form needs a submit button for that) */}
+          <button type="submit" hidden aria-hidden tabIndex={-1} />
+          <p className="col-span-2 text-xs text-muted-foreground">{t('grPriceOn', { date: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${lastPurchase.date}T12:00:00`)) })}</p>
         </form>
       )}
     </section>
   );
 }
 
-/** Everything about one item: its level, aisle, how often it is bought, and putting it on or off the list. */
+// Typing is saved once it pauses for this long; picking something (an aisle, the switch) is saved at once
+const TYPING_SAVE_MS = 600;
+
+/**
+ * Everything about one item: its level, aisle, how often it is bought, and putting it on or off the list.
+ * Every change is saved as it is made; there is nothing to confirm.
+ */
 export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList, onUnlist, onDelete, onPrice, items }) {
   const { t, language, user } = useTheme();
   const loc = localeOf(language);
   const [form, setForm] = useState(null);
+  const formRef = useRef(null);
+  const itemRef = useRef(item);
+  itemRef.current = item;
+  const timer = useRef(null);
+  const currency = user?.currency || 'ILS';
+  const { convert } = useMoney(currency);
 
   useEffect(() => {
-    if (open && item) setForm({ name: item.name, emoji: item.emoji || '', aisle: item.aisle || 'other', qty: item.qty || '', note: item.note || '', staple: isTracked(item) });
+    if (!open || !item) return;
+    const next = { name: item.name, emoji: item.emoji || '', aisle: item.aisle || 'other', qty: item.qty || '', note: item.note || '', staple: isTracked(item) };
+    formRef.current = next;
+    setForm(next);
   }, [open, item?.id]);
+
+  /** Saves whatever in the form differs from the item. */
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = null;
+    const f = formRef.current;
+    const current = itemRef.current;
+    if (!f || !current) return;
+    const changes = {};
+    if (f.name.trim() && f.name.trim() !== current.name) changes.name = f.name.trim().slice(0, 120);
+    if (f.emoji !== (current.emoji || '')) changes.emoji = [...f.emoji].slice(0, 2).join('');
+    if (f.aisle !== current.aisle) changes.aisle = f.aisle;
+    if (current.onList && f.qty !== (current.qty || '')) changes.qty = f.qty.slice(0, 40);
+    if (current.onList && f.note !== (current.note || '')) changes.note = f.note.slice(0, 300);
+    if (f.staple !== isTracked(current)) changes.staple = f.staple;
+    if (Object.keys(changes).length) onSave(current, changes);
+  }, [onSave]);
+
+  // Closed some other way (the page left mid-typing): what was typed is still saved
+  useEffect(() => () => { if (timer.current) flush(); }, [flush]);
 
   if (!item || !form) return null;
   const supply = supplyOf(item);
   const last = lastPrice(item);
+  const lastInMine = last && last.currency && last.currency !== currency ? convert(last.price, last.currency) : null;
   const times = new Set((item.purchases || []).map((p) => p.date)).size;
-  const set = (changes) => setForm((f) => ({ ...f, ...changes }));
+  const set = (changes, { now = false } = {}) => {
+    formRef.current = { ...formRef.current, ...changes };
+    setForm(formRef.current);
+    clearTimeout(timer.current);
+    if (now) flush(); else timer.current = setTimeout(flush, TYPING_SAVE_MS);
+  };
 
   const close = () => {
-    const changes = {};
-    if (form.name.trim() && form.name.trim() !== item.name) changes.name = form.name.trim().slice(0, 120);
-    if (form.emoji !== (item.emoji || '')) changes.emoji = [...form.emoji].slice(0, 2).join('');
-    if (form.aisle !== item.aisle) changes.aisle = form.aisle;
-    if (item.onList && form.qty !== (item.qty || '')) changes.qty = form.qty.slice(0, 40);
-    if (item.onList && form.note !== (item.note || '')) changes.note = form.note.slice(0, 300);
-    if (form.staple !== isTracked(item)) changes.staple = form.staple;
-    if (Object.keys(changes).length) onSave(item, changes);
+    flush();
     onClose();
   };
 
@@ -218,6 +266,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
             <input
               value={form.emoji}
               onChange={(e) => set({ emoji: e.target.value })}
+              onBlur={flush}
               aria-label={t('grEmoji')}
               placeholder="🛒"
               className="h-12 w-12 shrink-0 rounded-2xl bg-foreground/[0.05] text-center text-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -227,6 +276,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
               <input
                 value={form.name}
                 onChange={(e) => set({ name: e.target.value })}
+                onBlur={flush}
                 aria-label={t('grItemName')}
                 maxLength={120}
                 className="w-full bg-transparent text-xl font-bold tracking-tight text-foreground outline-none"
@@ -273,7 +323,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
           <div className="rounded-2xl bg-foreground/[0.04] p-3">
             <dt className="text-xs text-muted-foreground">{t('grLastPrice')}</dt>
             <dd className={cn('mt-0.5 text-base font-bold tabular-nums tracking-tight text-foreground', user?.blurValues && 'blur-sm')}>
-              {last ? money(loc, last.currency || user?.currency)(last.price) : '—'}
+              {!last ? '—' : typeof lastInMine === 'number' ? money(loc, currency)(lastInMine) : money(loc, last.currency || currency)(last.price)}
             </dd>
           </div>
         </dl>
@@ -282,8 +332,8 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
 
         {item.onList && (
           <div className="grid grid-cols-[1fr_2fr] gap-2">
-            <Input value={form.qty} onChange={(e) => set({ qty: e.target.value })} placeholder={t('grQty')} aria-label={t('grQty')} maxLength={40} className="h-11 rounded-xl" />
-            <Input value={form.note} onChange={(e) => set({ note: e.target.value })} placeholder={t('grNote')} aria-label={t('grNote')} maxLength={300} className="h-11 rounded-xl" />
+            <Input value={form.qty} onChange={(e) => set({ qty: e.target.value })} onBlur={flush} placeholder={t('grQty')} aria-label={t('grQty')} maxLength={40} className="h-11 rounded-xl" />
+            <Input value={form.note} onChange={(e) => set({ note: e.target.value })} onBlur={flush} placeholder={t('grNote')} aria-label={t('grNote')} maxLength={300} className="h-11 rounded-xl" />
           </div>
         )}
 
@@ -295,7 +345,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
                 key={a.key}
                 type="button"
                 aria-pressed={form.aisle === a.key}
-                onClick={() => set({ aisle: a.key })}
+                onClick={() => set({ aisle: a.key }, { now: true })}
                 className={cn(
                   'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors',
                   form.aisle === a.key ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/10'
@@ -312,19 +362,19 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
             <span className="block text-sm font-semibold text-foreground">{t('grTrackSupply')}</span>
             <span className="block text-xs text-muted-foreground">{t('grTrackSupplyHint')}</span>
           </span>
-          <Switch checked={form.staple} onCheckedChange={(v) => set({ staple: v })} />
+          <Switch checked={form.staple} onCheckedChange={(v) => set({ staple: v }, { now: true })} />
         </label>
 
         <div className="flex items-center gap-2 pt-1">
-          <Button type="button" variant="ghost" size="icon" onClick={() => { onDelete(item); onClose(); }} aria-label={t('grDelete')} className="h-11 w-11 shrink-0 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive">
+          <Button type="button" variant="ghost" size="icon" onClick={() => { clearTimeout(timer.current); timer.current = null; onDelete(item); onClose(); }} aria-label={t('grDelete')} className="h-11 w-11 shrink-0 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive">
             <Trash2 className="h-5 w-5" />
           </Button>
           {item.onList ? (
-            <Button type="button" variant="secondary" onClick={() => { onUnlist(item); onClose(); }} className="h-11 flex-1 rounded-xl">
+            <Button type="button" variant="secondary" onClick={() => { flush(); onUnlist(itemRef.current); onClose(); }} className="h-11 flex-1 rounded-xl">
               <ListX className="me-2 h-4 w-4" />{t('grTakeOffList')}
             </Button>
           ) : (
-            <Button type="button" variant="secondary" onClick={() => { onList(item); close(); }} className="h-11 flex-1 rounded-xl">
+            <Button type="button" variant="secondary" onClick={() => { flush(); onList(itemRef.current); onClose(); }} className="h-11 flex-1 rounded-xl">
               <ListPlus className="me-2 h-4 w-4" />{t('grPutOnList')}
             </Button>
           )}

@@ -83,16 +83,19 @@ export function useGroceryList() {
     await Promise.all(list.map((item) => update(item, boughtChanges(item, { date, by: me, price: prices[item.id] ?? null, currency, store }))));
   }, [update, me]);
 
-  /** One thing bought on its own (tapped off the list at home), with undo. */
-  const boughtOne = useCallback((item) => {
+  /** Things bought outside a shopping trip (tapped off the list at home), with one undo for all of them. */
+  const boughtMany = useCallback((list) => {
+    if (!list.length) return;
     haptic('light');
-    const before = {
+    const befores = list.map((item) => [item, {
       onList: item.onList, qty: item.qty || '', note: item.note || '', listedAt: item.listedAt || null, listedBy: item.listedBy || '',
       inCart: !!item.inCart, cartBy: item.cartBy || '', level: item.level ?? null, levelAt: item.levelAt ?? null, purchases: item.purchases || [],
-    };
-    update(item, boughtChanges(item, { by: me }));
-    toast(t('grBoughtOne', { name: item.name }), { action: { label: t('ntUndo'), onClick: () => update(item, before) } });
+    }]);
+    list.forEach((item) => update(item, boughtChanges(item, { by: me })));
+    const message = list.length === 1 ? t('grBoughtOne', { name: list[0].name }) : t('grBoughtMany', { n: list.length });
+    toast(message, { action: { label: t('ntUndo'), onClick: () => befores.forEach(([item, before]) => update(item, before)) } });
   }, [update, me, t]);
+  const boughtOne = useCallback((item) => boughtMany([item]), [boughtMany]);
 
   /**
    * Prices read from a receipt after the shop: written onto that day's purchase of each item, with the
@@ -129,5 +132,5 @@ export function useGroceryList() {
     });
   }, [api, failed, t]);
 
-  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, addPrices, setPurchasePrice, save, remove };
+  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, boughtMany, addPrices, setPurchasePrice, save, remove };
 }

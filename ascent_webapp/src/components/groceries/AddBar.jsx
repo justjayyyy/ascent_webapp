@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CornerDownLeft, Plus } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { DictateButton, useDictation } from '@/components/notes/useDictation';
@@ -8,9 +8,11 @@ import { ItemEmoji } from './GroceryParts';
 
 /**
  * Add to the list by typing or speaking: "milk, 2 eggs, bread". While typing, things the household has
- * bought before are offered first, so one tap puts them back on the list.
+ * bought before are offered first, so one tap puts them back on the list. `onQueryChange` hears what is
+ * typed, for a page that filters what it shows; with `suggest={false}` only the "Add" row is offered,
+ * because the page already shows the matches.
  */
-export default function AddBar({ items, onAddText, onPick, placeholder, className, inputRef: givenRef }) {
+export default function AddBar({ items, onAddText, onPick, onQueryChange, suggest = true, placeholder, className, inputRef: givenRef }) {
   const { t, language } = useTheme();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
@@ -24,11 +26,12 @@ export default function AddBar({ items, onAddText, onPick, placeholder, classNam
     setValue('');
   };
   const dictation = useDictation({ language, t, onText: submit });
+  useEffect(() => { onQueryChange?.(value); }, [value, onQueryChange]);
 
   const entries = useMemo(() => parseEntries(value), [value]);
   const matches = useMemo(() => {
     const q = normalizeName(value);
-    if (!q || entries.length > 1) return [];
+    if (!q || entries.length > 1 || !suggest) return [];
     return items
       .filter((i) => !i.onList)
       .map((i) => ({ i, at: normalizeName(i.name).indexOf(q) }))
@@ -36,9 +39,10 @@ export default function AddBar({ items, onAddText, onPick, placeholder, classNam
       .sort((a, b) => a.at - b.at || (b.i.purchases?.length || 0) - (a.i.purchases?.length || 0))
       .slice(0, 5)
       .map((m) => m.i);
-  }, [items, value, entries.length]);
+  }, [items, value, entries.length, suggest]);
   const exact = matches.some((m) => normalizeName(m.name) === normalizeName(value));
-  const open = focused && value.trim().length > 0;
+  // The in-page "Add" row stays while there is text, so the page does not jump when a tile is tapped
+  const open = (focused || !suggest) && value.trim().length > 0;
 
   return (
     <div className={cn('relative', className)}>
@@ -52,6 +56,7 @@ export default function AddBar({ items, onAddText, onPick, placeholder, classNam
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onKeyDown={(e) => { if (e.key === 'Escape' && value) { e.preventDefault(); setValue(''); } }}
           placeholder={placeholder || t('grAddPlaceholder')}
           aria-label={t('grAddLabel')}
           aria-autocomplete="list"
@@ -70,7 +75,8 @@ export default function AddBar({ items, onAddText, onPick, placeholder, classNam
       </form>
 
       {open && (
-        <div id={listId} role="listbox" className="absolute inset-x-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-2xl border border-border/60 bg-popover p-1.5 shadow-xl">
+        // Over the page while it offers matches; just the "Add" row sits in the page, above the matches it shows
+        <div id={listId} role="listbox" className={cn('overflow-hidden rounded-2xl border border-border/60 bg-popover p-1.5', suggest ? 'absolute inset-x-0 top-[calc(100%+6px)] z-30 shadow-xl' : 'mt-1.5')}>
           {entries.length > 1 ? (
             <button
               type="button"
