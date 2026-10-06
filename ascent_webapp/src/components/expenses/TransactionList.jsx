@@ -11,6 +11,7 @@ import { useHousehold } from '@/hooks/useHousehold';
 import HouseholdFields from './HouseholdFields';
 import BlurValue from '../BlurValue';
 import { formatTxTime, newestFirst } from '@/lib/txOrder';
+import { hasPeriod, periodLabel } from '@shared/homeCosts';
 
 const PAGE = 30;
 const isObjectId = (s) => !!s && /^[0-9a-fA-F]{24}$/.test(s);
@@ -185,6 +186,11 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                           <span className="truncate text-[0.9375rem] font-medium text-foreground">{tx.description}</span>
                           {tx.isRecurring && <Repeat aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                           {tx.isBigPurchase && !(tx.installmentCount > 1) && <ShoppingBag aria-label={t('bigPurchase')} className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                          {hasPeriod(tx) && (
+                            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-1.5 text-[0.6875rem] font-medium text-muted-foreground" aria-label={t('forPeriod').replace('{period}', periodLabel(tx.coversFrom, tx.coversTo, loc))}>
+                              {periodLabel(tx.coversFrom, tx.coversTo, loc)}
+                            </span>
+                          )}
                           {tx.installmentCount > 1 && (
                             <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[0.6875rem] font-semibold tabular-nums text-primary" dir="ltr" aria-label={t('installmentOf').replace('{index}', tx.installmentIndex).replace('{count}', tx.installmentCount)}>
                               {tx.installmentIndex}/{tx.installmentCount}
@@ -253,6 +259,7 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
                   {[
                     isObjectId(active.category) ? '' : translateCategory(active.category, language),
                     new Intl.DateTimeFormat(loc, { dateStyle: 'medium' }).format(new Date(`${dayKey(active.date)}T12:00:00`)) + (formatTxTime(active, loc) ? ` · ${formatTxTime(active, loc)}` : ''),
+                    hasPeriod(active) ? t('forPeriod').replace('{period}', periodLabel(active.coversFrom, active.coversTo, loc)) : '',
                     cardText(active),
                     !pickPayer && activeAuthor ? (activeAuthor.isMe ? t('me') : activeAuthor.name) : '',
                     activeConverted !== null ? money(activeConverted, userCurrency, 0) : '',

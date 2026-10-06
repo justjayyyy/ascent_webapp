@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Repeat, ShoppingBag, Minus, Plus, Sparkles, CalendarClock } from 'lucide-react';
+import { Loader2, Repeat, ShoppingBag, Minus, Plus, Sparkles, CalendarClock, CalendarRange } from 'lucide-react';
 import { format, addMonths, parseISO, isAfter } from 'date-fns';
 import { txTime } from '@/lib/txOrder';
 import { useTheme } from '../ThemeProvider';
@@ -19,6 +19,7 @@ import HouseholdFields from './HouseholdFields';
 import { useCategorySuggestion } from './useCategorySuggestion';
 import { isCoarsePointer } from '@/lib/pointer';
 import { previousMonthEnd } from './transactionRows';
+import { addMonths as addMonthKeys, isMonth, periodLabel } from '@shared/homeCosts';
 
 const LAST_KEY = 'ascent_last_transaction_choices';
 const readLastChoices = () => {
@@ -90,6 +91,9 @@ export default function AddTransactionDialog({
     commitmentId: '',
     paidBy: '',
     forPreviousMonth: true,
+    forOtherMonths: false,
+    coversFrom: '',
+    coversTo: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -185,6 +189,9 @@ export default function AddTransactionDialog({
         planItemId: editTransaction.planItemId || '',
         commitmentId: editTransaction.commitmentId || '',
         paidBy: editTransaction.paidBy || '',
+        forOtherMonths: isMonth(editTransaction.coversFrom),
+        coversFrom: isMonth(editTransaction.coversFrom) ? editTransaction.coversFrom : '',
+        coversTo: isMonth(editTransaction.coversTo) ? editTransaction.coversTo : (isMonth(editTransaction.coversFrom) ? editTransaction.coversFrom : ''),
         // A copy (no id yet) happens now; an existing row keeps the time it has, if any
         time: txTime(editTransaction) ? format(txTime(editTransaction), 'HH:mm') : (isEditing ? '' : format(new Date(), 'HH:mm')),
         forPreviousMonth: false,
@@ -215,6 +222,9 @@ export default function AddTransactionDialog({
         commitmentId: '',
         paidBy: '',
         forPreviousMonth: true,
+        forOtherMonths: false,
+        coversFrom: '',
+        coversTo: '',
       });
     }
     categoryTouched.current = false;
@@ -289,7 +299,11 @@ export default function AddTransactionDialog({
 
     rememberChoices(formData);
     const isExpense = formData.type === 'Expense';
-    const { forPreviousMonth, time, ...fields } = formData;
+    const { forPreviousMonth, time, forOtherMonths, coversFrom, coversTo, ...fields } = formData;
+    // The months a bill is for, kept only on a single expense that says so (and cleared when it no longer does)
+    const period = isExpense && forOtherMonths && isMonth(coversFrom) && !splitting && !(formData.isRecurring && !isEditing)
+      ? { coversFrom: coversFrom <= coversTo ? coversFrom : coversTo, coversTo: coversFrom <= coversTo ? coversTo : coversFrom }
+      : { coversFrom: null, coversTo: null };
     // The time belongs to one row only, not to every month of a series or every installment
     const single = !splitting && !(formData.isRecurring && !isEditing) && !(inSeries && wholeSeries);
     await onSubmit({
@@ -305,8 +319,19 @@ export default function AddTransactionDialog({
       planItemId: (isExpense && formData.planId && formData.planItemId) || null,
       commitmentId: (isExpense && formData.commitmentId) || null,
       paidBy: formData.paidBy || null,
+      ...period,
     }, { wholeSeries: inSeries && wholeSeries });
   };
+
+  // A bill for other months: the months it can be for, two years back to a year ahead of when it is paid
+  const paidMonth = (formData.date || format(new Date(), 'yyyy-MM-dd')).slice(0, 7);
+  const monthChoices = useMemo(() => Array.from({ length: 37 }, (_, i) => addMonthKeys(paidMonth, i - 24)).reverse(), [paidMonth]);
+  const monthName = (key) => new Intl.DateTimeFormat(loc, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 15)));
+  const togglePeriod = (on) => setFormData((f) => {
+    // The usual case is a bill for the month before, so that is where it starts
+    const before = addMonthKeys((f.date || format(new Date(), 'yyyy-MM-dd')).slice(0, 7), -1);
+    return { ...f, forOtherMonths: on, coversFrom: f.coversFrom || before, coversTo: f.coversTo || f.coversFrom || before };
+  });
 
   // Salary that lands at the start of a month is usually the previous month's pay
   const salaryShift = formData.type === 'Income' && !isEditing && isSalaryCategory(formData.category);
@@ -317,6 +342,8 @@ export default function AddTransactionDialog({
 
   const installments = Math.max(1, Math.min(60, parseInt(formData.installmentCount, 10) || 1));
   const splitting = formData.type === 'Expense' && !formData.isRecurring && !isEditing && installments > 1;
+  // Only a single expense can be for other months: not every month of a series, not each installment
+  const showPeriod = formData.type === 'Expense' && !splitting && !(formData.isRecurring && !isEditing) && !(inSeries && wholeSeries);
   const inCurrency = (n, currency = formData.currency) => new Intl.NumberFormat(loc, {
     style: 'currency', currency: currency || userCurrency, maximumFractionDigits: 2,
   }).format(n || 0);
@@ -667,6 +694,44 @@ export default function AddTransactionDialog({
               {t('installmentOf').replace('{index}', editTransaction.installmentIndex).replace('{count}', editTransaction.installmentCount)}
               {editTransaction.installmentTotal ? ` · ${t('totalPrice')} ${inCurrency(editTransaction.installmentTotal, editTransaction.currency)}` : ''}
             </p>
+          )}
+
+          {/* A bill for other months (water for July–August paid in October, property tax paid ahead) */}
+          {showPeriod && (
+            <div className={cn("rounded-2xl border p-2 transition-colors sm:p-3", formData.forOtherMonths ? "border-primary/40 bg-primary/[0.06]" : colors.border)}>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="forOtherMonths"
+                  checked={formData.forOtherMonths}
+                  onCheckedChange={(checked) => togglePeriod(!!checked)}
+                  className={cn(colors.border)}
+                />
+                <Label htmlFor="forOtherMonths" className={cn("flex cursor-pointer items-center gap-1.5 text-xs sm:text-sm", colors.textSecondary)}>
+                  <CalendarRange className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>{t('forOtherMonths')}</span>
+                </Label>
+              </div>
+              {formData.forOtherMonths && (
+                <>
+                  <div className="mt-2 grid grid-cols-2 gap-2 ps-6">
+                    {[['coversFrom', 'coversFromLabel'], ['coversTo', 'coversToLabel']].map(([field, label]) => (
+                      <div key={field} className="space-y-1">
+                        <Label className={cn("text-xs", colors.textTertiary)}>{t(label)}</Label>
+                        <Select value={formData[field]} onValueChange={(value) => setFormData((f) => ({ ...f, [field]: value, ...(field === 'coversFrom' && value > f.coversTo ? { coversTo: value } : {}), ...(field === 'coversTo' && value < f.coversFrom ? { coversFrom: value } : {}) }))}>
+                          <SelectTrigger aria-label={t(label)} className={cn("h-10 rounded-xl", colors.border, colors.textPrimary)}><SelectValue /></SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {monthChoices.map((m) => <SelectItem key={m} value={m} className={colors.textPrimary}>{monthName(m)}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                  <p className={cn("mt-2 ps-6 text-xs text-pretty", colors.textTertiary)}>
+                    {t('forOtherMonthsHelp').replace('{period}', periodLabel(formData.coversFrom, formData.coversTo, loc))}
+                  </p>
+                </>
+              )}
+            </div>
           )}
 
           {/* Big purchase: kept apart from everyday spending */}

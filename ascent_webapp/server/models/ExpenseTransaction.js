@@ -88,6 +88,28 @@ const expenseTransactionSchema = new mongoose.Schema({
     type: String
   }],
 
+  // The months a payment is for, when not the month it was paid: a water bill for July–August paid in
+  // October, property tax for two months paid ahead. 'YYYY-MM', both or neither (shared/homeCosts.js)
+  coversFrom: {
+    type: String,
+    default: null,
+    match: /^\d{4}-(0[1-9]|1[0-2])$/
+  },
+  coversTo: {
+    type: String,
+    default: null,
+    match: /^\d{4}-(0[1-9]|1[0-2])$/,
+    validate: {
+      // At most two years, never before it starts
+      validator(to) {
+        const from = this.coversFrom ?? this.get?.('coversFrom');
+        if (!to || !from) return true;
+        const months = (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + Number(to.slice(5)) - Number(from.slice(5));
+        return months >= 0 && months < 24;
+      },
+      message: 'coversTo must be within two years after coversFrom'
+    }
+  },
   // Big purchases: a one-off large expense, optionally paid in installments. Every installment is its
   // own row (so it lands in its month and budget) and shares installmentGroupId with its siblings.
   isBigPurchase: {

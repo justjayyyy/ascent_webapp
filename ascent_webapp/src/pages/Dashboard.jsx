@@ -17,6 +17,8 @@ import SubscriptionsCard from '@/components/insights/SubscriptionsCard';
 import { formatTxTime, newestFirst } from '@/lib/txOrder';
 import { localDay } from '@/lib/localDay';
 import CommitmentsCard from '@/components/insights/CommitmentsCard';
+import HomeCostsCard from '@/components/insights/HomeCostsCard';
+import { defaultIsHome } from '@shared/homeCosts';
 import AssistantBar from '@/components/insights/AssistantBar';
 import { useTransactions } from '@/lib/offline/txOutbox';
 import LoadFailed from '@/components/shell/LoadFailed';
@@ -117,6 +119,11 @@ export default function Dashboard() {
   const showForecast = forecast.phase === 'current';
 
   const selectedKey = monthKey(selectedMonth);
+  // Home costs show once there is any rent, bill, tax, insurance or subscription (or a bill for other months)
+  const hasHomeCosts = useMemo(() => {
+    const isHome = defaultIsHome(normalized);
+    return normalized.some((tx) => tx.type === 'Expense' && isHome(tx.category));
+  }, [normalized]);
   const prevKey = monthKey(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1));
   const monthTx = useMemo(() => normalized.filter((tx) => tx._month === selectedKey), [normalized, selectedKey]);
 
@@ -498,6 +505,13 @@ export default function Dashboard() {
           <Tile i={3} className="md:col-span-6">
             <CommitmentsCard commitments={commitments} convert={convert} />
           </Tile>
+
+          {/* What the home costs each month, counted in the months each bill is for */}
+          {hasHomeCosts && (
+            <Tile i={3} className="md:col-span-6">
+              <HomeCostsCard rows={normalized} monthKey={selectedKey} categories={categories} locale={locale} currency={userCurrency} blur={blur} />
+            </Tile>
+          )}
 
           <Tile i={3} className="md:col-span-6">
             <SubscriptionsCard subscriptions={subscriptions} />
