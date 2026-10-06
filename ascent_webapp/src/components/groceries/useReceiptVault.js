@@ -91,25 +91,31 @@ export function useReceiptVault() {
     }
   }, [put, queryClient, key, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Has the assistant read a photo already uploaded; fills in the fields it finds. */
-  const readWithAssistant = useCallback(async (receipt, image) => {
-    if (!aiReady) return;
+  /**
+   * Has the assistant read a photo (again): fills in the shop, day, total and every line. `match` is the
+   * grocery items the lines may be (id, name); `onRead(read, receipt)` hears what was read. Returns it, or null.
+   */
+  const readWithAssistant = useCallback(async (receipt, image, { match = [], onRead } = {}) => {
+    if (!aiReady) return null;
     markReading(receipt.id, true);
     try {
       let b64 = image;
       if (!b64) b64 = (await ascent.entities.Receipt.getFile(receipt.id, 'file')).data;
-      const read = await ascent.assist.readReceipt({ image: b64, mediaType: 'image/jpeg', items: [] });
-      if (read?.isReceipt) await update(receipt, fromRead(read));
-      else toast(t('rcptCouldNotRead'));
+      const read = await ascent.assist.readReceipt({ image: b64, mediaType: 'image/jpeg', items: match });
+      if (!read?.isReceipt) { toast(t('rcptCouldNotRead')); return null; }
+      await update(receipt, fromRead(read));
+      onRead?.(read, receipt);
+      return read;
     } catch {
       toast(t('rcptCouldNotRead'));
+      return null;
     } finally {
       markReading(receipt.id, false);
     }
   }, [aiReady, update, t]);
 
   /** Photos or PDFs picked from the camera, gallery or files: each kept at once, then read. */
-  const add = useCallback(async (fileList) => {
+  const add = useCallback(async (fileList, readOptions) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
     if (!online) { toast.error(t('rcptNeedOnline')); return; }
@@ -130,7 +136,7 @@ export function useReceiptVault() {
         // The grid shows the photo just taken, without fetching it back
         if (preview) queryClient.setQueryData(fileKey(saved.id, 'thumb'), preview);
         haptic('success');
-        if (image && aiReady) readWithAssistant(saved, image);
+        if (image && aiReady) readWithAssistant(saved, image, readOptions?.(saved));
       } catch (e) {
         setList((list) => list.filter((r) => r.id !== tmp));
         toast.error(t(e.status === 413 ? 'rcTooLarge' : 'rcUploadFailed'));

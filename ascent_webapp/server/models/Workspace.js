@@ -74,6 +74,15 @@ const workspaceSchema = new mongoose.Schema({
     aiAssistant: { type: Boolean, default: false },
     largeExpenseAlert: { type: Number, default: null, min: 0 }, // notify the others at or above this amount
     largeExpenseCurrency: { type: String, default: null }
+  },
+  // The kitchen check: going through what is at home and saying how much is left of each. Every member is
+  // reminded every `everyDays` (null = never) counted from the last check, or from `since` before the first;
+  // whoever does it does it for the whole household (server/lib/kitchenReminders.js)
+  kitchenCheck: {
+    everyDays: { type: Number, default: null, min: 1, max: 60 },
+    since: { type: Date, default: null },
+    lastAt: { type: Date, default: null },
+    lastBy: { type: String, default: '', maxlength: 120 } // their email
   }
 }, {
   timestamps: { createdAt: 'created_date', updatedAt: 'updated_date' }

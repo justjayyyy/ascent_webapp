@@ -1,6 +1,6 @@
-import React, { memo, useMemo, useRef } from 'react';
+import React, { memo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LayoutGrid, ListChecks, Loader2, Receipt, Tag } from 'lucide-react';
+import { BellRing, ChevronRight, LayoutGrid, ListChecks, Loader2, Receipt, Tag } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,7 @@ import WallView from '@/components/groceries/WallView';
 import CheckView from '@/components/groceries/CheckView';
 import PricesView from '@/components/groceries/PricesView';
 import ReceiptsView from '@/components/groceries/ReceiptsView';
-import { checkQueue } from '@/components/groceries/groceryUtils';
+import { useKitchenCheck } from '@/components/groceries/useKitchenCheck';
 
 // The Wall is the default; the Check, Prices and Receipts are one tap away and kept in the address (?view=check)
 const VIEWS = [
@@ -82,7 +82,7 @@ function Groceries() {
   const view = ['check', 'prices', 'receipts'].includes(params.get('view')) ? params.get('view') : 'wall';
   const list = useGroceryList();
   const shell = useGroceryShell(list);
-  const { items, isLoading, low, onList, today } = list;
+  const { items, isLoading, low, onList } = list;
 
   const setView = (next) => {
     if (next === view) return;
@@ -92,10 +92,10 @@ function Groceries() {
     setParams(nextParams, { replace: true });
   };
 
-  const toCheck = useMemo(() => (view === 'check' ? checkQueue(items, today).length : 0), [view, items, today]);
+  const kitchen = useKitchenCheck();
   const subtitle = view === 'receipts' ? t('rcptSubtitle')
     : !items.length ? t('grSubtitle')
-    : view === 'check' && toCheck ? t('grCheckToGo', { n: toCheck })
+    : view === 'check' ? t('grKitchenCheckSub')
       : [t('grToBuyCount', { n: onList.length }), low.length ? t('grRunningLowCount', { n: low.length }) : null].filter(Boolean).join(' · ');
 
   const View = view === 'check' ? CheckView : view === 'prices' ? PricesView : view === 'receipts' ? ReceiptsView : WallView;
@@ -113,6 +113,20 @@ function Groceries() {
         // The tabs point at the panel only while it is there (not while loading or on the empty list)
         toggle={<ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} controls={showsPanel ? 'gr-view' : undefined} />}
       />
+
+      {/* Due for the whole household until one of you does it */}
+      {kitchen.due && view !== 'check' && items.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setView('check')}
+          className="mb-4 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-warning/40 bg-warning/[0.08] px-4 py-2.5 text-start transition-colors hover:bg-warning/[0.12]"
+        >
+          <BellRing className="h-5 w-5 shrink-0 text-warning" aria-hidden />
+          <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">{t('grCheckDueBanner')}</span>
+          <span className="shrink-0 text-sm font-bold text-warning">{t('grStartCheck')}</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-warning rtl:-scale-x-100" aria-hidden />
+        </button>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -138,7 +152,7 @@ function Groceries() {
         </AnimatePresence>
       )}
 
-      <StartShopping count={onList.length} onClick={shell.startShopping} />
+      {view !== 'check' && <StartShopping count={onList.length} onClick={shell.startShopping} />}
       {shell.overlays}
     </div>
   );

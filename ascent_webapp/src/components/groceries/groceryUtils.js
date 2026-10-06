@@ -155,11 +155,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const dayNumber = (day) => Math.round(Date.parse(`${day}T00:00:00Z`) / DAY_MS);
 /** Whole days from `a` to `b` (both 'YYYY-MM-DD'). */
 export const daysBetween = (a, b) => dayNumber(b) - dayNumber(a);
-const dayOf = (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : value ? localDay(new Date(value)) : null);
+// A day as written ('2026-10-06') stays as it is; a moment (a level set at 01:30 in Israel is 22:30 the day
+// before in UTC) is the day it was on this device, so a level set after midnight counts from the right day
+const dayOf = (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : value ? localDay(new Date(value)) : null);
 
 export const LEVEL_VALUE = { full: 1, half: 0.5, low: 0.2, out: 0 };
 const LOW_SHARE = 0.25;
+// Close to running out by the calendar too, once at most half is left. Not by the calendar alone: bread
+// bought every two days is "two days left" the day it is bought, full, and is not running low then.
 const LOW_DAYS = 2;
+const LOW_DAYS_SHARE = 0.5;
 const MAX_PURCHASES = 30;
 
 /** The distinct days it was bought, oldest first. */
@@ -209,7 +214,10 @@ export function supplyOf(item, today = localDay()) {
 
   let status = 'unknown';
   if (manual && item.level === 'out') status = 'out';
-  else if (share !== null) status = share <= 0 ? 'out' : share <= LOW_SHARE || (daysLeft !== null && daysLeft <= LOW_DAYS) ? 'low' : 'ok';
+  else if (share !== null) {
+    status = share <= 0 ? 'out'
+      : share <= LOW_SHARE || (daysLeft !== null && daysLeft <= LOW_DAYS && share <= LOW_DAYS_SHARE) ? 'low' : 'ok';
+  }
 
   return {
     share,
@@ -227,7 +235,8 @@ export function supplyOf(item, today = localDay()) {
 /** Staples that are low or out and not on the list yet, most urgent first. */
 export function runningLow(items, today = localDay()) {
   return items
-    .filter((i) => !i.onList && isTracked(i))
+    // Said to be low or out by hand (in the kitchen check, say) counts even before it is tracked
+    .filter((i) => !i.onList && (isTracked(i) || i.level === 'low' || i.level === 'out'))
     .map((item) => ({ item, supply: supplyOf(item, today) }))
     .filter(({ supply }) => supply.status === 'low' || supply.status === 'out')
     .sort((a, b) => (a.supply.share ?? 0) - (b.supply.share ?? 0));
@@ -266,6 +275,16 @@ export const listChanges = ({ qty = '', note, by = '' } = {}) => ({
 export const unlistChanges = () => ({ onList: false, inCart: false, cartBy: '', qty: '', note: '', listedAt: null, listedBy: '' });
 
 /**
+ * Taking it off the list without buying it says it is not needed yet: when it was running low (by the
+ * estimate, or a level set by hand), it goes back to the pantry as half left instead of straight into
+ * Running low. The estimate runs down from there, so it comes back when it really is running out.
+ */
+export function offListChanges(item, today = localDay()) {
+  const { status } = supplyOf({ ...item, onList: false }, today);
+  return { ...unlistChanges(), ...(status === 'low' || status === 'out' ? levelChanges('half') : {}) };
+}
+
+/**
  * It was bought: off the list, a purchase recorded (with the receipt price when there is one), and any
  * level set by hand cleared so it counts as full from today.
  */
@@ -275,12 +294,13 @@ export function boughtChanges(item, { date = localDay(), by = '', price = null, 
     ...unlistChanges(),
     level: null,
     levelAt: null,
+    levelBy: '',
     purchases: [...(item.purchases || []), purchase].slice(-MAX_PURCHASES),
   };
 }
 
-/** Setting the level by hand ("we're low on rice"). */
-export const levelChanges = (level) => ({ level, levelAt: level ? new Date().toISOString() : null });
+/** Setting the level by hand ("we're low on rice"), and who said so. */
+export function levelChanges(level, by = '') { return { level, levelAt: level ? new Date().toISOString() : null, levelBy: level ? by : '' }; }
 
 /** The last price paid, as { price, currency, date, store }, or null. */
 export function lastPrice(item) {
@@ -290,24 +310,26 @@ export function lastPrice(item) {
 }
 
 /**
- * The staples worth asking about ("running out?"): tracked, not on the list, and close to empty by the
- * estimate, unless someone already answered for this stretch. Emptiest first.
+ * What the kitchen check goes through: everything not on the list, emptiest first by the estimate (what
+ * is probably low is looked at first), then by name. [{ item, supply }]
  */
-export function checkQueue(items, today = localDay()) {
+export function kitchenItems(items, today = localDay(), loc) {
   return items
-    .filter((i) => !i.onList && isTracked(i))
+    .filter((i) => !i.onList)
     .map((item) => ({ item, supply: supplyOf(item, today) }))
-    .filter(({ item, supply }) => {
-      if (supply.share === null) return false;
-      // An answer by hand counts until the estimate says it should be checked again
-      if (supply.manual && item.level !== 'out' && supply.share > 0.3) return false;
-      return supply.share <= 0.3 || (supply.daysLeft !== null && supply.daysLeft <= 2);
-    })
-    .sort((a, b) => a.supply.share - b.supply.share);
+    .sort((a, b) => (a.supply.share ?? 2) - (b.supply.share ?? 2) || a.item.name.localeCompare(b.item.name, loc));
 }
 
-/** "Still have it": it lasts longer than guessed, so it counts as half full from now. */
-export const haveItChanges = () => levelChanges('half');
+/** Whether someone said how much is left of it (or bought it) since `since` (a moment, or null for today). */
+export function checkedSince(item, since, today = localDay()) {
+  const after = (value) => {
+    if (!value) return false;
+    if (since) return new Date(value).getTime() >= new Date(since).getTime();
+    return dayOf(value) === today;
+  };
+  const bought = lastBought(item);
+  return after(item.levelAt) || (!!bought && bought >= (since ? dayOf(since) : today));
+}
 
 /** A new item from a name someone typed. */
 export function newItem(name, { qty = '', by = '', onList = true } = {}) {
@@ -335,7 +357,7 @@ const storeKey = (store) => normalizeName(store);
 export function pricePoints(item, toMine = (p) => p) {
   return (item.purchases || [])
     .filter((p) => typeof p.price === 'number' && p.price > 0)
-    .map((p) => ({ date: p.date, price: toMine(p.price, p.currency), store: cleanStore(p.store) }))
+    .map((p) => ({ date: p.date, price: toMine(p.price, p.currency), store: cleanStore(p.store), qty: p.qty || '', unit: unitOf(p.qty) }))
     .filter((p) => typeof p.price === 'number' && Number.isFinite(p.price))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
@@ -392,9 +414,13 @@ export function priceStats(item, toMine) {
   };
 }
 
+/** How many of something are on the list, when it says a plain number ("2"); otherwise one. */
+const countOf = (qty) => (/^\d+(?:[.,]\d+)?$/.test(String(qty || '').trim()) ? parseFloat(String(qty).replace(',', '.')) : 1);
+
 /**
  * What the list will probably cost: each item at its last price (at `store`'s last price when it was
- * bought there before). { total, priced, missing, atStore }.
+ * bought there before), times how many are on the list when that is a plain number and the price is for
+ * one. { total, priced, missing, atStore }.
  */
 export function basketEstimate(items, { toMine, store = '' } = {}) {
   const want = store ? storeKey(store) : null;
@@ -405,7 +431,8 @@ export function basketEstimate(items, { toMine, store = '' } = {}) {
     const points = pricePoints(item, toMine);
     if (!points.length) continue;
     const here = want ? points.filter((p) => storeKey(p.store) === want).at(-1) : null;
-    total += (here || points.at(-1)).price;
+    const point = here || points.at(-1);
+    total += point.price * (point.unit ? 1 : countOf(item.qty));
     priced += 1;
     if (here) atStore += 1;
   }
@@ -501,6 +528,26 @@ export function findLoggedExpense(transactions, { total, currency, date }, conve
   }
   return best?.tx || null;
 }
+
+/** A receipt line's quantity as kept on a purchase: "3", "1.25 kg". Null when it was one of something. */
+export function receiptQty(line) {
+  if (!line?.qty || (line.qty === 1 && !line.unit)) return null;
+  return line.unit ? `${line.qty} ${line.unit}` : String(line.qty);
+}
+
+/** The purchase of an item a receipt from `date` is about: that day's, or the nearest within three days. -1 if none. */
+export function purchaseNear(item, date) {
+  let at = -1;
+  let best = 4;
+  (item.purchases || []).forEach((p, i) => {
+    const d = p.date ? Math.abs(daysBetween(p.date, date)) : 99;
+    if (d < best || (d === best && at >= 0)) { best = d; at = i; }
+  });
+  return at;
+}
+
+/** The unit a purchase's price is for, from its quantity: 'kg', 'g', 'l', 'ml', or null for "each". */
+export const unitOf = (qty) => String(qty || '').trim().match(/\b(kg|g|l|ml)$/i)?.[1]?.toLowerCase() || null;
 
 /** A receipt line's quantity as people say it: "3", "1.25 kg". Null when it was one of something. */
 export function lineQty(line, loc) {

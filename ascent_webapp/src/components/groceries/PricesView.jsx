@@ -1,12 +1,16 @@
 import React, { memo, useCallback, useMemo } from 'react';
-import { ArrowDownRight, ArrowUpRight, Receipt, Store } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Receipt, RotateCcw, Store } from 'lucide-react';
 import { motion } from '@/lib/motion';
 import { useTheme } from '@/components/ThemeProvider';
-import { useCategories, useMoney } from '@/hooks/useWorkspaceData';
+import { useCategories, useMoney, useReceipts } from '@/hooks/useWorkspaceData';
 import { useTransactions } from '@/lib/offline/txOutbox';
 import { cn } from '@/lib/utils';
 import { ItemEmoji, localeOf, money } from './GroceryParts';
 import { basketEstimate, knownStores, priceMovers, priceStats, storeComparison } from './groceryUtils';
+
+// What a price is for: one of it, or a kg (litre...) of it
+const per = (point, t) => (point?.unit ? t('grPerUnit', { unit: point.unit }) : t('grEach'));
 
 const card = 'rounded-3xl border border-border/60 bg-card/75 p-4 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-14px_hsl(0_0%_0%/0.45)] sm:p-5';
 const MONTHS = 6;
@@ -61,6 +65,12 @@ function PricesView({ list, shell }) {
     return out;
   }, [transactions, categories, amountOf, loc]);
   const maxMonth = Math.max(...months.map((m) => m.amount), 1);
+
+  // Receipts read before each line was counted put the whole line's price on an item; reading them again fixes it
+  const { data: receipts = [] } = useReceipts();
+  const unlined = receipts.filter((r) => r.read && !r.items && String(r.type || '').startsWith('image/')).length;
+  const [params, setParams] = useSearchParams();
+  const toReceipts = () => { const next = new URLSearchParams(params); next.set('view', 'receipts'); setParams(next, { replace: true }); };
   const spentAny = months.some((m) => m.amount > 0);
 
   if (!priced.length && !spentAny) {
@@ -77,6 +87,13 @@ function PricesView({ list, shell }) {
 
   return (
     <div className="space-y-4">
+      {unlined > 0 && (
+        <button type="button" onClick={toReceipts} className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/[0.06] px-4 py-3 text-start transition-colors hover:bg-primary/[0.1]">
+          <RotateCcw className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1 text-sm text-foreground">{t('grPricesFromOld', { n: unlined })}</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground rtl:-scale-x-100" aria-hidden />
+        </button>
+      )}
       {onList.length > 0 && (
         <section className={card} aria-labelledby="gp-list">
           <h2 id="gp-list" className="text-sm text-muted-foreground">{t('grListWillCost')}</h2>
@@ -147,7 +164,10 @@ function PricesView({ list, shell }) {
                   <span className="block truncate text-sm font-medium text-foreground">{item.name}</span>
                   <span className="block truncate text-xs text-muted-foreground" dir="auto">{t('grUsually', { price: hide(fmt(stats.avg)) })}</span>
                 </span>
-                <span className="text-sm font-semibold tabular-nums text-foreground" dir="ltr">{hide(fmt(stats.last.price))}</span>
+                <span className="text-end">
+                  <span className="block text-sm font-semibold tabular-nums text-foreground" dir="ltr">{hide(fmt(stats.last.price))}</span>
+                  <span className="block text-[11px] text-muted-foreground">{per(stats.last, t)}</span>
+                </span>
                 <span className={cn('inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', change > 0 ? 'bg-warning/15 text-warning' : 'bg-success/15 text-success')} dir="ltr">
                   {change > 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}{Math.round(Math.abs(change) * 100)}%
                 </span>
@@ -190,10 +210,13 @@ function PricesView({ list, shell }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground">{item.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {stats.cheapest ? t('grCheapestAt', { store: stats.cheapest.store }) : stats.last.store || ''}
+                      {[stats.cheapest ? t('grCheapestAt', { store: stats.cheapest.store }) : stats.last.store || '', stats.last.qty ? t('grLastBoughtQty', { qty: stats.last.qty }) : ''].filter(Boolean).join(' · ')}
                     </span>
                   </span>
-                  <span className="text-sm font-semibold tabular-nums text-foreground" dir="ltr">{hide(fmt(stats.last.price))}</span>
+                  <span className="shrink-0 text-end">
+                    <span className="block text-sm font-semibold tabular-nums text-foreground" dir="ltr">{hide(fmt(stats.last.price))}</span>
+                    <span className="block text-[11px] text-muted-foreground">{per(stats.last, t)}</span>
+                  </span>
                 </button>
               </li>
             ))}

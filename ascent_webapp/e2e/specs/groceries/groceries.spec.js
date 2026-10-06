@@ -2,7 +2,7 @@
 import { test, expect } from '../../fixtures.js';
 import { openApp } from '../../support/app.js';
 import { L } from '../../support/i18n.js';
-import { expense } from '../../support/factories.js';
+import { day, expense } from '../../support/factories.js';
 
 const onList = async (api) => (await api.list('groceries')).filter((i) => i.onList).map((i) => [i.name.toLowerCase(), i.qty || '']).sort();
 
@@ -150,16 +150,56 @@ test('something bought every week says how long it usually lasts and when it run
   await expect(page.getByText(new RegExp(L('grDaysLeft', { n: '\\d+' }).replace('~', '~?'))).first()).toBeVisible();
 });
 
-test('the kitchen check: going through what is usually bought, "have it" for each, ends checked @critical', async ({ page, api }) => {
+test('the kitchen check: one of you goes through the kitchen and finishes it, and it is done for both @critical @multiuser', async ({ page, owner, api, member }) => {
+  const sam = await member('editor', { name: 'Sam Partner' });
   for (const name of ['Rice', 'Olive oil']) {
     await api.create('groceries', { name, onList: false, purchases: [bought('a', 30, 'Shufersal', 10), bought('b', 15, 'Shufersal', 10)] });
   }
+  await openApp(page, '/Groceries?view=check');
+  await page.getByRole('radio', { name: L('grRemindWeek') }).click();
+  await page.getByRole('group', { name: L('grHowMuchLeftOf', { name: 'Rice' }) }).getByRole('button', { name: L('grLevelOut') }).click();
+  await page.getByRole('group', { name: L('grHowMuchLeftOf', { name: 'Olive oil' }) }).getByRole('button', { name: L('grLevelFull') }).click();
+  await expect(page.getByText(L('grCheckProgress', { n: 2, total: 2 }))).toBeVisible();
+  await page.getByRole('button', { name: new RegExp(L('grFinishCheck')) }).click();
+  await expect(page.getByRole('heading', { name: L('grKitchenChecked') })).toBeVisible();
+
+  await expect.poll(async () => (await api.list('groceries')).map((i) => [i.name, i.level]).sort()).toEqual([['Olive oil', 'full'], ['Rice', 'out']]);
+  // The other one sees it done, by whom, with the reminder they share
+  await openApp(sam.page, '/Groceries?view=check');
+  await expect(sam.page.getByRole('region', { name: L('grKitchenCheck') }).getByText(new RegExp(owner.name))).toBeVisible();
+  await expect(sam.page.getByRole('radio', { name: L('grRemindWeek') })).toBeChecked();
+  // What was out is running low on the Wall
+  await sam.page.getByRole('tab', { name: L('grViewWall') }).click();
+  await expect(sam.page.getByRole('region', { name: new RegExp(L('grRunningLowShort')) }).getByRole('button', { name: /^Rice[,.]/ })).toBeVisible();
+});
+
+test('running low: something marked full is not on it, and something taken off the list goes back home @critical', async ({ page, api }) => {
+  // Pita is bought every two days and was just marked full; hummus is out by the estimate and on the list
+  await api.create('groceries', { name: 'Pita', onList: false, level: 'full', levelAt: new Date().toISOString(), purchases: [bought('a', 4, 'Shufersal', 8), bought('b', 2, 'Shufersal', 8)] });
+  await api.create('groceries', { name: 'Hummus', onList: true, listedAt: new Date().toISOString(), purchases: [bought('a', 30, 'Shufersal', 11), bought('b', 20, 'Shufersal', 11)] });
   await openApp(page, '/Groceries');
-  await page.getByRole('tab', { name: L('grViewCheck') }).click();
-  await expect(async () => {
-    await page.getByRole('button', { name: L('grHaveIt'), exact: true }).first().click({ timeout: 1000 });
-    await expect(page.getByText(L('grKitchenChecked'))).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 20_000 });
+  const home = page.getByRole('region', { name: new RegExp(L('grAtHome')) });
+  await expect(home.getByRole('button', { name: /^Pita[,.]/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: new RegExp(L('grRunningLowShort')) })).toHaveCount(0);
+
+  await page.getByRole('button', { name: /^Hummus[,.]/ }).click({ button: 'right' });
+  await page.getByRole('dialog').getByRole('button', { name: L('grTakeOffList') }).click();
+  await expect(home.getByRole('button', { name: /^Hummus[,.]/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: new RegExp(L('grRunningLowShort')) })).toHaveCount(0);
+});
+
+test('an older receipt read again counts each line, and the price of one goes onto the item @critical', async ({ page, owner, api }) => {
+  await api.call('PUT', `/workspaces?id=${owner.workspaceId}&action=settings`, { aiAssistant: true });
+  // Two cartons of milk bought today, priced at the whole line (13.80) by an older read
+  await api.create('groceries', { name: 'Milk', onList: false, purchases: [{ id: 'm1', date: day(0), qty: '2', price: 13.8, currency: 'USD', store: 'Rami Levy' }] });
+  await api.create('receipts', { type: 'image/png', data: RECEIPT_PHOTO.buffer.toString('base64'), store: 'Rami Levy', date: day(0), total: 87.4, currency: 'USD', read: true });
+  await openApp(page, '/Groceries?view=prices');
+  await page.getByRole('button', { name: L('grPricesFromOld', { n: 1 }) }).click();
+  await page.getByRole('button', { name: L('rcptReadAllAgain') }).click();
+
+  await expect.poll(async () => (await api.list('groceries'))[0].purchases[0].price).toBe(6.9);
+  expect((await api.list('receipts'))[0].items).toEqual([{ text: 'Milk 3%', qty: 2, unit: null, unitPrice: 6.9, price: 13.8 }]);
+  await expect(page.getByRole('button', { name: L('rcptReadAllAgain') })).toHaveCount(0);
 });
 
 test('with the assistant off, the receipt step says an owner can turn it on @critical', async ({ page, api }) => {

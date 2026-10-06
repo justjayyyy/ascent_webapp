@@ -344,6 +344,8 @@ const workspaces = {
   declineInvitation: (token) => request(`/workspaces?action=decline&token=${enc(token)}`, { method: 'POST' }),
   // Household options: { aiAssistant, largeExpenseAlert, largeExpenseCurrency }
   updateSettings: (id, settings) => request(`/workspaces?id=${enc(id)}&action=settings`, json('PUT', settings)),
+  // The kitchen check: { everyDays } sets how often the household is reminded, { done: true } records a check
+  kitchenCheck: (id, body) => request(`/workspaces?id=${enc(id)}&action=kitchen`, json('PUT', body)),
   // Public: the details shown on the invitation page before signing in
   invitation: (token) => request(`/invitations/${enc(token)}`),
 };

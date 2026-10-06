@@ -38,6 +38,7 @@ const groceryItemSchema = new mongoose.Schema({
   // Supply: a level someone set by hand (it wins over the learned guess from that moment on)
   level: { type: String, enum: [...LEVELS, null], default: null },
   levelAt: { type: Date, default: null },
+  levelBy: { type: String, default: '', maxlength: 120 }, // who set it (their email)
   lastsDays: { type: Number, default: null, min: 1, max: 365 }, // "lasts about", set by hand
   purchases: { type: [purchaseSchema], default: [] },
 

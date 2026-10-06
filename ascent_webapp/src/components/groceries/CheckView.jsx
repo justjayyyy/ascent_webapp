@@ -1,158 +1,184 @@
-import React, { memo, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
-import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform } from '@/lib/motion';
+import React, { memo, useMemo, useState } from 'react';
+import { BellRing, Check, ListPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { haptic } from '@/lib/haptics';
-import AddBar from './AddBar';
-import GroceryRows from './GroceryRows';
-import { ItemEmoji, daysAgo, leftLabel, localeOf } from './GroceryParts';
-import { checkQueue, haveItChanges, isTracked, levelChanges, supplyOf } from './groceryUtils';
+import { localDay } from '@/lib/localDay';
+import { ItemEmoji, TONE, daysAgo, leftLabel, localeOf, useWho } from './GroceryParts';
+import { checkedSince, daysBetween, kitchenItems, runningLow } from './groceryUtils';
+import { useKitchenCheck } from './useKitchenCheck';
 
-const SWIPE = 110;
+const LEVELS = ['full', 'half', 'low', 'out'];
+const STATUS_OF = { full: 'ok', half: 'ok', low: 'low', out: 'out' };
+const levelName = (level, t) => t(`grLevel${level[0].toUpperCase()}${level.slice(1)}`);
+// How often the household is reminded: off, every 3 days, weekly, fortnightly
+const RHYTHMS = [null, 3, 7, 14];
+const rhythmName = (days, t) => (!days ? t('grRemindOff') : days === 7 ? t('grRemindWeek') : days === 14 ? t('grRemindTwoWeeks') : t('grRemindDays', { n: days }));
 
-/** One "running out?" card. Drag it left to put it on the list, right if there is still some. */
-function CheckCard({ entry, onAnswer, t, loc, reduce }) {
-  const { item, supply } = entry;
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-240, 0, 240], [-10, 0, 10]);
-  const toList = useTransform(x, [-SWIPE, -20, 0], [1, 0, 0]);
-  const toHave = useTransform(x, [0, 20, SWIPE], [0, 0, 1]);
-
+/** One thing at home: what it is, what the estimate says (or who said how much is left), and four levels to tap. */
+const CheckRow = memo(function CheckRow({ item, supply, checked, by, onLevel, t }) {
+  const chosen = checked ? item.level : null;
   return (
-    <motion.article
-      drag="x"
-      dragDirectionLock
-      dragSnapToOrigin
-      dragElastic={0.85}
-      style={{ x, rotate }}
-      onDragEnd={(_, info) => {
-        if (info.offset.x < -SWIPE || info.velocity.x < -700) onAnswer('low', -1);
-        else if (info.offset.x > SWIPE || info.velocity.x > 700) onAnswer('have', 1);
-      }}
-      variants={{
-        enter: reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.97 },
-        shown: { opacity: 1, y: 0, scale: 1 },
-        gone: (dir) => (reduce ? { opacity: 0 } : { x: (dir || -1) * 420, rotate: (dir || -1) * 14, opacity: 0, transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }),
-      }}
-      initial="enter"
-      animate="shown"
-      exit="gone"
-      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-      className="absolute inset-x-0 top-0 h-[216px] cursor-grab touch-pan-y select-none rounded-[28px] border border-border/80 bg-gradient-to-b from-popover to-card p-5 shadow-[0_20px_40px_-24px_hsl(0_0%_0%/0.6)] active:cursor-grabbing"
-      aria-label={t('grRunningOutQ', { name: item.name })}
-    >
-      <motion.span aria-hidden style={{ opacity: toList }} className="pointer-events-none absolute inset-0 flex items-center rounded-[28px] bg-gradient-to-r from-warning/30 to-transparent ps-6 text-lg font-extrabold tracking-tight text-warning">
-        {t('grSwipeAddToList')}
-      </motion.span>
-      <motion.span aria-hidden style={{ opacity: toHave }} className="pointer-events-none absolute inset-0 flex items-center justify-end rounded-[28px] bg-gradient-to-l from-success/25 to-transparent pe-6 text-lg font-extrabold tracking-tight text-success">
-        {t('grSwipeStillHave')}
-      </motion.span>
-
-      <p className="text-xs font-semibold text-muted-foreground">{t('grRunningOut')}</p>
-      <div className="mt-4 flex items-center gap-4">
-        <span className="grid h-[72px] w-[72px] shrink-0 place-items-center rounded-[22px] bg-foreground/[0.06]">
-          <ItemEmoji item={item} className="text-[40px]" />
+    <li className="px-3.5 py-3 sm:flex sm:items-center sm:gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-foreground/[0.05]"><ItemEmoji item={item} className="text-xl" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold text-foreground">{item.name}</span>
+          <span className={cn('flex items-center gap-1 truncate text-xs', checked ? 'font-medium text-success' : supply.status === 'low' || supply.status === 'out' ? TONE[supply.status].text : 'text-muted-foreground')}>
+            {checked && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} aria-hidden />}
+            {checked ? [chosen ? levelName(chosen, t) : t('grBoughtToday'), by].filter(Boolean).join(' · ') : leftLabel(supply, t) || t('grLevelUnknown')}
+          </span>
         </span>
-        <div className="min-w-0">
-          <h3 className="truncate text-2xl font-extrabold tracking-tight text-foreground">{item.name}</h3>
-          <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
-            {supply.lastBought ? t('grBoughtWhen', { when: daysAgo(supply.sinceBought, loc) }) : t('grNeverBought')}
-            {supply.interval ? <><br />{t('grUsuallyLastsDays', { n: supply.interval })}</> : null}
-          </p>
-        </div>
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        <button type="button" onClick={() => onAnswer('out', -1)} className="h-12 rounded-2xl bg-danger/[0.14] text-sm font-bold text-danger transition-transform active:scale-95">{t('grOut')}</button>
-        <button type="button" onClick={() => onAnswer('low', -1)} className="h-12 rounded-2xl bg-warning/[0.15] text-sm font-bold text-warning transition-transform active:scale-95">{t('grLevelLow')}</button>
-        <button type="button" onClick={() => onAnswer('have', 1)} className="h-12 rounded-2xl bg-success/[0.13] text-sm font-bold text-success transition-transform active:scale-95">{t('grHaveIt')}</button>
+      <div role="group" aria-label={t('grHowMuchLeftOf', { name: item.name })} className="mt-2.5 grid grid-cols-4 gap-1.5 sm:mt-0 sm:w-72 sm:shrink-0">
+        {LEVELS.map((level) => {
+          const on = chosen === level;
+          const tone = TONE[STATUS_OF[level]];
+          return (
+            <button
+              key={level}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onLevel(item, level)}
+              className={cn(
+                'h-10 rounded-xl text-sm font-semibold transition-[background-color,color,transform] active:scale-95',
+                on ? cn(tone.fill, tone.text, 'ring-1 ring-current') : 'bg-foreground/[0.06] text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {levelName(level, t)}
+            </button>
+          );
+        })}
       </div>
-    </motion.article>
+    </li>
   );
-}
+});
 
 /**
- * The Check: the staples that are probably running out, one card at a time (swipe left onto the list,
- * right if there is still some), and the list itself by aisle. Side by side on wide screens.
+ * The kitchen check: everything at home, each with Full, Half, Low and Out to tap, emptiest by the estimate
+ * first. Whoever finishes it finishes it for the household, and a reminder can be set for everyone.
  */
-function CheckView({ list, shell }) {
+function CheckView({ list }) {
   const { t, language } = useTheme();
   const loc = localeOf(language);
-  const reduce = useReducedMotion();
-  const { items, onList, groups, today } = list;
-  const [answered, setAnswered] = useState(() => new Set());
-  const [dir, setDir] = useState(-1);
-  const sessionSize = useRef(0);
+  const who = useWho();
+  const { items, today, me } = list;
+  const kitchen = useKitchenCheck();
+  const { check, due, dueOn } = kitchen;
+  const [finished, setFinished] = useState(false);
 
-  const queue = useMemo(() => checkQueue(items, today).filter((e) => !answered.has(e.item.id)), [items, today, answered]);
-  sessionSize.current = Math.max(sessionSize.current, queue.length + answered.size);
+  // Said since the last check counts as checked in this one (or today, before there was one)
+  const since = check.lastAt && !finished ? check.lastAt : null;
+  const rows = useMemo(() => kitchenItems(items, today, loc).map((row) => ({ ...row, checked: checkedSince(row.item, since, today) })), [items, today, loc, since]);
+  const done = rows.filter((r) => r.checked).length;
+  const low = useMemo(() => runningLow(items, today), [items, today]);
 
-  const nextOut = useMemo(() => items
-    .filter((i) => !i.onList && isTracked(i))
-    .map((item) => ({ item, supply: supplyOf(item, today) }))
-    .filter(({ supply }) => supply.daysLeft !== null && supply.status === 'ok')
-    .sort((a, b) => a.supply.daysLeft - b.supply.daysLeft)[0], [items, today]);
-
-  const answer = (entry, kind, direction) => {
-    setDir(direction);
-    setAnswered((s) => new Set(s).add(entry.item.id));
-    if (kind === 'have') { haptic('selection'); list.save(entry.item, haveItChanges()); } else list.putOnList(entry.item, levelChanges(kind));
+  const onLevel = (item, level) => {
+    // The same level again takes the answer back
+    if (item.level === level && checkedSince(item, since, today)) list.setLevel(item, null);
+    else list.setLevel(item, level);
+  };
+  const finish = async () => {
+    haptic('success');
+    if (await kitchen.finish(me)) {
+      setFinished(true);
+      toast(t('grKitchenChecked'), { description: who.isShared ? t('grCheckedForAll') : undefined });
+    }
+  };
+  const addLow = () => {
+    haptic('light');
+    low.forEach(({ item }) => list.putOnList(item));
   };
 
-  const top = queue.slice(0, 3);
+  const lastBy = check.lastBy ? (check.lastBy === me ? t('grYou') : who.of(check.lastBy)?.name) : '';
+  const lastWhen = check.lastAt ? daysAgo(Math.max(0, daysBetween(localDay(new Date(check.lastAt)), today)), loc) : '';
+  const nextWhen = dueOn ? new Intl.DateTimeFormat(loc, { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date(`${dueOn}T12:00:00`)) : '';
 
   return (
-    <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
-      <div className="lg:sticky lg:top-6">
-        <section aria-label={t('grKitchenCheck')} className="mb-6 lg:mb-0">
-          {top.length > 0 ? (
-            <>
-              <div className="mb-3 flex items-center justify-between px-0.5">
-                <h2 className="text-[15px] font-bold tracking-tight text-foreground">{t('grKitchenCheck')}</h2>
-                <span className="flex gap-1" aria-label={t('grCheckProgress', { n: answered.size, total: sessionSize.current })}>
-                  {Array.from({ length: Math.min(8, sessionSize.current) }).map((_, i) => (
-                    <i key={i} className={cn('h-1 w-4 rounded-full', i < answered.size ? 'bg-primary' : i === answered.size ? 'bg-primary/60' : 'bg-foreground/15')} />
-                  ))}
-                </span>
-              </div>
-              <div className="relative h-[238px]">
-                {top.length > 2 && <div aria-hidden className="absolute inset-x-0 top-0 h-[216px] translate-y-[18px] scale-[0.92] rounded-[28px] border border-border/50 bg-card/60" />}
-                {top.length > 1 && <div aria-hidden className="absolute inset-x-0 top-0 h-[216px] translate-y-[9px] scale-[0.96] rounded-[28px] border border-border/60 bg-card/85" />}
-                <AnimatePresence custom={dir} initial={false}>
-                  <CheckCard key={top[0].item.id} entry={top[0]} t={t} loc={loc} reduce={reduce} onAnswer={(kind, d) => answer(top[0], kind, d)} />
-                </AnimatePresence>
-              </div>
-              <p className="mt-1 flex justify-between px-2 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><ArrowLeft className="h-3.5 w-3.5 rtl:-scale-x-100" />{t('grSwipeAddToList')}</span>
-                <span className="inline-flex items-center gap-1">{t('grSwipeStillHave')}<ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100" /></span>
-              </p>
-            </>
-          ) : (
-            <div className="flex items-center gap-4 rounded-3xl border border-border/60 bg-card/75 p-4 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05)]">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-success/[0.14] text-success"><Check className="h-6 w-6" strokeWidth={3} /></span>
-              <div className="min-w-0">
-                <h2 className="font-semibold text-foreground">{t('grKitchenChecked')}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {nextOut ? t('grNextToRunOut', { name: nextOut.item.name, when: leftLabel(nextOut.supply, t) }) : t('grKitchenCheckedHint')}
-                </p>
-              </div>
-            </div>
+    <div className="space-y-4 pb-24">
+      <section aria-labelledby="gk-title" className="rounded-3xl border border-border/60 bg-card/75 p-4 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05)] sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="gk-title" className="text-lg font-bold tracking-tight text-foreground">{t('grKitchenCheck')}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {check.lastAt ? t('grLastCheckedBy', { name: lastBy || '—', when: lastWhen }) : t('grNeverChecked')}
+            </p>
+          </div>
+          {due && !finished && <span className="shrink-0 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-bold text-warning">{t('grCheckDue')}</span>}
+        </div>
+
+        <div className="mt-4">
+          <p id="gk-remind" className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground"><BellRing className="h-4 w-4 text-muted-foreground" aria-hidden />{t('grRemind')}</p>
+          <div role="radiogroup" aria-labelledby="gk-remind" className="grid grid-cols-4 gap-1 rounded-2xl bg-foreground/[0.05] p-1">
+            {RHYTHMS.map((days) => {
+              const on = (check.everyDays || null) === days;
+              return (
+                <button
+                  key={days ?? 'off'}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => { if (!on) { haptic('selection'); kitchen.setEvery(days); } }}
+                  className={cn('min-h-9 rounded-xl px-1 text-xs font-semibold transition-colors sm:text-sm', on ? 'bg-popover text-foreground shadow-[0_2px_10px_-4px_hsl(0_0%_0%/0.5)]' : 'text-muted-foreground hover:text-foreground')}
+                >
+                  {rhythmName(days, t)}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {check.everyDays ? [who.isShared ? t('grRemindHint') : t('grRemindHintSolo'), nextWhen && t('grNextCheck', { when: nextWhen })].filter(Boolean).join(' ') : t('grRemindOffHint')}
+          </p>
+        </div>
+      </section>
+
+      {finished ? (
+        <section className="flex flex-col items-center gap-3 rounded-3xl bg-success/[0.08] px-5 py-8 text-center">
+          <span className="grid h-12 w-12 place-items-center rounded-full bg-success/[0.16] text-success"><Check className="h-6 w-6" strokeWidth={3} /></span>
+          <h2 className="text-lg font-semibold text-foreground">{t('grKitchenChecked')}</h2>
+          <p className="max-w-sm text-sm text-muted-foreground">{who.isShared ? t('grCheckedForAll') : t('grCheckedHint')}</p>
+          {low.length > 0 && (
+            <button type="button" onClick={addLow} className="mt-1 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground active:scale-[0.98]">
+              <ListPlus className="h-4 w-4" />{t('grAddLowToList', { n: low.length })}
+            </button>
           )}
+          <button type="button" onClick={() => setFinished(false)} className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline">{t('grCheckAgain')}</button>
         </section>
-      </div>
-      <div>
-        <AddBar inputRef={shell.addRef} items={items} onAddText={list.addText} onPick={(i) => list.putOnList(i)} className="mb-5" />
-        <section aria-labelledby="gc-list">
-          <h2 id="gc-list" className="mb-2.5 px-0.5 text-[15px] font-bold tracking-tight text-foreground">
-            {t('grOnTheList')} <span className="ms-1 font-medium tabular-nums text-muted-foreground">{onList.length}</span>
-          </h2>
-          {groups.length === 0 ? (
-            <p className="rounded-3xl bg-foreground/[0.04] px-5 py-6 text-center text-sm text-muted-foreground">{t('grListEmpty')}</p>
-          ) : (
-            <GroceryRows groups={groups} today={today} onOpen={shell.openItem} onBought={list.boughtOne} />
-          )}
+      ) : rows.length === 0 ? (
+        <p className="rounded-3xl bg-foreground/[0.04] px-5 py-8 text-center text-sm text-muted-foreground">{t('grNothingAtHome')}</p>
+      ) : (
+        <section aria-labelledby="gk-items">
+          <div className="mb-2.5 flex items-baseline justify-between gap-3 px-0.5">
+            <h2 id="gk-items" className="text-[15px] font-bold tracking-tight text-foreground">{t('grHowMuchLeft')}</h2>
+            <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">{t('grCheckProgress', { n: done, total: rows.length })}</span>
+          </div>
+          <ul className="divide-y divide-border/50 overflow-hidden rounded-3xl border border-border/60 bg-card/75">
+            {rows.map(({ item, supply, checked }) => (
+              <CheckRow
+                key={item.id} item={item} supply={supply} checked={checked} t={t} onLevel={onLevel}
+                by={checked && who.isShared && item.levelBy && item.levelBy !== me ? who.of(item.levelBy)?.name : ''}
+              />
+            ))}
+          </ul>
         </section>
-      </div>
+      )}
+
+      {!finished && rows.length > 0 && (
+        // Stays in view at the foot of the list, above the dock on phones
+        <div className="pointer-events-none sticky bottom-[calc(env(safe-area-inset-bottom)+96px)] z-20 flex justify-center md:bottom-6">
+          <button
+            type="button"
+            onClick={finish}
+            disabled={done === 0}
+            className="pointer-events-auto inline-flex h-[52px] items-center gap-2.5 rounded-full bg-primary pe-5 ps-4 text-[15px] font-bold text-primary-foreground shadow-[0_6px_20px_-6px_hsl(var(--glow)/0.55)] transition-[opacity,transform] active:scale-[0.97] disabled:opacity-50"
+          >
+            <Check className="h-5 w-5" strokeWidth={3} />
+            {t('grFinishCheck')}
+            <span className="rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[13px] tabular-nums">{done}/{rows.length}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

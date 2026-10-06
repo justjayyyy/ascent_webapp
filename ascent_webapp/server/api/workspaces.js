@@ -380,6 +380,26 @@ export default async function handler(req, res) {
           return success(res, await present(workspace, user));
         }
 
+        // The kitchen check, a chore any member does for the household: how often everyone is reminded
+        // ({ everyDays: 1-60, or null for never }) and that it was just done ({ done: true })
+        if (action === 'kitchen') {
+          if (!actor) return forbidden(res, 'Only members of this household can do that');
+          const next = { ...(workspace.kitchenCheck?.toObject?.() ?? workspace.kitchenCheck ?? {}) };
+          if (body.everyDays !== undefined) {
+            const days = Number(body.everyDays);
+            next.everyDays = body.everyDays === null || !(days >= 1) ? null : Math.min(Math.round(days), 60);
+            // A new rhythm counts from now until the first check
+            next.since = next.everyDays ? new Date() : null;
+          }
+          if (body.done === true) {
+            next.lastAt = new Date();
+            next.lastBy = String(user.email || '').toLowerCase().slice(0, 120);
+          }
+          workspace.kitchenCheck = next;
+          await workspace.save();
+          return success(res, await present(workspace, user));
+        }
+
         // Household options: the AI assistant and alerts for large expenses (owners and admins)
         if (action === 'settings') {
           if (!isManagerRole(actor?.role) && !isSame(workspace.ownerId, user._id)) return forbidden(res, 'Only owners and admins can change household settings');

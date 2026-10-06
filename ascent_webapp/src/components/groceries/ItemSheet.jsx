@@ -138,9 +138,16 @@ function PriceMemory({ item, items, onPrice, t, loc, user }) {
         <>
           <div className="mt-2 flex items-end justify-between gap-3">
             <div className="min-w-0">
-              <p className={cn('text-2xl font-bold tabular-nums tracking-tight text-foreground', blur && 'blur-sm')} dir="ltr">{fmt(stats.last.price)}</p>
+              <p className="flex items-baseline gap-1.5">
+                <span className={cn('text-2xl font-bold tabular-nums tracking-tight text-foreground', blur && 'blur-sm')} dir="ltr">{fmt(stats.last.price)}</span>
+                <span className="text-xs text-muted-foreground">{stats.last.unit ? t('grPerUnit', { unit: stats.last.unit }) : t('grEach')}</span>
+              </p>
               <p className="truncate text-xs text-muted-foreground">
-                {[stats.last.store, new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${stats.last.date}T12:00:00`))].filter(Boolean).join(' · ')}
+                {[
+                  stats.last.store,
+                  new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${stats.last.date}T12:00:00`)),
+                  stats.last.qty ? t('grLastBoughtQty', { qty: stats.last.qty }) : null,
+                ].filter(Boolean).join(' · ')}
               </p>
             </div>
             {stats.points.length > 1 && <Sparkline values={stats.points.slice(-10).map((p) => p.price)} width={88} height={28} className="text-foreground" />}

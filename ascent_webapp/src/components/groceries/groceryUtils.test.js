@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from 'vitest';
 import {
-  basketEstimate, boughtChanges, findByName, findLoggedExpense, lineQty, groupByAisle, guessItem, isTracked, knownStores, learnedInterval, parseEntries,
-  priceMovers, priceStats, purchasePriceChanges, runningLow, storeComparison, supplyOf,
+  basketEstimate, boughtChanges, checkedSince, findByName, findLoggedExpense, lineQty, groupByAisle, guessItem, isTracked, kitchenItems, knownStores,
+  learnedInterval, offListChanges, parseEntries, priceMovers, priceStats, purchaseNear, purchasePriceChanges, receiptQty, runningLow, storeComparison, supplyOf,
 } from './groceryUtils';
 
 const bought = (...dates) => dates.map((date, i) => ({ id: `p${i}`, date }));
@@ -209,5 +209,80 @@ describe('lineQty', () => {
     expect(lineQty({ qty: 1.25, unit: 'kg' }, 'en-US')).toBe('1.25 kg');
     expect(lineQty({ qty: 1 }, 'en-US')).toBeNull();
     expect(lineQty({ qty: null }, 'en-US')).toBeNull();
+  });
+});
+
+describe('what is running low, and what is not', () => {
+  // Bread bought every two days
+  const pita = { id: 'p', purchases: bought('2026-10-02', '2026-10-04') };
+
+  test('something that lasts two days is not running low the day it is bought, or marked full', () => {
+    expect(supplyOf(pita, '2026-10-04')).toMatchObject({ share: 1, daysLeft: 2, status: 'ok' });
+    const full = { ...pita, level: 'full', levelAt: '2026-10-05T09:00:00Z' };
+    expect(supplyOf(full, '2026-10-05')).toMatchObject({ manual: true, share: 1, status: 'ok' });
+    expect(runningLow([full], '2026-10-05')).toEqual([]);
+    // A day later half is gone, and it is
+    expect(supplyOf(pita, '2026-10-05')).toMatchObject({ share: 0.5, status: 'low' });
+  });
+
+  test('a level set after midnight counts from that day where it was set', () => {
+    // 00:30 on the 5th in Israel is still the 4th in UTC; it was bought on the 5th, then marked full
+    const item = { purchases: bought('2026-09-28', '2026-10-05'), level: 'full', levelAt: new Date(2026, 9, 5, 0, 30).toISOString() };
+    expect(supplyOf(item, '2026-10-05').manual).toBe(true);
+  });
+
+  test('taken off the list without buying it, it goes back home rather than into running low', () => {
+    const low = { id: 'b', onList: true, purchases: bought('2026-09-01', '2026-09-11') }; // out by the estimate
+    const changes = offListChanges(low, '2026-09-30');
+    expect(changes).toMatchObject({ onList: false, level: 'half' });
+    expect(runningLow([{ ...low, ...changes, levelAt: '2026-09-30T08:00:00' }], '2026-09-30')).toEqual([]);
+    // Something that was fine is just taken off
+    expect(offListChanges({ onList: true, purchases: bought('2026-09-20', '2026-09-27') }, '2026-09-28').level).toBeUndefined();
+  });
+
+  test('marked low or out by hand, it is running low even before it has been bought twice', () => {
+    const salt = { id: 's', purchases: [], level: 'out', levelAt: '2026-10-05T08:00:00' };
+    expect(runningLow([salt], '2026-10-05').map((x) => x.item.id)).toEqual(['s']);
+  });
+});
+
+describe('the kitchen check', () => {
+  test('goes through everything not on the list, emptiest first', () => {
+    const items = [
+      { id: 'full', name: 'A', purchases: bought('2026-09-28', '2026-10-05') },
+      { id: 'out', name: 'B', purchases: bought('2026-09-01', '2026-09-11') },
+      { id: 'new', name: 'C', purchases: [] },
+      { id: 'listed', name: 'D', onList: true, purchases: [] },
+    ];
+    expect(kitchenItems(items, '2026-10-05', 'en').map((x) => x.item.id)).toEqual(['out', 'full', 'new']);
+  });
+
+  test('counts what was said since the last check (or today), and what was bought since', () => {
+    const lastCheck = '2026-10-01T10:00:00.000Z';
+    expect(checkedSince({ level: 'half', levelAt: '2026-10-02T08:00:00.000Z' }, lastCheck, '2026-10-05')).toBe(true);
+    expect(checkedSince({ level: 'half', levelAt: '2026-09-30T08:00:00.000Z' }, lastCheck, '2026-10-05')).toBe(false);
+    expect(checkedSince({ purchases: bought('2026-10-03') }, lastCheck, '2026-10-05')).toBe(true);
+    expect(checkedSince({ level: 'low', levelAt: new Date(2026, 9, 5, 9).toISOString() }, null, '2026-10-05')).toBe(true);
+  });
+});
+
+describe('prices of one, from receipts', () => {
+  test('the quantity of a line, as kept on the purchase', () => {
+    expect(receiptQty({ qty: 2 })).toBe('2');
+    expect(receiptQty({ qty: 1.25, unit: 'kg' })).toBe('1.25 kg');
+    expect(receiptQty({ qty: 1 })).toBeNull();
+  });
+
+  test('a receipt is about the purchase on its day, or the nearest within three days', () => {
+    const item = { purchases: [{ date: '2026-09-01' }, { date: '2026-10-03' }] };
+    expect(purchaseNear(item, '2026-10-03')).toBe(1);
+    expect(purchaseNear(item, '2026-10-05')).toBe(1);
+    expect(purchaseNear(item, '2026-10-20')).toBe(-1);
+  });
+
+  test('the list is costed at the price of one times how many are on it; a price per kg once', () => {
+    const milk = { onList: true, qty: '2', purchases: [{ date: '2026-10-01', price: 6.9, qty: '2' }] };
+    const tomatoes = { onList: true, qty: '1kg', purchases: [{ date: '2026-10-01', price: 8.9, qty: '1.2 kg' }] };
+    expect(basketEstimate([milk, tomatoes]).total).toBeCloseTo(13.8 + 8.9);
   });
 });

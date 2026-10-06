@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Download, FileText, Loader2, Receipt, Search, Sparkles, Trash2, Upload } from 'lucide-react';
+import { Camera, Download, FileText, Loader2, Receipt, RotateCcw, Search, Sparkles, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import { ReceiptLines, localeOf, money, useWho } from './GroceryParts';
 import { openReceiptFile, useReceiptFile, useReceiptVault } from './useReceiptVault';
+import { purchaseNear } from './groceryUtils';
+import { localDay } from '@/lib/localDay';
 
 const card = 'rounded-3xl border border-border/60 bg-card/75 p-4 shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-14px_hsl(0_0%_0%/0.45)] sm:p-5';
 const CURRENCIES = ['ILS', 'USD', 'EUR', 'GBP', 'RUB'];
@@ -94,8 +97,8 @@ function PhotoViewer({ src, name, onClose }) {
   );
 }
 
-/** One receipt: the photo, what it says (editable), and opening, reading or deleting it. */
-function ReceiptSheet({ receipt, vault, stores, onClose }) {
+/** One receipt: the photo, what it says (editable), and opening, reading (again) or deleting it. */
+function ReceiptSheet({ receipt, vault, stores, onClose, onRead }) {
   const { t, language, user } = useTheme();
   const loc = localeOf(language);
   const who = useWho();
@@ -174,10 +177,10 @@ function ReceiptSheet({ receipt, vault, stores, onClose }) {
             </button>
           )}
 
-          {image && vault.aiReady && !receipt.read && (
-            <Button type="button" variant="secondary" disabled={reading} onClick={() => vault.readWithAssistant(receipt)} className="h-11 rounded-xl">
-              {reading ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Sparkles className="me-2 h-4 w-4" />}
-              {reading ? t('rcptReading') : t('rcptReadIt')}
+          {image && vault.aiReady && (
+            <Button type="button" variant="secondary" disabled={reading} onClick={() => onRead(receipt)} className="h-11 rounded-xl">
+              {reading ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : receipt.read ? <RotateCcw className="me-2 h-4 w-4" /> : <Sparkles className="me-2 h-4 w-4" />}
+              {reading ? t('rcptReading') : receipt.read ? t('rcptReadAgain') : t('rcptReadIt')}
             </Button>
           )}
 
@@ -245,9 +248,10 @@ function ReceiptSheet({ receipt, vault, stores, onClose }) {
 
 /**
  * The receipts vault: snap or upload a receipt and it is kept for the whole household, grouped by
- * month with what each month's receipts add up to. The assistant (when on) fills in shop, day and total.
+ * month with what each month's receipts add up to. The assistant (when on) fills in shop, day, total and
+ * every line, and the price of each thing goes onto the grocery item it was bought as.
  */
-function ReceiptsView() {
+function ReceiptsView({ list }) {
   const { t, language, user } = useTheme();
   const loc = localeOf(language);
   const blur = !!user?.blurValues;
@@ -281,6 +285,40 @@ function ReceiptsView() {
       }));
   }, [receipts, query, loc, t, currency, convert]);
 
+  // The grocery items a receipt from `date` may list: those bought within three days of it
+  const matchFor = useCallback((date) => (list?.items || [])
+    .filter((i) => purchaseNear(i, date || localDay()) >= 0)
+    .slice(0, 200)
+    .map((i) => ({ id: i.id, name: i.name })), [list?.items]);
+  const readOptions = useCallback((receipt, { quiet = false } = {}) => ({
+    match: matchFor(receipt.date),
+    onRead: (read) => {
+      const updated = list?.applyReceipt ? list.applyReceipt(read, { date: receipt.date || read.date || localDay(), currency: read.currency || currency, store: read.store || '' }) : 0;
+      if (!quiet) toast(t('rcptReadDone', { n: read.items.length, m: updated }));
+      return updated;
+    },
+  }), [matchFor, list, currency, t]);
+  const readAgain = useCallback((receipt) => vault.readWithAssistant(receipt, null, readOptions(receipt)), [vault, readOptions]);
+  const addFiles = useCallback((files) => vault.add(files, (saved) => readOptions(saved, { quiet: true })), [vault, readOptions]);
+
+  // Receipts read before each line's quantity was counted: offered to be read again, all at once
+  const unlined = useMemo(() => receipts.filter((r) => r.read && !r.items && isImage(r) && !r.uploading), [receipts]);
+  const [rereading, setRereading] = useState(false);
+  const readAllAgain = async () => {
+    setRereading(true);
+    let lines = 0;
+    let updated = 0;
+    for (const r of unlined) {
+      const opts = readOptions(r, { quiet: true });
+      let changed = 0;
+      // One at a time, so the assistant is not sent them all at once
+      const read = await vault.readWithAssistant(r, null, { match: opts.match, onRead: (x) => { changed = opts.onRead(x); } });
+      if (read) { lines += read.items.length; updated += changed; }
+    }
+    setRereading(false);
+    toast(t('rcptReadDone', { n: lines, m: updated }));
+  };
+
   const open = receipts.find((r) => r.id === openId) || null;
   // Whoever added a receipt can delete it, and so can the household's owner and admins (as on the server)
   const isAdmin = isWorkspaceOwner || currentMember?.role === 'admin';
@@ -299,8 +337,18 @@ function ReceiptsView() {
             <p className="mt-0.5 text-sm text-muted-foreground">{vault.aiReady ? t('rcptHintAi') : t('rcptHint')}</p>
           </div>
         </div>
-        <AddButtons onFiles={vault.add} t={t} />
+        <AddButtons onFiles={addFiles} t={t} />
       </section>
+
+      {vault.aiReady && unlined.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-3xl border border-primary/30 bg-primary/[0.06] p-4 sm:flex-row sm:items-center">
+          <p className="min-w-0 flex-1 text-sm text-foreground">{t('rcptUnlined', { n: unlined.length })}</p>
+          <Button onClick={readAllAgain} disabled={rereading} className="h-11 shrink-0 rounded-xl">
+            {rereading ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <RotateCcw className="me-2 h-4 w-4" />}
+            {rereading ? t('rcptReading') : t('rcptReadAllAgain')}
+          </Button>
+        </section>
+      )}
 
       {receipts.length >= SEARCH_FROM && (
         <label className="relative block">
@@ -338,7 +386,7 @@ function ReceiptsView() {
         ))
       )}
 
-      {open && <ReceiptSheet receipt={open} vault={vaultWithRules} stores={stores} onClose={() => setOpenId(null)} />}
+      {open && <ReceiptSheet receipt={open} vault={vaultWithRules} stores={stores} onClose={() => setOpenId(null)} onRead={readAgain} />}
     </div>
   );
 }

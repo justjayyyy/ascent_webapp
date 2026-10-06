@@ -14,7 +14,7 @@ import { localDay } from '@/lib/localDay';
 import { cn } from '@/lib/utils';
 import { prepareReceipt } from './receiptImage';
 import { ReceiptLines, localeOf, money } from './GroceryParts';
-import { findLoggedExpense } from './groceryUtils';
+import { findLoggedExpense, receiptQty } from './groceryUtils';
 
 const groceriesCategory = (categories) =>
   categories.find((c) => c.nameKey === 'groceries' || c.name === 'groceries')
@@ -94,7 +94,7 @@ export default function FinishTrip({ trip, list, onClose }) {
         if (!line.matchId || prices[line.matchId] !== undefined) return;
         const price = line.unitPrice ?? line.price;
         if (price !== null) prices[line.matchId] = price;
-        if (line.qty && (line.qty !== 1 || line.unit)) qtys[line.matchId] = line.unit ? `${line.qty} ${line.unit}` : String(line.qty);
+        if (receiptQty(line)) qtys[line.matchId] = receiptQty(line);
       });
       const fresh = trip.items.map((i) => list.items.find((x) => x.id === i.id) || i);
       list.addPrices(fresh, prices, { currency: result.currency || currency, date: trip.date, store: trip.store ? '' : result.store || '', qtys });

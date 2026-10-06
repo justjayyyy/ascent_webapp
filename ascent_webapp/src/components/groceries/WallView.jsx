@@ -149,7 +149,10 @@ function WallView({ list, shell }) {
     const suggested = new Set(low.map((l) => l.item.id));
     return items
       .filter((i) => !i.onList && !suggested.has(i.id))
-      .map((item) => ({ item, supply: supplyOf(item, today), tracked: isTracked(item) }))
+      .map((item) => {
+        const supply = supplyOf(item, today);
+        return { item, supply, tracked: isTracked(item) || supply.manual };
+      })
       .sort((a, b) => (b.tracked - a.tracked)
         || ((a.supply.share ?? 2) - (b.supply.share ?? 2))
         || a.item.name.localeCompare(b.item.name, loc));
