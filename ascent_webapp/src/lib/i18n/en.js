@@ -1441,7 +1441,7 @@ export default {
   // Subscriptions
   homeTitle: 'Home costs',
   homeHint: 'Rent, bills, taxes, insurance and subscriptions, counted in the months they are for',
-  homePerMonth: 'a month on average',
+  homePerMonth: 'a month, from your latest bills',
   homeByMonth: 'Home costs, month by month',
   homeMonthTotal: '{month}: {amount}',
   homeEstimatedPart: '≈ {amount} expected',

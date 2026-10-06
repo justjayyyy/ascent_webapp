@@ -1437,7 +1437,7 @@ export default {
 
   homeTitle: 'הוצאות הבית',
   homeHint: 'שכירות, חשבונות, ארנונה, ביטוח ומנויים, לפי החודשים שעליהם שילמתם',
-  homePerMonth: 'בחודש בממוצע',
+  homePerMonth: 'בחודש, לפי החשבונות האחרונים',
   homeByMonth: 'הוצאות הבית, חודש אחר חודש',
   homeMonthTotal: '{month}: {amount}',
   homeEstimatedPart: '≈ {amount} צפוי',

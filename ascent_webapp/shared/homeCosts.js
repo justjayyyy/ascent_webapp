@@ -50,9 +50,9 @@ const seriesOf = (tx) => `${tx.category}|${tx.merchantKey || firstWord(tx.descri
  *     that has a period)
  *   until: the last month that can be estimated (this month); later months only show what is paid ahead
  * Returns { months: [{ key, total, estimated, paid }], byCategory: { [category]: { [month]: { amount, estimated, parts } } },
- *   average } where `paid` is what was paid in that month for the home (by payment date), `estimated` the part
- *   of `total` that is a guess, and `parts` [{ tx, amount, estimated }] says where each amount came from. `average`
- *   is the monthly average over the months up to `until` that have any home cost.
+ *   monthly } where `paid` is what was paid in that month for the home (by payment date), `estimated` the part
+ *   of `total` that is a guess, and `parts` [{ tx, amount, estimated }] says where each amount came from. `monthly`
+ *   is what the home costs a month now, from the latest bill of each kind still running.
  */
 export function homeCosts(rows, { months, until = months.at(-1), isHome = defaultIsHome(rows) } = {}) {
   const expenses = (rows || []).filter((tx) => tx && tx.type !== 'Income' && isHome(tx.category) && typeof tx._amount === 'number' && tx._amount > 0);
@@ -78,17 +78,22 @@ export function homeCosts(rows, { months, until = months.at(-1), isHome = defaul
     series.get(key).push({ tx, from: covered[0], to: covered.at(-1), span: covered.length, share });
   }
 
-  // A month a series has no bill for yet, up to this month: the bill before it, if it was recent enough (within
-  // two of its periods: a bill every two months that is a month late is still expected, one from a year ago is not)
+  // A month a series has no bill for yet, up to this month: what the last month it had cost (every bill of the
+  // kind covering it: two car insurance policies are both expected), if it was recent enough (within two of its
+  // periods: a bill every two months that is a month late is still expected, one from a year ago is not)
+  let monthly = 0;
   for (const bills of series.values()) {
-    bills.sort((a, b) => a.to.localeCompare(b.to));
     const covers = new Set(bills.flatMap((b) => coveredMonths(b.tx)));
     for (const m of months) {
       if (m > until || covers.has(m)) continue;
-      const before = bills.filter((b) => b.to < m).at(-1);
-      if (!before || monthsBetween(before.to, m) > 2 * before.span) continue;
-      add(before.tx.category, m, before.share, before.tx, true);
+      const last = latestBefore(bills, m);
+      if (!last || !recent(bills, last, m)) continue;
+      billsIn(bills, last).forEach((b) => add(b.tx.category, m, b.share, b.tx, true));
     }
+    // What the kind costs a month now: this month if it is paid for, otherwise its latest month, while it is
+    // still running. Missing history (months before the household started recording) cannot pull it down.
+    const ref = covers.has(until) ? until : latestBefore(bills, addMonths(until, 1));
+    if (ref && recent(bills, ref, until)) monthly += billsIn(bills, ref).reduce((sum, b) => sum + b.share, 0);
   }
 
   const paidIn = {};
@@ -108,10 +113,20 @@ export function homeCosts(rows, { months, until = months.at(-1), isHome = defaul
     }
     return { key, total, estimated, paid: paidIn[key] || 0 };
   });
-  const counted = out.filter((m) => m.key <= until && m.total > 0);
-  const average = counted.length ? counted.reduce((s, m) => s + m.total, 0) / counted.length : 0;
-  return { months: out, byCategory, average };
+  return { months: out, byCategory, monthly };
 }
+
+// The bills of a series covering a month; the latest month before `m` any of them covers; whether a month is
+// within two billing periods after it
+const billsIn = (bills, month) => bills.filter((b) => b.from <= month && b.to >= month);
+const latestBefore = (bills, m) => bills.reduce((last, b) => {
+  const to = b.to < m ? b.to : b.from < m ? addMonths(m, -1) : '';
+  return to > last ? to : last;
+}, '') || null;
+const recent = (bills, month, m) => {
+  const span = Math.max(1, ...billsIn(bills, month).map((b) => b.span));
+  return monthsBetween(month, m) <= 2 * span;
+};
 
 /** The default categories that are the home, plus any category with a bill paid for other months. */
 export function defaultIsHome(rows) {

@@ -1437,7 +1437,7 @@ export default {
 
   homeTitle: 'Расходы на дом',
   homeHint: 'Аренда, счета, арнона, страховка и подписки — по месяцам, за которые они',
-  homePerMonth: 'в месяц в среднем',
+  homePerMonth: 'в месяц, по последним счетам',
   homeByMonth: 'Расходы на дом по месяцам',
   homeMonthTotal: '{month}: {amount}',
   homeEstimatedPart: '≈ {amount} ожидается',

@@ -78,7 +78,31 @@ test('only the home counts: groceries are left out, a category with a bill for o
   ];
   const r = homeCosts(rows, { months: MONTHS, until: '2026-10' });
   assert.deepEqual(Object.keys(r.byCategory), ['Building fee']);
-  assert.equal(r.average, 200);
+  assert.equal(r.monthly, 200);
+});
+
+test('what the home costs a month now comes from the latest bill of each kind, whatever is missing before', () => {
+  // Rent and two insurance policies recorded only from October; water and property tax as they come
+  const rows = [
+    exp({ category: 'rent_housing', description: 'Rent', date: '2026-10-01', amount: 5500 }),
+    exp({ category: 'insurance', description: 'Car insurance - full', date: '2026-10-02', amount: 700 }),
+    exp({ category: 'insurance', description: 'Car insurance - mandatory', date: '2026-10-02', amount: 370 }),
+    exp({ date: '2026-10-05', amount: 191.55, coversFrom: '2026-07', coversTo: '2026-08' }),
+    exp({ category: 'taxes', description: 'Arnona', date: '2026-09-01', amount: 916.3, coversFrom: '2026-09', coversTo: '2026-10' }),
+    // Cancelled long ago: not part of what the home costs now
+    exp({ category: 'subscriptions', description: 'Old gym', date: '2026-01-05', amount: 200 }),
+  ];
+  const r = homeCosts(rows, { months: MONTHS, until: '2026-10' });
+  assert.equal(Math.round(r.monthly * 100) / 100, Math.round((5500 + 700 + 370 + 191.55 / 2 + 458.15) * 100) / 100);
+});
+
+test('a month with no bill yet expects every bill of the kind from the month before', () => {
+  const rows = [
+    exp({ category: 'insurance', description: 'Car insurance - full', date: '2026-09-02', amount: 700 }),
+    exp({ category: 'insurance', description: 'Car insurance - mandatory', date: '2026-09-02', amount: 370 }),
+  ];
+  const r = homeCosts(rows, { months: MONTHS, until: '2026-10' });
+  assert.deepEqual([at(r, 'insurance', '2026-10').amount, at(r, 'insurance', '2026-10').estimated, at(r, 'insurance', '2026-10').parts.length], [1070, true, 2]);
 });
 
 test('a period reads the way people say it', () => {

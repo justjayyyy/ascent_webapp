@@ -48,9 +48,9 @@ export default function HomeCostsCard({ rows, monthKey, categories = [], locale,
     <div className="p-6">
       <div className="flex items-start justify-between gap-3">
         <h2 className="flex items-center gap-2 text-base font-semibold"><Home className="h-4 w-4 text-primary" aria-hidden />{t('homeTitle')}</h2>
-        {costs.average > 0 && (
+        {costs.monthly > 0 && (
           <div className="shrink-0 text-end">
-            <p className="text-xl font-bold tabular-nums tracking-tight" dir="ltr">{money(costs.average)}</p>
+            <p className="text-xl font-bold tabular-nums tracking-tight" dir="ltr">{money(costs.monthly)}</p>
             <p className="text-xs text-muted-foreground">{t('homePerMonth')}</p>
           </div>
         )}
