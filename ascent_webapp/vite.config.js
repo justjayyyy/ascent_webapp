@@ -152,6 +152,10 @@ export default defineConfig({
     ],
   },
   server: {
+    watch: {
+      // OneDrive locks these generated folders, which crashes the watcher (EBUSY)
+      ignored: ['**/playwright-report/**', '**/test-results/**'],
+    },
     proxy: {
       '/api': {
         target: process.env.API_PROXY_TARGET || 'http://localhost:3002',

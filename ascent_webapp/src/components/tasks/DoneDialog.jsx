@@ -41,7 +41,7 @@ export default function DoneDialog({ task, open, onClose, onDone, canLog, saving
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="w-[95vw] max-w-[95vw] p-5 sm:w-full sm:max-w-sm sm:p-6">
+      <DialogContent className="grid-cols-[minmax(0,1fr)] p-5 sm:max-w-sm sm:p-6">
         <DialogHeader className="text-start">
           <div className="flex items-center gap-3">
             <span aria-hidden className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-success/15 text-2xl">{taskEmoji(task)}</span>
@@ -55,7 +55,7 @@ export default function DoneDialog({ task, open, onClose, onDone, canLog, saving
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <div className="space-y-2">
               <Label htmlFor="tk-done-amount" className="text-sm text-muted-foreground">{t('tkItCost', { currency: task.currency || '' })}</Label>
               <Input

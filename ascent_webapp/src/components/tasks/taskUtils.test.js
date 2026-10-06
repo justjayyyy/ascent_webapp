@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addMonths, completeChanges, dueState, groupTasks, nextDue, upcomingCost } from './taskUtils';
+import { addMonths, completeChanges, dueState, isMine, nextDue, sectionTasks, totalOf, upcomingCost } from './taskUtils';
 
 const today = new Date(2026, 9, 2, 12);
 const task = (title, dueDate, extra = {}) => ({ id: title, title, dueDate, status: 'open', repeat: 'none', amount: 0, remindDays: 7, ...extra });
@@ -23,14 +23,28 @@ describe('dates', () => {
   });
 });
 
-test('tasks grouped by when they are due', () => {
-  const g = groupTasks([
-    task('late', '2026-09-20'), task('week', '2026-10-06'), task('month', '2026-10-25'), task('later', '2027-01-01'),
-    task('whenever', null), task('finished', '2026-09-01', { status: 'done' }),
+test('the page in reading order: what needs someone now, then by month', () => {
+  const s = sectionTasks([
+    task('later', '2027-01-01'), task('month', '2026-10-25'), task('soon', '2026-10-06'), task('late', '2026-09-20'),
+    task('far but reminded early', '2026-10-30', { remindDays: 30 }), task('whenever', null),
+    task('finished', '2026-09-01', { status: 'done' }), task('also October', '2026-10-20'),
   ], today);
-  expect(Object.fromEntries(Object.entries(g).map(([k, v]) => [k, v.map((t) => t.title)]))).toEqual({
-    overdue: ['late'], week: ['week'], month: ['month'], later: ['later'], undated: ['whenever'], done: ['finished'],
-  });
+  expect(s.now.map((t) => t.title)).toEqual(['late', 'soon', 'far but reminded early']);
+  expect(s.months.map((m) => [m.key, m.tasks.map((t) => t.title)])).toEqual([
+    ['2026-10', ['also October', 'month']], ['2027-01', ['later']],
+  ]);
+  expect(s.undated.map((t) => t.title)).toEqual(['whenever']);
+  expect(s.done.map((t) => t.title)).toEqual(['finished']);
+});
+
+test('mine is what is given to me, and what is given to nobody', () => {
+  expect(isMine(task('a', null, { assignee: 'me@x' }), 'me@x')).toBe(true);
+  expect(isMine(task('a', null, { assignee: '' }), 'me@x')).toBe(true);
+  expect(isMine(task('a', null, { assignee: 'you@x' }), 'me@x')).toBe(false);
+});
+
+test('a total converts each cost and skips the free ones', () => {
+  expect(totalOf([task('a', null, { amount: 10, currency: 'USD' }), task('b', null, { amount: 5 }), task('c', null)], (a, c) => (c === 'USD' ? a * 4 : a))).toBe(45);
 });
 
 test('what the next month will cost, late tasks included', () => {

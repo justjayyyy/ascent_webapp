@@ -72,25 +72,38 @@ export function dueState(task, today = new Date()) {
   return days <= Math.max(task.remindDays ?? 7, 3) ? 'soon' : 'later';
 }
 
+/** Late, due today, or inside its "show as due" window: the tasks that need someone now. */
+export const needsYou = (task, today = new Date()) => ['overdue', 'today', 'soon'].includes(dueState(task, today));
+
+/** Mine: the tasks given to `email`, and the ones given to nobody (anyone can do them). */
+export const isMine = (task, email) => !task.assignee || task.assignee === email;
+
 /**
- * Open tasks in the order to deal with them, and the done ones apart:
- * { overdue, week (the next 7 days), month (up to 30), later, undated, done }.
+ * The page in reading order: { now, months, undated, done }.
+ * `now` is what needs someone (late first, then by date); `months` is every other dated open task as
+ * [{ key: '2026-10', tasks }] in date order; `undated` has no date; `done` is newest first.
  */
-export function groupTasks(tasks, today = new Date()) {
-  const out = { overdue: [], week: [], month: [], later: [], undated: [], done: [] };
+export function sectionTasks(tasks, today = new Date()) {
+  const out = { now: [], months: [], undated: [], done: [] };
   const byDue = (a, b) => String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999')) || String(a.title).localeCompare(String(b.title));
+  const months = new Map();
   for (const task of [...tasks].sort(byDue)) {
-    if (task.status === 'done') { out.done.push(task); continue; }
-    const days = daysUntil(task, today);
-    if (days === null) out.undated.push(task);
-    else if (days < 0) out.overdue.push(task);
-    else if (days <= 7) out.week.push(task);
-    else if (days <= 30) out.month.push(task);
-    else out.later.push(task);
+    if (task.status === 'done') out.done.push(task);
+    else if (!task.dueDate) out.undated.push(task);
+    else if (needsYou(task, today)) out.now.push(task);
+    else {
+      const key = task.dueDate.slice(0, 7);
+      if (!months.has(key)) months.set(key, []);
+      months.get(key).push(task);
+    }
   }
+  out.months = [...months].map(([key, list]) => ({ key, tasks: list }));
   out.done.sort((a, b) => String(b.doneAt || b.updated_date || '').localeCompare(String(a.doneAt || a.updated_date || '')));
   return out;
 }
+
+/** What a list of tasks adds up to in the viewer's currency. `toMine(amount, currency)` converts. */
+export const totalOf = (tasks, toMine = (a) => a) => tasks.reduce((s, t) => s + (t.amount > 0 ? (toMine(t.amount, t.currency) ?? t.amount) : 0), 0);
 
 /**
  * What open tasks due within `days` (late ones included) will cost, in the viewer's currency:
@@ -99,7 +112,7 @@ export function groupTasks(tasks, today = new Date()) {
 export function upcomingCost(tasks, { today = new Date(), days = 30, toMine = (a) => a } = {}) {
   const due = tasks.filter((t) => t.status !== 'done' && t.amount > 0 && daysUntil(t, today) !== null && daysUntil(t, today) <= days);
   return {
-    total: due.reduce((s, t) => s + (toMine(t.amount, t.currency) ?? t.amount), 0),
+    total: totalOf(due, toMine),
     count: due.length,
     tasks: due,
   };
