@@ -113,8 +113,9 @@ export default async function handler(req, res) {
     }
     const ev = parsed.event;
 
-    const cards = await Card.find({ workspaceId: workspace._id }).select('lastFourDigits walletName isActive').lean();
-    const card = matchCard(cards, ev.cardText);
+    // Everything matchCard looks at: leaving out the name and network made every match by them fail
+    const cards = await Card.find({ workspaceId: workspace._id }).select('name lastFourDigits walletName network isActive isDefault createdBy').lean();
+    const card = matchCard(cards, ev.cardText, { owner: token.userId });
     ev.cardId = card ? String(card._id) : null;
 
     // Layer 1: the same request replayed, caught atomically by the unique partial index and checked up front.

@@ -48,7 +48,16 @@ const models = {
       return chain(ok ? ws : null);
     },
   },
-  Card: { find: () => chain(db.cards) },
+  Card: {
+    find() {
+      let fields = null;
+      const c = {
+        select: (f) => { fields = f.split(/\s+/); return c; },
+        lean: async () => db.cards.map((card) => (fields ? Object.fromEntries(['_id', ...fields].filter((k) => k in card).map((k) => [k, card[k]])) : card)),
+      };
+      return c;
+    },
+  },
   ExpenseTransaction: {
     findOne(q) {
       return chain(db.rows.find((r) => r.dedupeKey && r.dedupeKey === q.dedupeKey) ?? null);

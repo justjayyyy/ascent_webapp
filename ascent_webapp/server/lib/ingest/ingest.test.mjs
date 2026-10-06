@@ -146,7 +146,10 @@ test('matchCard falls back to the card name, then the network, only when unambig
     { id: 'b', name: 'Max', network: 'visa', lastFourDigits: '5678', isActive: true },
   ];
   assert.equal(matchCard(cards, 'Isracard Mastercard').id, 'a');
-  assert.equal(matchCard(cards, 'ישראכרט'), null);
+  // The same issuer named in Hebrew
+  assert.equal(matchCard(cards, 'ישראכרט').id, 'a');
+  assert.equal(matchCard(cards, 'מקס').id, 'b');
+  assert.equal(matchCard(cards, 'כאל'), null);
   assert.equal(matchCard(cards, 'Visa').id, 'b');
   assert.equal(matchCard(cards, 'Mastercard').id, 'a');
   assert.equal(matchCard([...cards, { id: 'c', name: 'Other', network: 'visa', isActive: true }], 'Visa'), null);
@@ -168,6 +171,25 @@ test('matchCard: last four, then the saved Wallet name, never a guess', () => {
   assert.equal(matchCard(cards, 'Twin ••4242'), null);       // ambiguous last four
   assert.equal(matchCard(cards, 'Some other card'), null);
   assert.equal(matchCard(cards, ''), null);
+});
+
+test('matchCard: the cards of whoever tapped first, and their default card when Wallet does not say', () => {
+  const me = 'u1';
+  const cards = [
+    { id: 'mine', name: 'Visa Leumi', network: 'visa', isActive: true, createdBy: me, isDefault: true },
+    { id: 'mine2', name: 'Isracard', network: 'mastercard', isActive: true, createdBy: me },
+    { id: 'theirs', name: 'Visa Hapoalim', network: 'visa', isActive: true, createdBy: 'u2' },
+  ];
+  // Both partners have a Visa: the one who tapped is the one paying
+  assert.equal(matchCard(cards, 'Visa', { owner: me }).id, 'mine');
+  assert.equal(matchCard(cards, 'Visa'), null);
+  // The partner's card is still found when it is named
+  assert.equal(matchCard(cards, 'Visa Hapoalim', { owner: me }).id, 'theirs');
+  // Wallet sent no card: the tapper's default, or their only card; never someone else's
+  assert.equal(matchCard(cards, '', { owner: me }).id, 'mine');
+  assert.equal(matchCard(cards.map((c) => ({ ...c, isDefault: false })), '', { owner: me }), null);
+  assert.equal(matchCard([cards[2]], '', { owner: 'u2' }).id, 'theirs');
+  assert.equal(matchCard(cards, '', { owner: 'nobody' }), null);
 });
 
 /* ------------------------------------------------------- access control */
