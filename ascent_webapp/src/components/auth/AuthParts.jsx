@@ -37,14 +37,17 @@ export function LanguageSwitch({ flow, className }) {
 }
 
 /** Main action: spinner crossfades in place of the label so the width never jumps */
-export function PrimaryButton({ loading, children, className, icon, ...props }) {
+/** `quiet` steps it back to an outline when another button on the screen is the main way on */
+export function PrimaryButton({ loading, children, className, icon, quiet = false, ...props }) {
   return (
     <motion.button
       whileTap={{ scale: 0.98 }}
       disabled={loading || props.disabled}
       className={cn(
-        'relative flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary px-5 text-base font-semibold text-primary-foreground outline-none',
-        'shadow-[0_10px_28px_-12px_hsl(var(--glow)/0.75)] transition-[filter,box-shadow] hover:brightness-110',
+        'relative flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-5 text-base font-semibold outline-none',
+        quiet
+          ? 'border border-border/70 bg-background/40 text-foreground transition-[background-color,border-color] hover:border-foreground/20 hover:bg-accent'
+          : 'bg-primary text-primary-foreground shadow-[0_10px_28px_-12px_hsl(var(--glow)/0.75)] transition-[filter,box-shadow] hover:brightness-110',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-progress',
         className,
       )}

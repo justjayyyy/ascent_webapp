@@ -477,6 +477,7 @@ export default {
   authSignInCancelled: 'הכניסה בוטלה',
   authPasswordShort: 'השתמשו בלפחות 6 תווים',
   authPasskeyShort: 'מפתח גישה',
+  authSignInWith: 'התחברות עם {method}',
   authLegalLine: 'בהמשך, אתם מסכימים ל{terms} ול{privacy}.',
   authLegalTerms: 'תנאי השימוש',
   authLegalPrivacy: 'מדיניות הפרטיות',

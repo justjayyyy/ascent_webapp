@@ -475,6 +475,7 @@ export default {
   authSignInCancelled: 'Sign-in was cancelled',
   authPasswordShort: 'Use at least 6 characters',
   authPasskeyShort: 'Passkey',
+  authSignInWith: 'Sign in with {method}',
   authLegalLine: 'By continuing, you agree to the {terms} and {privacy}.',
   authLegalTerms: 'Terms of Service',
   authLegalPrivacy: 'Privacy Policy',

@@ -34,7 +34,9 @@ test('add a passkey in Settings, sign out, sign in with it @critical', async ({ 
   await expect(page).toHaveURL(/\/login/);
   await expect.poll(() => sessionCookie(context)).toBeUndefined();
 
-  await page.getByRole('button', { name: L('passkeySignIn') }).click();
+  // The passkey made here is remembered, so the page now leads with it, by the device's own name
+  await expect(page.getByRole('button', { name: L('passkeySignIn') })).toBeHidden();
+  await page.getByRole('button', { name: Lre('authSignInWith') }).click();
   await expect(page).not.toHaveURL(/\/login/);
   expect(await sessionCookie(context)).toBeTruthy();
 });

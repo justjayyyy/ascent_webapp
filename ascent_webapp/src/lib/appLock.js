@@ -45,6 +45,11 @@ export function rememberCredential(userId, id) {
   if (!credentialIds.includes(id)) setLockPrefs(userId, { credentialIds: [...credentialIds, id].slice(-5) });
 }
 
+/** Has someone signed in or unlocked with a passkey on this device? The sign-in page then leads with it. */
+export function passkeyUsedHere() {
+  return Object.values(readAll()).some((p) => p?.credentialIds?.length > 0);
+}
+
 /** Does this device have a built-in authenticator (Face ID, Touch ID, fingerprint, Windows Hello)? */
 export async function deviceCanUseBiometrics() {
   try {

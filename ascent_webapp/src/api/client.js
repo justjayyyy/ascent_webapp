@@ -210,7 +210,8 @@ const auth = {
     }
     const result = await request('/auth/passkey?action=login-verify', json('POST', { response }));
     markSignedIn();
-    return { ...result, credentialId: response.id };
+    // A phone held up to a computer's QR code answers as 'cross-platform': its passkey is not on this device
+    return { ...result, credentialId: response.id, onThisDevice: response.authenticatorAttachment !== 'cross-platform' };
   },
 
   // Confirms the session; a device that signed in before the cookie has been moved over by now

@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from '@/lib/motion';
-import { ArrowLeft, ArrowRight, Loader2, ScanFace } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Fingerprint, KeyRound, Loader2, ScanFace } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AscentLogo from '@/components/AscentLogo';
 import { Link } from 'react-router-dom';
@@ -723,24 +723,37 @@ const pill = cn(
   'focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
 );
 
-/** Passkey and Google side by side, so the first step fits on a small phone */
+/** Whether this device's Face ID (or fingerprint) leads the first step instead of the email field */
+const passkeyLeads = (flow, signin) => signin && flow.passkeyReady && flow.passkeyHere;
+
+/**
+ * Passkey and Google side by side, so the first step fits on a small phone. Where someone has used
+ * Face ID here before, it is the main button, called by its own name, and Google shrinks to its mark.
+ */
 function QuickWays({ flow, signin }) {
-  const { t, passkeyReady, passkeyLoading, signInWithPasskey, googleEnabled, googleLoading, signInWithGoogle } = flow;
+  const { t, passkeyReady, passkeyLoading, signInWithPasskey, passkeyMethod, passkeyKind, googleEnabled, googleLoading, signInWithGoogle } = flow;
   const passkey = signin && passkeyReady;
+  const leads = passkeyLeads(flow, signin);
   if (!passkey && !googleEnabled) return null;
+  const MethodIcon = { face: ScanFace, fingerprint: Fingerprint, key: KeyRound }[passkeyKind];
   return (
     <>
       <div className="flex gap-3">
-        {passkey && (
+        {leads ? (
+          <PrimaryButton type="button" onClick={signInWithPasskey} loading={passkeyLoading} className="min-w-0 flex-1">
+            <MethodIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span className="truncate">{t('authSignInWith', { method: passkeyMethod })}</span>
+          </PrimaryButton>
+        ) : passkey && (
           <button type="button" onClick={signInWithPasskey} disabled={passkeyLoading} aria-label={t('passkeySignIn')} className={pill}>
-            {passkeyLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" /> : <ScanFace className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />}
+            {passkeyLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" /> : <MethodIcon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />}
             <span className="truncate">{t('authPasskeyShort')}</span>
           </button>
         )}
         {googleEnabled && (
-          <button type="button" onClick={signInWithGoogle} disabled={googleLoading} aria-label={t('continueWithGoogle')} className={pill}>
+          <button type="button" onClick={signInWithGoogle} disabled={googleLoading} aria-label={t('continueWithGoogle')} className={cn(pill, leads && 'w-[52px] flex-none px-0')}>
             {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <GoogleMark />}
-            <span className="truncate">Google</span>
+            {!leads && <span className="truncate">Google</span>}
           </button>
         )}
       </div>
@@ -986,6 +999,7 @@ export default function SummitLogin({ flow }) {
                     <PrimaryButton
                       type="submit"
                       loading={busy || entering}
+                      quiet={current === 'email' && passkeyLeads(flow, signin)}
                       className="mt-5"
                       icon={current !== 'password' ? <NextIcon className="h-[18px] w-[18px]" aria-hidden="true" /> : null}
                     >

@@ -477,6 +477,7 @@ export default {
   authSignInCancelled: 'Вход отменён',
   authPasswordShort: 'Не менее 6 символов',
   authPasskeyShort: 'Ключ доступа',
+  authSignInWith: 'Войти через {method}',
   authLegalLine: 'Продолжая, вы принимаете {terms} и {privacy}.',
   authLegalTerms: 'Условия использования',
   authLegalPrivacy: 'Политику конфиденциальности',

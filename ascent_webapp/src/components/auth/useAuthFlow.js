@@ -7,6 +7,7 @@ import { setPageLanguage } from '@/lib/documentLanguage';
 import { isLanguage, loadLanguage, stringsFor, translate, useLanguage } from '@/lib/translations';
 import { startEntry } from '@/components/EntryTransition';
 import { LOGIN_LANG_KEY } from '@/lib/storageKeys';
+import { biometricKind, biometricName, passkeyUsedHere, rememberCredential } from '@/lib/appLock';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
@@ -114,6 +115,13 @@ export function useAuthFlow() {
   // ---- passkeys ----
   const [passkeyReady, setPasskeyReady] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+  // Someone has used Face ID here before: it becomes the page's main way in, called by its own name
+  const [passkeyHere] = useState(passkeyUsedHere);
+  const passkeyMethod = biometricName(t);
+  const passkeyKind = biometricKind();
+  const rememberPasskey = (result) => {
+    if (result.onThisDevice) rememberCredential(result.user?.id || result.user?._id, result.credentialId);
+  };
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -125,6 +133,7 @@ export function useAuthFlow() {
       try {
         const result = await loginWithPasskey({ autofill: true });
         enteringRef.current = true;
+        rememberPasskey(result);
         enter(result.user);
       } catch { /* dismissed, or replaced by the button's own request */ }
     })();
@@ -138,6 +147,7 @@ export function useAuthFlow() {
     enteringRef.current = true;
     try {
       const result = await loginWithPasskey();
+      rememberPasskey(result);
       enter(result.user);
     } catch (error) {
       enteringRef.current = false;
@@ -271,7 +281,7 @@ export function useAuthFlow() {
 
   return {
     t, lang, setLang, langs: LANGS, isRTL,
-    passkeyReady, passkeyLoading, signInWithPasskey,
+    passkeyReady, passkeyLoading, signInWithPasskey, passkeyHere, passkeyMethod, passkeyKind,
     googleEnabled: Boolean(GOOGLE_CLIENT_ID), googleLoading, signInWithGoogle, googleHost,
     busy, entering, validateEmail, signIn, signUp, forgotPassword, resetSentTo, setResetSentTo,
   };
