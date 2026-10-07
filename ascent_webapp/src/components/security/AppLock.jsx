@@ -6,7 +6,7 @@ import AscentLogo from '@/components/AscentLogo';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { ascent } from '@/api/client';
-import { getLockPrefs, rememberCredential, unlockOnDevice, biometricName, biometricKind, markUnlocked, unlockedThisSession } from '@/lib/appLock';
+import { getLockPrefs, rememberCredential, rememberPasskeyAccount, unlockOnDevice, biometricName, biometricKind, markUnlocked, unlockedThisSession } from '@/lib/appLock';
 import { isOnline, isNetworkError, useOnline } from '@/lib/offline/network';
 import { haptic } from '@/lib/haptics';
 
@@ -35,6 +35,12 @@ export function AppLockProvider({ children }) {
     window.addEventListener('ascent:lock-prefs', read);
     return () => window.removeEventListener('ascent:lock-prefs', read);
   }, [userId]);
+
+  // Whoever has a working passkey here is who the sign-in page greets after signing out
+  const hasPasskeyHere = prefs.credentialIds.length > 0;
+  useEffect(() => {
+    if (userId && hasPasskeyHere) rememberPasskeyAccount(userId, user?.full_name);
+  }, [userId, hasPasskeyHere, user?.full_name]);
 
   // Opened fresh with the lock on: locked, also when the account arrives after this mounted
   useEffect(() => {

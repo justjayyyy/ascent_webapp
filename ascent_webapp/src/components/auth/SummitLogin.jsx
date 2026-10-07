@@ -826,6 +826,9 @@ export default function SummitLogin({ flow }) {
     }
   };
 
+  // Whoever last used Face ID here is greeted by name in place of the step's title
+  const greet = current === 'email' && passkeyLeads(flow, signin) && !!flow.passkeyName;
+
   const title = {
     email: signin ? 'authTitleSignIn' : 'authTitleSignUp',
     name: 'authNameTitle',
@@ -899,7 +902,7 @@ export default function SummitLogin({ flow }) {
                     onSubmit={submit}
                     noValidate
                   >
-                    {(step > 0 || !short) && (
+                    {(step > 0 || !short || greet) && (
                     <div className={cn('flex min-h-11 items-center gap-1', short ? 'mb-2' : 'mb-4')}>
                       {step > 0 && (
                         <button
@@ -911,7 +914,20 @@ export default function SummitLogin({ flow }) {
                           <BackIcon className="h-5 w-5" aria-hidden="true" />
                         </button>
                       )}
-                      {short
+                      {greet ? (
+                        <>
+                          <h2 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight text-foreground">
+                            {t('authWelcomeBackName', { name: flow.passkeyName })}
+                          </h2>
+                          <button
+                            type="button"
+                            onClick={flow.notMe}
+                            className="-me-1 inline-flex min-h-11 max-w-[45%] shrink-0 items-center rounded px-1 text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <span className="truncate">{t('authNotYou', { name: flow.passkeyName })}</span>
+                          </button>
+                        </>
+                      ) : short
                         ? <h2 className="sr-only">{t(title)}</h2>
                         : <h2 className="text-balance text-xl font-semibold tracking-tight text-foreground">{t(title)}</h2>}
                     </div>

@@ -478,6 +478,7 @@ export default {
   authPasswordShort: 'השתמשו בלפחות 6 תווים',
   authPasskeyShort: 'מפתח גישה',
   authSignInWith: 'התחברות עם {method}',
+  authNotYou: 'לא {name}?',
   authLegalLine: 'בהמשך, אתם מסכימים ל{terms} ול{privacy}.',
   authLegalTerms: 'תנאי השימוש',
   authLegalPrivacy: 'מדיניות הפרטיות',

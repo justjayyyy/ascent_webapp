@@ -32,7 +32,7 @@ vi.mock('@/api/client', () => ({
     workspaces: { list: api.list, create: api.create },
   },
 }));
-vi.mock('@/lib/appLock', () => ({ markUnlocked: vi.fn() }));
+vi.mock('@/lib/appLock', () => ({ markUnlocked: vi.fn(), markSignedOutOnPurpose: vi.fn() }));
 
 const ME = { id: 'u1', email: 'me@x.test', language: 'en' };
 const OWNED = { id: 'w1', ownerId: 'u1', members: [{ userId: 'u1', status: 'accepted', role: 'owner' }] };

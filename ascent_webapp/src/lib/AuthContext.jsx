@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ascent, systemPrefs } from '@/api/client';
 import { isNetworkError } from '@/lib/offline/network';
-import { markUnlocked } from '@/lib/appLock';
+import { markSignedOutOnPurpose, markUnlocked } from '@/lib/appLock';
 import { setMonitoringUser } from '@/lib/monitoring';
 import { rememberInvite, rememberJoined, takePendingInvite } from '@/lib/pendingInvite';
 import {
@@ -230,6 +230,7 @@ export const AuthProvider = ({ children }) => {
   }, [loadWorkspaces]);
 
   const logout = useCallback((shouldRedirect = true) => {
+    markSignedOutOnPurpose();
     setIsSigningOut(true);
     setUser(null);
     setIsAuthenticated(false);

@@ -6,10 +6,14 @@
 
 const KEY = 'ascent_lock';
 const UNLOCKED_KEY = 'ascent_unlocked_at';
+const SIGNED_OUT_KEY = 'ascent_signed_out';
 
 /** Called after any sign-in or unlock, so this browsing session does not lock straight away. */
 export function markUnlocked() {
-  try { sessionStorage.setItem(UNLOCKED_KEY, String(Date.now())); } catch { /* storage unavailable */ }
+  try {
+    sessionStorage.setItem(UNLOCKED_KEY, String(Date.now()));
+    sessionStorage.removeItem(SIGNED_OUT_KEY);
+  } catch { /* storage unavailable */ }
 }
 export function unlockedThisSession() {
   try { return !!sessionStorage.getItem(UNLOCKED_KEY); } catch { return false; }
@@ -48,6 +52,38 @@ export function rememberCredential(userId, id) {
 /** Has someone signed in or unlocked with a passkey on this device? The sign-in page then leads with it. */
 export function passkeyUsedHere() {
   return Object.values(readAll()).some((p) => p?.credentialIds?.length > 0);
+}
+
+// Who last used a passkey here, by first name only, so the sign-in page can greet them
+const LAST_ACCOUNT_KEY = 'ascent_passkey_account';
+
+export function rememberPasskeyAccount(userId, fullName) {
+  const name = String(fullName || '').trim().split(/\s+/)[0];
+  if (!userId) return;
+  try { localStorage.setItem(LAST_ACCOUNT_KEY, JSON.stringify({ id: String(userId), name })); } catch { /* storage unavailable */ }
+}
+
+/** { id, name } of that person, while their passkey still works on this device; otherwise null. */
+export function passkeyAccount() {
+  try {
+    const account = JSON.parse(localStorage.getItem(LAST_ACCOUNT_KEY) || 'null');
+    return account?.id && getLockPrefs(account.id).credentialIds.length ? account : null;
+  } catch {
+    return null;
+  }
+}
+
+export function forgetPasskeyAccount() {
+  try { localStorage.removeItem(LAST_ACCOUNT_KEY); } catch { /* storage unavailable */ }
+}
+
+// Signing out from the menu (or "Use password" on the lock screen) means "not with Face ID": until the
+// next sign-in in this tab, the sign-in page waits for a tap instead of opening Face ID by itself
+export function markSignedOutOnPurpose() {
+  try { sessionStorage.setItem(SIGNED_OUT_KEY, '1'); } catch { /* storage unavailable */ }
+}
+export function signedOutOnPurpose() {
+  try { return sessionStorage.getItem(SIGNED_OUT_KEY) === '1'; } catch { return false; }
 }
 
 /** Does this device have a built-in authenticator (Face ID, Touch ID, fingerprint, Windows Hello)? */

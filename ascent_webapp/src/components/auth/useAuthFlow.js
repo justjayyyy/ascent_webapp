@@ -7,7 +7,9 @@ import { setPageLanguage } from '@/lib/documentLanguage';
 import { isLanguage, loadLanguage, stringsFor, translate, useLanguage } from '@/lib/translations';
 import { startEntry } from '@/components/EntryTransition';
 import { LOGIN_LANG_KEY } from '@/lib/storageKeys';
-import { biometricKind, biometricName, passkeyUsedHere, rememberCredential } from '@/lib/appLock';
+import {
+  biometricKind, biometricName, forgetPasskeyAccount, passkeyAccount, passkeyUsedHere, rememberCredential, signedOutOnPurpose,
+} from '@/lib/appLock';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
@@ -115,20 +117,52 @@ export function useAuthFlow() {
   // ---- passkeys ----
   const [passkeyReady, setPasskeyReady] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
-  // Someone has used Face ID here before: it becomes the page's main way in, called by its own name
-  const [passkeyHere] = useState(passkeyUsedHere);
+  // Someone has used Face ID here before: it becomes the page's main way in, called by its own name,
+  // and the person who last used it is greeted by first name
+  const [passkeyHere, setPasskeyHere] = useState(passkeyUsedHere);
+  const [passkeyName, setPasskeyName] = useState(() => (reason === 'account_deleted' ? '' : passkeyAccount()?.name || ''));
   const passkeyMethod = biometricName(t);
   const passkeyKind = biometricKind();
+  const tapped = useRef(false);
   const rememberPasskey = (result) => {
     if (result.onThisDevice) rememberCredential(result.user?.id || result.user?._id, result.credentialId);
   };
+
+  /** "Not Dana?": this visit goes back to the plain page, and the name is no longer shown here */
+  const notMe = useCallback(() => {
+    forgetPasskeyAccount();
+    setPasskeyName('');
+    setPasskeyHere(false);
+  }, []);
+
   useEffect(() => {
+    if (reason === 'account_deleted') forgetPasskeyAccount();
     let cancelled = false;
     (async () => {
       const { browserSupportsWebAuthn, browserSupportsWebAuthnAutofill } = await import('@simplewebauthn/browser');
       if (cancelled || !browserSupportsWebAuthn()) return;
       setPasskeyReady(true);
       ascent.auth.preparePasskeyLogin();
+
+      // Back on a device that uses Face ID, after a lock-out or a session that ran out: Face ID opens by
+      // itself once the page is up. Not after signing out on purpose, which usually means another way
+      // in or another account. A cancel, or a browser that wants a tap first, just leaves the page.
+      if (passkeyUsedHere() && !signedOutOnPurpose() && reason !== 'account_deleted') {
+        await new Promise((resolve) => { setTimeout(resolve, 350); });
+        if (cancelled || tapped.current) return;
+        try {
+          const result = await loginWithPasskey();
+          enteringRef.current = true;
+          rememberPasskey(result);
+          enter(result.user);
+          return;
+        } catch (error) {
+          if (error?.data?.error === 'unknown_passkey') toast.error(t('passkeyUnknown'));
+        }
+        // The button's own request replaced this one: leave it be
+        if (cancelled || tapped.current) return;
+      }
+
       if (!(await browserSupportsWebAuthnAutofill()) || cancelled) return;
       try {
         const result = await loginWithPasskey({ autofill: true });
@@ -143,6 +177,7 @@ export function useAuthFlow() {
   }, []);
 
   const signInWithPasskey = useCallback(async () => {
+    tapped.current = true;
     setPasskeyLoading(true);
     enteringRef.current = true;
     try {
@@ -281,7 +316,7 @@ export function useAuthFlow() {
 
   return {
     t, lang, setLang, langs: LANGS, isRTL,
-    passkeyReady, passkeyLoading, signInWithPasskey, passkeyHere, passkeyMethod, passkeyKind,
+    passkeyReady, passkeyLoading, signInWithPasskey, passkeyHere, passkeyMethod, passkeyKind, passkeyName, notMe,
     googleEnabled: Boolean(GOOGLE_CLIENT_ID), googleLoading, signInWithGoogle, googleHost,
     busy, entering, validateEmail, signIn, signUp, forgotPassword, resetSentTo, setResetSentTo,
   };

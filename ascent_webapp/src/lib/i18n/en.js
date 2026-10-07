@@ -476,6 +476,7 @@ export default {
   authPasswordShort: 'Use at least 6 characters',
   authPasskeyShort: 'Passkey',
   authSignInWith: 'Sign in with {method}',
+  authNotYou: 'Not {name}?',
   authLegalLine: 'By continuing, you agree to the {terms} and {privacy}.',
   authLegalTerms: 'Terms of Service',
   authLegalPrivacy: 'Privacy Policy',

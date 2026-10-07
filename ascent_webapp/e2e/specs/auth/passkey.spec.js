@@ -19,26 +19,58 @@ async function virtualAuthenticator(context, page) {
   return { cdp, authenticatorId };
 }
 
-test('add a passkey in Settings, sign out, sign in with it @critical', async ({ page, context, owner: _owner }) => {
-  await virtualAuthenticator(context, page);
+/** Adds a passkey on this device in Settings; the owner is Dana Owner */
+async function addPasskeyHere(page) {
   await openApp(page, '/Settings');
   const settings = new SettingsScreen(page);
   await expect(settings.addPasskey).toBeEnabled();
   await settings.addPasskey.click();
   await expect(page.getByText(L('secAdded'))).toBeVisible();
-
   // The sign-in page also offers passkeys in the email field's autofill, which this authenticator would
-  // answer at once; turned off here, so the button is what signs in
+  // answer at once; turned off here, so what the page itself does is what signs in
   await page.addInitScript(() => { PublicKeyCredential.isConditionalMediationAvailable = async () => false; });
+  return settings;
+}
+
+test('add a passkey in Settings, sign out, sign in with it @critical', async ({ page, context, owner: _owner }) => {
+  await virtualAuthenticator(context, page);
+  const settings = await addPasskeyHere(page);
   await settings.logout();
   await expect(page).toHaveURL(/\/login/);
   await expect.poll(() => sessionCookie(context)).toBeUndefined();
 
-  // The passkey made here is remembered, so the page now leads with it, by the device's own name
+  // The passkey made here is remembered, so the page greets its owner and leads with it, by the
+  // device's own name. Signed out on purpose, so Face ID waits for the tap.
+  await expect(page.getByRole('heading', { name: L('authWelcomeBackName', { name: 'Dana' }) })).toBeVisible();
   await expect(page.getByRole('button', { name: L('passkeySignIn') })).toBeHidden();
+  await expect(page).toHaveURL(/\/login/);
   await page.getByRole('button', { name: Lre('authSignInWith') }).click();
   await expect(page).not.toHaveURL(/\/login/);
   expect(await sessionCookie(context)).toBeTruthy();
+});
+
+test('back after the session ran out: Face ID opens by itself', async ({ page, context, owner: _owner }) => {
+  await virtualAuthenticator(context, page);
+  await addPasskeyHere(page);
+  // The session ends without the person choosing to sign out
+  await context.clearCookies();
+  await page.goto('/login?reason=session_expired');
+  // Nobody taps: the new session comes from Face ID opening by itself
+  await expect.poll(() => sessionCookie(context)).toBeTruthy();
+  await expect(page).not.toHaveURL(/\/login/);
+});
+
+test('"Not Dana?" puts the sign-in page back to its plain self', async ({ page, context, owner: _owner }) => {
+  await virtualAuthenticator(context, page);
+  const settings = await addPasskeyHere(page);
+  await settings.logout();
+  await page.getByRole('button', { name: L('authNotYou', { name: 'Dana' }) }).click();
+  await expect(page.getByRole('heading', { name: L('authWelcomeBackName', { name: 'Dana' }) })).toBeHidden();
+  await expect(page.getByRole('button', { name: L('passkeySignIn') })).toBeVisible();
+  // and the name is not shown here again
+  await page.reload();
+  await expect(page.getByRole('button', { name: Lre('authSignInWith') })).toBeVisible();
+  await expect(page.getByText('Dana')).toBeHidden();
 });
 
 test('Face ID lock: turn it on, reopen the app, unlock with one tap @critical', async ({ page, context, owner: _owner }) => {
