@@ -73,10 +73,51 @@ export function searchableText(note) {
   return `${note.title || ''} ${note.content || ''} ${items} ${(note.tags || []).join(' ')}`.toLowerCase();
 }
 
+// How a line of copied text says what it is: "# " a title, a box (ticked or not) or a bullet an item
+const TITLE_MARK = /^#{1,6}\s+/;
+const DONE_MARK = /^(?:[-*•]\s*)?(?:\[[xX✓✔]\]|[☑☒✓✔✅])\s*/;
+const BOX_MARK = /^(?:[-*•]\s*)?(?:\[\s?\]|[□☐▢❏❑])\s*/;
+const BULLET_MARK = /^[-*•·]\s+/;
+const RULE = /^[-_=*]{3,}$/;
+
+/**
+ * Copied text as checklist lines. Where the text marks its tasks (boxes or bullets), the lines
+ * without a mark are text between them and a wrapped line carries on the task above it; plain
+ * lines with no marks anywhere are all items, like Keep.
+ */
+export function parseLines(text) {
+  const lines = [];
+  let pending = null; // a box on a line of its own, as PDFs copy them, belongs to the next line
+  for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
+    let s = raw.trim();
+    if (!s || RULE.test(s)) { lines.push(null); continue; }
+    let mark = null;
+    for (const [re, m] of [[TITLE_MARK, 'title'], [DONE_MARK, 'done'], [BOX_MARK, 'box'], [BULLET_MARK, 'box']]) {
+      if (re.test(s)) { mark = m; s = s.replace(re, '').trim(); break; }
+    }
+    if (!s) { if (mark !== 'title') pending = mark; continue; }
+    lines.push({ text: s, mark: mark || pending });
+    pending = null;
+  }
+  const marked = lines.some(l => l && (l.mark === 'box' || l.mark === 'done'));
+  const out = [];
+  let last = null; // the line a wrapped one carries on, until a blank line
+  for (const l of lines) {
+    if (!l) { last = null; continue; }
+    if (l.mark === 'title') { out.push({ text: l.text, kind: 'title', done: false }); last = null; continue; }
+    if (l.mark || !marked) { last = { text: l.text, done: l.mark === 'done' }; out.push(last); continue; }
+    if (last && !last.kind) { last.text = `${last.text} ${l.text}`; continue; }
+    if (last?.kind === 'text') { last.text = `${last.text}\n${l.text}`; continue; }
+    last = { text: l.text, kind: 'text', done: false };
+    out.push(last);
+  }
+  return out;
+}
+
 /** Turn "a\nb" lines into checklist items, and back. */
 export function textToItems(text) {
-  const lines = (text || '').split('\n').map(l => l.replace(/^\s*(?:[-*•]\s+|\[[ xX]\]\s*)/, '').trim()).filter(Boolean);
-  return lines.length ? lines.map(line => ({ id: newItemId(), text: line, done: false })) : [blankItem()];
+  const lines = parseLines(text);
+  return lines.length ? lines.map(line => ({ id: newItemId(), ...line })) : [blankItem()];
 }
 
 export function itemsToText(items) {

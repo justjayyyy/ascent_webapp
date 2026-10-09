@@ -9,9 +9,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { AutoTextarea } from './NoteParts';
-import { blankItem, fmt, highlight, isTickable, isTicked, lineKind, textDir } from './noteUtils';
+import { blankItem, fmt, highlight, isTickable, isTicked, lineKind, parseLines, textDir } from './noteUtils';
 
-const cleanLine = (l) => l.replace(/^\s*(?:[-*•]\s+|\[[ xX]\]\s*)/, '').trim();
 const MAX_SUGGESTIONS = 5;
 
 // The kinds of line a checklist can hold: tickable items, and plain text or titles between them
@@ -178,11 +177,11 @@ function Row({
           onFocus={() => onFocusChange?.(true)}
           onBlur={() => onFocusChange?.(false)}
           onPaste={(e) => {
-            // Pasting several lines makes one item per line, like Keep
+            // Pasting several lines makes one line each: items, and titles and text where the copy marks them
             if (readOnly || !onPasteLines || kind === 'text') return;
             const text = e.clipboardData?.getData('text') || '';
             if (!/\r?\n/.test(text.trim())) return;
-            const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
+            const lines = parseLines(text);
             if (lines.length < 2) return;
             e.preventDefault();
             onPasteLines(lines);
@@ -337,11 +336,12 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
     const idx = items.findIndex(i => i.id === id);
     if (idx < 0) return;
     const current = items[idx];
-    const fresh = lines.slice(1).map(text => ({ ...blankItem(), text }));
+    const fresh = lines.map(line => ({ ...blankItem(line.kind), text: line.text, done: line.done }));
+    // An empty line takes the first pasted one's place; one with text keeps it and the paste goes under
     const next = [...items];
-    next.splice(idx, 1, { ...current, text: current.text ? `${current.text} ${lines[0]}` : lines[0] }, ...fresh);
+    next.splice(idx, 1, ...(current.text ? [current, ...fresh] : fresh));
     patch(next);
-    focusSoon((fresh[fresh.length - 1] || current).id);
+    focusSoon(fresh[fresh.length - 1].id);
   };
 
   const backspaceEmpty = (id) => {

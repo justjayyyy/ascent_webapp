@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  noteToText, searchableText, textToItems, itemsToText, isEmptyNote, distribute, formatBytes, nextOccurrence,
+  noteToText, searchableText, textToItems, itemsToText, parseLines, isEmptyNote, distribute, formatBytes, nextOccurrence,
   extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob,
 } from './noteUtils';
 
@@ -18,6 +18,46 @@ describe('text and lists', () => {
     expect(items.map((i) => i.text)).toEqual(['milk', 'eggs', 'bread', 'jam']);
     expect(itemsToText(items)).toBe('milk\neggs\nbread\njam');
     expect(textToItems('')).toHaveLength(1); // an empty list still has one line to type in
+  });
+
+  const shape = (lines) => lines.map(({ text, kind, done }) => [kind || (done ? 'done' : 'item'), text]);
+
+  test('plain lines with no marks are all items, a "# " line a title', () => {
+    expect(shape(parseLines('# Shop\nmilk\neggs'))).toEqual([['title', 'Shop'], ['item', 'milk'], ['item', 'eggs']]);
+  });
+
+  test('a copied document keeps its titles, its text and its tasks, ticked or not', () => {
+    const doc = [
+      '# לפני החתונה',
+      'הסימון הוא לקריאה בלבד.',
+      'שורה שנייה של ההסבר.',
+      '',
+      '☐ לקנות נעליים',
+      '☑ להזמין פרחים',
+      '- [ ] לסגור סידורי שולחנות',
+      '- [x] לשלוח את רשימת האורחים',
+      '---',
+      '## חתן, אולם ורבנות',
+      '□',
+      'לבחור רב מחתן.',
+    ].join('\r\n');
+    expect(shape(parseLines(doc))).toEqual([
+      ['title', 'לפני החתונה'],
+      ['text', 'הסימון הוא לקריאה בלבד.\nשורה שנייה של ההסבר.'],
+      ['item', 'לקנות נעליים'],
+      ['done', 'להזמין פרחים'],
+      ['item', 'לסגור סידורי שולחנות'],
+      ['done', 'לשלוח את רשימת האורחים'],
+      ['title', 'חתן, אולם ורבנות'],
+      ['item', 'לבחור רב מחתן.'], // a box on its own line, as PDFs copy it, goes with the next line
+    ]);
+  });
+
+  test('a task wrapped onto the next line stays one task; after a blank line it is text', () => {
+    expect(shape(parseLines('☐ book the hall\nand pay the deposit\n\nnotes for later'))).toEqual([
+      ['item', 'book the hall and pay the deposit'],
+      ['text', 'notes for later'],
+    ]);
   });
 
   test('search covers title, body, list items and labels, case-insensitively', () => {

@@ -36,6 +36,25 @@ test('a checklist: Enter adds the next item, and ticking one is kept @critical',
   await expect.poll(async () => (await api.list('notes'))[0].items.filter((i) => i.done).map((i) => i.text)).toEqual(['Call grandma']);
 });
 
+test('a document pasted into a checklist keeps its titles, its text and its tasks', async ({ page, api }) => {
+  await openApp(page, '/Notes');
+  await page.getByRole('button', { name: L('ntNewChecklist') }).first().click();
+  const doc = '# Before the wedding\nWhat is still open.\n\n☐ Book the hall\n☑ Buy the rings\n\n# The day before\n☐ Charge the phones';
+  await page.getByRole('textbox', { name: L('ntListItem') }).last().evaluate((el, text) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }, doc);
+  await expect(page.getByRole('textbox', { name: L('ntListItem') }).last()).toHaveValue('Charge the phones');
+  await page.keyboard.press('Escape');
+
+  await expect.poll(async () => (await api.list('notes'))[0]?.items?.filter((i) => i.text).map((i) => [i.kind || (i.done ? 'done' : 'item'), i.text]))
+    .toEqual([
+      ['title', 'Before the wedding'], ['text', 'What is still open.'], ['item', 'Book the hall'], ['done', 'Buy the rings'],
+      ['title', 'The day before'], ['item', 'Charge the phones'],
+    ]);
+});
+
 test('a note can be pinned, archived and brought back with Undo, and trashed and restored @critical', async ({ page, api }) => {
   await api.create('notes', { type: 'text', title: 'Boiler code', content: '4471', isShared: false });
   await openApp(page, '/Notes');
