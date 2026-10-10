@@ -9,8 +9,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { LinkChips, PeopleStack, PersonDot } from './NoteParts';
-import { CardPhotos } from './NoteExtras';
-import { extractLinks, fmt, formatReminder, highlight, isOverdue, isPreviewable, isTicked, lastEditor, lineKind, resolveColor, textDir, timeAgo } from './noteUtils';
+import { CardPhotos, LinePicture, placedPictures, useNearView } from './NoteExtras';
+import {
+  extractLinks, fmt, formatAmount, formatReminder, hasAmount, highlight, isOverdue, isPreviewable, isTicked, lastEditor, lineKind, resolveColor,
+  textDir, timeAgo,
+} from './noteUtils';
+import { amountTotals, lineNumbers } from './noteDocument';
 
 const PREVIEW_ITEMS = 5;
 // A long note shows a short preview; open it to read the rest
@@ -20,7 +24,35 @@ const LONG_PRESS = 450;
 const SWIPE = 110;
 const isCoarse = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
-function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true }) {
+/** A picture among the lines of a card, loaded as the card comes near the screen. */
+function CardLinePicture({ noteId, fileId, online, alt }) {
+  const ref = useRef(null);
+  const near = useNearView(ref);
+  return (
+    <span ref={ref} className="block">
+      <LinePicture noteId={noteId} fileId={fileId} load={near && online} alt={alt} className="max-h-40" />
+    </span>
+  );
+}
+
+const CardAmount = ({ item, currency, language }) => (
+  <span className="ms-auto shrink-0 ps-2 text-sm font-medium tabular-nums text-foreground/85">
+    {formatAmount(item.amount, item.currency || currency, language)}
+  </span>
+);
+
+// A line with details under its first line (a numbered entry, an amount line): the name, then the small print
+function Lined({ text, query }) {
+  const [first, ...rest] = String(text || '').split('\n');
+  return (
+    <span className="min-w-0 break-words">
+      <span className="text-foreground/90">{highlight(first, query)}</span>
+      {rest.length > 0 && <span className="block text-xs leading-snug text-muted-foreground line-clamp-2">{highlight(rest.join(' '), query)}</span>}
+    </span>
+  );
+}
+
+function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true, currency }) {
   const color = resolveColor(note.color);
   const isOwner = note.myAccess === 'owner';
   const canEdit = isOwner || note.myAccess === 'edit';
@@ -36,15 +68,18 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   const editorPerson = lastEditor(note, people);
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
 
-  const openItems = (note.items || []).filter(i => !isTicked(i) && (i.text || lineKind(i) === 'item'));
+  const openItems = (note.items || []).filter(i => !isTicked(i) && (i.text || ['item', 'image'].includes(lineKind(i)) || hasAmount(i)));
   const doneCount = (note.items || []).filter(isTicked).length;
   const previewItems = openItems.slice(0, PREVIEW_ITEMS);
   const hiddenItems = openItems.length - previewItems.length;
+  const numbers = lineNumbers(openItems);
+  const totals = amountTotals(openItems, currency);
   const hasBody = note.type === 'checklist' ? (note.items || []).length > 0 : !!note.content?.trim();
   const text = note.content?.trim() || '';
   const longText = text.length > LONG_TEXT || text.split(/\r?\n/).length > 6;
 
-  const photoCount = (note.attachments || []).filter(a => isPreviewable(a.type)).length;
+  const placed = placedPictures(note);
+  const photoCount = (note.attachments || []).filter(a => isPreviewable(a.type) && !placed.has(a.id)).length;
   const fileCount = (note.attachments || []).length - photoCount;
 
   const toggleItem = (id, done) =>
@@ -157,32 +192,63 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
 
         {note.type === 'checklist' ? (
           <ul dir={textDir(note.title || note.items?.[0]?.text)} className="space-y-1">
-            {previewItems.map(item => (lineKind(item) !== 'item' ? (
-              // Text and titles between the items, without a checkbox
-              <li
-                key={item.id}
-                dir={textDir(item.text)}
-                className={cn(
-                  'min-w-0 break-words',
-                  lineKind(item) === 'title'
-                    ? 'pt-1 text-[13px] font-semibold text-foreground line-clamp-1'
-                    : 'whitespace-pre-wrap text-sm leading-snug text-foreground/80 line-clamp-3'
-                )}
-              >
-                {highlight(item.text, query)}
-              </li>
-            ) : (
-              <li key={item.id} dir={textDir(item.text)} className="flex items-start gap-2 text-sm leading-snug">
-                <Checkbox
-                  checked={false}
-                  disabled={!canEdit || trashed}
-                  onCheckedChange={() => toggleItem(item.id, true)}
-                  aria-label={item.text}
-                  className="pointer-events-auto relative z-[2] mt-[1px] h-4 w-4 rounded-[5px]"
-                />
-                <span className="min-w-0 break-words text-foreground/90 line-clamp-2">{highlight(item.text, query)}</span>
-              </li>
-            )))}
+            {previewItems.map((item, i) => {
+              const kind = lineKind(item);
+              const total = totals.get(i) && (
+                <li key={`${item.id}-total`} className="flex justify-end gap-2 border-t border-dashed border-foreground/20 pt-1 text-xs">
+                  <span className="text-muted-foreground">{t('ntTotal')}</span>
+                  <span className="font-semibold tabular-nums">{totals.get(i).map(s => formatAmount(s.amount, s.currency, language)).join(' + ')}</span>
+                </li>
+              );
+              let line;
+              if (kind === 'image') {
+                line = (
+                  <li key={item.id} className="-mx-1">
+                    <CardLinePicture noteId={note.id} fileId={item.fileId} online={online} alt={item.text} />
+                    {item.text && <span className="mt-0.5 block text-center text-xs text-muted-foreground line-clamp-1">{highlight(item.text, query)}</span>}
+                  </li>
+                );
+              } else if (kind === 'item') {
+                line = (
+                  <li key={item.id} dir={textDir(item.text)} className="flex items-start gap-2 text-sm leading-snug">
+                    <Checkbox
+                      checked={false}
+                      disabled={!canEdit || trashed}
+                      onCheckedChange={() => toggleItem(item.id, true)}
+                      aria-label={item.text}
+                      className="pointer-events-auto relative z-[2] mt-[1px] h-4 w-4 rounded-[5px]"
+                    />
+                    <span className="min-w-0 break-words text-foreground/90 line-clamp-2">{highlight(item.text, query)}</span>
+                    {hasAmount(item) && <CardAmount item={item} currency={currency} language={language} />}
+                  </li>
+                );
+              } else if (kind === 'number' || hasAmount(item)) {
+                line = (
+                  <li key={item.id} dir={textDir(item.text)} className="flex items-start gap-1.5 text-sm leading-snug">
+                    {kind === 'number' && <span className="shrink-0 tabular-nums text-muted-foreground">{numbers[i]}.</span>}
+                    <Lined text={item.text} query={query} />
+                    {hasAmount(item) && <CardAmount item={item} currency={currency} language={language} />}
+                  </li>
+                );
+              } else {
+                // Text, titles and boxes between the items, without a checkbox
+                line = (
+                  <li
+                    key={item.id}
+                    dir={textDir(item.text)}
+                    className={cn(
+                      'min-w-0 break-words',
+                      kind === 'title' && 'pt-1 text-[13px] font-semibold text-foreground line-clamp-1',
+                      kind === 'text' && 'whitespace-pre-wrap text-sm leading-snug text-foreground/80 line-clamp-3',
+                      kind === 'callout' && 'whitespace-pre-wrap rounded-lg border-s-[3px] border-foreground/25 bg-foreground/[0.06] px-2 py-1 text-sm leading-snug text-foreground/85 line-clamp-4'
+                    )}
+                  >
+                    {highlight(item.text, query)}
+                  </li>
+                );
+              }
+              return total ? [line, total] : line;
+            })}
             {hiddenItems > 0 && (
               <li className="ps-6 text-xs text-muted-foreground">{fmt(t('ntMoreItems'), { n: hiddenItems })}</li>
             )}

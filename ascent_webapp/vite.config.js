@@ -83,7 +83,8 @@ export default defineConfig({
         // Never serve the SPA shell for API calls
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['**/logo-dark.png', '**/logo-light.png'],
+        // The PDF reader (pdf.js) loads only when someone imports a PDF into a note; not worth precaching for everyone
+        globIgnores: ['**/logo-dark.png', '**/logo-light.png', '**/assets/pdf-*.js', '**/assets/pdf.worker*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         // Adds the notification-tap handler used by note reminders

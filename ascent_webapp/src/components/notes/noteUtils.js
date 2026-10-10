@@ -51,17 +51,66 @@ export function newItemId() {
 
 export const blankItem = (kind) => ({ id: newItemId(), text: '', done: false, ...(kind && kind !== 'item' ? { kind } : {}) });
 
-// A checklist line is a tickable item unless it is plain text or a title placed between the items
-export const lineKind = (item) => (item?.kind === 'text' || item?.kind === 'title' ? item.kind : 'item');
+// A checklist line is a tickable item unless it is one of these, placed between the items: plain text, a title,
+// a numbered line, a highlighted box or a picture (one of the note's files, by fileId, with its caption as text)
+export const LINE_KINDS = ['text', 'title', 'number', 'callout', 'image'];
+export const lineKind = (item) => (LINE_KINDS.includes(item?.kind) ? item.kind : 'item');
 export const isTickable = (item) => lineKind(item) === 'item';
 export const isTicked = (item) => isTickable(item) && !!item.done;
+// Items, text and numbered lines can carry an amount, shown on the side and added up under a run of them
+export const canHaveAmount = (item) => ['item', 'text', 'number'].includes(lineKind(item));
+export const hasAmount = (item) => canHaveAmount(item) && typeof item.amount === 'number' && Number.isFinite(item.amount);
+
+const LOCALES = { he: 'he-IL', ru: 'ru-RU', en: 'en-US' };
+
+/** "₪8,000" in the reader's language; an amount with no currency is a plain number. */
+export function formatAmount(amount, currency, language) {
+  const digits = Number.isInteger(amount) ? 0 : 2;
+  try {
+    return new Intl.NumberFormat(LOCALES[language] || language || 'en-US', {
+      ...(currency ? { style: 'currency', currency } : {}), minimumFractionDigits: digits, maximumFractionDigits: digits,
+    }).format(amount);
+  } catch {
+    return String(amount);
+  }
+}
+
+const amountText = (it) => (hasAmount(it) ? ` · ${formatAmount(it.amount, it.currency)}` : '');
+
+const CURRENCY_SIGNS = [
+  ['ש"ח', 'ILS'], ['ש״ח', 'ILS'], ['NIS', 'ILS'], ['ILS', 'ILS'], ['₪', 'ILS'],
+  ['USD', 'USD'], ['$', 'USD'], ['EUR', 'EUR'], ['€', 'EUR'], ['GBP', 'GBP'], ['£', 'GBP'],
+  ['руб.', 'RUB'], ['руб', 'RUB'], ['RUB', 'RUB'], ['₽', 'RUB'],
+];
+const BIDI_MARKS = /[‎‏‪-‮⁦-⁩]/g;
+
+/** "₪8,000", "8,000 ש"ח", "12.50" -> { amount, currency }, or null when the text is anything more than an amount. */
+export function parseAmount(raw) {
+  let s = String(raw ?? '').replace(BIDI_MARKS, '').trim();
+  let currency = null;
+  for (const [sign, code] of CURRENCY_SIGNS) {
+    if (s.startsWith(sign)) { currency = code; s = s.slice(sign.length).trim(); break; }
+    if (s.endsWith(sign)) { currency = code; s = s.slice(0, -sign.length).trim(); break; }
+  }
+  if (!/^-?\d{1,3}(?:[,\u00a0\u202f ]\d{3})+(?:\.\d+)?$|^-?\d+(?:[.,]\d{1,2})?$/.test(s)) return null;
+  const amount = /^-?\d+,\d{1,2}$/.test(s) ? Number(s.replace(',', '.')) : Number(s.replace(/[,\u00a0\u202f ]/g, ''));
+  return Number.isFinite(amount) ? { amount, currency } : null;
+}
 
 /** Plain text of a note, for search, copying and the share sheet. */
 export function noteToText(note, { withTitle = true } = {}) {
   const parts = [];
   if (withTitle && note.title) parts.push(note.title);
   if (note.type === 'checklist') {
-    (note.items || []).forEach(it => it.text && parts.push(isTickable(it) ? `${it.done ? '[x]' : '[ ]'} ${it.text}` : it.text));
+    let n = 0;
+    (note.items || []).forEach((it) => {
+      const kind = lineKind(it);
+      n = kind === 'number' ? n + 1 : 0;
+      if (!it.text || kind === 'image') return;
+      if (kind === 'item') parts.push(`${it.done ? '[x]' : '[ ]'} ${it.text}${amountText(it)}`);
+      else if (kind === 'number') parts.push(`${n}. ${it.text}${amountText(it)}`);
+      else parts.push(`${it.text}${amountText(it)}`);
+    });
   } else if (note.content) {
     parts.push(note.content);
   }
@@ -78,12 +127,25 @@ const TITLE_MARK = /^#{1,6}\s+/;
 const DONE_MARK = /^(?:[-*•]\s*)?(?:\[[xX✓✔]\]|[☑☒✓✔✅])\s*/;
 const BOX_MARK = /^(?:[-*•]\s*)?(?:\[\s?\]|[□☐▢❏❑])\s*/;
 const BULLET_MARK = /^[-*•·]\s+/;
+const CALLOUT_MARK = /^>\s?/;
+const NUMBER_MARK = /^\d{1,3}[.)]\s+/;
 const RULE = /^[-_=*]{3,}$/;
+const MARKS = [[TITLE_MARK, 'title'], [DONE_MARK, 'done'], [BOX_MARK, 'box'], [BULLET_MARK, 'box'], [CALLOUT_MARK, 'callout']];
+
+// "Hall\t73,440": an amount in the last column, as a spreadsheet copies its rows
+function splitAmount(s) {
+  const tab = s.lastIndexOf('\t');
+  const money = tab > 0 ? parseAmount(s.slice(tab + 1)) : null;
+  const text = money && s.slice(0, tab).split('\t').map(c => c.trim()).filter(Boolean).join(' · ');
+  return text ? { text, amount: money.amount, ...(money.currency ? { currency: money.currency } : {}) } : null;
+}
 
 /**
  * Copied text as checklist lines. Where the text marks its tasks (boxes or bullets), the lines
- * without a mark are text between them and a wrapped line carries on the task above it; plain
- * lines with no marks anywhere are all items, like Keep.
+ * without a mark are text between them and a wrapped line carries on the line above it; plain
+ * lines with no marks anywhere are all items, like Keep. "# " is a title, "> " a highlighted box,
+ * "1. " a numbered line in a document that has titles, boxes or tasks, and a last column holding
+ * an amount (as copied from a spreadsheet) goes on the side.
  */
 export function parseLines(text) {
   const lines = [];
@@ -92,23 +154,39 @@ export function parseLines(text) {
     let s = raw.trim();
     if (!s || RULE.test(s)) { lines.push(null); continue; }
     let mark = null;
-    for (const [re, m] of [[TITLE_MARK, 'title'], [DONE_MARK, 'done'], [BOX_MARK, 'box'], [BULLET_MARK, 'box']]) {
+    for (const [re, m] of MARKS) {
       if (re.test(s)) { mark = m; s = s.replace(re, '').trim(); break; }
     }
-    if (!s) { if (mark !== 'title') pending = mark; continue; }
-    lines.push({ text: s, mark: mark || pending });
+    if (!s) { if (mark === 'box' || mark === 'done') pending = mark; continue; }
+    const money = mark === 'title' || mark === 'callout' ? null : splitAmount(s);
+    lines.push({ ...(money || { text: s }), mark: mark || pending });
     pending = null;
   }
   const marked = lines.some(l => l && (l.mark === 'box' || l.mark === 'done'));
+  const doc = marked || lines.some(l => l && (l.mark === 'title' || l.mark === 'callout'));
   const out = [];
   let last = null; // the line a wrapped one carries on, until a blank line
   for (const l of lines) {
     if (!l) { last = null; continue; }
-    if (l.mark === 'title') { out.push({ text: l.text, kind: 'title', done: false }); last = null; continue; }
-    if (l.mark || !marked) { last = { text: l.text, done: l.mark === 'done' }; out.push(last); continue; }
-    if (last && !last.kind) { last.text = `${last.text} ${l.text}`; continue; }
-    if (last?.kind === 'text') { last.text = `${last.text}\n${l.text}`; continue; }
-    last = { text: l.text, kind: 'text', done: false };
+    const { mark, text: lineText, ...money } = l;
+    if (mark === 'title') { out.push({ text: lineText, kind: 'title', done: false }); last = null; continue; }
+    if (mark === 'callout') {
+      if (last?.kind === 'callout') last.text = `${last.text}\n${lineText}`;
+      else { last = { text: lineText, kind: 'callout', done: false }; out.push(last); }
+      continue;
+    }
+    if (!mark && doc && NUMBER_MARK.test(lineText)) {
+      last = { text: lineText.replace(NUMBER_MARK, ''), kind: 'number', done: false, ...money };
+      out.push(last);
+      continue;
+    }
+    const wraps = !('amount' in money);
+    // The lines right under a numbered entry are its details
+    if (!mark && wraps && last?.kind === 'number') { last.text = `${last.text}\n${lineText}`; continue; }
+    if (mark || !marked) { last = { text: lineText, done: mark === 'done', ...money }; out.push(last); continue; }
+    if (wraps && last && !last.kind) { last.text = `${last.text} ${lineText}`; continue; }
+    if (wraps && (last?.kind === 'text' || last?.kind === 'number')) { last.text = `${last.text}\n${lineText}`; continue; }
+    last = { text: lineText, kind: 'text', done: false, ...money };
     out.push(last);
   }
   return out;
@@ -126,7 +204,7 @@ export function itemsToText(items) {
 
 export const isEmptyNote = (n) =>
   !n.title?.trim() &&
-  (n.type === 'checklist' ? !(n.items || []).some(i => i.text.trim()) : !n.content?.trim());
+  (n.type === 'checklist' ? !(n.items || []).some(i => i.text.trim() || i.kind === 'image' || hasAmount(i)) : !n.content?.trim());
 
 /** Rough height of a card, so short and tall notes balance across the masonry columns. */
 function estimateHeight(note, previewItems = 6) {

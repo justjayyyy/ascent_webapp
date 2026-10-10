@@ -88,8 +88,23 @@ function Tile({ noteId, att, canEdit, online, onRemove, onPreview, t, wide }) {
   );
 }
 
+/** A picture placed among a note's lines: one of its files, loaded once `load` says so. */
+export function LinePicture({ noteId, fileId, load, alt, className }) {
+  const thumb = useThumb(noteId || '', { id: fileId || '' }, !!noteId && !!fileId && !!load);
+  if (thumb.data) return <img src={thumb.data} alt={alt || ''} draggable={false} className={cn('block w-full rounded-xl object-cover', className)} />;
+  return (
+    <span className={cn('flex h-32 w-full items-center justify-center rounded-xl bg-foreground/[0.06] text-muted-foreground', className)}>
+      {thumb.isFetching ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
+    </span>
+  );
+}
+
+/** The files a note shows among its lines, as pictures, rather than with its photos. */
+export const placedPictures = (note) => new Set((note.type === 'checklist' ? note.items || [] : [])
+  .filter(i => i.kind === 'image' && i.fileId).map(i => i.fileId));
+
 /** True once the element has come near the screen (photos on note cards load as you scroll). */
-function useNearView(ref) {
+export function useNearView(ref) {
   const [near, setNear] = useState(false);
   useEffect(() => {
     if (near || !ref.current) return undefined;
@@ -117,7 +132,8 @@ function CardPhoto({ noteId, att, load, className, more }) {
 export function CardPhotos({ note, online }) {
   const ref = useRef(null);
   const near = useNearView(ref);
-  const photos = (note.attachments || []).filter(a => isPreviewable(a.type));
+  const placed = placedPictures(note);
+  const photos = (note.attachments || []).filter(a => isPreviewable(a.type) && !placed.has(a.id));
   if (!photos.length) return null;
   const load = near && online;
   const shown = photos.slice(0, 3);
@@ -145,10 +161,11 @@ export function CardPhotos({ note, online }) {
  * What is attached to a note. `kind="photos"` is the photos, large, at the top of the note (with the
  * upload in progress); `kind="files"` is every other file as a row to download, below the text.
  */
-export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t, kind = 'files' }) {
+export function AttachmentPanel({ note, canEdit, online, uploading, onRemove, t, kind = 'files', exclude }) {
   const [preview, setPreview] = useState(null);
   const photos = kind === 'photos';
-  const list = (note.attachments || []).filter(a => isPreviewable(a.type) === photos);
+  const hidden = exclude || placedPictures(note);
+  const list = (note.attachments || []).filter(a => isPreviewable(a.type) === photos && !hidden.has(a.id));
   const busy = photos && uploading > 0;
   if (!list.length && !busy) return null;
   return (

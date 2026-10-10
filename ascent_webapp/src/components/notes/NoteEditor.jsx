@@ -17,8 +17,10 @@ import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
 import { DictateButton, useDictation } from './useDictation';
 import {
-  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, isTicked, itemsToText, lastEditor, noteToText, resolveColor, textToItems, timeAgo, blankItem,
+  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, isTicked, itemsToText, lastEditor, lineKind, newItemId, noteToText, resolveColor, textToItems, timeAgo, blankItem,
 } from './noteUtils';
+import { readPaste } from './noteDocument';
+import { pictureFromSrc } from './importDocument';
 
 const ib = 'h-11 w-11 sm:h-9 sm:w-9 [@media(pointer:coarse)]:before:hidden';
 const CONTENT_KEYS = ['title', 'content', 'type', 'items', 'tags', 'color'];
@@ -45,7 +47,7 @@ function useVisualViewport() {
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export default function NoteEditor({
-  note, people, labels, itemSuggestions, actions, onClose, onShare, t, language, online, pending, canCreate, uploading, fresh,
+  note, people, labels, itemSuggestions, actions, onClose, onShare, t, language, online, pending, canCreate, uploading, fresh, currency,
 }) {
   const reduce = useReducedMotion();
   const vv = useVisualViewport();
@@ -208,6 +210,25 @@ export default function NoteEditor({
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
   const overdue = isOverdue(note.reminder);
   const pickFiles = (e) => { actions.addFiles(noteId, e.target.files); e.target.value = ''; };
+  const addImage = useCallback((blob) => actions.addImage(noteId, blob), [actions, noteId]);
+  // Pictures placed among the lines are shown there, not again with the note's photos
+  const placed = new Set((draft.items || []).filter(i => lineKind(i) === 'image').map(i => i.fileId));
+
+  // A page or document pasted into an empty note becomes its lines: titles, tasks, boxes, amounts, pictures
+  const pasteIntoEmpty = async (e) => {
+    if (!canEdit || draft.content?.trim()) return;
+    const lines = readPaste({ html: e.clipboardData?.getData('text/html') || '', text: '' });
+    if (!lines || lines.every(l => lineKind(l) === 'text' && !('amount' in l))) return;
+    e.preventDefault();
+    const items = [];
+    for (const { src, ...line } of lines) {
+      if (line.kind === 'image') {
+        const fileId = online ? await pictureFromSrc(src).then(addImage).catch(() => null) : null;
+        if (fileId) items.push({ id: newItemId(), kind: 'image', text: line.text || '', done: false, fileId });
+      } else items.push({ done: false, ...line, id: newItemId() });
+    }
+    if (items.length) change({ type: 'checklist', items });
+  };
 
   const transition = reduce ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 36 };
 
@@ -309,6 +330,7 @@ export default function NoteEditor({
               <AttachmentPanel
                 kind="photos"
                 note={note}
+                exclude={placed}
                 canEdit={canEdit}
                 online={online}
                 uploading={uploading}
@@ -337,6 +359,11 @@ export default function NoteEditor({
                     autoFocus={fresh}
                     suggestions={itemSuggestions}
                     t={t}
+                    noteId={noteId}
+                    online={online}
+                    currency={currency}
+                    language={language}
+                    onAddImage={canEdit ? addImage : undefined}
                   />
                 ) : (
                   <AutoTextarea
@@ -344,6 +371,7 @@ export default function NoteEditor({
                     value={draft.content}
                     readOnly={!canEdit}
                     onChange={(e) => change({ content: e.target.value })}
+                    onPaste={pasteIntoEmpty}
                     placeholder={t('ntTakeNote')}
                     aria-label={t('noteContent')}
                     maxLength={100000}

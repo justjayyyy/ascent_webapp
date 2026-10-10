@@ -54,6 +54,22 @@ function anthropic({ ai = 'ok' }, url, init) {
       items: firstItem ? [{ text: 'Milk 3%', qty: 2, unit: null, unitPrice: 6.9, price: 13.8, matchId: firstItem }] : [],
     }));
   }
+  if (system.startsWith('You copy documents into a notes app')) {
+    // A wedding plan: its picture where one was listed, a box, numbered suppliers with amounts, a task
+    const line = (over) => ({ kind: 'text', text: '', done: false, amount: null, currency: null, picture: null, ...over });
+    return message(JSON.stringify({
+      title: 'Before the wedding',
+      lines: [
+        line({ text: 'Version 3, with the latest answers.' }),
+        ...(/picture 1:/.test(userText) ? [line({ kind: 'picture', text: 'For illustration only', picture: 1 })] : []),
+        line({ kind: 'callout', text: 'What is not settled\nPayment dates are missing.' }),
+        line({ kind: 'title', text: 'Suppliers' }),
+        line({ kind: 'numbered', text: 'DJ\nNo contract yet', amount: 8000, currency: 'ILS' }),
+        line({ kind: 'numbered', text: 'Hall', amount: 73440, currency: 'ILS' }),
+        line({ kind: 'task', text: 'Book the hall' }),
+      ],
+    }));
+  }
   return message(ASSISTANT_ANSWER);
 }
 

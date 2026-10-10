@@ -5,7 +5,8 @@ import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
 import { getNotesSync } from './notesSync';
-import { MAX_FILES, newNoteId, prepareUpload, useOnlineStatus } from './noteUtils';
+import { MAX_FILE_BYTES, MAX_FILES, fmt, newItemId, newNoteId, prepareUpload, useOnlineStatus } from './noteUtils';
+import { isPdf, pictureFromSrc, readDocument } from './importDocument';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const CONTENT_KEYS = ['title', 'content', 'type', 'items', 'tags', 'color'];
@@ -200,6 +201,86 @@ export function useNotes() {
     }
   }, [online, sync, queryClient, queryKey, applyAttachments, t]);
 
+  // One picture for a line of the note (pasted, or placed by an import): the new file's id, or null
+  const addImage = useCallback(async (noteId, blob, name = 'picture.jpg') => {
+    if (!online) return null;
+    await sync.flush();
+    if (sync.pendingFor(noteId)) return null;
+    const existing = (queryClient.getQueryData(queryKey) || []).find(n => n.id === noteId)?.attachments || [];
+    if (existing.length >= MAX_FILES) return null;
+    try {
+      const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+      const saved = await ascent.entities.Note.uploadFile(noteId, await prepareUpload(file));
+      applyAttachments(saved);
+      const before = new Set(existing.map(a => a.id));
+      return (saved.attachments || []).find(a => !before.has(a.id))?.id || null;
+    } catch {
+      return null;
+    }
+  }, [online, sync, queryClient, queryKey, applyAttachments]);
+
+  /**
+   * A PDF or photos of paper, read by the assistant into a new checklist note with its titles, text, tasks,
+   * numbered entries, boxes, amounts and pictures. Resolves to { id, missingPictures, cut }.
+   */
+  const importDocument = useCallback(async (files, { language, onProgress, tags = [] } = {}) => {
+    const list = Array.from(files || []);
+    const doc = await readDocument(list, { readPages: ascent.entities.Note.importPages, language, onProgress });
+    const name = (list.find(isPdf) || list[0])?.name?.replace(/\.[^.]+$/, '') || '';
+    const id = createNote({ type: 'checklist', title: doc.title || name, items: [], tags });
+
+    // The pictures it placed, uploaded in order; one that cannot be (offline, too many files) is left out
+    onProgress?.({ stage: 'pictures', done: 0, total: doc.pictures.length });
+    const fileIds = new Map();
+    const wanted = doc.pictures.filter(p => doc.lines.some(l => l.picture === p.ref));
+    for (const [i, picture] of wanted.entries()) {
+      const fileId = await addImage(id, picture.blob, `picture-${picture.ref}.jpg`);
+      if (fileId) fileIds.set(picture.ref, fileId);
+      onProgress?.({ stage: 'pictures', done: i + 1, total: wanted.length });
+    }
+    const items = doc.lines
+      .filter(l => l.kind !== 'image' || fileIds.has(l.picture))
+      .map(({ picture, ...l }) => ({ ...l, id: newItemId(), ...(l.kind === 'image' ? { fileId: fileIds.get(picture) } : {}) }));
+    patchNote(id, { items });
+
+    // The PDF itself goes with the note when it fits, to open the original
+    const pdf = list.find(isPdf);
+    if (pdf && pdf.size <= MAX_FILE_BYTES) await addFiles(id, [pdf]);
+    return { id, missingPictures: wanted.length - fileIds.size, cut: doc.cut };
+  }, [createNote, patchNote, addImage, addFiles]);
+
+  /**
+   * A new checklist note made of pasted lines. It is there at once; the pictures (pasted with their `src`) are
+   * uploaded into it and put back where they were, after whatever line came before them. Resolves to its id.
+   */
+  const createFromLines = useCallback(({ title = '', color, tags = [], lines }) => {
+    const all = lines.map(l => ({ done: false, ...l, id: l.id || newItemId() }));
+    const waiting = all.filter(l => l.kind === 'image' && !l.fileId);
+    const id = createNote({
+      type: 'checklist', title, tags, ...(color ? { color } : {}),
+      items: all.filter(l => !waiting.includes(l)).map(({ src: _src, ...l }) => l),
+    });
+    if (waiting.length) {
+      (async () => {
+        const placed = [];
+        for (const line of waiting) {
+          const fileId = await pictureFromSrc(line.src).then(blob => addImage(id, blob)).catch(() => null);
+          if (fileId) placed.push({ id: line.id, kind: 'image', text: line.text || '', done: false, fileId });
+        }
+        if (placed.length) {
+          const items = [...((queryClient.getQueryData(queryKey) || []).find(n => n.id === id)?.items || [])];
+          for (const line of placed) {
+            const before = all.slice(0, all.findIndex(l => l.id === line.id)).reverse().find(l => items.some(i => i.id === l.id));
+            items.splice(before ? items.findIndex(i => i.id === before.id) + 1 : 0, 0, line);
+          }
+          patchNote(id, { items });
+        }
+        if (placed.length < waiting.length) toast.error(fmt(t('ntPicturesSkipped'), { n: waiting.length - placed.length }));
+      })();
+    }
+    return id;
+  }, [createNote, patchNote, addImage, queryClient, queryKey, t]);
+
   const removeFile = useCallback(async (noteId, fileId) => {
     if (!online) { toast.error(t('ntNeedOnline')); return; }
     update(list => list.map(n => (n.id === noteId
@@ -226,6 +307,9 @@ export function useNotes() {
     deleteNote,
     emptyTrash,
     addFiles,
+    addImage,
+    importDocument,
+    createFromLines,
     removeFile,
     uploading,
   };

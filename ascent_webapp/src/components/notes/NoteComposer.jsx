@@ -7,14 +7,17 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
 import { AutoTextarea, ColorPicker, LabelEditor } from './NoteParts';
-import { blankItem, isEmptyNote, itemsToText, resolveColor, textToItems } from './noteUtils';
+import { blankItem, hasAmount, isEmptyNote, itemsToText, lineKind, newItemId, resolveColor, textToItems } from './noteUtils';
+import { readPaste } from './noteDocument';
 
 const blank = (tag) => ({
   title: '', content: '', type: 'text', items: [], color: 'default', tags: tag ? [tag] : [],
 });
 
 /** "Take a note…" bar that opens into a full inline editor, like Google Keep. */
-export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, onCreate, onImage, request, onRequestHandled }) {
+export default function NoteComposer({
+  t, labels, itemSuggestions, defaultTag, onCreate, onImage, onDocument, request, onRequestHandled, currency, language,
+}) {
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => blank(defaultTag));
@@ -32,7 +35,7 @@ export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, o
     if (!isEmptyNote(d)) {
       onCreate({
         ...d,
-        items: d.type === 'checklist' ? d.items.filter(i => i.text.trim()) : [],
+        items: d.type === 'checklist' ? d.items.filter(i => i.text.trim() || hasAmount(i)) : [],
         content: d.type === 'checklist' ? '' : d.content,
       });
     }
@@ -65,6 +68,24 @@ export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, o
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
   }, [open, commit]);
+
+  // A paste with pictures needs a note to put them in: it becomes one, opened, with what was written so far
+  const handOff = (lines) => {
+    const d = draftRef.current;
+    onDocument({ title: d.title, color: d.color, tags: d.tags, lines });
+    setDraft(blank(defaultTag));
+    setOpen(false);
+  };
+
+  // A page or document pasted into an empty note becomes its lines
+  const pasteIntoEmpty = (e) => {
+    if (draftRef.current.content?.trim()) return;
+    const lines = readPaste({ html: e.clipboardData?.getData('text/html') || '', text: '' });
+    if (!lines || lines.every(l => lineKind(l) === 'text' && !('amount' in l))) return;
+    e.preventDefault();
+    if (onDocument && lines.some(l => l.kind === 'image')) { handOff(lines); return; }
+    patch({ type: 'checklist', items: lines.filter(l => l.kind !== 'image').map(l => ({ done: false, ...l, id: newItemId() })) });
+  };
 
   const startChecklist = () => {
     setDraft({ ...blank(defaultTag), type: 'checklist', items: [blankItem()] });
@@ -173,6 +194,9 @@ export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, o
                     autoFocus
                     suggestions={itemSuggestions}
                     t={t}
+                    currency={currency}
+                    language={language}
+                    onPasteDocument={onDocument ? handOff : undefined}
                   />
                 ) : (
                   <AutoTextarea
@@ -180,6 +204,7 @@ export default function NoteComposer({ t, labels, itemSuggestions, defaultTag, o
                     autoFocus
                     value={draft.content}
                     onChange={(e) => patch({ content: e.target.value })}
+                    onPaste={pasteIntoEmpty}
                     placeholder={t('ntTakeNote')}
                     aria-label={t('noteContent')}
                     maxLength={100000}

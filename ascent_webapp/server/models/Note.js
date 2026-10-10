@@ -5,8 +5,13 @@ const itemSchema = new mongoose.Schema({
   id: { type: String, required: true },
   text: { type: String, default: '' },
   done: { type: Boolean, default: false },
-  // A checklist line is a tickable item, or a plain line of text or a title placed between items
-  kind: { type: String, enum: ['item', 'text', 'title'], default: undefined }
+  // A checklist line is a tickable item, or one of these placed between items: a plain line of text, a title,
+  // a numbered line, a highlighted box, or a picture (one of the note's files, its caption in `text`)
+  kind: { type: String, enum: ['item', 'text', 'title', 'number', 'callout', 'image'], default: undefined },
+  // Items, text and numbered lines may carry an amount, shown on the side and added up under a run of them
+  amount: { type: Number, default: undefined },
+  currency: { type: String, default: undefined },
+  fileId: { type: String, default: undefined }
 }, { _id: false });
 
 const collaboratorSchema = new mongoose.Schema({

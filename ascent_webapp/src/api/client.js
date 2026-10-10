@@ -320,6 +320,8 @@ const entities = {
     uploadFile: (noteId, file) => request(`/entities/notes?action=file&id=${enc(noteId)}`, json('POST', file)),
     getFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`),
     deleteFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`, { method: 'DELETE' }),
+    // A few pages of a document (JPEG base64) read into { title, lines } by the assistant
+    importPages: (body) => request('/entities/notes?action=import', json('POST', body, { timeout: 70000 })),
   },
 };
 

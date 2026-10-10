@@ -84,6 +84,17 @@ const NoteFile = {
   async deleteOne(q) { files = files.filter((f) => !same(f._id, q._id)); },
   async deleteMany(q) { files = files.filter((f) => !(q.noteId.$in || [q.noteId]).some((id) => same(id, f.noteId))); },
 };
+// Reading documents: the assistant's answer is stood in for; what the handler checks first is real
+let aiOn = true;
+const imports = [];
+class AssistantDeclined extends Error {}
+mock.module(at('../lib/assistant.js'), { exports: { aiConfigured: () => aiOn, AssistantDeclined } });
+mock.module(at('../lib/noteImport.js'), {
+  exports: {
+    MAX_PAGES_PER_CALL: 4,
+    readDocumentPages: async (args) => { imports.push(args); return { title: 'Wedding', lines: [{ text: 'Hall', done: false, kind: 'number', amount: 73440, currency: 'ILS' }] }; },
+  },
+});
 mock.module(at('../models/Note.js'), { exports: { default: Note } });
 mock.module(at('../models/NoteFile.js'), { exports: { default: NoteFile } });
 
@@ -286,6 +297,53 @@ test('a checklist keeps text and titles between its items, never ticked', async 
     { id: 'p', text: 'from the market', done: false, kind: 'text' },
     { id: 'x', text: 'odd', done: false },
   ]);
+});
+
+test('the lines of a document keep their kind, their amount and their picture, and nothing they may not carry', async () => {
+  const file = oid();
+  const r = await call('PUT', { id: shared.id }, { items: [
+    { id: 'n', text: 'Hall', kind: 'number', amount: '73440.456', currency: 'ILS' },
+    { id: 'c', text: 'Not settled', kind: 'callout', amount: 5 },
+    { id: 'i', text: 'cover', kind: 'image', fileId: file, amount: 3 },
+    { id: 'j', text: '', kind: 'image', fileId: '../etc' },
+    { id: 't', text: 'Tip', amount: 200, currency: 'shekel' },
+    { id: 'e', text: 'Empty', kind: 'text', amount: '' },
+  ] });
+  assert.equal(r.code, 200);
+  assert.deepEqual(r.body.data.items, [
+    { id: 'n', text: 'Hall', done: false, kind: 'number', amount: 73440.46, currency: 'ILS' },
+    { id: 'c', text: 'Not settled', done: false, kind: 'callout' },
+    { id: 'i', text: 'cover', done: false, kind: 'image', fileId: file },
+    { id: 'j', text: '', done: false, kind: 'image' },
+    { id: 't', text: 'Tip', done: false, amount: 200 },
+    { id: 'e', text: 'Empty', done: false, kind: 'text' },
+  ]);
+});
+
+test('reading a document needs the assistant on, the notes permission, and a few page images at a time', async () => {
+  const page = { data: 'AAAA', mediaType: 'image/jpeg' };
+  const r = await call('POST', { action: 'import' }, { pages: [page], pictures: [{ ref: 1, page: 1, width: 1536, height: 1024 }, { ref: 'x' }], firstPage: 1, pageCount: 8 });
+  assert.equal(r.code, 403); // the household has not turned the assistant on
+  workspace.settings = { aiAssistant: true };
+  try {
+    const ok = await call('POST', { action: 'import' }, { pages: [page], pictures: [{ ref: 1, page: 1, width: 1536, height: 1024 }, { ref: 'x' }], firstPage: 1, pageCount: 8 });
+    assert.equal(ok.code, 200);
+    assert.deepEqual(ok.body.data.lines.map((l) => l.text), ['Hall']);
+    assert.deepEqual(imports.at(-1).pictures, [{ ref: 1, page: 1, width: 1536, height: 1024 }]);
+    assert.equal(imports.at(-1).pageCount, 8);
+
+    assert.equal((await call('POST', { action: 'import' }, { pages: Array(5).fill(page) })).code, 400);
+    assert.equal((await call('POST', { action: 'import' }, { pages: [{ data: 'AAAA', mediaType: 'application/pdf' }] })).code, 400);
+    assert.equal((await call('GET', { action: 'import' })).code, 405);
+    as(VIEWER); // may read notes, not create them
+    assert.equal((await call('POST', { action: 'import' }, { pages: [page] })).code, 403);
+    aiOn = false;
+    as(OWNER);
+    assert.equal((await call('POST', { action: 'import' }, { pages: [page] })).code, 403); // no key on the server
+  } finally {
+    aiOn = true;
+    delete workspace.settings;
+  }
 });
 
 test('two people ticking different checklist items at once both keep their tick', async () => {

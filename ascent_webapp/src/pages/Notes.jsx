@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from '@/lib/motion';
 import {
   Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, Plus, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
-  ListChecks, Image as ImageIcon, StickyNote as NoteIcon,
+  ListChecks, Image as ImageIcon, StickyNote as NoteIcon, FileUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,12 @@ import ShortcutsDialog from '@/components/notes/ShortcutsDialog';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import { useReminders } from '@/components/notes/useReminders';
 import { buildPeople } from '@/components/notes/NoteParts';
+import ImportDocumentDialog from '@/components/notes/ImportDocumentDialog';
+import { noteToHtml } from '@/components/notes/noteDocument';
+import { useAssistStatus } from '@/hooks/useWorkspaceData';
+import { ascent } from '@/api/client';
 import {
-  NOTE_COLORS, NOTE_FILTERS, blankItem, distribute, fmt, matchesFilter, newItemId, noteToText, resolveColor, searchableText, useColumnCount,
+  NOTE_COLORS, NOTE_FILTERS, blankItem, distribute, fmt, lineKind, matchesFilter, newItemId, noteToText, resolveColor, searchableText, useColumnCount,
 } from '@/components/notes/noteUtils';
 
 const VIEW_KEY = 'ascent_notes_view';
@@ -49,12 +53,16 @@ const canEditNote = (n) => n.myAccess === 'owner' || n.myAccess === 'edit';
 
 function Notes() {
   const { user, t, language, isRTL } = useTheme();
-  const { currentWorkspace, hasPermission } = useAuth();
+  const { currentWorkspace, hasPermission, isWorkspaceOwner } = useAuth();
   const [params, setParams] = useSearchParams();
   const {
     notes, isLoading, isFetching, online, pending, userId,
-    createNote, patchNote, deleteNote, emptyTrash, refetch, addFiles, removeFile, uploading,
+    createNote, patchNote, deleteNote, emptyTrash, refetch, addFiles, removeFile, uploading, addImage, importDocument, createFromLines,
   } = useNotes();
+  const currency = user?.currency || 'ILS';
+  const { data: assistStatus } = useAssistStatus();
+  const aiOff = !!assistStatus && !(assistStatus.ai?.configured && assistStatus.ai?.enabled);
+  const importRef = useRef(null);
 
   const canCreate = hasPermission('editNotes');
   const view = VIEWS.includes(params.get('f')) ? params.get('f') : 'notes';
@@ -104,6 +112,7 @@ function Notes() {
     { id: 'note', label: t('ntNewNote'), icon: NoteIcon, run: () => newNote('text') },
     { id: 'list', label: t('ntNewChecklist'), icon: ListChecks, run: () => newNote('checklist') },
     { id: 'photo', label: t('ntNewImageNote'), icon: ImageIcon, run: () => photoInput.current?.click() },
+    { id: 'import', label: t('ntImportDocument'), icon: FileUp, run: () => importRef.current?.start() },
   ]);
 
   // ---- entry points: install shortcut (?new=1) and text shared to the app (?share=1) ----
@@ -309,21 +318,48 @@ function Notes() {
       discard: (id) => deleteNote(id),
       share: (id) => setShareId(id),
       addFiles,
+      addImage,
       removeFile,
+      // The whole note: as HTML (titles, tasks, numbers, boxes, amounts and its pictures) for documents and other
+      // notes, and as text for everything else. The pictures are fetched while the copy is being written.
       copy: async (n) => {
-        try { await navigator.clipboard.writeText(noteToText(n)); toast.success(t('ntCopied')); }
-        catch { toast.error(t('ntCopyFailed')); }
+        const text = noteToText(n);
+        const html = async () => {
+          const images = {};
+          for (const it of (n.items || []).filter(i => lineKind(i) === 'image' && i.fileId)) {
+            try {
+              const file = await ascent.entities.Note.getFile(n.id, it.fileId);
+              images[it.fileId] = `data:${file.type};base64,${file.data}`;
+            } catch { /* copied without that picture */ }
+          }
+          return new Blob([noteToHtml(n, { images, language, currency, totalLabel: t('ntTotal') })], { type: 'text/html' });
+        };
+        try {
+          if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+            await navigator.clipboard.write([new ClipboardItem({
+              'text/plain': new Blob([text], { type: 'text/plain' }),
+              'text/html': html(),
+            })]);
+          } else {
+            await navigator.clipboard.writeText(text);
+          }
+          toast.success(t('ntCopied'));
+        } catch {
+          try { await navigator.clipboard.writeText(text); toast.success(t('ntCopied')); }
+          catch { toast.error(t('ntCopyFailed')); }
+        }
       },
       duplicate: (n, { quiet } = {}) => {
         createNote({
           title: n.title ? `${n.title} (${t('ntCopySuffix')})` : '',
           content: n.content, type: n.type, color: n.color, tags: n.tags || [],
-          items: (n.items || []).map(i => ({ ...i, id: newItemId() })),
+          // Pictures belong to the note they were added to; the copy keeps everything else
+          items: (n.items || []).filter(i => lineKind(i) !== 'image').map(i => ({ ...i, id: newItemId() })),
         });
         if (!quiet) toast.success(t('noteCreated'));
       },
     };
-  }, [patchNote, deleteNote, createNote, addFiles, removeFile, notes, t, userId]);
+  }, [patchNote, deleteNote, createNote, addFiles, addImage, removeFile, notes, t, userId, language, currency]);
 
   // ---- labels: rename or remove everywhere ----
   const renameLabel = useCallback((from, to) => {
@@ -447,6 +483,7 @@ function Notes() {
                 selecting={selecting}
                 onToggleSelect={toggleSelect}
                 online={online}
+                currency={currency}
               />
             ))}
           </div>
@@ -480,6 +517,16 @@ function Notes() {
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {statusPill}
+            {canCreate && (
+              <Button
+                variant="ghost" size="icon"
+                onClick={() => importRef.current?.start()}
+                aria-label={t('ntImportDocument')}
+                title={t('ntImportDocument')}
+              >
+                <FileUp />
+              </Button>
+            )}
             {/* Phones: the inline composer is hidden, so a + opens a new note */}
             {showComposer && (
               <Button
@@ -609,6 +656,9 @@ function Notes() {
                   defaultTag={label}
                   onCreate={onCreate}
                   onImage={newImageNote}
+                  onDocument={(data) => { const id = createFromLines(data); setFreshId(null); setOpenId(id); }}
+                  currency={currency}
+                  language={language}
                   request={composerRequest}
                   onRequestHandled={() => setComposerRequest(null)}
                 />
@@ -671,6 +721,16 @@ function Notes() {
           </div>
         </div>
 
+        <ImportDocumentDialog
+          ref={importRef}
+          importDocument={(files, opts) => importDocument(files, { ...opts, tags: label ? [label] : [] })}
+          aiOff={aiOff}
+          isOwner={isWorkspaceOwner}
+          onImported={(id) => { setFreshId(null); setOpenId(id); }}
+          language={language}
+          t={t}
+        />
+
         <input
           ref={photoInput}
           type="file"
@@ -718,6 +778,7 @@ function Notes() {
               uploading={uploading}
               canCreate={canCreate}
               fresh={freshId === openNote.id}
+              currency={currency}
             />
           )}
         </AnimatePresence>

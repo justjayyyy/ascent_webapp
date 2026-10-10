@@ -6,6 +6,8 @@ import { handleCors } from '../lib/cors.js';
 import { success, error, notFound, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { mergeChecklist } from '../lib/checklistMerge.js';
+import { aiConfigured, AssistantDeclined } from '../lib/assistant.js';
+import { readDocumentPages, MAX_PAGES_PER_CALL } from '../lib/noteImport.js';
 
 const TRASH_DAYS = 7;
 const MAX_ITEMS = 500;
@@ -15,9 +17,26 @@ const MAX_FILES = 10;
 const MAX_FILE_BYTES = 3 * 1024 * 1024; // base64 in JSON stays under Vercel's 4.5 MB body limit
 
 const REPEATS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
-const LINE_KINDS = ['text', 'title']; // besides an ordinary tickable item, which stores no kind
+const LINE_KINDS = ['text', 'title', 'number', 'callout', 'image']; // besides an ordinary tickable item, which stores no kind
+const PRICED_KINDS = [null, 'text', 'number']; // the lines that may carry an amount (null: a tickable item)
 
 const sameId = (a, b) => a && b && a.toString() === b.toString();
+
+// Reading documents into notes uses the assistant: a few pages per call, a limited number of calls per person
+const IMPORT_LIMIT = { windowMs: 60 * 60_000, max: 30 };
+const importCalls = new Map();
+const PAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_IMPORT_CHARS = 4_200_000; // the pages' base64 together, under Vercel's 4.5 MB body limit
+const LANGUAGES = { en: 'English', he: 'Hebrew', ru: 'Russian' };
+
+function importRateLimited(userId) {
+  const now = Date.now();
+  const recent = (importCalls.get(userId) || []).filter((t) => now - t < IMPORT_LIMIT.windowMs);
+  if (recent.length >= IMPORT_LIMIT.max) return true;
+  recent.push(now);
+  importCalls.set(userId, recent);
+  return false;
+}
 
 // The stored bytes, exactly. A lean read gives a BSON Binary (its .buffer is the data); a Node Buffer
 // must be used as it is, because its .buffer is the whole shared memory pool it was cut from.
@@ -31,7 +50,7 @@ export function fileBytes(data) {
 
 // What the caller may do with a note:
 //   'owner' created it, 'edit' can change its content, 'view' can only read, null: no access
-function accessFor(note, user, member) {
+export function accessFor(note, user, member) {
   if (sameId(note.createdBy, user._id)) return 'owner';
 
   const collab = (note.collaborators || []).find(c => sameId(c.userId, user._id));
@@ -66,9 +85,26 @@ function present(note, user, member) {
     collaborators: (note.collaborators || []).map(c => ({
       userId: c.userId.toString(), email: c.email, role: c.role
     })),
-    items: (note.items || []).map(({ id, text, done, kind }) => ({ id, text, done: !!done, ...(LINE_KINDS.includes(kind) ? { kind } : {}) })),
+    items: (note.items || []).map(presentLine),
     attachments: (note.attachments || []).map(({ id, name, type, size }) => ({ id, name, type, size }))
   };
+}
+
+// The extras a line keeps: an amount (with its currency) on items, text and numbered lines, a file on a picture
+function lineExtras(it, kind) {
+  const out = {};
+  const amount = Number(it?.amount);
+  if (PRICED_KINDS.includes(kind) && it?.amount !== null && it?.amount !== undefined && it?.amount !== '' && Number.isFinite(amount)) {
+    out.amount = Math.round(amount * 100) / 100;
+    if (typeof it.currency === 'string' && /^[A-Z]{3}$/.test(it.currency)) out.currency = it.currency;
+  }
+  if (kind === 'image' && typeof it?.fileId === 'string' && /^[0-9a-f]{24}$/.test(it.fileId)) out.fileId = it.fileId;
+  return out;
+}
+
+function presentLine({ id, text, done, kind, ...rest }) {
+  const k = LINE_KINDS.includes(kind) ? kind : null;
+  return { id, text, done: !!done, ...(k ? { kind: k } : {}), ...lineExtras(rest, k) };
 }
 
 function cleanItems(items) {
@@ -78,9 +114,10 @@ function cleanItems(items) {
     return {
       id: String(it?.id || `i${Date.now().toString(36)}${i}`).slice(0, 40),
       text: String(it?.text ?? '').slice(0, 2000),
-      // Text and titles are never ticked
+      // Only items are ticked
       done: !kind && !!it?.done,
-      ...(kind ? { kind } : {})
+      ...(kind ? { kind } : {}),
+      ...lineExtras(it, kind)
     };
   });
 }
@@ -157,6 +194,37 @@ export default async function handler(req, res) {
 
     const { id, action, _single } = req.query;
     const uid = user._id;
+
+    // ---- reading a document: POST ?action=import { pages: [{ data, mediaType }], pictures, firstPage, pageCount } ----
+    // -> { title, lines }: the note's lines for these pages; the app creates the note and uploads the pictures
+    if (action === 'import') {
+      if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
+      if (!canCreate) return error(res, 'You do not have permission to create notes', 403);
+      if (!aiConfigured() || workspace.settings?.aiAssistant !== true) return error(res, 'ai_disabled', 403);
+      const body = req.body || {};
+      const pages = Array.isArray(body.pages) ? body.pages : [];
+      if (!pages.length || pages.length > MAX_PAGES_PER_CALL) return error(res, `Send 1 to ${MAX_PAGES_PER_CALL} pages at a time`, 400);
+      if (pages.some((p) => typeof p?.data !== 'string' || !p.data || !PAGE_TYPES.has(p.mediaType))) return error(res, 'Pages must be JPEG, PNG or WebP images', 400);
+      if (pages.reduce((n, p) => n + p.data.length, 0) > MAX_IMPORT_CHARS) return error(res, 'The pages are too large', 413);
+      const pictures = (Array.isArray(body.pictures) ? body.pictures : []).slice(0, 40)
+        .map((p) => ({ ref: Number(p?.ref), page: Number(p?.page), width: Number(p?.width) || 0, height: Number(p?.height) || 0 }))
+        .filter((p) => Number.isInteger(p.ref) && p.ref > 0 && Number.isInteger(p.page));
+      if (importRateLimited(uid.toString())) return error(res, 'Too many documents read this hour. Try again later.', 429);
+      try {
+        const doc = await readDocumentPages({
+          pages: pages.map((p) => ({ data: p.data, mediaType: p.mediaType })),
+          pictures,
+          firstPage: Math.max(1, Number(body.firstPage) || 1),
+          pageCount: Math.max(0, Number(body.pageCount) || 0) || undefined,
+          language: LANGUAGES[user.language] || LANGUAGES[body.language],
+        });
+        return success(res, doc);
+      } catch (err) {
+        if (err instanceof AssistantDeclined) return error(res, 'declined', 422);
+        console.error('[Notes] import failed:', err?.message);
+        return error(res, 'The document could not be read. Try again.', 502);
+      }
+    }
 
     // ---- file attachments: ?action=file&id=<noteId>[&fileId=<fileId>] ----
     if (action === 'file') {

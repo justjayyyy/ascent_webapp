@@ -1,29 +1,46 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, useDragControls } from '@/lib/motion';
 import {
-  ChevronRight, CornerDownRight, GripVertical, Heading, Pilcrow, Plus, RotateCcw, SquareCheck, X,
+  ChevronRight, Coins, CornerDownRight, GripVertical, Heading, Highlighter, ImagePlus, ListOrdered, ListPlus, Pilcrow, Plus, RotateCcw, SquareCheck, X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { AutoTextarea } from './NoteParts';
-import { blankItem, fmt, highlight, isTickable, isTicked, lineKind, parseLines, textDir } from './noteUtils';
+import { LinePicture } from './NoteExtras';
+import {
+  blankItem, canHaveAmount, fmt, formatAmount, hasAmount, highlight, isTickable, isTicked, lineKind, newItemId, parseAmount,
+  textDir, useLatest,
+} from './noteUtils';
+import { amountTotals, lineNumbers, readPaste } from './noteDocument';
+import { pictureFromSrc } from './importDocument';
 
 const MAX_SUGGESTIONS = 5;
 
-// The kinds of line a checklist can hold: tickable items, and plain text or titles between them
+// The kinds of line a checklist can hold: tickable items, and text, titles, numbered lines and boxes between them.
+// Pictures are added with their own button and stay pictures.
 const KINDS = [
   { kind: 'item', icon: SquareCheck, label: 'ntKindItem' },
   { kind: 'text', icon: Pilcrow, label: 'ntKindText' },
   { kind: 'title', icon: Heading, label: 'ntKindTitle' },
+  { kind: 'number', icon: ListOrdered, label: 'ntKindNumber' },
+  { kind: 'callout', icon: Highlighter, label: 'ntKindCallout' },
 ];
+// Lines that may run over several lines (Shift+Enter); the rest stay on one
+const MULTILINE = new Set(['text', 'number', 'callout']);
 const withKind = (item, kind) => {
   const { kind: _old, ...rest } = item;
-  return kind === 'item' ? rest : { ...rest, kind, done: false };
+  const next = kind === 'item' ? rest : { ...rest, kind, done: false };
+  if (!canHaveAmount(next)) { delete next.amount; delete next.currency; }
+  if (!MULTILINE.has(kind)) next.text = next.text.replace(/\n/g, ' ');
+  return next;
 };
-const PLACEHOLDER = { item: 'ntListItem', text: 'ntTextLine', title: 'ntTitleLine' };
+const withoutAmount = ({ amount: _a, currency: _c, ...rest }) => rest;
+const PLACEHOLDER = { item: 'ntListItem', text: 'ntTextLine', title: 'ntTitleLine', number: 'ntNumberLine', callout: 'ntCalloutLine' };
 
 /**
  * What to offer while typing an item: a ticked item of this list comes back, an item already
@@ -92,8 +109,9 @@ function Suggestions({ list, highlighted, query, onPick, t }) {
   );
 }
 
-/** Switches a line between a checkbox item, plain text and a title. */
-function KindMenu({ kind, onChange, t }) {
+/** Switches a line between a checkbox item, text, a title, a numbered line and a box, and gives it an amount. */
+function KindMenu({ item, onChange, onAmount, t }) {
+  const kind = lineKind(item);
   const Current = KINDS.find(k => k.kind === kind)?.icon || SquareCheck;
   return (
     <DropdownMenu modal={false}>
@@ -102,12 +120,13 @@ function KindMenu({ kind, onChange, t }) {
           type="button"
           aria-label={t('ntLineKind')}
           title={t('ntLineKind')}
-          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-60"
+          // On touch screens it shows on the line being edited, leaving the others their full width
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:hidden [@media(hover:none)]:opacity-60 [@media(hover:none)]:group-focus-within/row:flex [@media(hover:none)]:data-[state=open]:flex"
         >
           <Current className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[10rem]" onCloseAutoFocus={(e) => e.preventDefault()}>
+      <DropdownMenuContent align="end" className="min-w-[11rem]" onCloseAutoFocus={(e) => e.preventDefault()}>
         <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">{t('ntLineKind')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={kind} onValueChange={onChange}>
           {KINDS.map(({ kind: k, icon: Icon, label }) => (
@@ -116,18 +135,66 @@ function KindMenu({ kind, onChange, t }) {
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
+        {canHaveAmount(item) && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onAmount}>
+              <Coins className="me-2 h-4 w-4" /> {hasAmount(item) ? t('ntRemoveAmount') : t('ntAddAmount')}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
+/** The amount on the side of a line: the number while you type it, written as money otherwise. */
+function AmountInput({ item, currency, language, readOnly, onChange, t, inputRef }) {
+  const [typing, setTyping] = useState(null);
+  const cur = item.currency || currency;
+  const shown = typing ?? (item.amount ? formatAmount(item.amount, cur, language) : '');
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      inputMode="decimal"
+      value={shown}
+      readOnly={readOnly}
+      placeholder={formatAmount(0, cur, language)}
+      aria-label={item.text ? `${t('ntAmount')}: ${item.text.split('\n')[0]}` : t('ntAmount')}
+      onFocus={() => { if (!readOnly) setTyping(item.amount ? String(item.amount) : ''); }}
+      onBlur={() => setTyping(null)}
+      onChange={(e) => {
+        setTyping(e.target.value);
+        const money = parseAmount(e.target.value);
+        if (money) onChange(money.amount);
+        else if (!e.target.value.trim()) onChange(0);
+      }}
+      className="mt-0.5 h-8 w-[5.25rem] shrink-0 rounded-lg sm:w-[6.5rem] bg-transparent px-1.5 text-end text-sm font-medium tabular-nums outline-none placeholder:text-muted-foreground/50 focus:bg-foreground/[0.06] read-only:focus:bg-transparent"
+    />
+  );
+}
+
+/** The sum under a run of lines with amounts. */
+function TotalRow({ totals, language, t, editable }) {
+  return (
+    <div className={cn('flex items-center justify-end gap-3 border-t border-dashed border-foreground/20 pb-1 pt-1.5 text-sm', editable ? 'pe-[4.5rem] [@media(hover:none)]:pe-[2.4rem]' : 'pe-0')}>
+      <span className="text-muted-foreground">{t('ntTotal')}</span>
+      <span className="min-w-[5.25rem] px-1.5 text-end font-semibold tabular-nums sm:min-w-[6.5rem]">
+        {totals.map(s => formatAmount(s.amount, s.currency, language)).join(' + ')}
+      </span>
+    </div>
+  );
+}
+
 function Row({
-  item, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, onPasteLines, registerRef,
-  onKind, suggestions, onPick, onFocusChange,
+  item, number, total, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, onPasteLines, registerRef,
+  onKind, suggestions, onPick, onFocusChange, noteId, online, currency, language,
 }) {
   const controls = useDragControls();
   const [highlighted, setHighlighted] = useState(-1);
   const [dismissed, setDismissed] = useState(null);
+  const amountRef = useRef(null);
   const list = suggestions?.length && dismissed !== item.text ? suggestions : [];
   useEffect(() => { setHighlighted(-1); }, [item.text]);
   const kind = lineKind(item);
@@ -136,20 +203,77 @@ function Row({
   const wrapperProps = reorderable
     ? { value: item, dragListener: false, dragControls: controls, whileDrag: { scale: 1.02, boxShadow: '0 10px 30px -10px hsl(0 0% 0% / 0.45)', zIndex: 20 } }
     : {};
+
+  const toggleAmount = () => {
+    if (hasAmount(item)) { onChange(withoutAmount(item)); return; }
+    onChange({ ...item, amount: 0, ...(currency ? { currency } : {}) });
+    requestAnimationFrame(() => amountRef.current?.focus());
+  };
+
+  const grip = !readOnly && reorderable && (
+    <button
+      type="button"
+      aria-label={t('ntDragItem')}
+      onPointerDown={(e) => controls.start(e)}
+      className="mt-1 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60"
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  );
+  const removeButton = !readOnly && (
+    <button
+      type="button"
+      aria-label={kind === 'image' ? t('ntRemovePicture') : t('ntDeleteItem')}
+      onClick={onRemove}
+      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+
+  if (kind === 'image') {
+    return (
+      <Wrapper {...wrapperProps} className="group/row relative rounded-lg py-1">
+        <div className="flex items-start gap-1.5">
+          {grip}
+          <figure className="min-w-0 flex-1">
+            <LinePicture noteId={noteId} fileId={item.fileId} load={online} alt={item.text} className="max-h-80" />
+            {(!readOnly || item.text) && (
+              <AutoTextarea
+                ref={registerRef}
+                value={item.text}
+                readOnly={readOnly}
+                onChange={(e) => onChange({ ...item, text: e.target.value.replace(/\n/g, ' ') })}
+                onFocus={() => onFocusChange?.(true)}
+                onBlur={() => onFocusChange?.(false)}
+                onKeyDown={(e) => {
+                  if (!readOnly && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onEnter(); }
+                }}
+                placeholder={t('ntCaption')}
+                aria-label={t('ntCaption')}
+                className="mt-1 py-0.5 text-center text-xs leading-5 text-muted-foreground"
+              />
+            )}
+          </figure>
+          {removeButton}
+        </div>
+      </Wrapper>
+    );
+  }
+
+  const multiline = MULTILINE.has(kind);
   return (
-    <Wrapper {...wrapperProps} className={cn('group/row relative rounded-lg', kind === 'title' && 'pt-2')}>
+    <Wrapper
+      {...wrapperProps}
+      className={cn(
+        'group/row relative rounded-lg',
+        kind === 'title' && 'pt-2',
+        kind === 'callout' && 'my-1 rounded-xl border-s-[3px] border-foreground/25 bg-foreground/[0.06] py-1 ps-1'
+      )}
+    >
       {/* A Hebrew line sits right to left in an English list, and the other way round */}
       <div dir={textDir(item.text)} className="flex items-start gap-1.5">
-        {!readOnly && reorderable && (
-          <button
-            type="button"
-            aria-label={t('ntDragItem')}
-            onPointerDown={(e) => controls.start(e)}
-            className="mt-1 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60"
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
-        )}
+        {grip}
         {kind === 'item' && (
           <Checkbox
             checked={item.done}
@@ -159,14 +283,19 @@ function Row({
             className="mt-[7px] h-[18px] w-[18px] rounded-md"
           />
         )}
+        {kind === 'number' && (
+          <span aria-hidden className="min-w-[1.5rem] shrink-0 py-1 text-end text-base font-medium leading-6 tabular-nums text-muted-foreground sm:text-sm">
+            {number}.
+          </span>
+        )}
         <AutoTextarea
           ref={registerRef}
           value={item.text}
           readOnly={readOnly}
           onChange={(e) => {
             let text = e.target.value;
-            // Only plain text may run over several lines
-            if (kind !== 'text') text = text.replace(/\n/g, ' ');
+            // Only text, numbered lines and boxes may run over several lines
+            if (!multiline) text = text.replace(/\n/g, ' ');
             // "# " at the start of an item makes it a title, like in most editors
             if (kind === 'item' && /^#\s/.test(text) && !/^#\s/.test(item.text)) {
               onChange(withKind({ ...item, text: text.slice(2) }, 'title'));
@@ -177,12 +306,13 @@ function Row({
           onFocus={() => onFocusChange?.(true)}
           onBlur={() => onFocusChange?.(false)}
           onPaste={(e) => {
-            // Pasting several lines makes one line each: items, and titles and text where the copy marks them
-            if (readOnly || !onPasteLines || kind === 'text') return;
-            const text = e.clipboardData?.getData('text') || '';
-            if (!/\r?\n/.test(text.trim())) return;
-            const lines = parseLines(text);
-            if (lines.length < 2) return;
+            // Several lines, or a page or document, make one line each: items, titles, text, numbered lines,
+            // boxes, amounts and pictures where the copy has them. Multi-line kinds keep plain text as typed.
+            if (readOnly || !onPasteLines) return;
+            const html = e.clipboardData?.getData('text/html') || '';
+            const text = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('text') || '';
+            const lines = readPaste({ html, text: multiline ? '' : text });
+            if (!lines || (multiline && lines.every(l => lineKind(l) === 'text' && !('amount' in l)))) return;
             e.preventDefault();
             onPasteLines(lines);
           }}
@@ -217,29 +347,44 @@ function Row({
             kind === 'item' && item.done && 'text-muted-foreground line-through'
           )}
         />
-        {!readOnly && onKind && <KindMenu kind={kind} onChange={onKind} t={t} />}
-        {!readOnly && (
-          <button
-            type="button"
-            aria-label={t('ntDeleteItem')}
-            onClick={onRemove}
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        {hasAmount(item) && (
+          <AmountInput
+            item={item}
+            currency={currency}
+            language={language}
+            readOnly={readOnly}
+            onChange={(amount) => onChange({ ...item, amount })}
+            t={t}
+            inputRef={amountRef}
+          />
         )}
+        {!readOnly && onKind && <KindMenu item={item} onChange={onKind} onAmount={toggleAmount} t={t} />}
+        {removeButton}
       </div>
       {list.length > 0 && <Suggestions list={list} highlighted={highlighted} query={item.text.trim()} onPick={onPick} t={t} />}
+      {total && <TotalRow totals={total} language={language} t={t} editable={!readOnly} />}
     </Wrapper>
   );
 }
 
-/** Checklist body of a note: reorderable open lines (items, text, titles) and a collapsible list of completed ones. */
-export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, t, suggestions }) {
+/**
+ * Checklist body of a note: reorderable open lines (items, text, titles, numbered lines, boxes, pictures,
+ * amounts with their totals) and a collapsible list of completed ones. `onAddImage(blob)` uploads a picture
+ * to the note and resolves to its file id (null when it cannot). Where there is no note yet (the composer),
+ * a paste with pictures goes to `onPasteDocument(lines)` whole, to become a note that can hold them.
+ */
+export default function ChecklistEditor({
+  items, onChange, readOnly, autoFocus, t, suggestions, noteId, online = true, currency, language, onAddImage, onPasteDocument,
+}) {
   const refs = useRef({});
+  const pictureInput = useRef(null);
   const [showDone, setShowDone] = useState(false);
+  const itemsRef = useLatest(items);
   const open = items.filter(i => !isTicked(i));
   const done = items.filter(isTicked);
+  const numbers = useMemo(() => lineNumbers(open), [open]);
+  const totals = useMemo(() => amountTotals(open, currency), [open, currency]);
+  const canPicture = !!onAddImage && online && !readOnly;
 
   // The line being typed in, for suggestions and for where new lines go.
   // Blur waits a moment so a tapped suggestion or add button still knows the line.
@@ -284,64 +429,112 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
 
   const patch = (next) => onChange(next);
 
-  const replace = (item) => patch(items.map(i => (i.id === item.id ? item : i)));
+  const replace = (item) => patch(itemsRef.current.map(i => (i.id === item.id ? item : i)));
 
-  const insertAfter = (id, kind) => {
-    const fresh = blankItem(kind);
-    const idx = items.findIndex(i => i.id === id);
-    const next = [...items];
-    next.splice(idx + 1, 0, fresh);
-    patch(next);
-    focusSoon(fresh.id);
+  // New lines go right under `afterId`, or at the end of the open lines
+  const insertLines = (afterId, fresh) => {
+    const list = itemsRef.current;
+    const idx = afterId ? list.findIndex(i => i.id === afterId) : -1;
+    if (idx < 0) {
+      const openNow = list.filter(i => !isTicked(i));
+      patch([...openNow, ...fresh, ...list.filter(isTicked)]);
+    } else {
+      const next = [...list];
+      next.splice(idx + 1, 0, ...fresh);
+      patch(next);
+    }
+    focusLastOpen(fresh);
   };
 
-  // New lines go right under the line you were in, or at the end of the list
-  const addLine = (kind) => {
-    const anchor = focusedItem;
-    if (anchor) { insertAfter(anchor.id, kind); return; }
-    const fresh = blankItem(kind);
-    patch([...open, fresh, ...done]);
-    focusSoon(fresh.id);
+  // The cursor goes to the last of the new lines still on screen (a ticked one is folded away)
+  const focusLastOpen = (fresh) => {
+    const target = [...fresh].reverse().find(i => !isTicked(i));
+    if (target) focusSoon(target.id);
+  };
+
+  const insertAfter = (id, kind) => insertLines(id, [blankItem(kind)]);
+
+  const addLine = (kind, extra = {}) => insertLines(focusedItem?.id, [{ ...blankItem(kind), ...extra }]);
+
+  const addPicture = async (file) => {
+    if (!file || !onAddImage) return;
+    const anchor = focusedItem?.id;
+    const loading = toast.loading(t('ntAddingPictures'));
+    const fileId = await onAddImage(file);
+    toast.dismiss(loading);
+    if (!fileId) { toast.error(t('ntPictureFailed')); return; }
+    insertLines(anchor, [{ ...blankItem('image'), fileId }]);
   };
 
   const setKind = (id, kind) => {
-    patch(items.map(i => (i.id === id ? withKind(i, kind) : i)));
+    patch(itemsRef.current.map(i => (i.id === id ? withKind(i, kind) : i)));
     focusSoon(id);
   };
 
   const pick = (rowId, s) => {
-    const idx = items.findIndex(i => i.id === rowId);
+    const list = itemsRef.current;
+    const idx = list.findIndex(i => i.id === rowId);
     if (idx < 0) return;
     if (s.kind === 'fill') {
       const fresh = blankItem();
-      const next = items.map(i => (i.id === rowId ? { ...i, text: s.text } : i));
+      const next = list.map(i => (i.id === rowId ? { ...i, text: s.text } : i));
       next.splice(idx + 1, 0, fresh);
       patch(next);
       focusSoon(fresh.id);
       return;
     }
     // A ticked item comes back in place of the one being typed; one already on the list is jumped to
-    const target = items.find(i => i.id === s.id);
+    const target = list.find(i => i.id === s.id);
     if (!target) return;
-    const next = items.filter(i => i.id !== rowId && i.id !== s.id);
-    const at = items.slice(0, idx).filter(i => i.id !== s.id).length;
+    const next = list.filter(i => i.id !== rowId && i.id !== s.id);
+    const at = list.slice(0, idx).filter(i => i.id !== s.id).length;
     next.splice(at, 0, s.kind === 'restore' ? { ...target, done: false } : target);
     patch(next);
     focusSoon(target.id, target.text.length);
   };
 
-  const remove = (id) => patch(items.filter(i => i.id !== id));
+  const remove = (id) => patch(itemsRef.current.filter(i => i.id !== id));
 
-  const pasteLines = (id, lines) => {
-    const idx = items.findIndex(i => i.id === id);
-    if (idx < 0) return;
-    const current = items[idx];
-    const fresh = lines.map(line => ({ ...blankItem(line.kind), text: line.text, done: line.done }));
+  // A paste of several lines: pictures in it are uploaded first, then everything goes in where the paste was
+  const pasteLines = async (id, lines) => {
+    let ready = lines;
+    const pictures = lines.some(l => l.kind === 'image');
+    if (pictures && !canPicture && onPasteDocument) {
+      const list = itemsRef.current;
+      const at = list.findIndex(i => i.id === id);
+      const fresh = lines.map(line => ({ done: false, ...line, id: newItemId() }));
+      const kept = list.filter(i => i.text || i.id !== id);
+      const pos = at < 0 ? kept.length : kept.findIndex(i => i.id === id) + 1 || at;
+      onPasteDocument([...kept.slice(0, pos), ...fresh, ...kept.slice(pos)]);
+      return;
+    }
+    if (pictures) {
+      const loading = canPicture ? toast.loading(t('ntAddingPictures')) : null;
+      let missed = 0;
+      ready = [];
+      for (const line of lines) {
+        if (line.kind !== 'image') { ready.push(line); continue; }
+        const fileId = canPicture ? await pictureFromSrc(line.src).then(onAddImage).catch(() => null) : null;
+        if (fileId) ready.push({ kind: 'image', text: line.text || '', fileId });
+        else missed += 1;
+      }
+      if (loading) toast.dismiss(loading);
+      if (missed) toast.error(fmt(t('ntPicturesSkipped'), { n: missed }));
+    }
+    if (!ready.length) return;
+    const fresh = ready.map(({ src: _src, ...line }) => ({ done: false, ...line, id: newItemId() }));
+    const list = itemsRef.current;
+    const current = list.find(i => i.id === id);
     // An empty line takes the first pasted one's place; one with text keeps it and the paste goes under
-    const next = [...items];
-    next.splice(idx, 1, ...(current.text ? [current, ...fresh] : fresh));
-    patch(next);
-    focusSoon(fresh[fresh.length - 1].id);
+    if (current && !current.text && lineKind(current) !== 'image') {
+      const idx = list.indexOf(current);
+      const next = [...list];
+      next.splice(idx, 1, ...fresh);
+      patch(next);
+      focusLastOpen(fresh);
+    } else {
+      insertLines(current ? id : null, fresh);
+    }
   };
 
   const backspaceEmpty = (id) => {
@@ -356,28 +549,31 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
   // Keep the line's text box focused while an add button is pressed, so the new line goes under it
   const keepFocus = { onPointerDown: (e) => e.preventDefault(), onMouseDown: (e) => e.preventDefault() };
   const addButton = 'flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground';
+  const shared = { t, noteId, online, currency, language };
 
   return (
     <div className="space-y-0.5">
       <Reorder.Group axis="y" values={open} onReorder={reorderOpen} className="space-y-0.5">
-        {open.map(item => (
-          <Row
-            key={item.id}
-            item={item}
-            reorderable={!readOnly}
-            readOnly={readOnly}
-            t={t}
-            onChange={replace}
-            onRemove={() => remove(item.id)}
-            onEnter={() => insertAfter(item.id)}
-            onBackspaceEmpty={() => backspaceEmpty(item.id)}
-            onPasteLines={(lines) => pasteLines(item.id, lines)}
-            onKind={(kind) => setKind(item.id, kind)}
-            suggestions={focusedId === item.id ? offered : null}
-            onPick={(s) => pick(item.id, s)}
-            onFocusChange={trackFocus(item.id)}
-            registerRef={(el) => { if (el) refs.current[item.id] = el; else delete refs.current[item.id]; }}
-          />
+        {open.map((item, i) => (
+            <Row
+              {...shared}
+              key={item.id}
+              item={item}
+              number={numbers[i]}
+              total={totals.get(i)}
+              reorderable={!readOnly}
+              readOnly={readOnly}
+              onChange={replace}
+              onRemove={() => remove(item.id)}
+              onEnter={() => insertAfter(item.id, lineKind(item) === 'number' ? 'number' : undefined)}
+              onBackspaceEmpty={() => backspaceEmpty(item.id)}
+              onPasteLines={(lines) => pasteLines(item.id, lines)}
+              onKind={(kind) => setKind(item.id, kind)}
+              suggestions={focusedId === item.id ? offered : null}
+              onPick={(s) => pick(item.id, s)}
+              onFocusChange={trackFocus(item.id)}
+              registerRef={(el) => { if (el) refs.current[item.id] = el; else delete refs.current[item.id]; }}
+            />
         ))}
       </Reorder.Group>
 
@@ -392,6 +588,40 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
           <button type="button" {...keepFocus} onClick={() => addLine('title')} className={addButton}>
             <Heading className="h-4 w-4" /> {t('ntAddTitle')}
           </button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button type="button" {...keepFocus} className={addButton}>
+                <ListPlus className="h-4 w-4" /> {t('ntAddMore')}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[12rem]" onCloseAutoFocus={(e) => e.preventDefault()}>
+              <DropdownMenuItem onSelect={() => addLine('number')}>
+                <ListOrdered className="me-2 h-4 w-4" /> {t('ntAddNumber')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => addLine('callout')}>
+                <Highlighter className="me-2 h-4 w-4" /> {t('ntAddCallout')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => addLine('text', { amount: 0, ...(currency ? { currency } : {}) })}>
+                <Coins className="me-2 h-4 w-4" /> {t('ntAddAmountLine')}
+              </DropdownMenuItem>
+              {onAddImage && (
+                <DropdownMenuItem disabled={!canPicture} onSelect={() => pictureInput.current?.click()}>
+                  <ImagePlus className="me-2 h-4 w-4" /> {online ? t('ntAddPicture') : t('ntNeedOnline')}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {onAddImage && (
+            <input
+              ref={pictureInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(e) => { addPicture(e.target.files?.[0]); e.target.value = ''; }}
+            />
+          )}
         </div>
       )}
 
@@ -410,10 +640,10 @@ export default function ChecklistEditor({ items, onChange, readOnly, autoFocus, 
             <div className="space-y-0.5">
               {done.map(item => (
                 <Row
+                  {...shared}
                   key={item.id}
                   item={item}
                   readOnly={readOnly}
-                  t={t}
                   onChange={replace}
                   onRemove={() => remove(item.id)}
                   onEnter={() => {}}

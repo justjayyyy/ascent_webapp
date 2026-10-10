@@ -4,7 +4,7 @@
 // Without a base (an older app) the sent list simply replaces the stored one, as before.
 
 const byId = (list) => new Map(list.map((item) => [item.id, item]));
-const FIELDS = ['text', 'done', 'kind'];
+const FIELDS = ['text', 'done', 'kind', 'amount', 'currency', 'fileId'];
 
 /** The ids `list` keeps in the same relative order as `reference` (both filtered to shared ids). */
 function sameOrder(a, b) {
