@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { Plus, ScanLine, ShoppingCart } from 'lucide-react';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
@@ -10,21 +10,29 @@ import { guessItem, parseEntries } from './groceryUtils';
 import ItemSheet from './ItemSheet';
 import ShoppingMode from './ShoppingMode';
 import FinishTrip from './FinishTrip';
+import ScanReceipt from './ScanReceipt';
 
 /**
- * What every Groceries layout shares: the item sheet, shopping mode and the finish after it, and the
- * dock's + jumping to the add field. Pages lay out the list; this holds the overlays.
+ * What every Groceries layout shares: the item sheet, shopping mode and the finish after it, a receipt
+ * scanned on its own, and the dock's + jumping to the add field (held: add, or scan a receipt). Pages lay
+ * out the list; this holds the overlays.
  */
 export function useGroceryShell(list) {
+  const { t } = useTheme();
   const [openId, setOpenId] = useState(null);
   const [shopping, setShopping] = useState(false);
   const [trip, setTrip] = useState(null); // { items, date }
+  const [scanning, setScanning] = useState(false);
   const addRef = useRef(null);
 
-  usePageCreateAction(useCallback(() => {
+  const focusAdd = useCallback(() => {
     addRef.current?.focus();
     addRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, []));
+  }, []);
+  usePageCreateAction(focusAdd, [
+    { id: 'add', label: t('grAddLabel'), icon: Plus, run: focusAdd },
+    { id: 'receipt', label: t('grScanAReceipt'), icon: ScanLine, run: () => setScanning(true) },
+  ]);
 
   const finish = useCallback(async (cart, { store = '' } = {}) => {
     const date = localDay();
@@ -51,14 +59,18 @@ export function useGroceryShell(list) {
       />
       <ShoppingMode open={shopping} list={list} onClose={() => setShopping(false)} onDone={finish} />
       <FinishTrip trip={trip} list={list} onClose={() => setTrip(null)} />
+      <ScanReceipt open={scanning} onClose={() => setScanning(false)} />
     </>
   );
 
-  return { openItem: (i) => setOpenId(i.id), startShopping: () => setShopping(true), addRef, overlays };
+  return { openItem: (i) => setOpenId(i.id), startShopping: () => setShopping(true), scanReceipt: () => setScanning(true), addRef, overlays };
 }
 
-/** The page title, the household's faces, a view switch (`toggle`), and Start shopping on wider screens. */
-export function GroceryHeader({ title, subtitle, count, onShop, toggle }) {
+/**
+ * The page title, the household's faces, a view switch (`toggle`), Scan a receipt (`onScan`), and Start
+ * shopping on wider screens.
+ */
+export function GroceryHeader({ title, subtitle, count, onShop, onScan, toggle }) {
   const { t } = useTheme();
   const { members, isShared } = useHousehold();
   return (
@@ -79,6 +91,11 @@ export function GroceryHeader({ title, subtitle, count, onShop, toggle }) {
               </span>
             ))}
           </span>
+        )}
+        {onScan && (
+          <Button variant="secondary" onClick={onScan} aria-label={t('grScanAReceipt')} className="h-10 rounded-full px-3 sm:px-4">
+            <ScanLine className="h-4 w-4 sm:me-2" /><span className="hidden sm:inline">{t('grScanAReceipt')}</span>
+          </Button>
         )}
         {count > 0 && onShop && (
           <Button onClick={onShop} className="hidden h-10 rounded-full px-5 md:inline-flex">

@@ -23,6 +23,14 @@ test('nonsense is dropped: unknown units, negative or huge numbers, lines with n
   assert.deepEqual(lines, [{ text: 'Bread', qty: null, unit: null, unitPrice: null, price: null }]);
 });
 
+test('the everyday name and aisle are kept when given, and an aisle the app does not have is not', () => {
+  const lines = cleanReceiptLines([
+    { text: 'חלב 3% טרה 1 ל', qty: 1, price: 6.9, name: '  חלב ', aisle: 'dairy' },
+    { text: 'Thing', qty: 1, price: 2, name: '', aisle: 'garden' },
+  ]);
+  assert.deepEqual(lines.map((l) => [l.name, l.aisle]), [['חלב', 'dairy'], [undefined, undefined]]);
+});
+
 test('a match to the shopping list is kept only for an item on that list', () => {
   const ids = new Set(['a1']);
   const lines = cleanReceiptLines([{ text: 'Milk', qty: 1, price: 6.9, matchId: 'a1' }, { text: 'Eggs', qty: 1, price: 12, matchId: 'zz' }], { ids });

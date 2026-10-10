@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
-import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag, CloudUpload, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, ArrowDownLeft, ArrowUpRight, Copy, Repeat, Check, Nfc, Receipt, Loader2, ShoppingBag, CloudUpload, AlertCircle, ScanLine } from 'lucide-react';
 import { motion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
@@ -9,6 +9,10 @@ import { useExchangeRates } from '@/hooks/useWorkspaceData';
 import { amountInCurrency } from '@shared/money';
 import { useHousehold } from '@/hooks/useHousehold';
 import HouseholdFields from './HouseholdFields';
+import { isGroceryPayment } from '../groceries/groceryUtils';
+
+// The receipt reader and the groceries it fills load only when a supermarket payment's receipt is added
+const ScanReceipt = React.lazy(() => import('../groceries/ScanReceipt'));
 import BlurValue from '../BlurValue';
 import { formatTxTime, newestFirst } from '@/lib/txOrder';
 import { hasPeriod, periodLabel } from '@shared/homeCosts';
@@ -81,6 +85,7 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
   const dayLabel = useDayLabel(language, t);
   const [visible, setVisible] = useState(PAGE);
   const [active, setActive] = useState(null);
+  const [scanFor, setScanFor] = useState(null); // a supermarket payment whose receipt is being added to Groceries
   const sentinel = useRef(null);
 
   const iconByCategory = useMemo(() => {
@@ -281,6 +286,7 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
               {canEdit && (
                 <div className="space-y-1 px-3 pb-4 pt-2">
                   {onConfirm && active.status === 'pending' && <ActionRow icon={Check} tone="primary" label={t('confirmTransaction')} onClick={run(onConfirm)} />}
+                  {isGroceryPayment(active, categories) && <ActionRow icon={ScanLine} label={t('grReceiptToGroceries')} onClick={run(setScanFor)} />}
                   <ActionRow icon={Edit} label={t('edit')} onClick={run(onEdit)} />
                   <ActionRow icon={Copy} label={t('duplicate')} onClick={run(onDuplicate)} />
                   <ActionRow icon={Trash2} tone="danger" label={t('delete')} onClick={run((tx) => onDelete(tx.id))} />
@@ -291,6 +297,12 @@ function TransactionList({ transactions, cards = [], categories = [], plans = {}
           )}
         </DrawerContent>
       </Drawer>
+
+      {scanFor && (
+        <React.Suspense fallback={null}>
+          <ScanReceipt open transaction={scanFor} onConfirmTransaction={onConfirm} onClose={() => setScanFor(null)} />
+        </React.Suspense>
+      )}
     </>
   );
 }

@@ -1,25 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Archive, Camera, Check, CircleAlert, Loader2, PenLine, RotateCcw, Sparkles } from 'lucide-react';
+import { Archive, Camera, Check, Loader2, PenLine, RotateCcw, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { ascent } from '@/api/client';
-import { useAssistStatus, useCategories, useMoney, usePlans } from '@/hooks/useWorkspaceData';
-import { useTransactions } from '@/lib/offline/txOutbox';
-import AddTransactionDialog from '@/components/expenses/AddTransactionDialog';
-import { useSaveTransaction } from '@/components/expenses/useTransactionMutations';
-import { localDay } from '@/lib/localDay';
+import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { cn } from '@/lib/utils';
 import { prepareReceipt } from './receiptImage';
 import { ReceiptLines, localeOf, money } from './GroceryParts';
-import { findLoggedExpense, receiptQty } from './groceryUtils';
-
-const groceriesCategory = (categories) =>
-  categories.find((c) => c.nameKey === 'groceries' || c.name === 'groceries')
-  || categories.find((c) => /grocer|מכולת|продукт/i.test(c.name))
-  || categories.find((c) => c.type === 'Expense');
+import { receiptQty } from './groceryUtils';
+import { ExpenseQuestion, useShopExpense } from './ShopExpense';
 
 /**
  * After the shop: the items are already counted as bought today. Snap the receipt and the assistant
@@ -34,41 +26,23 @@ export default function FinishTrip({ trip, list, onClose }) {
   const canLog = hasPermission('editExpenses');
   const { data: status } = useAssistStatus();
   const aiReady = !!(status?.ai?.configured && status?.ai?.enabled);
-  const { data: categories = [] } = useCategories({ enabled: !!trip && canLog });
-  const { data: plans = [] } = usePlans({ enabled: !!trip && canLog });
-  // The payments around the shop's day, to spot the one Apple Pay or the bank already added
-  const since = trip?.date ? localDay(new Date(Date.parse(`${trip.date}T12:00:00`) - 7 * 86_400_000)) : undefined;
-  const { data: transactions = [] } = useTransactions({ from: since, enabled: !!trip && canLog && hasPermission('viewExpenses') });
-  const { save, saving } = useSaveTransaction();
   const fileRef = useRef(null);
   const [stage, setStage] = useState('choose'); // choose | reading | read | failed
   const [preview, setPreview] = useState(null);
   const [read, setRead] = useState(null);
-  const [expense, setExpense] = useState(null);
   const [kept, setKept] = useState(false);
   const queryClient = useQueryClient();
-  const { convert } = useMoney(read?.currency || user?.currency || 'ILS');
+  // The payments around the shop's day, to spot the one Apple Pay or the bank already added
+  const expense = useShopExpense({ enabled: !!trip, date: trip?.date, currency: read?.currency, onDone: onClose });
 
   useEffect(() => {
-    if (trip) { setStage('choose'); setPreview(null); setRead(null); setExpense(null); setKept(false); }
+    if (trip) { setStage('choose'); setPreview(null); setRead(null); setKept(false); }
   }, [trip]);
 
   if (!trip) return null;
   const currency = user?.currency || 'ILS';
   const fmt = money(loc, read?.currency || currency);
-
-  const openExpense = (fromReceipt) => {
-    const category = groceriesCategory(categories);
-    setExpense({
-      type: 'Expense',
-      category: category?.name || '',
-      description: fromReceipt?.store || trip.store || t('grExpenseDescription'),
-      amount: fromReceipt?.total || '',
-      currency: fromReceipt?.currency || currency,
-      date: fromReceipt?.date || trip.date || localDay(),
-      paymentMethod: '',
-    });
-  };
+  const openExpense = (fromReceipt) => expense.open(fromReceipt, { store: trip.store });
 
   const onFile = async (e) => {
     const file = e.target.files?.[0];
@@ -101,7 +75,7 @@ export default function FinishTrip({ trip, list, onClose }) {
       ascent.entities.Receipt.create({
         type: 'image/jpeg', data: photo.image, thumb: photo.thumb, name: `receipt-${result.date || trip.date}.jpg`,
         store: result.store || trip.store || '', date: result.date || trip.date, total: result.total, currency: result.currency || currency, read: true,
-        items: result.items.map(({ matchId: _m, ...line }) => line),
+        items: result.items.map(({ matchId: _m, name: _n, aisle: _a, ...line }) => line),
       }).then(() => { setKept(true); queryClient.invalidateQueries({ queryKey: ['receipts'] }); }).catch(() => {});
     } catch {
       setStage('failed');
@@ -109,14 +83,11 @@ export default function FinishTrip({ trip, list, onClose }) {
   };
 
   const matched = read ? new Set(read.items.filter((l) => l.matchId).map((l) => l.matchId)).size : 0;
-  const logged = read && canLog
-    ? findLoggedExpense(transactions, { total: read.total, currency: read.currency || currency, date: read.date || trip.date }, convert)
-    : null;
-  const day = (d) => new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).format(new Date(`${String(d).slice(0, 10)}T12:00:00`));
+  const logged = expense.loggedFor(read && { ...read, date: read.date || trip.date });
 
   return (
     <>
-      <Dialog open={!expense} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Dialog open={!expense.isOpen} onOpenChange={(o) => { if (!o) onClose(); }}>
         <DialogContent className="max-h-[92dvh] w-[95vw] max-w-[95vw] overflow-y-auto p-5 sm:w-full sm:max-w-md sm:p-6">
           <DialogHeader className="text-start">
             <DialogTitle className="text-2xl font-bold tracking-tight">{t('grShopDone')}</DialogTitle>
@@ -164,31 +135,7 @@ export default function FinishTrip({ trip, list, onClose }) {
             <p className="rounded-2xl bg-danger/10 p-3 text-sm text-foreground" role="alert">{t('grReceiptUnreadable')}</p>
           )}
 
-          {stage === 'read' && canLog && (
-            <section aria-labelledby="gr-expense-q" className={cn('rounded-2xl p-3.5', logged ? 'bg-warning/10' : 'bg-foreground/[0.04]')}>
-              <h3 id="gr-expense-q" className="text-base font-semibold text-foreground">{t('grExpenseQ')}</h3>
-              {logged ? (
-                <p className="mt-1 flex gap-1.5 text-sm text-foreground">
-                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-                  <span>
-                    {t('grExpenseAlreadyThere', {
-                      what: logged.description || logged.merchant || t('grExpenseDescription'),
-                      amount: money(loc, logged.currency || currency)(logged.amount),
-                      date: day(logged.date),
-                    })}
-                  </span>
-                </p>
-              ) : (
-                <p className="mt-1 text-sm text-muted-foreground">{t('grExpenseQHint')}</p>
-              )}
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Button variant={logged ? 'default' : 'secondary'} onClick={onClose} className="h-12 rounded-xl text-base">{t('grExpenseNo')}</Button>
-                <Button variant={logged ? 'secondary' : 'default'} onClick={() => openExpense(read)} className="h-12 rounded-xl text-base">
-                  {t(logged ? 'grExpenseAddAnyway' : 'grExpenseYes')}
-                </Button>
-              </div>
-            </section>
-          )}
+          {stage === 'read' && canLog && <ExpenseQuestion logged={logged} onNo={onClose} onYes={() => openExpense(read)} />}
 
           <div className="grid gap-2 empty:hidden">
             {(stage === 'choose' || stage === 'failed') && canLog && (
@@ -218,16 +165,7 @@ export default function FinishTrip({ trip, list, onClose }) {
         </DialogContent>
       </Dialog>
 
-      <AddTransactionDialog
-        open={!!expense}
-        onClose={() => { setExpense(null); onClose(); }}
-        onSubmit={async (data) => { if (await save(data, null)) { setExpense(null); onClose(); } }}
-        isLoading={saving}
-        categories={categories}
-        editTransaction={expense}
-        defaultType="Expense"
-        plans={plans}
-      />
+      {expense.dialog}
     </>
   );
 }

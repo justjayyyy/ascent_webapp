@@ -110,6 +110,7 @@ function Groceries() {
         subtitle={subtitle}
         count={onList.length}
         onShop={shell.startShopping}
+        onScan={shell.scanReceipt}
         // The tabs point at the panel only while it is there (not while loading or on the empty list)
         toggle={<ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} controls={showsPanel ? 'gr-view' : undefined} />}
       />

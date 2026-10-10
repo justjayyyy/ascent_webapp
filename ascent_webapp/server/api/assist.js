@@ -128,7 +128,7 @@ export default async function handler(req, res) {
       }
       const listItems = (Array.isArray(body.items) ? body.items : [])
         .filter((i) => i && typeof i.id === 'string' && typeof i.name === 'string')
-        .slice(0, 200)
+        .slice(0, 400) // every grocery item the household has bought, not only the list
         .map((i) => ({ id: i.id.slice(0, 64), name: i.name.slice(0, 120) }));
       const read = await readReceipt({ image, mediaType, listItems });
       // Only let through what the app can use as is

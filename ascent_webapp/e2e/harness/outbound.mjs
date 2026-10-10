@@ -48,10 +48,22 @@ function anthropic({ ai = 'ok' }, url, init) {
   if (system.startsWith('You read short notes')) return message(JSON.stringify(draftFrom(userText)));
   if (system.startsWith('You read photos of shop receipts')) {
     const firstItem = userText.match(/^- ([^:]+): /m)?.[1] || null;
+    if (ai === 'whole-receipt') {
+      // A shop off the list: the first item the household has, and two things it never bought before
+      const line = (over) => ({ qty: 1, unit: null, unitPrice: null, price: null, matchId: null, aisle: 'other', ...over });
+      return message(JSON.stringify({
+        isReceipt: true, store: 'Rami Levy', date: new Date().toISOString().slice(0, 10), total: 33.83, currency: 'USD',
+        items: [
+          ...(firstItem ? [line({ text: 'Milk 3% Tara 1L', name: 'Milk', aisle: 'dairy', qty: 2, unitPrice: 6.9, price: 13.8, matchId: firstItem })] : []),
+          line({ text: 'Hummus Achla 400g', name: 'Hummus', aisle: 'pantry', unitPrice: 8.9, price: 8.9 }),
+          line({ text: 'Tomatoes', name: 'Tomatoes', aisle: 'produce', qty: 1.25, unit: 'kg', unitPrice: 8.9, price: 11.13 }),
+        ],
+      }));
+    }
     return message(JSON.stringify({
       isReceipt: ai !== 'not-a-receipt', store: 'Rami Levy', date: new Date().toISOString().slice(0, 10), total: 87.4, currency: 'USD',
       // Two cartons at 6.90 each
-      items: firstItem ? [{ text: 'Milk 3%', qty: 2, unit: null, unitPrice: 6.9, price: 13.8, matchId: firstItem }] : [],
+      items: firstItem ? [{ text: 'Milk 3%', name: 'Milk', aisle: 'dairy', qty: 2, unit: null, unitPrice: 6.9, price: 13.8, matchId: firstItem }] : [],
     }));
   }
   if (system.startsWith('You copy documents into a notes app')) {

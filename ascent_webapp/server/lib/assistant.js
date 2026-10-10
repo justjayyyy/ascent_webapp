@@ -6,6 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // own `z`, every parse and receipt call failed before reaching the API: "Cannot read properties of undefined")
 import { z } from 'zod/v4';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { AISLES } from '../models/GroceryItem.js';
 
 const MODEL = 'claude-opus-5-5';
 // On a policy decline the API retries on Anthropic's recommended fallback model inside the same call
@@ -99,10 +100,13 @@ const ReceiptSchema = z.object({
     unit: z.string().nullable(),
     unitPrice: z.number().nullable(),
     price: z.number().nullable(),
+    name: z.string(),
+    aisle: z.enum(AISLES),
     matchId: z.string().nullable(),
   })),
 });
 
+// A template literal: the aisles are filled in from the grocery model
 const RECEIPT_SYSTEM = `You read photos of shop receipts (usually supermarket receipts in Hebrew, Russian or English) for a household finance app.
 
 - isReceipt: false when the photo is not a receipt or is too blurry to read; then use nulls and no items.
@@ -115,7 +119,9 @@ const RECEIPT_SYSTEM = `You read photos of shop receipts (usually supermarket re
   - unit: "kg", "g", "l" or "ml" when sold by weight or volume, otherwise null.
   - unitPrice: the price of one (or of one kg, g, l or ml) as printed, or null when not printed.
   - price: what the line came to, after any discount on it, or null.
-- matchId: when a line is clearly one of the shopping list items you are given (same product, in any language or spelling), that item's id; otherwise null. Never match two lines to one id unless the receipt repeats the product.
+  - name: the product as a person writes it on a shopping list: short (one to three words), no brand, size or percentage unless it tells products apart ("חלב 3% טרה 1 ל" -> "חלב", "Cottage 5% 250g" -> "Cottage cheese"), in the language the household's items are written in (the receipt's language when you are given none). For a matched line, that item's name.
+  - aisle: where it belongs in a supermarket: ${AISLES.join(', ')}.
+- matchId: when a line is clearly one of the household's grocery items you are given (same product, in any language or spelling), that item's id; otherwise null. Never match two lines to one id unless the receipt repeats the product.
 
 Read only what is printed. Never invent a number.`;
 
@@ -135,7 +141,7 @@ export async function readReceipt({ image, mediaType, listItems }) {
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-        { type: 'text', text: `Shopping list items (id: name):\n${list}` },
+        { type: 'text', text: `The household's grocery items (id: name):\n${list}` },
       ],
     }],
   }, ReceiptSchema);

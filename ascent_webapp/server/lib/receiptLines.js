@@ -1,5 +1,6 @@
 // A receipt's product lines, as the app keeps them: what was bought, how many (or how much, by weight),
 // the price of one and what the line came to. Used for what the assistant reads and what a receipt stores.
+import { AISLES } from '../models/GroceryItem.js';
 
 const MAX_LINES = 150;
 const UNITS = new Set(['kg', 'g', 'l', 'ml']);
@@ -9,8 +10,8 @@ const amount = (n) => (typeof n === 'number' && Number.isFinite(n) && n > 0 && n
 
 /**
  * Lines cleaned for storing or sending: [{ text, qty, unit, unitPrice, price }], plus `matchId` when
- * `ids` (the shopping list's item ids) is given. A missing price of one is worked out from the line's
- * price and quantity.
+ * `ids` (the grocery items' ids it may be) is given, and the everyday `name` and `aisle` when the assistant
+ * gave them. A missing price of one is worked out from the line's price and quantity.
  */
 export function cleanReceiptLines(lines, { ids } = {}) {
   return (Array.isArray(lines) ? lines : []).slice(0, MAX_LINES)
@@ -21,6 +22,9 @@ export function cleanReceiptLines(lines, { ids } = {}) {
       const given = money(line?.unitPrice);
       const unitPrice = given ?? (qty && price !== null ? Math.round((price / qty) * 100) / 100 : null);
       const row = { text: String(line?.text || '').trim().slice(0, 120), qty, unit, unitPrice, price };
+      const name = typeof line?.name === 'string' ? line.name.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      if (name) row.name = name;
+      if (typeof line?.aisle === 'string' && AISLES.includes(line.aisle)) row.aisle = line.aisle;
       if (ids) row.matchId = typeof line?.matchId === 'string' && ids.has(line.matchId) ? line.matchId : null;
       return row;
     })

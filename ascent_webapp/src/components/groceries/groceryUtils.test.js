@@ -2,6 +2,7 @@ import { describe, expect, it, test } from 'vitest';
 import {
   basketEstimate, boughtChanges, checkedSince, findByName, findLoggedExpense, lineQty, groupByAisle, guessItem, isTracked, kitchenItems, knownStores,
   learnedInterval, offListChanges, parseEntries, priceMovers, priceStats, purchaseNear, purchasePriceChanges, receiptQty, runningLow, storeComparison, supplyOf,
+  receiptPurchases, isGroceryPayment,
 } from './groceryUtils';
 
 const bought = (...dates) => dates.map((date, i) => ({ id: `p${i}`, date }));
@@ -284,5 +285,62 @@ describe('prices of one, from receipts', () => {
     const milk = { onList: true, qty: '2', purchases: [{ date: '2026-10-01', price: 6.9, qty: '2' }] };
     const tomatoes = { onList: true, qty: '1kg', purchases: [{ date: '2026-10-01', price: 8.9, qty: '1.2 kg' }] };
     expect(basketEstimate([milk, tomatoes]).total).toBeCloseTo(13.8 + 8.9);
+  });
+});
+
+describe('a receipt into the groceries', () => {
+  const items = [
+    { id: 'milk', name: 'Milk', onList: true, qty: '2', purchases: [] },
+    { id: 'bread', name: 'Bread', onList: false, purchases: [{ id: 'b1', date: '2026-10-09', qty: '', price: null, currency: null, store: '' }] },
+    { id: 'eggs', name: 'Eggs', onList: false, purchases: [{ id: 'e1', date: '2026-09-01', price: 12, currency: 'ILS' }] },
+  ];
+  const line = (over) => ({ text: '', qty: 1, unit: null, unitPrice: null, price: null, matchId: null, ...over });
+  const opts = { date: '2026-10-10', currency: 'ILS', store: 'Rami Levy', by: 'dana@x.test' };
+
+  test('the list item is bought and comes off the list, a known item gets the price, a new product becomes an item', () => {
+    const { updates, creates, kinds } = receiptPurchases(items, [
+      line({ text: 'חלב 3% טרה', name: 'Milk', matchId: 'milk', qty: 2, unitPrice: 6.9, price: 13.8 }),
+      line({ text: 'Bread whole wheat', name: 'Bread', price: 9.5 }),
+      line({ text: 'Eggs L 12', name: 'Eggs', matchId: 'eggs', price: 13 }),
+      line({ text: 'Hummus Achla 400g', name: 'Hummus', aisle: 'pantry', price: 8.9 }),
+      line({ text: 'Tomatoes', name: 'Tomatoes', qty: 1.25, unit: 'kg', unitPrice: 8.9, price: 11.13 }),
+    ], opts);
+    expect(kinds).toEqual(['list', 'known', 'known', 'new', 'new']);
+
+    const milk = updates.find((u) => u.item.id === 'milk').changes;
+    expect(milk.onList).toBe(false);
+    expect(milk.purchases.map((p) => [p.date, p.qty, p.price, p.store])).toEqual([['2026-10-10', '2', 6.9, 'Rami Levy']]);
+    // Bought yesterday from the list at home: that purchase gets the receipt's price, no second one
+    expect(updates.find((u) => u.item.id === 'bread').changes.purchases.map((p) => [p.id, p.price, p.store])).toEqual([['b1', 9.5, 'Rami Levy']]);
+    // Last bought a month ago: a new purchase
+    expect(updates.find((u) => u.item.id === 'eggs').changes.purchases.map((p) => p.price)).toEqual([12, 13]);
+
+    expect(creates.map((c) => [c.name, c.aisle, c.onList, c.purchases.map((p) => [p.qty, p.price, p.by])])).toEqual([
+      ['Hummus', 'pantry', false, [['', 8.9, 'dana@x.test']]],
+      ['Tomatoes', 'produce', false, [['1.25 kg', 8.9, 'dana@x.test']]],
+    ]);
+  });
+
+  test('only the lines kept count, and the same product twice is one item', () => {
+    const { updates, creates, kinds } = receiptPurchases(items, [
+      line({ text: 'Hummus', name: 'Hummus', price: 8.9 }),
+      line({ text: 'Plastic bag', name: 'Bag', price: 0.1 }),
+      line({ text: 'Hummus', name: 'Hummus', price: 8.9 }),
+    ], { ...opts, keep: new Set([0, 2]) });
+    expect(kinds).toEqual(['new', null, 'new']);
+    expect(creates.map((c) => c.name)).toEqual(['Hummus']);
+    expect(updates).toEqual([]);
+  });
+});
+
+describe('a supermarket payment', () => {
+  const categories = [{ id: 'c1', name: 'Groceries', nameKey: 'groceries' }, { id: 'c2', name: 'Restaurants' }, { id: 'c3', name: 'מכולת' }];
+  test('by its category or by the shop', () => {
+    expect(isGroceryPayment({ type: 'Expense', category: 'Groceries' }, categories)).toBe(true);
+    expect(isGroceryPayment({ type: 'Expense', category: 'מכולת' }, categories)).toBe(true);
+    expect(isGroceryPayment({ type: 'Expense', category: 'Restaurants', merchant: 'SHUFERSAL DEAL' }, categories)).toBe(true);
+    expect(isGroceryPayment({ type: 'Expense', category: 'Restaurants', description: 'רמי לוי שיווק השקמה' }, categories)).toBe(true);
+    expect(isGroceryPayment({ type: 'Expense', category: 'Restaurants', merchant: 'Aroma' }, categories)).toBe(false);
+    expect(isGroceryPayment({ type: 'Income', category: 'Groceries' }, categories)).toBe(false);
   });
 });

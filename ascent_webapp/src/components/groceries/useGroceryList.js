@@ -9,7 +9,7 @@ import { useListWrites } from '@/lib/offline/listWrites';
 import { localDay } from '@/lib/localDay';
 import { haptic } from '@/lib/haptics';
 import {
-  boughtChanges, cleanStore, findByName, purchaseNear, receiptQty, groupByAisle, isTracked, levelChanges, listChanges, newItem, offListChanges, parseEntries, purchasePriceChanges, runningLow,
+  boughtChanges, cleanStore, findByName, purchaseNear, receiptQty, receiptPurchases, groupByAisle, isTracked, levelChanges, listChanges, newItem, offListChanges, parseEntries, purchasePriceChanges, runningLow,
 } from './groceryUtils';
 
 export function useGroceryList() {
@@ -147,7 +147,20 @@ export function useGroceryList() {
     return updated;
   }, [items, update]);
 
-  /** A price (and shop) typed in by hand for one purchase. */
+  /**
+   * Everything a receipt says was bought, on the list or not (receiptPurchases): known items get the purchase
+   * and come off the list, new products become items. `keep`: the lines' indexes to use (all by default).
+   * Returns { updated, added, offList }.
+   */
+  const recordReceipt = useCallback((read, { keep, date = localDay(), currency = null, store = '' } = {}) => {
+    const { updates, creates } = receiptPurchases(items, read.items || [], { date, currency, store, by: me, keep });
+    updates.forEach(({ item, changes }) => update(item, changes));
+    creates.forEach((row) => api.create(row).catch(failed));
+    if (updates.length || creates.length) haptic('success');
+    return { updated: updates.length, added: creates.length, offList: updates.filter((u) => u.item.onList).length };
+  }, [items, update, api, me, failed]);
+
+    /** A price (and shop) typed in by hand for one purchase. */
   const setPurchasePrice = useCallback((item, purchaseId, values) => update(item, purchasePriceChanges(item, purchaseId, values)), [update]);
 
   const save = useCallback((item, changes) => update(item, changes), [update]);
@@ -165,5 +178,5 @@ export function useGroceryList() {
     });
   }, [api, failed, t]);
 
-  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, boughtMany, addPrices, applyReceipt, setPurchasePrice, save, remove };
+  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, boughtMany, addPrices, applyReceipt, recordReceipt, setPurchasePrice, save, remove };
 }

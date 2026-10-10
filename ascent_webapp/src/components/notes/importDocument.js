@@ -114,6 +114,34 @@ async function readPdf(file, onProgress) {
   return { pages, pictures, pageCount };
 }
 
+/** A PDF's first pages drawn one under the other as one JPEG blob (a receipt sent as a PDF, read like a photo). */
+export async function pdfAsImage(file, { maxPages = 3, width = 1000 } = {}) {
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  try {
+    const pdf = await task.promise;
+    const drawn = [];
+    for (let n = 1; n <= Math.min(pdf.numPages, maxPages); n += 1) {
+      const page = await pdf.getPage(n);
+      const viewport = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width });
+      const canvas = canvasOf(viewport.width, viewport.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, canvas, viewport }).promise;
+      drawn.push(canvas);
+      page.cleanup();
+    }
+    const sheet = canvasOf(width, drawn.reduce((h, c) => h + c.height, 0));
+    const ctx = sheet.getContext('2d');
+    let y = 0;
+    for (const c of drawn) { ctx.drawImage(c, 0, y); y += c.height; }
+    return await toBlob(sheet, 0.85);
+  } finally {
+    await task.destroy?.();
+  }
+}
+
 /** Photos of paper -> pages. */
 async function readPhotos(files, onProgress) {
   const pages = [];

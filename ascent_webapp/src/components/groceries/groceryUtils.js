@@ -556,3 +556,72 @@ export function lineQty(line, loc) {
   const n = new Intl.NumberFormat(loc, { maximumFractionDigits: 3 }).format(line.qty);
   return line.unit ? `${n} ${line.unit}` : n;
 }
+
+// ---- a receipt into the groceries: whatever was bought, on the list or not ----
+
+/**
+ * What a receipt does to the groceries. Each line kept (`keep`: the lines' indexes, all by default) is the
+ * item it was matched to, else a known item of the same name, else a new item (its everyday name, its aisle).
+ * A purchase from the receipt's day (or within three days, the same shop counted already) is given the price,
+ * how many and the shop; otherwise a purchase is added. Anything bought comes off the list.
+ * Returns { updates: [{ item, changes }], creates: [row], kinds: [index -> 'list' | 'known' | 'new' | null] }.
+ */
+export function receiptPurchases(items, lines, { date = localDay(), currency = null, store = '', by = '', keep } = {}) {
+  const updates = new Map(); // item id -> { item, changes }
+  const creates = [];
+  const kinds = lines.map(() => null);
+  lines.forEach((line, i) => {
+    if (keep && !keep.has(i)) return;
+    const name = (line.name || line.text || '').trim();
+    const target = (line.matchId && items.find((it) => it.id === line.matchId))
+      || findByName(items, name) || findByName(items, line.text || '');
+    const price = line.unitPrice ?? line.price ?? null;
+    const qty = receiptQty(line) || '';
+    const purchase = { price: typeof price === 'number' ? price : null, currency: typeof price === 'number' ? currency : null, qty, store: cleanStore(store) };
+    if (!target) {
+      const fresh = creates.find((c) => normalizeName(c.name) === normalizeName(name));
+      if (fresh) { kinds[i] = 'new'; return; } // the same thing on two lines: one item, one purchase
+      const row = newItem(name.slice(0, 120), { onList: false });
+      if (line.aisle && AISLE_ORDER[line.aisle] !== undefined) {
+        row.aisle = line.aisle;
+        if (!row.emoji) row.emoji = aisleEmoji(line.aisle);
+      }
+      row.purchases = [{ id: randomId(), date, by, ...purchase }];
+      creates.push(row);
+      kinds[i] = 'new';
+      return;
+    }
+    kinds[i] = target.onList ? 'list' : 'known';
+    if (updates.has(target.id)) return;
+    const at = purchaseNear(target, date);
+    let changes;
+    if (at >= 0) {
+      const purchases = [...target.purchases];
+      const p = purchases[at];
+      purchases[at] = {
+        ...p,
+        ...(purchase.price !== null ? { price: purchase.price, currency: purchase.currency } : {}),
+        ...(qty ? { qty: qty.slice(0, 40) } : {}),
+        ...(purchase.store && !p.store ? { store: purchase.store } : {}),
+      };
+      changes = { purchases, ...(target.onList ? { ...unlistChanges(), level: null, levelAt: null, levelBy: '' } : {}) };
+    } else {
+      changes = boughtChanges(target, { date, by, price: purchase.price, currency, store });
+      if (qty) changes.purchases[changes.purchases.length - 1].qty = qty.slice(0, 40);
+    }
+    updates.set(target.id, { item: target, changes });
+  });
+  return { updates: [...updates.values()], creates, kinds };
+}
+
+const GROCERY_CATEGORY = /grocer|supermarket|סופר|מכולת|מזון|продукт|супермаркет/i;
+const SUPERMARKETS = /shufersal|שופרסל|rami ?levy|רמי לוי|victory|ויקטורי|yochananof|יוחננוף|osher ?ad|אושר עד|tiv ?taam|טיב טעם|carrefour|קרפור|yeinot bitan|יינות ביתן|hazi ?hinam|חצי חינם|mega ?bair|מגה בעיר|am:?pm|supermarket|סופרמרקט|מכולת|grocery|пятёрочка|перекрёсток|магнит/i;
+
+/** Whether an expense was most likely at a supermarket: its category is groceries, or the shop is one. */
+export function isGroceryPayment(tx, categories = []) {
+  if (!tx || tx.type !== 'Expense') return false;
+  const category = categories.find((c) => c.name === tx.category || c.id === tx.category);
+  if (category?.nameKey === 'groceries' || tx.category === 'groceries') return true;
+  if (GROCERY_CATEGORY.test(category?.name || tx.category || '')) return true;
+  return SUPERMARKETS.test(`${tx.merchant || ''} ${tx.description || ''}`);
+}
