@@ -8,7 +8,8 @@ import { isLanguage, loadLanguage, stringsFor, translate, useLanguage } from '@/
 import { startEntry } from '@/components/EntryTransition';
 import { LOGIN_LANG_KEY } from '@/lib/storageKeys';
 import {
-  biometricKind, biometricName, forgetPasskeyAccount, passkeyAccount, passkeyUsedHere, rememberCredential, signedOutOnPurpose,
+  biometricKind, biometricName, forgetPasskeyAccount, getLockPrefs, passkeyAccount, passkeyUsedHere, rememberCredential,
+  signedOutOnPurpose,
 } from '@/lib/appLock';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -124,6 +125,11 @@ export function useAuthFlow() {
   const passkeyMethod = biometricName(t);
   const passkeyKind = biometricKind();
   const tapped = useRef(false);
+  // The greeted person's passkeys on this phone: Face ID opens for them without the passkey picker first
+  const ownPasskeys = () => {
+    const account = passkeyAccount();
+    return account ? getLockPrefs(account.id).credentialIds : [];
+  };
   const rememberPasskey = (result) => {
     if (result.onThisDevice) rememberCredential(result.user?.id || result.user?._id, result.credentialId);
   };
@@ -151,7 +157,7 @@ export function useAuthFlow() {
         await new Promise((resolve) => { setTimeout(resolve, 350); });
         if (cancelled || tapped.current) return;
         try {
-          const result = await loginWithPasskey();
+          const result = await loginWithPasskey({ credentialIds: ownPasskeys() });
           enteringRef.current = true;
           rememberPasskey(result);
           enter(result.user);
@@ -181,7 +187,7 @@ export function useAuthFlow() {
     setPasskeyLoading(true);
     enteringRef.current = true;
     try {
-      const result = await loginWithPasskey();
+      const result = await loginWithPasskey({ credentialIds: ownPasskeys() });
       rememberPasskey(result);
       enter(result.user);
     } catch (error) {

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ascent, request, createEntity } from './client';
 
+const webauthn = vi.hoisted(() => ({ startAuthentication: vi.fn() }));
+vi.mock('@simplewebauthn/browser', () => ({ ...webauthn, WebAuthnAbortService: { cancelCeremony: vi.fn() } }));
+
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const ok = (data) => json(200, { success: true, data });
 
@@ -163,5 +166,38 @@ describe('signing out', () => {
     expect(url).toBe('/api/auth/logout');
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBeUndefined();
+  });
+});
+
+describe('passkey sign-in', () => {
+  beforeEach(() => {
+    fetchMock.mockImplementation(async (url) => (String(url).includes('login-options')
+      ? ok({ challenge: 'c1', rpId: 'localhost' })
+      : ok({ user: { id: 'u1' } })));
+  });
+
+  test("names this phone's passkeys, so Face ID opens without the passkey picker", async () => {
+    webauthn.startAuthentication.mockResolvedValueOnce({ id: 'cred1', response: {}, authenticatorAttachment: 'platform' });
+    const result = await ascent.auth.passkeyLogin({ credentialIds: ['cred1'] });
+    expect(webauthn.startAuthentication.mock.calls[0][0].optionsJSON).toEqual({
+      challenge: 'c1', rpId: 'localhost', allowCredentials: [{ id: 'cred1', type: 'public-key', transports: ['internal'] }],
+    });
+    expect(result).toMatchObject({ credentialId: 'cred1', onThisDevice: true });
+  });
+
+  test('the autofill suggestion stays open to any passkey', async () => {
+    webauthn.startAuthentication.mockResolvedValueOnce({ id: 'cred1', response: {} });
+    await ascent.auth.passkeyLogin({ autofill: true, credentialIds: ['cred1'] });
+    expect(webauthn.startAuthentication.mock.calls.at(-1)[0].optionsJSON.allowCredentials).toBeUndefined();
+  });
+
+  test('a named passkey that fails lets the next try offer any passkey', async () => {
+    webauthn.startAuthentication.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'NotAllowedError' }));
+    await expect(ascent.auth.passkeyLogin({ credentialIds: ['old'] })).rejects.toMatchObject({ name: 'NotAllowedError' });
+    expect(webauthn.startAuthentication.mock.calls.at(-1)[0].optionsJSON.allowCredentials).toHaveLength(1);
+
+    webauthn.startAuthentication.mockResolvedValueOnce({ id: 'cred2', response: {} });
+    await ascent.auth.passkeyLogin({ credentialIds: ['old'] });
+    expect(webauthn.startAuthentication.mock.calls.at(-1)[0].optionsJSON.allowCredentials).toBeUndefined();
   });
 });
