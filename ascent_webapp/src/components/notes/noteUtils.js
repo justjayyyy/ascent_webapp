@@ -198,8 +198,19 @@ export function textToItems(text) {
   return lines.length ? lines.map(line => ({ id: newItemId(), ...line })) : [blankItem()];
 }
 
+// Items keep their boxes in the text (☐ open, ☑ ticked), which textToItems reads back. A blank line goes
+// between an item and text after it, or the text would be read back as the item running on.
 export function itemsToText(items) {
-  return (items || []).map(i => i.text).filter(Boolean).join('\n');
+  const out = [];
+  let prev = null;
+  for (const i of items || []) {
+    if (!i.text) continue;
+    const kind = lineKind(i);
+    if (prev === 'item' && kind !== 'item') out.push('');
+    out.push(kind === 'item' ? `${i.done ? '☑' : '☐'} ${i.text}` : i.text);
+    prev = kind;
+  }
+  return out.join('\n');
 }
 
 export const isEmptyNote = (n) =>

@@ -16,8 +16,27 @@ describe('text and lists', () => {
   test('lines become list items without their bullets or boxes, and back', () => {
     const items = textToItems('- milk\n* eggs\n[x] bread\n\n  • jam  ');
     expect(items.map((i) => i.text)).toEqual(['milk', 'eggs', 'bread', 'jam']);
-    expect(itemsToText(items)).toBe('milk\neggs\nbread\njam');
     expect(textToItems('')).toHaveLength(1); // an empty list still has one line to type in
+  });
+
+  test('as continuous text, items keep their boxes, ticked or not, and come back as they were', () => {
+    const items = [
+      { id: 'a', text: 'Shopping', kind: 'title', done: false },
+      { id: 'b', text: 'milk', done: false },
+      { id: 'c', text: 'bread', done: true },
+      { id: 'd', text: '', done: false },
+      { id: 'e', text: 'from the market\nbefore noon', kind: 'text', done: false },
+      { id: 'f', text: 'jam', done: false },
+    ];
+    const text = itemsToText(items);
+    expect(text).toBe('Shopping\n☐ milk\n☑ bread\n\nfrom the market\nbefore noon\n☐ jam');
+    expect(textToItems(text).map(({ text: tx, done, kind }) => [tx, done, kind || 'item'])).toEqual([
+      ['Shopping', false, 'text'],
+      ['milk', false, 'item'],
+      ['bread', true, 'item'],
+      ['from the market\nbefore noon', false, 'text'],
+      ['jam', false, 'item'],
+    ]);
   });
 
   const shape = (lines) => lines.map(({ text, kind, done }) => [kind || (done ? 'done' : 'item'), text]);
