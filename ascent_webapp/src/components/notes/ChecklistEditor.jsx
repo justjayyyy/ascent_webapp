@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, useDragControls } from '@/lib/motion';
 import {
-  ChevronRight, Coins, CornerDownRight, GripVertical, Heading, Highlighter, ImagePlus, ListOrdered, ListPlus, Pilcrow, Plus, RotateCcw, SquareCheck, X,
+  ChevronRight, Coins, CornerDownRight, GripVertical, Heading, Highlighter, ImagePlus, ListOrdered, ListPlus, MoveDiagonal2, Pilcrow, Plus, RotateCcw,
+  SquareCheck, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -191,6 +192,66 @@ function TotalRow({ totals, language, t, editable }) {
   );
 }
 
+const MIN_WIDTH = 15;
+const fitWidth = (w) => Math.max(MIN_WIDTH, Math.min(100, Math.round(w)));
+
+/**
+ * A picture among the lines, as wide as its line or narrower: dragged by the handle on its corner, or with the
+ * arrow keys on that handle. Double-click the handle for full width again. `onResize(width)` gets a percentage,
+ * or undefined for full width.
+ */
+function SizedPicture({ item, readOnly, onResize, t, picture, caption }) {
+  const box = useRef(null);
+  const [dragging, setDragging] = useState(null);
+  const width = dragging ?? item.width ?? 100;
+  const rtl = () => !!box.current && getComputedStyle(box.current).direction === 'rtl';
+  const widthAt = (e) => {
+    const own = box.current.getBoundingClientRect();
+    const line = box.current.parentElement.getBoundingClientRect();
+    const px = rtl() ? own.right - e.clientX : e.clientX - own.left;
+    return fitWidth((px / line.width) * 100);
+  };
+  const save = (w) => onResize(w >= 100 ? undefined : w);
+  return (
+    <div ref={box} className="max-w-full" style={{ width: `${width}%` }}>
+      <div className="relative">
+        {picture(!!item.width || dragging !== null)}
+        {!readOnly && (
+          <button
+            type="button"
+            aria-label={t('ntResizePicture')}
+            title={t('ntResizePicture')}
+            onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); setDragging(width); }}
+            onPointerMove={(e) => { if (dragging !== null) setDragging(widthAt(e)); }}
+            onPointerUp={() => { if (dragging !== null) { save(dragging); setDragging(null); } }}
+            onPointerCancel={() => setDragging(null)}
+            onDoubleClick={() => save(100)}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              const grow = (e.key === 'ArrowRight') !== rtl();
+              save(fitWidth(width + (grow ? 10 : -10)));
+            }}
+            className={cn(
+              'absolute bottom-1.5 end-1.5 flex h-8 w-8 touch-none items-center justify-center rounded-full border border-foreground/15 bg-background/85 text-foreground shadow-sm backdrop-blur',
+              'cursor-nwse-resize rtl:cursor-nesw-resize opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-90',
+              dragging !== null && 'opacity-100'
+            )}
+          >
+            <MoveDiagonal2 className="h-4 w-4 rtl:-scale-x-100" />
+          </button>
+        )}
+        {dragging !== null && (
+          <span className="pointer-events-none absolute start-1.5 top-1.5 rounded-full bg-background/85 px-2 py-0.5 text-xs font-medium tabular-nums backdrop-blur">
+            {Math.round(dragging)}%
+          </span>
+        )}
+      </div>
+      {caption}
+    </div>
+  );
+}
+
 function Row({
   item, number, total, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, onPasteLines, registerRef,
   onKind, suggestions, onPick, onFocusChange, noteId, online, currency, language,
@@ -247,23 +308,30 @@ function Row({
         <div className="flex items-start gap-1.5">
           {grip}
           <figure className="min-w-0 flex-1">
-            <LinePicture noteId={noteId} fileId={item.fileId} load={online} alt={item.text} className="max-h-80" />
-            {(!readOnly || item.text) && (
-              <AutoTextarea
-                ref={registerRef}
-                value={item.text}
-                readOnly={readOnly}
-                onChange={(e) => onChange({ ...item, text: e.target.value.replace(/\n/g, ' ') })}
-                onFocus={() => onFocusChange?.(true)}
-                onBlur={() => onFocusChange?.(false)}
-                onKeyDown={(e) => {
-                  if (!readOnly && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onEnter(); }
-                }}
-                placeholder={t('ntCaption')}
-                aria-label={t('ntCaption')}
-                className="mt-1 py-0.5 text-center text-xs leading-5 text-muted-foreground"
-              />
-            )}
+            <SizedPicture
+              item={item}
+              readOnly={readOnly}
+              t={t}
+              onResize={(width) => { const { width: _old, ...rest } = item; onChange(width ? { ...rest, width } : rest); }}
+              // A picture given a size is shown whole at it; at full width a tall one is cut to a band
+              picture={(sized) => <LinePicture noteId={noteId} fileId={item.fileId} load={online} alt={item.text} className={sized ? 'object-contain' : 'max-h-80'} />}
+              caption={(!readOnly || item.text) && (
+                <AutoTextarea
+                  ref={registerRef}
+                  value={item.text}
+                  readOnly={readOnly}
+                  onChange={(e) => onChange({ ...item, text: e.target.value.replace(/\n/g, ' ') })}
+                  onFocus={() => onFocusChange?.(true)}
+                  onBlur={() => onFocusChange?.(false)}
+                  onKeyDown={(e) => {
+                    if (!readOnly && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onEnter(); }
+                  }}
+                  placeholder={t('ntCaption')}
+                  aria-label={t('ntCaption')}
+                  className="mt-1 py-0.5 text-center text-xs leading-5 text-muted-foreground"
+                />
+              )}
+            />
           </figure>
           {removeButton}
         </div>
@@ -650,7 +718,7 @@ export default function ChecklistEditor({
       for (const line of lines) {
         if (line.kind !== 'image') { ready.push(line); continue; }
         const fileId = canPicture ? await pictureFromSrc(line.src).then(onAddImage).catch(() => null) : null;
-        if (fileId) ready.push({ kind: 'image', text: line.text || '', fileId });
+        if (fileId) ready.push({ kind: 'image', text: line.text || '', fileId, ...(line.width ? { width: line.width } : {}) });
         else missed += 1;
       }
       if (loading) toast.dismiss(loading);

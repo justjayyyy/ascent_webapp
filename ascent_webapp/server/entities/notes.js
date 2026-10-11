@@ -90,7 +90,8 @@ function present(note, user, member) {
   };
 }
 
-// The extras a line keeps: an amount (with its currency) on items, text and numbered lines, a file on a picture
+// The extras a line keeps: an amount (with its currency) on items, text and numbered lines, a file and a width
+// (in percent, less than full) on a picture
 function lineExtras(it, kind) {
   const out = {};
   const amount = Number(it?.amount);
@@ -99,6 +100,8 @@ function lineExtras(it, kind) {
     if (typeof it.currency === 'string' && /^[A-Z]{3}$/.test(it.currency)) out.currency = it.currency;
   }
   if (kind === 'image' && typeof it?.fileId === 'string' && /^[0-9a-f]{24}$/.test(it.fileId)) out.fileId = it.fileId;
+  const width = Math.round(Number(it?.width));
+  if (kind === 'image' && width >= 10 && width < 100) out.width = width;
   return out;
 }
 

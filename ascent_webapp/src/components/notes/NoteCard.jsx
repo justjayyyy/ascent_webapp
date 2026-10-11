@@ -24,13 +24,14 @@ const LONG_PRESS = 450;
 const SWIPE = 110;
 const isCoarse = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
-/** A picture among the lines of a card, loaded as the card comes near the screen. */
-function CardLinePicture({ noteId, fileId, online, alt }) {
+/** A picture among the lines of a card, at the width it was given, loaded as the card comes near the screen. */
+function CardLinePicture({ noteId, fileId, online, alt, width, query }) {
   const ref = useRef(null);
   const near = useNearView(ref);
   return (
-    <span ref={ref} className="block">
+    <span ref={ref} className="block" style={width ? { width: `${width}%` } : undefined}>
       <LinePicture noteId={noteId} fileId={fileId} load={near && online} alt={alt} className="max-h-40" />
+      {alt && <span className="mt-0.5 block text-center text-xs text-muted-foreground line-clamp-1">{highlight(alt, query)}</span>}
     </span>
   );
 }
@@ -147,7 +148,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
       onPointerCancel={endPress}
       onContextMenu={(e) => { if (coarse) e.preventDefault(); }}
       className={cn(
-        'note-surface group relative overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
+        'note-surface group relative rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
         'shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-16px_hsl(0_0%_0%/0.5)]',
         'transition-shadow hover:shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06),0_14px_36px_-14px_hsl(0_0%_0%/0.6)]',
         color === 'default' && 'border-border/60 bg-card/75 backdrop-blur-xl',
@@ -164,7 +165,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
         className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
 
-      {/* Select tick: on hover with a mouse, always while selecting */}
+      {/* Select tick: on hover with a mouse, on the card's corner clear of its title; inside it while selecting */}
       {onToggleSelect && (
         <button
           type="button"
@@ -172,11 +173,11 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
           aria-label={selected ? t('ntDeselect') : t('ntSelect')}
           aria-pressed={!!selected}
           className={cn(
-            'absolute top-1.5 z-[3] grid h-7 w-7 place-items-center rounded-full border-2 transition-[opacity,transform,background-color] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            selecting ? 'end-2 top-2' : 'start-1.5',
+            'absolute z-[3] grid h-7 w-7 place-items-center rounded-full border-2 transition-[opacity,transform,background-color] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            selecting ? 'end-2 top-2' : '-start-2.5 -top-2.5',
             selected
               ? 'border-primary bg-primary text-primary-foreground opacity-100 scale-100'
-              : 'border-foreground/40 bg-background/80 text-transparent backdrop-blur',
+              : 'border-foreground/40 bg-background text-transparent hover:border-foreground/70',
             !selected && (selecting ? 'opacity-100' : 'opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 [@media(pointer:coarse)]:hidden')
           )}
         >
@@ -186,8 +187,20 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
 
       <div className="pointer-events-none relative z-[1] space-y-2">
         <CardPhotos note={note} online={online} />
+        {/* Room for the pin and menu in the top corner: the title stops short of them, other text flows around them */}
+        {!note.title && !photoCount && hasBody && (
+          <div aria-hidden className={cn('float-end -mt-2 h-8 w-14 [@media(pointer:coarse)]:h-10', !note.isPinned && '[@media(pointer:coarse)]:w-7')} />
+        )}
         {(note.title || (!hasBody && !photoCount)) && (
-          <h3 dir={textDir(note.title)} className={cn('pe-8 text-[15px] [@media(pointer:coarse)]:pe-11 font-semibold leading-snug tracking-tight break-words line-clamp-3', !note.title && 'text-muted-foreground')}>
+          <h3
+            dir={textDir(note.title)}
+            className={cn(
+              'pe-14 text-[15px] font-semibold leading-snug tracking-tight break-words line-clamp-3',
+              // On touch there is only the menu, and the pin's mark beside it on a pinned note
+              note.isPinned ? '[@media(pointer:coarse)]:pe-[3.25rem]' : '[@media(pointer:coarse)]:pe-6',
+              !note.title && 'text-muted-foreground'
+            )}
+          >
             {note.title ? highlight(note.title, query) : (hasBody ? '' : t('ntEmptyNote'))}
           </h3>
         )}
@@ -206,8 +219,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
               if (kind === 'image') {
                 line = (
                   <li key={item.id} className="-mx-1">
-                    <CardLinePicture noteId={note.id} fileId={item.fileId} online={online} alt={item.text} />
-                    {item.text && <span className="mt-0.5 block text-center text-xs text-muted-foreground line-clamp-1">{highlight(item.text, query)}</span>}
+                    <CardLinePicture noteId={note.id} fileId={item.fileId} online={online} alt={item.text} width={item.width} query={query} />
                   </li>
                 );
               } else if (kind === 'item') {
@@ -303,32 +315,33 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
           </div>
         )}
 
+        {/* Who it is shared with and who changed it last, on one line (wrapping when it is long) */}
         {(isShared || involved.length > 0) && (
-          <div className="flex items-center gap-2 pt-1 text-muted-foreground">
-            {involved.length > 0 ? <PeopleStack people={involved} max={3} size={24} /> : <Users className="h-3.5 w-3.5" />}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-xs text-muted-foreground">
+            {involved.length > 0 ? <PeopleStack people={involved} max={3} size={24} /> : <Users className="h-3.5 w-3.5 shrink-0" />}
             {!isOwner && (
-              <span className="truncate text-xs">
+              <span className="truncate">
                 {fmt(t('ntFromName'), { name: people.byId[note.createdBy]?.name || '' })}
               </span>
             )}
-            {note.myAccess === 'view' && <span className="text-xs">· {t('ntViewOnly')}</span>}
+            {note.myAccess === 'view' && <span>· {t('ntViewOnly')}</span>}
+            {isShared && (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                {editorPerson && !editorPerson.isMe && involved.length === 0 && <PersonDot person={editorPerson} size={16} />}
+                <span className="min-w-0 break-words">
+                  {editorPerson && !editorPerson.isMe
+                    ? fmt(t('ntEditedBy'), { name: editorPerson.name, time: timeAgo(note.updated_date, language) })
+                    : editorPerson
+                      ? fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })
+                      : fmt(t('ntEditedAt'), { time: timeAgo(note.updated_date, language) })}
+                </span>
+              </span>
+            )}
           </div>
-        )}
-        {isShared && (
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {editorPerson && !editorPerson.isMe && <PersonDot person={editorPerson} size={16} />}
-            <span className="min-w-0 break-words">
-              {editorPerson && !editorPerson.isMe
-                ? fmt(t('ntEditedBy'), { name: editorPerson.name, time: timeAgo(note.updated_date, language) })
-                : editorPerson
-                  ? fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })
-                  : fmt(t('ntEditedAt'), { time: timeAgo(note.updated_date, language) })}
-            </span>
-          </p>
         )}
       </div>
 
-      {/* Pin + menu: on hover / focus with a mouse, always visible on touch */}
+      {/* Menu + pin: on hover / focus with a mouse, the pin in the corner; on touch the menu in the corner, always */}
       <div className={cn('pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5', photoCount > 0 && 'rounded-full bg-background/70 backdrop-blur', selecting && 'hidden')}>
         {!trashed && note.isPinned && (
           <Pin aria-hidden="true" className="hidden h-4 w-4 fill-current text-foreground/80 [@media(pointer:coarse)]:block" />
@@ -340,7 +353,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
             aria-label={note.isPinned ? t('ntUnpin') : t('ntPin')}
             aria-pressed={note.isPinned}
             className={cn(
-              'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full transition-opacity [@media(pointer:coarse)]:hidden hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'pointer-events-auto order-last flex h-8 w-8 items-center justify-center rounded-full transition-opacity [@media(pointer:coarse)]:hidden hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               note.isPinned ? 'text-foreground opacity-100' : 'text-muted-foreground opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-70'
             )}
           >

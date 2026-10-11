@@ -147,7 +147,9 @@ export function parseHtml(html) {
   const image = (img, caption) => {
     const src = img.getAttribute('src') || '';
     if (!/^(data:image\/|https?:|blob:)/i.test(src)) return;
-    push({ kind: 'image', src, text: caption || img.getAttribute('alt') || '' });
+    // A picture made narrower keeps its width (as this app copies it: a percentage)
+    const width = /^\d+(\.\d+)?%$/.test(img.style?.width || '') ? Math.round(parseFloat(img.style.width)) : 0;
+    push({ kind: 'image', src, text: caption || img.getAttribute('alt') || '', ...(width >= 10 && width < 100 ? { width } : {}) });
   };
 
   const list = (el, ordered) => {
@@ -268,7 +270,8 @@ export function noteToHtml(note, { images = {}, language, currency, totalLabel =
       else if (kind === 'callout') parts.push(`<blockquote>${withBreaks(it.text)}</blockquote>`);
       else if (kind === 'image') {
         const src = images[it.fileId];
-        if (src) parts.push(`<figure><img src="${esc(src)}" alt="${esc(it.text)}">${it.text ? `<figcaption>${esc(it.text)}</figcaption>` : ''}</figure>`);
+        const sized = it.width ? ` style="width:${Number(it.width)}%"` : '';
+        if (src) parts.push(`<figure><img src="${esc(src)}" alt="${esc(it.text)}"${sized}>${it.text ? `<figcaption>${esc(it.text)}</figcaption>` : ''}</figure>`);
       } else if (it.text || hasAmount(it)) parts.push(`<p>${withBreaks(it.text)}${priced(it)}</p>`);
     }
     if (totals.has(i)) {

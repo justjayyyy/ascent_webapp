@@ -309,22 +309,24 @@ test('a checklist keeps text and titles between its items, never ticked', async 
   ]);
 });
 
-test('the lines of a document keep their kind, their amount and their picture, and nothing they may not carry', async () => {
+test('the lines of a document keep their kind, their amount and their picture (and its width), and nothing they may not carry', async () => {
   const file = oid();
   const r = await call('PUT', { id: shared.id }, { items: [
     { id: 'n', text: 'Hall', kind: 'number', amount: '73440.456', currency: 'ILS' },
     { id: 'c', text: 'Not settled', kind: 'callout', amount: 5 },
-    { id: 'i', text: 'cover', kind: 'image', fileId: file, amount: 3 },
-    { id: 'j', text: '', kind: 'image', fileId: '../etc' },
-    { id: 't', text: 'Tip', amount: 200, currency: 'shekel' },
+    { id: 'i', text: 'cover', kind: 'image', fileId: file, amount: 3, width: '42.4' },
+    { id: 'j', text: '', kind: 'image', fileId: '../etc', width: 100 },
+    { id: 'k', text: '', kind: 'image', width: 3 },
+    { id: 't', text: 'Tip', amount: 200, currency: 'shekel', width: 50 },
     { id: 'e', text: 'Empty', kind: 'text', amount: '' },
   ] });
   assert.equal(r.code, 200);
   assert.deepEqual(r.body.data.items, [
     { id: 'n', text: 'Hall', done: false, kind: 'number', amount: 73440.46, currency: 'ILS' },
     { id: 'c', text: 'Not settled', done: false, kind: 'callout' },
-    { id: 'i', text: 'cover', done: false, kind: 'image', fileId: file },
+    { id: 'i', text: 'cover', done: false, kind: 'image', fileId: file, width: 42 },
     { id: 'j', text: '', done: false, kind: 'image' },
+    { id: 'k', text: '', done: false, kind: 'image' },
     { id: 't', text: 'Tip', done: false, amount: 200 },
     { id: 'e', text: 'Empty', done: false, kind: 'text' },
   ]);

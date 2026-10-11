@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { describe, expect, test } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ChecklistEditor from './ChecklistEditor';
 import { NoteTypeMenu } from './NoteParts';
 import { lineKind } from './noteUtils';
@@ -9,10 +10,17 @@ import { lineKind } from './noteUtils';
 const t = (key) => key;
 let seen = [];
 
+const queries = new QueryClient();
+
 function Editor({ start, flow = false }) {
   const [items, setItems] = useState(start);
   seen = items;
-  return <ChecklistEditor items={items} onChange={setItems} t={t} flow={flow} />;
+  // Pictures load through the query client; offline here, so they show their placeholder
+  return (
+    <QueryClientProvider client={queries}>
+      <ChecklistEditor items={items} onChange={setItems} t={t} flow={flow} online={false} />
+    </QueryClientProvider>
+  );
 }
 
 const line = (id, text, kind) => ({ id, text, done: false, ...(kind ? { kind } : {}) });
@@ -99,6 +107,31 @@ describe('continuous text', () => {
     render(<Editor flow start={[line('a', 'Dear ', 'text'), line('b', 'diary', 'text')]} />);
     fireEvent.keyDown(caretAt(screen.getByDisplayValue('diary'), 0), { key: 'Backspace' });
     expect(texts()).toEqual([['text', 'Dear diary']]);
+  });
+});
+
+describe('pictures', () => {
+  const picture = (extra) => ({ id: 'p', text: 'cover', done: false, kind: 'image', fileId: 'f1', ...extra });
+
+  test('the handle on a picture makes it narrower or wider with the arrows, and full width again', () => {
+    render(<Editor flow start={[picture({ width: 40 })]} />);
+    const handle = screen.getByRole('button', { name: 'ntResizePicture' });
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    expect(seen[0].width).toBe(50);
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    expect(seen[0].width).toBe(30);
+    fireEvent.doubleClick(handle);
+    expect('width' in seen[0]).toBe(false);
+  });
+
+  test('never narrower than a small picture, and full width is no width at all', () => {
+    render(<Editor flow start={[picture({ width: 20 })]} />);
+    const handle = screen.getByRole('button', { name: 'ntResizePicture' });
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    expect(seen[0].width).toBe(15);
+    for (let i = 0; i < 12; i += 1) fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    expect('width' in seen[0]).toBe(false);
   });
 });
 

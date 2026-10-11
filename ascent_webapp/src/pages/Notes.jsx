@@ -216,6 +216,17 @@ function Notes() {
   const filtering = !!filter || !!colorFilter;
   const searching = query.trim().length > 0 || filtering;
 
+  // While a note is open its card stays where it was, and moves up (or to the pinned ones) once it is closed.
+  // A card that moves to another column is made again there, and the new one would take the open note's place
+  // in their shared open-and-close animation: the note would vanish into its card while you edit it.
+  const held = useRef({ id: null });
+  if (held.current.id !== openId) {
+    const open = openId ? notes.find(n => n.id === openId) : null;
+    held.current = open ? { id: openId, updated_date: open.updated_date, isPinned: open.isPinned } : { id: openId };
+  }
+  const heldAt = held.current;
+  const placeOf = useCallback((n) => (n.id === heldAt.id && 'isPinned' in heldAt ? heldAt : n), [heldAt]);
+
   const shown = useMemo(() => {
     let list;
     if (searching) {
@@ -240,15 +251,17 @@ function Notes() {
     if (view === 'reminders' && !searching && !label) {
       return [...list].sort((a, b) => new Date(a.reminder) - new Date(b.reminder));
     }
-    return [...list].sort((a, b) => {
+    return [...list].sort((x, y) => {
+      const a = placeOf(x);
+      const b = placeOf(y);
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       return new Date(b.updated_date) - new Date(a.updated_date);
     });
-  }, [visible, view, label, query, searching, filter, colorFilter]);
+  }, [visible, view, label, query, searching, filter, colorFilter, placeOf]);
 
   const splitPins = !searching && view !== 'trash' && view !== 'archive' && view !== 'reminders';
-  const pinned = splitPins ? shown.filter(n => n.isPinned) : [];
-  const others = splitPins ? shown.filter(n => !n.isPinned) : shown;
+  const pinned = splitPins ? shown.filter(n => placeOf(n).isPinned) : [];
+  const others = splitPins ? shown.filter(n => !placeOf(n).isPinned) : shown;
 
   // ---- selection ----
   const selecting = selected.size > 0;

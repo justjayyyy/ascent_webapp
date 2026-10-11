@@ -178,6 +178,7 @@ export default {
   ntAmount: 'Amount',
   ntTotal: 'Total',
   ntCaption: 'Caption',
+  ntResizePicture: 'Resize picture',
   ntRemovePicture: 'Remove picture',
   ntAddingPictures: 'Adding pictures…',
   ntPictureFailed: 'The picture could not be added',

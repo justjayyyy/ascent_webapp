@@ -178,6 +178,7 @@ export default {
   ntAmount: 'Сумма',
   ntTotal: 'Итого',
   ntCaption: 'Подпись',
+  ntResizePicture: 'Изменить размер картинки',
   ntRemovePicture: 'Убрать картинку',
   ntAddingPictures: 'Добавляем картинки…',
   ntPictureFailed: 'Не удалось добавить картинку',

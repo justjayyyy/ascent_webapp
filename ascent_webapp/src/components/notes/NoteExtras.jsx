@@ -139,7 +139,8 @@ export function CardPhotos({ note, online }) {
   const shown = photos.slice(0, 3);
   const more = photos.length - shown.length;
   return (
-    <div ref={ref} aria-hidden className={cn('-mx-4 -mt-4 mb-1 grid gap-0.5', shown.length > 1 && 'grid-cols-2')}>
+    // Rounded like the card's top corners: the card itself does not clip, so its select tick can sit on its corner
+    <div ref={ref} aria-hidden className={cn('-mx-4 -mt-4 mb-1 grid gap-0.5 overflow-hidden rounded-t-[15px]', shown.length > 1 && 'grid-cols-2')}>
       {shown.map((att, i) => (
         <CardPhoto
           key={att.id}

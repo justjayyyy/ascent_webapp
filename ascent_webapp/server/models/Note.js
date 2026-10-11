@@ -11,7 +11,9 @@ const itemSchema = new mongoose.Schema({
   // Items, text and numbered lines may carry an amount, shown on the side and added up under a run of them
   amount: { type: Number, default: undefined },
   currency: { type: String, default: undefined },
-  fileId: { type: String, default: undefined }
+  fileId: { type: String, default: undefined },
+  // How wide a picture is shown, in percent of the note's width (10–99); without it, full width
+  width: { type: Number, default: undefined }
 }, { _id: false });
 
 const collaboratorSchema = new mongoose.Schema({

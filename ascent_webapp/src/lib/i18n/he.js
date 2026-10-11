@@ -178,6 +178,7 @@ export default {
   ntAmount: 'סכום',
   ntTotal: 'סה״כ',
   ntCaption: 'כיתוב',
+  ntResizePicture: 'שינוי גודל התמונה',
   ntRemovePicture: 'הסרת התמונה',
   ntAddingPictures: 'מוסיף תמונות…',
   ntPictureFailed: 'לא הצלחנו להוסיף את התמונה',

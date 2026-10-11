@@ -129,6 +129,13 @@ describe('copying a note out', () => {
     ]);
   });
 
+  test('a picture made narrower pastes back at its width', () => {
+    const sized = { ...note, items: [{ id: '5', text: 'cover', kind: 'image', fileId: 'f1', width: 40 }] };
+    const html = noteToHtml(sized, { images: { f1: 'data:image/jpeg;base64,BBBB' } });
+    expect(html).toContain('style="width:40%"');
+    expect(parseHtml(html).find(l => l.kind === 'image')).toMatchObject({ kind: 'image', width: 40 });
+  });
+
   test('as plain text, numbered and with the amounts written out', () => {
     expect(noteToText(note)).toBe('Wedding\nSuppliers\n1. DJ · ₪8,000\n2. Hall · ₪73,440\nNot settled\n[x] Book the hall');
   });
