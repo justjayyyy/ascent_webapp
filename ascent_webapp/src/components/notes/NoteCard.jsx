@@ -194,16 +194,19 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
           <div aria-hidden className={cn('float-end -mt-2 h-8 w-14 [@media(pointer:coarse)]:h-10', !note.isPinned && '[@media(pointer:coarse)]:w-7')} />
         )}
         {(note.title || (!hasBody && !photoCount)) && (
+          // The room for the buttons follows the page's direction, as they do; only the words follow their own
+          // language (an English title in Hebrew would otherwise keep its room on the wrong side)
           <h3
-            dir={textDir(note.title)}
             className={cn(
-              'pe-14 text-[15px] font-semibold leading-snug tracking-tight break-words line-clamp-3',
+              'pe-14 text-[15px] font-semibold leading-snug tracking-tight',
               // On touch there is only the menu, and the pin's mark beside it on a pinned note
-              note.isPinned ? '[@media(pointer:coarse)]:pe-[3.25rem]' : '[@media(pointer:coarse)]:pe-6',
+              note.isPinned ? '[@media(pointer:coarse)]:pe-16' : '[@media(pointer:coarse)]:pe-6',
               !note.title && 'text-muted-foreground'
             )}
           >
-            {note.title ? highlight(note.title, query) : (hasBody ? '' : t('ntEmptyNote'))}
+            <span dir={textDir(note.title)} className="block break-words line-clamp-3">
+              {note.title ? highlight(note.title, query) : (hasBody ? '' : t('ntEmptyNote'))}
+            </span>
           </h3>
         )}
 
