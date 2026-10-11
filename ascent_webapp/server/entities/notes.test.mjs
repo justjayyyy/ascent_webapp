@@ -87,8 +87,15 @@ const NoteFile = {
 // Reading documents: the assistant's answer is stood in for; what the handler checks first is real
 let aiOn = true;
 const imports = [];
+const asked = [];
 class AssistantDeclined extends Error {}
-mock.module(at('../lib/assistant.js'), { exports: { aiConfigured: () => aiOn, AssistantDeclined } });
+mock.module(at('../lib/assistant.js'), {
+  exports: {
+    aiConfigured: () => aiOn,
+    AssistantDeclined,
+    answerAboutNote: async (args) => { asked.push(args); return 'Milk is still to buy.'; },
+  },
+});
 mock.module(at('../lib/noteImport.js'), {
   exports: {
     MAX_PAGES_PER_CALL: 4,
@@ -354,6 +361,33 @@ test('reading a document needs the assistant on, the notes permission, and a few
     assert.equal((await call('POST', { action: 'import' }, { pages: [page] })).code, 403); // no key on the server
   } finally {
     aiOn = true;
+    delete workspace.settings;
+  }
+});
+
+test('asking about a note needs the assistant on and access to that note', async () => {
+  const body = { title: 'Groceries', text: '[ ] milk', question: 'What is left to buy?', today: '2026-01-01' };
+  assert.equal((await call('POST', { action: 'ask', id: shared.id }, body)).code, 403); // the assistant is off
+  workspace.settings = { aiAssistant: true };
+  try {
+    const history = [{ question: 'Hi', answer: 'Hello' }, { question: 1, answer: 'bad' }, { question: '', answer: 'empty' }];
+    const ok = await call('POST', { action: 'ask', id: shared.id }, { ...body, history });
+    assert.equal(ok.code, 200);
+    assert.equal(ok.body.data.answer, 'Milk is still to buy.');
+    assert.equal(asked.at(-1).question, 'What is left to buy?');
+    assert.equal(asked.at(-1).text, '[ ] milk');
+    assert.deepEqual(asked.at(-1).history, [{ question: 'Hi', answer: 'Hello' }]);
+
+    as(VIEWER); // reading is enough to ask
+    assert.equal((await call('POST', { action: 'ask', id: shared.id }, body)).code, 200);
+    assert.equal((await call('POST', { action: 'ask', id: privateNote.id }, body)).code, 404);
+    as(OUTSIDER);
+    assert.equal((await call('POST', { action: 'ask', id: shared.id }, body)).code, 404);
+    as(OWNER);
+    assert.equal((await call('POST', { action: 'ask', id: shared.id }, { ...body, question: '  ' })).code, 400);
+    assert.equal((await call('POST', { action: 'ask' }, body)).code, 400);
+    assert.equal((await call('GET', { action: 'ask', id: shared.id })).code, 405);
+  } finally {
     delete workspace.settings;
   }
 });

@@ -3,7 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, useReducedMotion } from '@/lib/motion';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, LogOut, MoreVertical,
-  Camera, ImagePlus, Images, Palette, Paperclip, Pin, Share2, Tag, Trash2, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,
+  Camera, ImagePlus, Images, Palette, Paperclip, Pin, Share2, Tag, Trash2, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat, Sparkles,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import AskNoteDialog from './AskNoteDialog';
 import ChecklistEditor from './ChecklistEditor';
 import { AutoTextarea, ColorPicker, LabelEditor, LinkChips, NoteTypeMenu, PersonDot } from './NoteParts';
 import { AttachmentPanel, ReminderPicker } from './NoteExtras';
@@ -49,6 +50,7 @@ const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(poi
 
 export default function NoteEditor({
   note, people, labels, itemSuggestions, actions, onClose, onShare, t, language, online, pending, canCreate, uploading, fresh, currency,
+  assistant, isWorkspaceOwner,
 }) {
   const reduce = useReducedMotion();
   const vv = useVisualViewport();
@@ -62,6 +64,7 @@ export default function NoteEditor({
   const [, setHistoryTick] = useState(0);
   const [hasDirty, setHasDirty] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [formatting, toggleFormatting] = useFormatBar();
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
@@ -544,6 +547,11 @@ export default function NoteEditor({
                       <DropdownMenuSeparator />
                     </>
                   )}
+                  {assistant?.configured && !trashed && (
+                    <DropdownMenuItem onSelect={() => setAskOpen(true)}>
+                      <Sparkles className="me-2 h-4 w-4" /> {t('ntAskTitle')}
+                    </DropdownMenuItem>
+                  )}
                   {canSend && (
                     <DropdownMenuItem onSelect={share}>
                       <Send className="me-2 h-4 w-4" /> {t('ntSend')}
@@ -592,6 +600,18 @@ export default function NoteEditor({
                 </Button>
               </div>
             </div>
+            {assistant?.configured && (
+              <AskNoteDialog
+                open={askOpen}
+                onOpenChange={setAskOpen}
+                note={{ ...note, ...draft }}
+                text={askOpen ? noteToText({ ...note, ...draft }, { withTitle: false }) : ''}
+                aiOff={!assistant.enabled}
+                isOwner={isWorkspaceOwner}
+                online={online}
+                t={t}
+              />
+            )}
           </motion.div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

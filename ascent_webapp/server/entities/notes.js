@@ -6,7 +6,7 @@ import { handleCors } from '../lib/cors.js';
 import { success, error, notFound, serverError } from '../lib/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { mergeChecklist } from '../lib/checklistMerge.js';
-import { aiConfigured, AssistantDeclined } from '../lib/assistant.js';
+import { aiConfigured, answerAboutNote, AssistantDeclined } from '../lib/assistant.js';
 import { readDocumentPages, MAX_PAGES_PER_CALL } from '../lib/noteImport.js';
 
 const TRASH_DAYS = 7;
@@ -28,14 +28,26 @@ const importCalls = new Map();
 const PAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_IMPORT_CHARS = 4_200_000; // the pages' base64 together, under Vercel's 4.5 MB body limit
 const LANGUAGES = { en: 'English', he: 'Hebrew', ru: 'Russian' };
+// Questions about a note: the note's text as the app shows it (with unsaved edits), and the last few turns
+const ASK_LIMIT = { windowMs: 60 * 60_000, max: 40 };
+const askCalls = new Map();
+const MAX_ASK_TEXT = 60_000;
+const MAX_ASK_TURNS = 6;
 
-function importRateLimited(userId) {
+function rateLimited(calls, limit, userId) {
   const now = Date.now();
-  const recent = (importCalls.get(userId) || []).filter((t) => now - t < IMPORT_LIMIT.windowMs);
-  if (recent.length >= IMPORT_LIMIT.max) return true;
+  const recent = (calls.get(userId) || []).filter((t) => now - t < limit.windowMs);
+  if (recent.length >= limit.max) return true;
   recent.push(now);
-  importCalls.set(userId, recent);
+  calls.set(userId, recent);
   return false;
+}
+
+// The device's own date, trusted within a day of the server's
+function localToday(given) {
+  const utc = new Date().toISOString().slice(0, 10);
+  if (typeof given !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(given)) return utc;
+  return Math.abs(Date.parse(given) - Date.parse(utc)) <= 86_400_000 ? given : utc;
 }
 
 // The stored bytes, exactly. A lean read gives a BSON Binary (its .buffer is the data); a Node Buffer
@@ -213,7 +225,7 @@ export default async function handler(req, res) {
       const pictures = (Array.isArray(body.pictures) ? body.pictures : []).slice(0, 40)
         .map((p) => ({ ref: Number(p?.ref), page: Number(p?.page), width: Number(p?.width) || 0, height: Number(p?.height) || 0 }))
         .filter((p) => Number.isInteger(p.ref) && p.ref > 0 && Number.isInteger(p.page));
-      if (importRateLimited(uid.toString())) return error(res, 'Too many documents read this hour. Try again later.', 429);
+      if (rateLimited(importCalls, IMPORT_LIMIT, uid.toString())) return error(res, 'Too many documents read this hour. Try again later.', 429);
       try {
         const doc = await readDocumentPages({
           pages: pages.map((p) => ({ data: p.data, mediaType: p.mediaType })),
@@ -227,6 +239,38 @@ export default async function handler(req, res) {
         if (err instanceof AssistantDeclined) return error(res, 'declined', 422);
         console.error('[Notes] import failed:', err?.message);
         return error(res, 'The document could not be read. Try again.', 502);
+      }
+    }
+
+    // ---- a question about a note: POST ?action=ask&id=<noteId> { title, text, question, history: [{ question, answer }] } ----
+    // -> { answer }. Anyone who can read the note may ask; the text is the note as it stands on their screen.
+    if (action === 'ask') {
+      if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
+      if (!id || !mongoose.isValidObjectId(id)) return error(res, 'A valid note id is required', 400);
+      const note = await Note.findOne({ _id: id, workspaceId: workspace._id }).lean();
+      if (!note || !accessFor(note, user, member)) return notFound(res, 'Note not found');
+      if (!aiConfigured() || workspace.settings?.aiAssistant !== true) return error(res, 'ai_disabled', 403);
+      const body = req.body || {};
+      const question = String(body.question ?? '').trim().slice(0, 1000);
+      if (!question) return error(res, 'question_required', 400);
+      const history = (Array.isArray(body.history) ? body.history : [])
+        .filter((h) => typeof h?.question === 'string' && typeof h?.answer === 'string' && h.question.trim() && h.answer.trim())
+        .slice(-MAX_ASK_TURNS)
+        .map((h) => ({ question: h.question.slice(0, 1000), answer: h.answer.slice(0, 4000) }));
+      if (rateLimited(askCalls, ASK_LIMIT, uid.toString())) return error(res, 'rate_limited', 429);
+      try {
+        const answer = await answerAboutNote({
+          title: String(body.title ?? '').slice(0, 500),
+          text: String(body.text ?? '').slice(0, MAX_ASK_TEXT),
+          question,
+          history,
+          today: localToday(body.today),
+        });
+        return success(res, { answer });
+      } catch (err) {
+        if (err instanceof AssistantDeclined) return error(res, 'ai_declined', 422);
+        console.error('[Notes] ask failed:', err?.message);
+        return error(res, 'The assistant could not answer. Try again.', 502);
       }
     }
 

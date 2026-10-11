@@ -322,6 +322,9 @@ const entities = {
     deleteFile: (noteId, fileId) => request(`/entities/notes?action=file&id=${enc(noteId)}&fileId=${enc(fileId)}`, { method: 'DELETE' }),
     // A few pages of a document (JPEG base64) read into { title, lines } by the assistant
     importPages: (body) => request('/entities/notes?action=import', json('POST', body, { timeout: 70000 })),
+    // A question about a note, from its text as shown (with the earlier turns) -> { answer }
+    ask: (noteId, { title, text, question, history }) =>
+      request(`/entities/notes?action=ask&id=${enc(noteId)}`, json('POST', { title, text, question, history, today: localDay() }, { timeout: 60000 })),
   },
 };
 

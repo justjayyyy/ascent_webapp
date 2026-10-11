@@ -792,6 +792,8 @@ function Notes() {
               canCreate={canCreate}
               fresh={freshId === openNote.id}
               currency={currency}
+              assistant={assistStatus?.ai}
+              isWorkspaceOwner={isWorkspaceOwner}
             />
           )}
         </AnimatePresence>

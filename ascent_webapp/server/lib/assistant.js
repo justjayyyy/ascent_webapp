@@ -168,3 +168,42 @@ export async function answerQuestion({ question, summary, language }) {
   if (response.stop_reason === 'refusal') throw new AssistantDeclined('declined');
   return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
 }
+
+const NOTE_SYSTEM = `You answer questions about one note in Ascent, a household app where families keep shared notes: shopping lists, plans, recipes, documents they copied in, to-dos.
+
+- The note is given as plain text. "[ ]" marks an open task and "[x]" a ticked one; "1." starts a numbered entry; an amount after " · " belongs to that line.
+- Answer from the note. When the note does not say, say so plainly, then add general knowledge only if it clearly helps, and say that it is not from the note.
+- Lead with the direct answer. Keep it short: a few sentences or up to six "- " bullets, under 150 words unless asked for more (a summary, a rewrite, a full list).
+- Add up amounts, count tasks or dates exactly as written; never invent a number, name or date.
+- Answer in the language of the question.
+- Plain text with simple "- " bullets. No headings, tables or code.`;
+
+const noteBlock = (note, today) => ({
+  type: 'text',
+  text: `Today: ${today}\n\nThe note:\n<note>\n${note}\n</note>`,
+  cache_control: { type: 'ephemeral' },
+});
+
+/** A question about one note (with the conversation so far) -> a short answer. */
+export async function answerAboutNote({ title, text, question, history = [], today }) {
+  const note = [title ? `Title: ${title}` : null, text || '(the note is empty)'].filter(Boolean).join('\n\n');
+  const turns = history.flatMap((h) => [
+    { role: 'user', content: h.question },
+    { role: 'assistant', content: h.answer },
+  ]);
+  // The note goes first and is cached: follow-up questions about it reuse it
+  if (turns.length) turns[0] = { role: 'user', content: [noteBlock(note, today), { type: 'text', text: history[0].question }] };
+  const response = await getClient().beta.messages.create({
+    model: MODEL,
+    max_tokens: 8000,
+    betas: BETAS,
+    fallbacks: 'default',
+    output_config: { effort: 'low' },
+    system: NOTE_SYSTEM,
+    messages: turns.length
+      ? [...turns, { role: 'user', content: question }]
+      : [{ role: 'user', content: [noteBlock(note, today), { type: 'text', text: question }] }],
+  });
+  if (response.stop_reason === 'refusal') throw new AssistantDeclined('declined');
+  return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+}
