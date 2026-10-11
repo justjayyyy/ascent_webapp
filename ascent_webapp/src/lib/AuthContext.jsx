@@ -219,8 +219,8 @@ export const AuthProvider = ({ children }) => {
   );
 
   // Face ID / fingerprint sign-in (and the lock screen's unlock, which keeps this device's session)
-  const loginWithPasskey = useCallback(async ({ autofill = false } = {}) => {
-    const result = await ascent.auth.passkeyLogin({ autofill });
+  const loginWithPasskey = useCallback(async ({ autofill = false, credentialIds = [] } = {}) => {
+    const result = await ascent.auth.passkeyLogin({ autofill, credentialIds });
     markUnlocked();
     setUser(result.user);
     setIsAuthenticated(true);

@@ -177,6 +177,12 @@ async function withinLimit(ceremony) {
   }
 }
 
+// Naming the passkeys known to be on this phone lets iPhone open Face ID straight away, instead of first
+// asking which passkey to use. One that is gone from the phone fails that request: from then on, the
+// prompt asks again, so the next tap still finds whichever passkey is there.
+let namedPasskeyFailed = false;
+const onThisPhone = (credentialIds) => credentialIds.map((id) => ({ id, type: 'public-key', transports: ['internal'] }));
+
 const LOGIN_OPTIONS = '/auth/passkey?action=login-options';
 const REGISTER_OPTIONS = '/auth/passkey?action=register-options';
 
@@ -191,10 +197,13 @@ const auth = {
   preparePasskeyLogin: () => prepareOptions('login', LOGIN_OPTIONS).catch(() => {}),
   /** Closes the sign-in page's passkey autofill request, if it is still open. */
   cancelPasskeyAutofill: () => cancelAutofill().catch(() => {}),
-  async passkeyLogin({ autofill = false } = {}) {
-    const [{ startAuthentication }, optionsJSON] = await takeOptions('login', LOGIN_OPTIONS);
+  /** `credentialIds`: passkeys this device has used before, so Face ID opens without the passkey picker. */
+  async passkeyLogin({ autofill = false, credentialIds = [] } = {}) {
+    const [{ startAuthentication }, prepared] = await takeOptions('login', LOGIN_OPTIONS);
     // The autofill request stays open while the page waits, so the button needs options of its own
     if (autofill) auth.preparePasskeyLogin();
+    const named = !autofill && !namedPasskeyFailed && credentialIds.length > 0;
+    const optionsJSON = named ? { ...prepared, allowCredentials: onThisPhone(credentialIds) } : prepared;
     let response;
     try {
       if (autofill) {
@@ -205,6 +214,7 @@ const auth = {
         response = await withinLimit(startAuthentication({ optionsJSON }));
       }
     } catch (err) {
+      if (named && err?.name === 'NotAllowedError') namedPasskeyFailed = true;
       if (!autofill) auth.preparePasskeyLogin(); // ready for the next tap
       throw err;
     }

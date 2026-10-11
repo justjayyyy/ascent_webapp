@@ -136,7 +136,7 @@ function LockScreen({ userId, onUnlocked }) {
     try {
       if (isOnline()) {
         try {
-          const result = await loginWithPasskey();
+          const result = await loginWithPasskey({ credentialIds: getLockPrefs(userId).credentialIds });
           rememberCredential(userId, result.credentialId);
           // Someone else's passkey on a shared device: the app now belongs to that account
           const id = result.user?.id || result.user?._id;
