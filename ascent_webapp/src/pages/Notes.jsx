@@ -42,7 +42,7 @@ import { noteToHtml } from '@/components/notes/noteDocument';
 import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { ascent } from '@/api/client';
 import {
-  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, distribute, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
+  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, columnEndIndex, distribute, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
   reorderPositions, resolveColor, searchableText, sortNotes, useColumnCount,
 } from '@/components/notes/noteUtils';
 
@@ -114,6 +114,22 @@ function MovableNote({ id, enabled, label, children }) {
     >
       {children(handle, isDragging)}
     </div>
+  );
+}
+
+/** The free space under a column: a note dropped there goes to the bottom of that column. */
+function ColumnEnd({ id, enabled, active }) {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: !enabled });
+  return (
+    <div
+      ref={setNodeRef}
+      aria-hidden="true"
+      className={cn(
+        'min-h-12 flex-1 rounded-2xl border-2 border-dashed border-transparent transition-colors',
+        active && 'border-border/50',
+        isOver && 'border-primary bg-primary/5'
+      )}
+    />
   );
 }
 
@@ -623,11 +639,12 @@ function Notes() {
 
   // Cards in columns, each as tall as its note; any of them can be moved to another's place
   const canDrag = !byReminder && !selecting && !searching && view !== 'trash';
-  const renderGrid = (list) => {
+  const renderGrid = (list, sectionKey) => {
     const cols = distribute(list, columnCount);
     return (
       <div
-        className={cn('flex items-start gap-3', listView && 'mx-auto max-w-2xl')}
+        // Columns as tall as the tallest, so the space under a shorter one can take a dropped note
+        className={cn('flex items-stretch gap-3', listView && 'mx-auto max-w-2xl')}
         onClickCapture={(e) => { if (Date.now() - draggedAt.current < 300) { e.stopPropagation(); e.preventDefault(); } }}
       >
         {cols.map((col, i) => (
@@ -656,6 +673,7 @@ function Notes() {
                 )}
               </MovableNote>
             ))}
+            {canDrag && <ColumnEnd id={`end|${sectionKey}|${i}`} enabled={canDrag} active={!!dragId} />}
           </div>
         ))}
       </div>
@@ -677,13 +695,18 @@ function Notes() {
     // On touch, held and let go in place is the long press that selects
     if (activatorEvent?.type === 'touchstart' && Math.hypot(delta.x, delta.y) < 10) { toggleSelect(active.id); return; }
     if (!over || over.id === active.id) return;
+    // Dropped on a card, or in the free space under a column ("end|section|column")
+    const [, endSection, endColumn] = String(over.id).startsWith('end|') ? String(over.id).split('|') : [];
     const from = sections.find(sec => sec.notes.some(n => n.id === active.id));
-    const into = sections.find(sec => sec.notes.some(n => n.id === over.id));
+    const into = endSection ? sections.find(sec => sec.key === endSection) : sections.find(sec => sec.notes.some(n => n.id === over.id));
     if (!from || !into) return;
     const toFolder = from !== into && from.folder !== undefined && into.folder !== undefined;
     if (from !== into && !toFolder) return;
     const moving = from.notes.find(n => n.id === active.id);
-    const to = into.notes.findIndex(n => n.id === over.id);
+    const othersThere = into.notes.filter(n => n.id !== active.id).length;
+    const to = endSection
+      ? columnEndIndex(othersThere, columnCount, Number(endColumn))
+      : into.notes.findIndex(n => n.id === over.id);
     if (toFolder) patchNote(active.id, { folder: into.folder });
 
     if (sort === 'manual') {
@@ -990,13 +1013,13 @@ function Notes() {
                       <h2 className={sectionTitle}>
                         <Pin className="h-3.5 w-3.5" /> {t('pinned')}
                       </h2>
-                      {renderGrid(pinned)}
+                      {renderGrid(pinned, 'pinned')}
                     </section>
                   )}
                   {others.length > 0 && !grouped && (
                     <section aria-label={pinned.length > 0 ? t('others') : heading}>
                       {pinned.length > 0 && <h2 className={sectionTitle}>{t('others')}</h2>}
-                      {renderGrid(others)}
+                      {renderGrid(others, 'all')}
                     </section>
                   )}
                   {others.length > 0 && grouped && groups.map(g => {
@@ -1014,7 +1037,7 @@ function Notes() {
                           <span className="truncate">{head.text}</span>
                           <span className="tabular-nums opacity-70">{g.notes.length}</span>
                         </h2>
-                        {renderGrid(g.notes)}
+                        {renderGrid(g.notes, g.key)}
                       </section>
                     );
                   })}

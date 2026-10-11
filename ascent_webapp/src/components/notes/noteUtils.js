@@ -248,29 +248,24 @@ export const isEmptyNote = (n) =>
   !n.title?.trim() &&
   (n.type === 'checklist' ? !(n.items || []).some(i => plainText(i.text).trim() || i.kind === 'image' || hasAmount(i)) : !plainText(n.content).trim());
 
-/** Rough height of a card, so short and tall notes balance across the masonry columns. */
-function estimateHeight(note, previewItems = 6) {
-  let h = 56 + (note.title ? 26 : 0);
-  if (note.type === 'checklist') {
-    h += Math.min((note.items || []).length, previewItems) * 26 + 10;
-  } else {
-    const text = plainText(note.content);
-    const lines = Math.min(text.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 34)), 0), 10);
-    h += lines * 21;
-  }
-  if (note.tags?.length) h += 30;
-  return h;
+/**
+ * Deal notes into `count` columns in reading order: the first across the top, then the next row, and so on. Every
+ * note keeps its own height; a note's place in the order says which column and row it is in, so moving it puts it
+ * where it was dropped.
+ */
+export function distribute(notes, count) {
+  const cols = Array.from({ length: count }, () => []);
+  notes.forEach((note, i) => cols[i % count].push(note));
+  return cols;
 }
 
-/** Deal notes into `count` columns, always into the shortest one, keeping the given order. */
-export function distribute(notes, count) {
-  const cols = Array.from({ length: count }, () => ({ h: 0, items: [] }));
-  notes.forEach(note => {
-    const col = cols.reduce((a, b) => (b.h < a.h ? b : a));
-    col.items.push(note);
-    col.h += estimateHeight(note) + 12;
-  });
-  return cols.map(c => c.items);
+/**
+ * Where a note dropped under column `col` goes among the `others` (how many notes there are besides it): the last
+ * place in that column, so it ends up at the bottom of the column it was dropped in.
+ */
+export function columnEndIndex(others, count, col) {
+  if (col > others) return others;
+  return others - ((others - col) % count);
 }
 
 /** Number of masonry columns that fit the container. */

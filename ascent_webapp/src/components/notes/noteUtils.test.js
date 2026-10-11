@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, noteForm, distribute, formatBytes, nextOccurrence,
+  noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, noteForm, distribute, columnEndIndex, formatBytes, nextOccurrence,
   extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes, reorderPositions,
 } from './noteUtils';
 
@@ -87,12 +87,22 @@ describe('text and lists', () => {
     expect(isEmptyNote(list(['x']))).toBe(false);
   });
 
-  test('cards are dealt into the shortest column, keeping order within each', () => {
-    const notes = [{ id: 1, content: 'x'.repeat(400) }, { id: 2 }, { id: 3 }, { id: 4 }];
+  test('cards are dealt across the columns in reading order, whatever their height', () => {
+    const notes = [{ id: 1, content: 'x'.repeat(400) }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
     const cols = distribute(notes, 2);
-    expect(cols.flat()).toHaveLength(4);
-    expect(cols[0].map((n) => n.id)).toEqual([1]);
-    expect(cols[1].map((n) => n.id)).toEqual([2, 3, 4]);
+    expect(cols.map(c => c.map((n) => n.id))).toEqual([[1, 3, 5], [2, 4]]);
+  });
+
+  test('a note dropped under a column goes to the bottom of that column', () => {
+    const columnOf = (others, count, col) => columnEndIndex(others, count, col) % count;
+    const isLast = (others, count, col) => columnEndIndex(others, count, col) + count > others;
+    for (const [others, count] of [[5, 3], [6, 2], [4, 3], [7, 4], [1, 3]]) {
+      for (let col = 0; col < Math.min(count, others + 1); col += 1) {
+        expect(columnOf(others, count, col)).toBe(col);
+        expect(isLast(others, count, col)).toBe(true);
+      }
+    }
+    expect(columnEndIndex(0, 3, 2)).toBe(0);
   });
 });
 
