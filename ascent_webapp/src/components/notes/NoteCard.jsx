@@ -1,7 +1,8 @@
 import React, { memo, useMemo, useRef } from 'react';
 import { motion, useMotionValue, useTransform } from '@/lib/motion';
 import {
-  Archive, ArchiveRestore, BellRing, Check, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Repeat, Share2, Trash2, Undo2, Users, XCircle,
+  Archive, ArchiveRestore, BellRing, Check, CheckCircle2, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Repeat, Share2, Trash2, Undo2, Users,
+  XCircle,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -83,6 +84,8 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
 
   const placed = placedPictures(note);
   const photoCount = (note.attachments || []).filter(a => isPreviewable(a.type) && !placed.has(a.id)).length;
+  // Buttons over a photo get their own backing to read against it
+  const onPhoto = photoCount > 0 && 'bg-background/75 backdrop-blur';
   const fileCount = (note.attachments || []).length - photoCount;
 
   const toggleItem = (id, done) =>
@@ -114,11 +117,12 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   };
   const endPress = () => { if (press.current) clearTimeout(press.current.timer); };
 
-  const activate = () => {
+  const activate = (e) => {
     // The tap that ends a long press or a swipe is not a click
     if (press.current?.fired || dragged.current) { press.current = null; dragged.current = false; return; }
     press.current = null;
-    if (selecting) onToggleSelect(note.id);
+    // Ctrl / Cmd / Shift + click selects, as in a file list
+    if (selecting || (onToggleSelect && (e.ctrlKey || e.metaKey || e.shiftKey))) onToggleSelect(note.id);
     else onOpen(note.id);
   };
 
@@ -148,7 +152,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
       onPointerCancel={endPress}
       onContextMenu={(e) => { if (coarse) e.preventDefault(); }}
       className={cn(
-        'note-surface group relative rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
+        'note-surface group relative overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
         'shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-16px_hsl(0_0%_0%/0.5)]',
         'transition-shadow hover:shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06),0_14px_36px_-14px_hsl(0_0%_0%/0.6)]',
         color === 'default' && 'border-border/60 bg-card/75 backdrop-blur-xl',
@@ -165,20 +169,18 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
         className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
 
-      {/* Select tick: on hover with a mouse, on the card's corner clear of its title; inside it while selecting */}
-      {onToggleSelect && (
+      {/* Select tick: while selecting (start it from the menu, a long press, or Ctrl / Shift + click) */}
+      {onToggleSelect && selecting && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleSelect(note.id); }}
           aria-label={selected ? t('ntDeselect') : t('ntSelect')}
           aria-pressed={!!selected}
           className={cn(
-            'absolute z-[3] grid h-7 w-7 place-items-center rounded-full border-2 transition-[opacity,transform,background-color] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            selecting ? 'end-2 top-2' : '-start-2.5 -top-2.5',
+            'absolute end-2 top-2 z-[3] grid h-7 w-7 place-items-center rounded-full border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             selected
-              ? 'border-primary bg-primary text-primary-foreground opacity-100 scale-100'
-              : 'border-foreground/40 bg-background text-transparent hover:border-foreground/70',
-            !selected && (selecting ? 'opacity-100' : 'opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 [@media(pointer:coarse)]:hidden')
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-foreground/40 bg-background/80 text-transparent backdrop-blur hover:border-foreground/70'
           )}
         >
           <Check className="h-4 w-4" strokeWidth={3} />
@@ -341,10 +343,13 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
         )}
       </div>
 
-      {/* Menu + pin: on hover / focus with a mouse, the pin in the corner; on touch the menu in the corner, always */}
-      <div className={cn('pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-0.5', photoCount > 0 && 'rounded-full bg-background/70 backdrop-blur', selecting && 'hidden')}>
+      {/* Menu + pin: on hover / focus with a mouse, the pin in the corner; on touch the menu in the corner, always.
+          Over a photo each one has its own backing, so nothing shows until the buttons do. */}
+      <div className={cn('pointer-events-none absolute end-1.5 top-1.5 z-[3] flex items-center gap-1', selecting && 'hidden')}>
         {!trashed && note.isPinned && (
-          <Pin aria-hidden="true" className="hidden h-4 w-4 fill-current text-foreground/80 [@media(pointer:coarse)]:block" />
+          <span aria-hidden="true" className={cn('hidden h-6 w-6 items-center justify-center rounded-full [@media(pointer:coarse)]:flex', onPhoto)}>
+            <Pin className="h-4 w-4 fill-current text-foreground/80" />
+          </span>
         )}
         {!trashed && (
           <button
@@ -354,6 +359,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
             aria-pressed={note.isPinned}
             className={cn(
               'pointer-events-auto order-last flex h-8 w-8 items-center justify-center rounded-full transition-opacity [@media(pointer:coarse)]:hidden hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              onPhoto,
               note.isPinned ? 'text-foreground opacity-100' : 'text-muted-foreground opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-70'
             )}
           >
@@ -367,7 +373,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
               aria-label={t('ntMore')}
               className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground opacity-0 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-70"
             >
-              <MoreVertical className="h-4 w-4" />
+              <MoreVertical className={cn('h-4 w-4', photoCount > 0 && 'h-8 w-8 rounded-full p-2 text-foreground', onPhoto)} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[13rem]">
@@ -386,6 +392,11 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
               </>
             ) : (
               <>
+                {onToggleSelect && (
+                  <DropdownMenuItem onSelect={() => onToggleSelect(note.id)}>
+                    <CheckCircle2 className="me-2 h-4 w-4" /> {t('ntSelect')}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={() => actions.patch(note.id, { isPinned: !note.isPinned })}>
                   {note.isPinned ? <PinOff className="me-2 h-4 w-4" /> : <Pin className="me-2 h-4 w-4" />}
                   {note.isPinned ? t('ntUnpin') : t('ntPin')}

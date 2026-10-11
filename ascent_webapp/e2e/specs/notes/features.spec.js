@@ -10,19 +10,19 @@ const cardButton = (page, title) => page.getByRole('button', { name: title, exac
 test('several notes selected at once are archived together; Escape clears the selection @critical', async ({ page, api }) => {
   for (const t of ['Gas bill', 'Water bill', 'Keep me']) await api.create('notes', note(t));
   await openApp(page, '/Notes');
-  for (const t of ['Gas bill', 'Water bill']) {
-    const card = page.getByRole('article').filter({ has: cardButton(page, t) });
-    await card.hover();
-    await card.getByRole('button', { name: L('ntSelect') }).click();
-  }
+  const card = (t) => page.getByRole('article').filter({ has: cardButton(page, t) });
+  // The first from its menu; once selecting, every card shows its tick
+  await card('Gas bill').hover();
+  await card('Gas bill').getByRole('button', { name: L('ntMore') }).click();
+  await page.getByRole('menuitem', { name: L('ntSelect') }).click();
+  await card('Water bill').getByRole('button', { name: L('ntSelect') }).click();
   await expect(page.getByText(L('ntSelectedCount', { n: 2 }))).toBeVisible();
   await page.getByRole('toolbar', { name: L('ntSelectedCount', { n: 2 }) }).getByRole('button', { name: L('ntArchive') }).click();
   await expect.poll(async () => (await api.list('notes')).filter((n) => n.isArchived).map((n) => n.title).sort()).toEqual(['Gas bill', 'Water bill']);
   await expect(page.getByText(L('ntSelectedCount', { n: 2 }))).toHaveCount(0);
 
-  const keep = page.getByRole('article').filter({ has: cardButton(page, 'Keep me') });
-  await keep.hover();
-  await keep.getByRole('button', { name: L('ntSelect') }).click();
+  // Ctrl + click selects too
+  await cardButton(page, 'Keep me').click({ modifiers: ['ControlOrMeta'] });
   await expect(page.getByText(L('ntSelectedCount', { n: 1 }))).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByText(L('ntSelectedCount', { n: 1 }))).toHaveCount(0);
