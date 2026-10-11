@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, noteForm, distribute, formatBytes, nextOccurrence,
-  extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob,
+  extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes,
 } from './noteUtils';
 
 const list = (items, extra = {}) => ({ type: 'checklist', items: items.map((text, i) => ({ id: `i${i}`, text, done: i === 0 })), ...extra });
@@ -170,5 +170,65 @@ describe('links, files and filters', () => {
 
   test('placeholders fill in', () => {
     expect(fmt('{n} notes', { n: 3 })).toBe('3 notes');
+  });
+});
+
+describe('sortNotes', () => {
+  const notes = [
+    { id: 'a', title: 'banana', created_date: '2026-01-03', updated_date: '2026-01-05' },
+    { id: 'b', title: '', content: '', created_date: '2026-01-04', updated_date: '2026-01-04' },
+    { id: 'c', title: 'Apple', created_date: '2026-01-01', updated_date: '2026-01-06' },
+    { id: 'd', title: 'zebra', isPinned: true, created_date: '2026-01-02', updated_date: '2026-01-01' },
+  ];
+  const ids = (list) => list.map(n => n.id).join('');
+
+  test('puts pinned notes first, then the latest edit', () => {
+    expect(ids(sortNotes(notes, 'updated'))).toBe('dcab');
+  });
+  test('can go by creation date', () => {
+    expect(ids(sortNotes(notes, 'created'))).toBe('dbac');
+  });
+  test('goes by title regardless of case, with untitled notes last', () => {
+    expect(ids(sortNotes(notes, 'title'))).toBe('dcab');
+    expect(ids(sortNotes(notes.map(n => ({ ...n, isPinned: false })), 'title'))).toBe('cadb');
+  });
+});
+
+describe('groupNotes', () => {
+  const now = new Date(2026, 9, 11, 15);
+  const at = (y, m, d) => new Date(y, m, d, 9).toISOString();
+
+  test('groups by date, newest first, older notes by month', () => {
+    const notes = [
+      { id: 'a', updated_date: at(2026, 9, 11) },
+      { id: 'b', updated_date: at(2026, 9, 10) },
+      { id: 'c', updated_date: at(2026, 9, 6) },
+      { id: 'd', updated_date: at(2026, 9, 1) },
+      { id: 'e', updated_date: at(2026, 7, 20) },
+      { id: 'f', updated_date: at(2025, 11, 2) },
+    ];
+    const groups = groupNotes(notes, 'date', { now });
+    expect(groups.map(g => g.bucket.key)).toEqual(['today', 'yesterday', 'week', 'month', 'm-2026-7', 'm-2025-11']);
+  });
+
+  test('groups by first label by name, unlabelled last, skipping the label being viewed', () => {
+    const notes = [
+      { id: 'a', tags: ['work', 'Home'] },
+      { id: 'b', tags: [] },
+      { id: 'c', tags: ['work'] },
+    ];
+    expect(groupNotes(notes, 'label', {}).map(g => [g.label, g.notes.map(n => n.id).join('')]))
+      .toEqual([['Home', 'a'], ['work', 'c'], [null, 'b']]);
+    expect(groupNotes(notes, 'label', { skipLabel: 'home' }).map(g => g.label)).toEqual(['work', null]);
+  });
+
+  test('groups by colour in palette order with plain notes last, and by type', () => {
+    const notes = [{ id: 'a' }, { id: 'b', color: 'sky' }, { id: 'c', color: 'coral', type: 'checklist', items: [] }];
+    expect(groupNotes(notes, 'color', {}).map(g => g.color)).toEqual(['coral', 'sky', 'default']);
+    expect(groupNotes(notes, 'type', {}).map(g => g.type)).toEqual(['checklist', 'text']);
+  });
+
+  test('leaves the notes as one group when not grouping', () => {
+    expect(groupNotes([{ id: 'a' }], 'none')).toEqual([{ key: 'all', kind: 'none', notes: [{ id: 'a' }] }]);
   });
 });

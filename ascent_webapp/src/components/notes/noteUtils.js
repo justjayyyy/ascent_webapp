@@ -539,3 +539,90 @@ export function matchesFilter(note, filter) {
   if (filter === 'reminders') return !!note.reminder;
   return true;
 }
+
+// ---- organising the notes: how they are sorted, and the headed groups they are shown in ----
+export const NOTE_SORTS = ['updated', 'created', 'title'];
+export const NOTE_GROUPS = ['none', 'date', 'label', 'color', 'type'];
+
+const titleOf = (note) => (note.title?.trim() || noteToText(note, { withTitle: false }).trim()).split('\n')[0].trim();
+
+/**
+ * The notes in the chosen order: last edited or created first, or by title (notes with no words at all last).
+ * `placeOf` gives the note's dates and pin as they are laid out (an open note keeps its place until it is closed).
+ */
+export function sortNotes(notes, sort, { language, placeOf = (n) => n } = {}) {
+  const collator = new Intl.Collator(language || 'en', { sensitivity: 'base', numeric: true });
+  const field = sort === 'created' ? 'created_date' : 'updated_date';
+  const time = (n) => new Date(placeOf(n)[field] || n.created_date || 0).getTime() || 0;
+  return [...notes].sort((x, y) => {
+    const a = placeOf(x);
+    const b = placeOf(y);
+    if (!!a.isPinned !== !!b.isPinned) return a.isPinned ? -1 : 1;
+    if (sort === 'title') {
+      const ta = titleOf(x), tb = titleOf(y);
+      if (!ta !== !tb) return ta ? -1 : 1;
+      const byTitle = collator.compare(ta, tb);
+      if (byTitle) return byTitle;
+    }
+    return time(y) - time(x);
+  });
+}
+
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** Which part of the calendar a date falls in, seen from `now`: today, yesterday, the past week, this month, or its month. */
+export function dateBucket(date, now = new Date()) {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return { key: 'older', rank: Number.MAX_SAFE_INTEGER };
+  const today = startOfDay(now);
+  const day = startOfDay(d);
+  const DAY = 86400000;
+  if (day >= today) return { key: 'today', rank: 0 };
+  if (day >= today - DAY) return { key: 'yesterday', rank: 1 };
+  if (day >= today - 6 * DAY) return { key: 'week', rank: 2 };
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) return { key: 'month', rank: 3 };
+  // Older notes: one group a month, the latest first
+  const months = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth();
+  return { key: `m-${d.getFullYear()}-${d.getMonth()}`, rank: 3 + months, year: d.getFullYear(), month: d.getMonth() };
+}
+
+/**
+ * Sorted notes in headed groups, in the order the groups are shown; inside a group the notes keep their order.
+ * Each group is { key, kind, notes } and, by kind: a date bucket (`bucket`), a label (`label`, null for none),
+ * a colour (`color`) or a note type (`type`). A note with several labels goes under the first of them by name;
+ * `skipLabel` (the label being looked at) is left out of that choice.
+ */
+export function groupNotes(notes, group, { language, sort, now = new Date(), placeOf = (n) => n, skipLabel = '' } = {}) {
+  if (!group || group === 'none') return [{ key: 'all', kind: 'none', notes }];
+  const collator = new Intl.Collator(language || 'en', { sensitivity: 'base', numeric: true });
+  const groups = new Map();
+  const add = (key, make, note) => {
+    if (!groups.has(key)) groups.set(key, { key, notes: [], ...make() });
+    groups.get(key).notes.push(note);
+  };
+  const skip = skipLabel.toLowerCase();
+  notes.forEach(n => {
+    if (group === 'date') {
+      const p = placeOf(n);
+      const bucket = dateBucket(sort === 'created' ? n.created_date : p.updated_date, now);
+      add(`date-${bucket.key}`, () => ({ kind: 'date', bucket, rank: bucket.rank }), n);
+    } else if (group === 'label') {
+      const tags = (n.tags || []).filter(tag => tag.toLowerCase() !== skip).sort(collator.compare);
+      const tag = tags[0] || null;
+      add(tag ? `label-${tag.toLowerCase()}` : 'label-none', () => ({ kind: 'label', label: tag }), n);
+    } else if (group === 'color') {
+      const color = resolveColor(n.color);
+      // The palette's order, plain notes last
+      const rank = color === 'default' ? NOTE_COLORS.length : NOTE_COLORS.indexOf(color);
+      add(`color-${color}`, () => ({ kind: 'color', color, rank }), n);
+    } else {
+      const type = noteForm(n);
+      add(`type-${type}`, () => ({ kind: 'type', type, rank: type === 'checklist' ? 0 : 1 }), n);
+    }
+  });
+  const list = [...groups.values()];
+  if (group === 'label') {
+    return list.sort((a, b) => (!a.label !== !b.label ? (a.label ? -1 : 1) : collator.compare(a.label || '', b.label || '')));
+  }
+  return list.sort((a, b) => a.rank - b.rank);
+}
