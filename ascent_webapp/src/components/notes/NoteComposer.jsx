@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
 import { AutoTextarea, ColorPicker, LabelEditor, NoteTypeMenu } from './NoteParts';
-import { blankItem, hasAmount, isEmptyNote, itemsToText, lineKind, newItemId, resolveColor, textToItems } from './noteUtils';
-import { readPaste } from './noteDocument';
+import {
+  blankItem, flowBlocks, flowChanges, formChanges, hasAmount, isEmptyNote, newItemId, noteForm, resolveColor,
+} from './noteUtils';
 
 const blank = (tag) => ({
-  title: '', content: '', type: 'text', items: [], color: 'default', tags: tag ? [tag] : [],
+  title: '', content: '', type: 'text', flow: false, items: [], color: 'default', tags: tag ? [tag] : [],
 });
 
 /** "Take a note…" bar that opens into a full inline editor, like Google Keep. */
@@ -27,6 +28,8 @@ export default function NoteComposer({
   const cameraRef = useRef(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // The id its text is edited under while it is plain text (see NoteEditor)
+  const textBlockId = useRef(newItemId());
 
   const patch = (changes) => setDraft(d => ({ ...d, ...changes }));
 
@@ -72,19 +75,15 @@ export default function NoteComposer({
   // A paste with pictures needs a note to put them in: it becomes one, opened, with what was written so far
   const handOff = (lines) => {
     const d = draftRef.current;
-    onDocument({ title: d.title, color: d.color, tags: d.tags, lines });
+    onDocument({ title: d.title, color: d.color, tags: d.tags, lines, flow: noteForm(d) === 'text' });
     setDraft(blank(defaultTag));
     setOpen(false);
   };
 
-  // A page or document pasted into an empty note becomes its lines
-  const pasteIntoEmpty = (e) => {
-    if (draftRef.current.content?.trim()) return;
-    const lines = readPaste({ html: e.clipboardData?.getData('text/html') || '', text: '' });
-    if (!lines || lines.every(l => lineKind(l) === 'text' && !('amount' in l))) return;
-    e.preventDefault();
-    if (onDocument && lines.some(l => l.kind === 'image')) { handOff(lines); return; }
-    patch({ type: 'checklist', items: lines.filter(l => l.kind !== 'image').map(l => ({ done: false, ...l, id: newItemId() })) });
+  const changeBlocks = (blocks) => {
+    const changes = flowChanges(draftRef.current, blocks);
+    if ('content' in changes && blocks[0]) textBlockId.current = blocks[0].id;
+    patch(changes);
   };
 
   const startChecklist = () => {
@@ -92,9 +91,9 @@ export default function NoteComposer({
     setOpen(true);
   };
 
-  const toggleType = () => {
-    if (draft.type === 'checklist') patch({ type: 'text', content: itemsToText(draft.items) || draft.content });
-    else patch({ type: 'checklist', items: textToItems(draft.content) });
+  const setForm = (to) => {
+    const changes = formChanges(draftRef.current, to);
+    if (changes) patch(changes);
   };
 
   const color = resolveColor(draft.color);
@@ -180,14 +179,14 @@ export default function NoteComposer({
               <AutoTextarea
                 value={draft.title}
                 onChange={(e) => patch({ title: e.target.value.replace(/\n/g, ' ') })}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.focus(); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.querySelector('textarea')?.focus(); } }}
                 placeholder={t('noteTitle')}
                 aria-label={t('noteTitle')}
                 maxLength={500}
                 className="text-base font-semibold tracking-tight"
               />
-              <div className="mt-1 pb-2">
-                {draft.type === 'checklist' ? (
+              <div ref={bodyRef} className="mt-1 pb-2">
+                {noteForm(draft) === 'checklist' ? (
                   <ChecklistEditor
                     items={draft.items.length ? draft.items : [blankItem()]}
                     onChange={(items) => patch({ items })}
@@ -199,17 +198,20 @@ export default function NoteComposer({
                     onPasteDocument={onDocument ? handOff : undefined}
                   />
                 ) : (
-                  <AutoTextarea
-                    ref={bodyRef}
-                    autoFocus
-                    value={draft.content}
-                    onChange={(e) => patch({ content: e.target.value })}
-                    onPaste={pasteIntoEmpty}
-                    placeholder={t('ntTakeNote')}
-                    aria-label={t('noteContent')}
-                    maxLength={100000}
-                    className="min-h-[4.5rem] text-base leading-relaxed sm:text-sm"
-                  />
+                  <div className="min-h-[4.5rem]">
+                    <ChecklistEditor
+                      flow
+                      items={flowBlocks(draft, textBlockId.current)}
+                      onChange={changeBlocks}
+                      autoFocus
+                      placeholder={t('ntTakeNote')}
+                      suggestions={itemSuggestions}
+                      t={t}
+                      currency={currency}
+                      language={language}
+                      onPasteDocument={onDocument ? handOff : undefined}
+                    />
+                  </div>
                 )}
               </div>
               {draft.tags.length > 0 && (
@@ -237,7 +239,7 @@ export default function NoteComposer({
                   <LabelEditor labels={draft.tags} suggestions={labels} onChange={(tags) => patch({ tags })} t={t} />
                 </PopoverContent>
               </Popover>
-              <NoteTypeMenu value={draft.type} onChange={toggleType} t={t} />
+              <NoteTypeMenu value={noteForm(draft)} onChange={setForm} t={t} />
               <Button variant="ghost" onClick={commit} className="ms-auto">{t('ntClose')}</Button>
             </div>
           </motion.div>

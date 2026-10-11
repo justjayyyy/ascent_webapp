@@ -9,7 +9,7 @@ import { MAX_FILE_BYTES, MAX_FILES, fmt, newItemId, newNoteId, prepareUpload, us
 import { isPdf, pictureFromSrc, readDocument } from './importDocument';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
-const CONTENT_KEYS = ['title', 'content', 'type', 'items', 'tags', 'color'];
+const CONTENT_KEYS = ['title', 'content', 'type', 'flow', 'items', 'tags', 'color'];
 const FILE_ERRORS = { 'too-large': 'ntFileTooLarge' };
 
 /**
@@ -114,7 +114,7 @@ export function useNotes() {
     const id = newNoteId();
     const now = new Date().toISOString();
     const note = {
-      title: '', content: '', type: 'text', items: [], color: 'default', tags: [],
+      title: '', content: '', type: 'text', flow: false, items: [], color: 'default', tags: [],
       isShared: false, collaborators: [], isPinned: false, isArchived: false,
       ...data,
       id,
@@ -133,7 +133,7 @@ export function useNotes() {
       type: 'create',
       id,
       data: {
-        title: note.title, content: note.content, type: note.type, items: note.items,
+        title: note.title, content: note.content, type: note.type, flow: !!note.flow, items: note.items,
         color: note.color, tags: note.tags, isShared: note.isShared,
         collaborators: note.collaborators.map(c => ({ userId: c.userId, role: c.role })),
         isPinned: note.isPinned, isArchived: note.isArchived,
@@ -227,7 +227,7 @@ export function useNotes() {
     const list = Array.from(files || []);
     const doc = await readDocument(list, { readPages: ascent.entities.Note.importPages, language, onProgress });
     const name = (list.find(isPdf) || list[0])?.name?.replace(/\.[^.]+$/, '') || '';
-    const id = createNote({ type: 'checklist', title: doc.title || name, items: [], tags });
+    const id = createNote({ type: 'checklist', flow: true, title: doc.title || name, items: [], tags });
 
     // The pictures it placed, uploaded in order; one that cannot be (offline, too many files) is left out
     onProgress?.({ stage: 'pictures', done: 0, total: doc.pictures.length });
@@ -253,11 +253,11 @@ export function useNotes() {
    * A new checklist note made of pasted lines. It is there at once; the pictures (pasted with their `src`) are
    * uploaded into it and put back where they were, after whatever line came before them. Resolves to its id.
    */
-  const createFromLines = useCallback(({ title = '', color, tags = [], lines }) => {
+  const createFromLines = useCallback(({ title = '', color, tags = [], lines, flow = false }) => {
     const all = lines.map(l => ({ done: false, ...l, id: l.id || newItemId() }));
     const waiting = all.filter(l => l.kind === 'image' && !l.fileId);
     const id = createNote({
-      type: 'checklist', title, tags, ...(color ? { color } : {}),
+      type: 'checklist', flow, title, tags, ...(color ? { color } : {}),
       items: all.filter(l => !waiting.includes(l)).map(({ src: _src, ...l }) => l),
     });
     if (waiting.length) {

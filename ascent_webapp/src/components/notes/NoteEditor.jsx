@@ -17,13 +17,12 @@ import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
 import { DictateButton, useDictation } from './useDictation';
 import {
-  extractLinks, fmt, formatReminder, isEmptyNote, isOverdue, isTicked, itemsToText, lastEditor, lineKind, newItemId, noteToText, resolveColor, textToItems, timeAgo, blankItem,
+  extractLinks, flowBlocks, flowChanges, fmt, formChanges, formatReminder, isEmptyNote, isOverdue, isPlainText, isTicked, lastEditor, lineKind,
+  newItemId, noteForm, noteToText, resolveColor, timeAgo, blankItem,
 } from './noteUtils';
-import { readPaste } from './noteDocument';
-import { pictureFromSrc } from './importDocument';
 
 const ib = 'h-11 w-11 sm:h-9 sm:w-9 [@media(pointer:coarse)]:before:hidden';
-const CONTENT_KEYS = ['title', 'content', 'type', 'items', 'tags', 'color'];
+const CONTENT_KEYS = ['title', 'content', 'type', 'flow', 'items', 'tags', 'color'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const pick = (note) => Object.fromEntries(CONTENT_KEYS.map(k => [k, note[k]]));
 const HISTORY_GAP = 700; // keystrokes closer together than this are one undo step
@@ -67,6 +66,8 @@ export default function NoteEditor({
   const dirty = useRef({});
   const timer = useRef(null);
   const bodyRef = useRef(null);
+  // The id continuous text is edited under while it is plain text, kept when it gets more blocks or goes back
+  const textBlockId = useRef(newItemId());
   const noteId = note.id;
 
   const flush = useCallback(() => {
@@ -153,13 +154,17 @@ export default function NoteEditor({
     onText: (text) => {
       if (!text) return;
       const d = draftRef.current;
-      if (d.type === 'checklist') {
+      if (noteForm(d) === 'checklist') {
         const items = (d.items || []).filter(i => i.text.trim() || i.done);
         change({ items: [...items, { ...blankItem(), text }] });
       } else {
-        const content = d.content || '';
-        const sep = content && !/\s$/.test(content) ? ' ' : '';
-        change({ content: content + sep + text });
+        // Continuous text: on at the end of its last text, or as new text under whatever ends it
+        const blocks = flowBlocks(d, textBlockId.current);
+        const last = blocks[blocks.length - 1];
+        const sep = last.text && !/\s$/.test(last.text) ? ' ' : '';
+        changeBlocks(isPlainText(last)
+          ? [...blocks.slice(0, -1), { ...last, text: last.text + sep + text }]
+          : [...blocks, { ...blankItem('text'), text }]);
       }
     },
   });
@@ -176,23 +181,35 @@ export default function NoteEditor({
     const key = e.key.toLowerCase();
     if (key === 'enter') { e.preventDefault(); close(); return; }
     if (!canEdit) return;
-    if (e.shiftKey && (e.code === 'Digit8' || key === '8' || key === '*')) { e.preventDefault(); toggleType(); return; }
+    if (e.shiftKey && (e.code === 'Digit8' || key === '8' || key === '*')) { e.preventDefault(); setForm(isList ? 'text' : 'checklist'); return; }
     if (key === 'z') { e.preventDefault(); travel(e.shiftKey ? 1 : -1); return; }
     if (key === 'y') { e.preventDefault(); travel(1); }
   };
 
-  const isChecklist = draft.type === 'checklist';
+  const isList = noteForm(draft) === 'checklist';
   const color = resolveColor(draft.color);
 
-  const toggleType = () => {
-    if (isChecklist) {
-      change({ type: 'text', content: itemsToText(draft.items) || draft.content || '' });
-    } else {
-      change({ type: 'checklist', items: textToItems(draft.content) });
-    }
+  const setForm = (to) => {
+    const changes = formChanges(draftRef.current, to);
+    if (changes) change(changes);
   };
 
-  const doneCount = isChecklist ? (draft.items || []).filter(isTicked).length : 0;
+  // Continuous text is edited as blocks; it is saved as plain text while it is one, as lines once it has more
+  function changeBlocks(blocks) {
+    const changes = flowChanges(draftRef.current, blocks);
+    if ('content' in changes && blocks[0]) textBlockId.current = blocks[0].id;
+    change(changes);
+  }
+  // Into the text: its start, or with `end` its end (a click under it)
+  const focusBody = (end) => {
+    const boxes = bodyRef.current?.querySelectorAll('textarea') || [];
+    const box = end ? boxes[boxes.length - 1] : boxes[0];
+    if (!box) return;
+    box.focus();
+    if (end) box.setSelectionRange(box.value.length, box.value.length);
+  };
+
+  const doneCount = draft.type === 'checklist' ? (draft.items || []).filter(isTicked).length : 0;
   const uncheckAll = () => change({ items: (draft.items || []).map(i => ({ ...i, done: false })) });
   const deleteChecked = () => change({ items: (draft.items || []).filter(i => !isTicked(i)) });
   const links = extractLinks(draft);
@@ -214,22 +231,6 @@ export default function NoteEditor({
   // Pictures placed among the lines are shown there, not again with the note's photos
   const placed = new Set((draft.items || []).filter(i => lineKind(i) === 'image').map(i => i.fileId));
 
-  // A page or document pasted into an empty note becomes its lines: titles, tasks, boxes, amounts, pictures
-  const pasteIntoEmpty = async (e) => {
-    if (!canEdit || draft.content?.trim()) return;
-    const lines = readPaste({ html: e.clipboardData?.getData('text/html') || '', text: '' });
-    if (!lines || lines.every(l => lineKind(l) === 'text' && !('amount' in l))) return;
-    e.preventDefault();
-    const items = [];
-    for (const { src, ...line } of lines) {
-      if (line.kind === 'image') {
-        const fileId = online ? await pictureFromSrc(src).then(addImage).catch(() => null) : null;
-        if (fileId) items.push({ id: newItemId(), kind: 'image', text: line.text || '', done: false, fileId });
-      } else items.push({ done: false, ...line, id: newItemId() });
-    }
-    if (items.length) change({ type: 'checklist', items });
-  };
-
   const transition = reduce ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 36 };
 
   return (
@@ -250,7 +251,7 @@ export default function NoteEditor({
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
-            if (canEdit && (!isTouch() || fresh)) bodyRef.current?.focus();
+            if (canEdit && (!isTouch() || fresh) && !isList) focusBody();
           }}
           onPointerDown={(e) => { if (e.target === e.currentTarget) close(); }}
           onKeyDown={onKeyDown}
@@ -342,7 +343,7 @@ export default function NoteEditor({
                 readOnly={!canEdit}
                 onChange={(e) => change({ title: e.target.value.replace(/\n/g, ' ') })}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.focus(); }
+                  if (e.key === 'Enter') { e.preventDefault(); focusBody(); }
                 }}
                 placeholder={t('noteTitle')}
                 aria-label={t('noteTitle')}
@@ -350,8 +351,8 @@ export default function NoteEditor({
                 className="text-xl font-semibold leading-snug tracking-tight"
               />
 
-              <div className="mt-2">
-                {isChecklist ? (
+              <div className="mt-2" ref={bodyRef}>
+                {isList ? (
                   <ChecklistEditor
                     items={draft.items?.length ? draft.items : (canEdit ? [blankItem()] : [])}
                     onChange={(items) => change({ items })}
@@ -366,17 +367,27 @@ export default function NoteEditor({
                     onAddImage={canEdit ? addImage : undefined}
                   />
                 ) : (
-                  <AutoTextarea
-                    ref={bodyRef}
-                    value={draft.content}
-                    readOnly={!canEdit}
-                    onChange={(e) => change({ content: e.target.value })}
-                    onPaste={pasteIntoEmpty}
-                    placeholder={t('ntTakeNote')}
-                    aria-label={t('noteContent')}
-                    maxLength={100000}
-                    className="min-h-[9rem] text-base leading-relaxed sm:min-h-[12rem] sm:text-[15px]"
-                  />
+                  // A click in the room under the text goes on at its end
+                  <div
+                    onClick={(e) => { if (canEdit && e.target === e.currentTarget) focusBody(true); }}
+                    className="min-h-[9rem] sm:min-h-[12rem]"
+                  >
+                    <ChecklistEditor
+                      flow
+                      items={flowBlocks(draft, textBlockId.current)}
+                      onChange={changeBlocks}
+                      readOnly={!canEdit}
+                      autoFocus={fresh}
+                      placeholder={t('ntTakeNote')}
+                      suggestions={itemSuggestions}
+                      t={t}
+                      noteId={noteId}
+                      online={online}
+                      currency={currency}
+                      language={language}
+                      onAddImage={canEdit ? addImage : undefined}
+                    />
+                  </div>
                 )}
                 {dictation.listening && (
                   <p className="mt-2 flex items-center gap-2 text-sm italic text-muted-foreground" aria-live="polite">
@@ -453,7 +464,7 @@ export default function NoteEditor({
                     </PopoverContent>
                   </Popover>
 
-                  <NoteTypeMenu value={draft.type} onChange={toggleType} t={t} className={ib} />
+                  <NoteTypeMenu value={noteForm(draft)} onChange={setForm} t={t} className={ib} />
                 </>
               )}
 
@@ -508,7 +519,7 @@ export default function NoteEditor({
                   <Button variant="ghost" size="icon" className={ib} aria-label={t('ntMore')}><MoreVertical /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[13rem]">
-                  {canEdit && isChecklist && doneCount > 0 && (
+                  {canEdit && doneCount > 0 && (
                     <>
                       <DropdownMenuItem onSelect={uncheckAll}>
                         <SquareCheck className="me-2 h-4 w-4" /> {t('ntUncheckAll')}

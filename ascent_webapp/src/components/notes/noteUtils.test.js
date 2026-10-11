@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  noteToText, searchableText, textToItems, itemsToText, parseLines, isEmptyNote, distribute, formatBytes, nextOccurrence,
+  noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, noteForm, distribute, formatBytes, nextOccurrence,
   extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob,
 } from './noteUtils';
 
@@ -13,30 +13,26 @@ describe('text and lists', () => {
     expect(noteToText({ title: 'T', content: 'c' }, { withTitle: false })).toBe('c');
   });
 
-  test('lines become list items without their bullets or boxes, and back', () => {
+  test('lines become list items without their bullets or boxes', () => {
     const items = textToItems('- milk\n* eggs\n[x] bread\n\n  • jam  ');
     expect(items.map((i) => i.text)).toEqual(['milk', 'eggs', 'bread', 'jam']);
     expect(textToItems('')).toHaveLength(1); // an empty list still has one line to type in
   });
 
-  test('as continuous text, items keep their boxes, ticked or not, and come back as they were', () => {
-    const items = [
-      { id: 'a', text: 'Shopping', kind: 'title', done: false },
-      { id: 'b', text: 'milk', done: false },
-      { id: 'c', text: 'bread', done: true },
-      { id: 'd', text: '', done: false },
-      { id: 'e', text: 'from the market\nbefore noon', kind: 'text', done: false },
-      { id: 'f', text: 'jam', done: false },
-    ];
-    const text = itemsToText(items);
-    expect(text).toBe('Shopping\n☐ milk\n☑ bread\n\nfrom the market\nbefore noon\n☐ jam');
-    expect(textToItems(text).map(({ text: tx, done, kind }) => [tx, done, kind || 'item'])).toEqual([
-      ['Shopping', false, 'text'],
-      ['milk', false, 'item'],
-      ['bread', true, 'item'],
-      ['from the market\nbefore noon', false, 'text'],
-      ['jam', false, 'item'],
-    ]);
+  test('continuous text stays plain text until it has more than one block of text', () => {
+    const plain = { type: 'text', content: 'Dear diary' };
+    expect(noteForm(plain)).toBe('text');
+    expect(noteForm({ type: 'checklist', flow: true })).toBe('text');
+    expect(noteForm({ type: 'checklist' })).toBe('checklist');
+    const [block] = flowBlocks(plain, 'b1');
+    expect(block).toEqual({ id: 'b1', kind: 'text', text: 'Dear diary', done: false });
+    expect(flowChanges(plain, [{ ...block, text: 'Dear diary, today' }])).toEqual({ content: 'Dear diary, today' });
+    const title = { id: 't', kind: 'title', text: 'Monday', done: false };
+    const doc = flowChanges(plain, [title, block]);
+    expect(doc).toEqual({ type: 'checklist', flow: true, content: '', items: [title, block] });
+    expect(flowChanges({ ...plain, ...doc }, [block])).toEqual({ type: 'text', flow: false, content: 'Dear diary', items: [] });
+    // An empty document is typed into as one empty block of text
+    expect(flowBlocks({ type: 'checklist', flow: true, items: [] }, 'b2')[0]).toMatchObject({ id: 'b2', kind: 'text', text: '' });
   });
 
   const shape = (lines) => lines.map(({ text, kind, done }) => [kind || (done ? 'done' : 'item'), text]);

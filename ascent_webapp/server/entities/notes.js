@@ -143,6 +143,7 @@ function contentPatch(body) {
   if (typeof body.title === 'string') set.title = body.title.slice(0, 500);
   if (typeof body.content === 'string') set.content = body.content.slice(0, MAX_TEXT);
   if (body.type === 'text' || body.type === 'checklist') set.type = body.type;
+  if (typeof body.flow === 'boolean') set.flow = body.flow;
   if (body.items !== undefined) {
     const items = cleanItems(body.items);
     if (items) set.items = items;
@@ -366,7 +367,7 @@ export default async function handler(req, res) {
         const set = {};
         const isOwner = access === 'owner';
         const canEditContent = access === 'owner' || access === 'edit';
-        const wantsContent = ['title', 'content', 'type', 'items', 'tags', 'color']
+        const wantsContent = ['title', 'content', 'type', 'flow', 'items', 'tags', 'color']
           .some(k => body[k] !== undefined);
 
         // Every check comes before the first write, so a refused request changes nothing

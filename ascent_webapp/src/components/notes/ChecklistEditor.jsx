@@ -13,8 +13,8 @@ import { cn } from '@/lib/utils';
 import { AutoTextarea } from './NoteParts';
 import { LinePicture } from './NoteExtras';
 import {
-  blankItem, canHaveAmount, fmt, formatAmount, hasAmount, highlight, isTickable, isTicked, lineKind, newItemId, parseAmount,
-  textDir, useLatest,
+  blankItem, canHaveAmount, fmt, formatAmount, hasAmount, highlight, isPlainText, isTickable, isTicked, lineKind, newItemId,
+  parseAmount, textDir, useLatest,
 } from './noteUtils';
 import { amountTotals, lineNumbers, readPaste } from './noteDocument';
 import { pictureFromSrc } from './importDocument';
@@ -34,6 +34,8 @@ const KINDS = [
 const MULTILINE = new Set(['text', 'number', 'callout']);
 // Kinds a run of lines is made of, which Enter keeps going
 const FLOWING = new Set(['item', 'text', 'number']);
+// In continuous text, these typed at the start of a line make it a title, a checkbox, a numbered line or a box
+const SHORTCUTS = { '# ': 'title', '[] ': 'item', '[ ] ': 'item', '1. ': 'number', '> ': 'callout' };
 const withKind = (item, kind) => {
   const { kind: _old, ...rest } = item;
   const next = kind === 'item' ? rest : { ...rest, kind, done: false };
@@ -192,6 +194,7 @@ function TotalRow({ totals, language, t, editable }) {
 function Row({
   item, number, total, reorderable, readOnly, t, onChange, onRemove, onEnter, onBackspaceEmpty, onPasteLines, registerRef,
   onKind, suggestions, onPick, onFocusChange, noteId, online, currency, language,
+  flow, alone, hint, onBackspaceStart, onMove, onShortcut,
 }) {
   const controls = useDragControls();
   const [highlighted, setHighlighted] = useState(-1);
@@ -212,17 +215,22 @@ function Row({
     requestAnimationFrame(() => amountRef.current?.focus());
   };
 
-  const grip = !readOnly && reorderable && (
+  const grip = !readOnly && reorderable && !alone && (
     <button
       type="button"
       aria-label={t('ntDragItem')}
       onPointerDown={(e) => controls.start(e)}
-      className="mt-1 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60"
+      className={cn(
+        'mt-1 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60',
+        // Continuous text lines up with the title: the handle sits in the margin, where there is a pointer to use it
+        flow && 'absolute -start-6 top-0 [@media(hover:none)]:hidden'
+      )}
     >
       <GripVertical className="h-4 w-4" />
     </button>
   );
-  const removeButton = !readOnly && (
+  // Text in continuous text is deleted as text, not with a button that would take the whole block
+  const removeButton = !readOnly && !(flow && isPlainText(item)) && (
     <button
       type="button"
       aria-label={kind === 'image' ? t('ntRemovePicture') : t('ntDeleteItem')}
@@ -303,6 +311,12 @@ function Row({
               onChange(withKind({ ...item, text: text.slice(2) }, 'title'));
               return;
             }
+            if (flow && kind === 'text' && onShortcut && text.length === item.text.length + 1) {
+              const caret = e.target.selectionStart;
+              const lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+              const to = SHORTCUTS[text.slice(lineStart, caret)];
+              if (to) { onShortcut(text, lineStart, caret, to); return; }
+            }
             onChange({ ...item, text });
           }}
           onFocus={() => onFocusChange?.(true)}
@@ -329,18 +343,31 @@ function Row({
               return;
             }
             if (list.length && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setDismissed(item.text); return; }
+            const el = e.currentTarget;
+            const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
+            const atEnd = el.selectionStart === item.text.length;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              if (highlighted >= 0 && list[highlighted]) { e.preventDefault(); onPick(list[highlighted]); return; }
+              // Continuous text goes on in the same text; a box too, until Enter on an empty last line leaves it
+              if (flow && kind === 'text') return;
+              const leaveBox = flow && kind === 'callout' && atEnd && item.text.endsWith('\n');
+              if (flow && kind === 'callout' && !leaveBox) return;
               e.preventDefault();
-              if (highlighted >= 0 && list[highlighted]) onPick(list[highlighted]);
+              if (leaveBox) onEnter({ ...item, text: item.text.slice(0, -1) });
+              // An empty checkbox or numbered line ends the list, as in a document
+              else if (flow && !item.text && (kind === 'item' || kind === 'number')) onKind('text');
               else onEnter();
+              return;
             }
-            if (e.key === 'Backspace' && item.text === '') {
-              e.preventDefault();
-              onBackspaceEmpty();
-            }
+            if (e.key === 'Backspace' && item.text === '') { e.preventDefault(); onBackspaceEmpty(); return; }
+            if (!flow) return;
+            if (e.key === 'Backspace' && atStart && onBackspaceStart) { e.preventDefault(); onBackspaceStart(); return; }
+            // The arrows go on into the line above or below at the edges, as in one text
+            if (onMove && e.key === 'ArrowUp' && atStart) { e.preventDefault(); onMove(-1); }
+            if (onMove && e.key === 'ArrowDown' && atEnd && el.selectionEnd === item.text.length) { e.preventDefault(); onMove(1); }
           }}
-          placeholder={t(PLACEHOLDER[kind])}
-          aria-label={t(PLACEHOLDER[kind])}
+          placeholder={hint || t(PLACEHOLDER[kind])}
+          aria-label={hint || t(PLACEHOLDER[kind])}
           className={cn(
             'py-1',
             kind === 'title' ? 'text-lg font-semibold leading-7 tracking-tight sm:text-base' : 'text-base leading-6 sm:text-sm',
@@ -372,16 +399,23 @@ function Row({
  * amounts with their totals) and a collapsible list of completed ones. `onAddImage(blob)` uploads a picture
  * to the note and resolves to its file id (null when it cannot). Where there is no note yet (the composer),
  * a paste with pictures goes to `onPasteDocument(lines)` whole, to become a note that can hold them.
+ *
+ * With `flow` it is continuous text instead: Enter goes on in the same text, titles, pictures, checkboxes and
+ * boxes are put in where the cursor is (cutting the text there), ticked items stay where they are, and text
+ * blocks that come together are one text again. `placeholder` is shown while it is one empty text.
  */
 export default function ChecklistEditor({
   items, onChange, readOnly, autoFocus, t, suggestions, noteId, online = true, currency, language, onAddImage, onPasteDocument,
+  flow = false, placeholder,
 }) {
   const refs = useRef({});
   const pictureInput = useRef(null);
   const [showDone, setShowDone] = useState(false);
   const itemsRef = useLatest(items);
-  const open = items.filter(i => !isTicked(i));
-  const done = items.filter(isTicked);
+  // Ticked items fold away under the list; in continuous text they stay in their place
+  const folds = (i) => !flow && isTicked(i);
+  const open = items.filter(i => !folds(i));
+  const done = items.filter(folds);
   const numbers = useMemo(() => lineNumbers(open), [open]);
   const totals = useMemo(() => amountTotals(open, currency), [open, currency]);
   const canPicture = !!onAddImage && online && !readOnly;
@@ -432,12 +466,11 @@ export default function ChecklistEditor({
   const replace = (item) => patch(itemsRef.current.map(i => (i.id === item.id ? item : i)));
 
   // New lines go right under `afterId`, or at the end of the open lines
-  const insertLines = (afterId, fresh) => {
-    const list = itemsRef.current;
+  const insertLines = (afterId, fresh, list = itemsRef.current) => {
     const idx = afterId ? list.findIndex(i => i.id === afterId) : -1;
     if (idx < 0) {
-      const openNow = list.filter(i => !isTicked(i));
-      patch([...openNow, ...fresh, ...list.filter(isTicked)]);
+      const openNow = list.filter(i => !folds(i));
+      patch([...openNow, ...fresh, ...list.filter(folds)]);
     } else {
       const next = [...list];
       next.splice(idx + 1, 0, ...fresh);
@@ -448,37 +481,129 @@ export default function ChecklistEditor({
 
   // The cursor goes to the last of the new lines still on screen (a ticked one is folded away)
   const focusLastOpen = (fresh) => {
-    const target = [...fresh].reverse().find(i => !isTicked(i));
+    const target = [...fresh].reverse().find(i => !folds(i));
     if (target) focusSoon(target.id);
   };
 
-  const insertAfter = (id, kind) => insertLines(id, [blankItem(kind)]);
-
   // Enter carries on the kind of line it was pressed on: text after text, items after items. A title, box or
   // picture leads into the lines around it (the next one first), so a heading over a list goes on with the list.
+  // In continuous text only the line right under it counts, and otherwise text follows.
   const nextKind = (id) => {
     const idx = open.findIndex(i => i.id === id);
     const kind = lineKind(open[idx]);
     if (FLOWING.has(kind)) return kind;
-    const around = [...open.slice(idx + 1), ...open.slice(0, idx).reverse()].map(lineKind).find(k => FLOWING.has(k));
-    return around || 'item';
+    const near = flow ? open.slice(idx + 1, idx + 2) : [...open.slice(idx + 1), ...open.slice(0, idx).reverse()];
+    return near.map(lineKind).find(k => FLOWING.has(k)) || (flow ? 'text' : 'item');
   };
 
-  const addLine = (kind, extra = {}) => insertLines(focusedItem?.id, [{ ...blankItem(kind), ...extra }]);
+  // Enter on a line (`changed` is that line as it should be saved with it). In continuous text, an empty text
+  // right under a title, box or picture is gone on into rather than another one made.
+  const enter = (id, changed) => {
+    const list = changed ? itemsRef.current.map(i => (i.id === id ? changed : i)) : itemsRef.current;
+    const idx = list.findIndex(i => i.id === id);
+    const after = list[idx + 1];
+    if (flow && after && isPlainText(after) && !after.text && !FLOWING.has(lineKind(list[idx]))) {
+      if (changed) patch(list);
+      focusSoon(after.id, 0);
+      return;
+    }
+    insertLines(id, [blankItem(nextKind(id))], list);
+  };
 
+  // Saves `list` and puts the cursor in line `id` at `caret`. In continuous text, text blocks that end up next
+  // to each other are one text again, a line apart, and the cursor goes where its text now is.
+  const commit = (list, id, caret) => {
+    let next = list;
+    let at = { id, caret };
+    if (flow) {
+      next = [];
+      for (const line of list) {
+        const prev = next[next.length - 1];
+        if (prev && isPlainText(prev) && isPlainText(line) && prev.text && line.text) {
+          if (line.id === at.id) at = { id: prev.id, caret: prev.text.length + 1 + (at.caret ?? 0) };
+          next[next.length - 1] = { ...prev, text: `${prev.text}\n${line.text}` };
+        } else next.push(line);
+      }
+    }
+    patch(next);
+    if (at.id) focusSoon(at.id, at.caret);
+  };
+
+  // A text block cut in two around new lines: what was before it stays, what was after goes under them
+  const splitText = (id, head, fresh, tail) => {
+    const list = itemsRef.current;
+    const idx = list.findIndex(i => i.id === id);
+    if (idx < 0) return;
+    const next = [...list];
+    next.splice(idx, 1, ...(head ? [{ ...list[idx], text: head }] : []), ...fresh, ...(tail ? [{ ...blankItem('text'), text: tail }] : []));
+    patch(next);
+  };
+
+  // Where the add buttons put new lines: under the line being typed in. In continuous text, at the cursor in it.
+  const cursor = () => (focusedItem ? { id: focusedItem.id, caret: refs.current[focusedItem.id]?.selectionStart } : null);
+  const place = (fresh, at = cursor()) => {
+    const cur = at && itemsRef.current.find(i => i.id === at.id);
+    if (flow && cur && isPlainText(cur) && typeof at.caret === 'number') {
+      if (!cur.text) {
+        // An empty text stays under them, to go on writing in
+        const next = [...itemsRef.current];
+        next.splice(next.indexOf(cur), 0, ...fresh);
+        patch(next);
+        focusLastOpen(fresh);
+        return;
+      }
+      const tail = cur.text.slice(at.caret).replace(/^\n/, '');
+      if (tail) {
+        splitText(cur.id, cur.text.slice(0, at.caret).replace(/\n$/, ''), fresh, tail);
+        focusLastOpen(fresh);
+        return;
+      }
+    }
+    insertLines(at?.id, fresh);
+  };
+
+  const addLine = (kind, extra = {}) => place([{ ...blankItem(kind), ...extra }]);
+
+  // Where the picture goes is taken when it is asked for: choosing the file takes the cursor away
+  const pictureAt = useRef(null);
+  const pickPicture = () => { pictureAt.current = cursor(); pictureInput.current?.click(); };
   const addPicture = async (file) => {
     if (!file || !onAddImage) return;
-    const anchor = focusedItem?.id;
+    const at = pictureAt.current;
     const loading = toast.loading(t('ntAddingPictures'));
     const fileId = await onAddImage(file);
     toast.dismiss(loading);
     if (!fileId) { toast.error(t('ntPictureFailed')); return; }
-    insertLines(anchor, [{ ...blankItem('image'), fileId }]);
+    place([{ ...blankItem('image'), fileId }], at);
   };
 
-  const setKind = (id, kind) => {
-    patch(itemsRef.current.map(i => (i.id === id ? withKind(i, kind) : i)));
-    focusSoon(id);
+  // "# " and the like at the start of a line of continuous text: that line becomes a title (or a checkbox…)
+  const shortcut = (id, text, lineStart, caret, kind) => {
+    const rest = text.slice(caret);
+    const cut = rest.indexOf('\n');
+    const line = { ...blankItem(kind), text: cut < 0 ? rest : rest.slice(0, cut) };
+    splitText(id, text.slice(0, lineStart).replace(/\n$/, ''), [line], cut < 0 ? '' : rest.slice(cut + 1));
+    focusSoon(line.id, 0);
+  };
+
+  const setKind = (id, kind, caret) => commit(itemsRef.current.map(i => (i.id === id ? withKind(i, kind) : i)), id, caret);
+
+  // Backspace at the start of a line of continuous text: text joins the text above, anything else becomes text
+  const backspaceStart = (id) => {
+    const idx = open.findIndex(i => i.id === id);
+    const cur = open[idx];
+    const prev = open[idx - 1];
+    if (isPlainText(cur) && prev && isPlainText(prev)) {
+      const list = itemsRef.current
+        .filter(i => i.id !== id)
+        .map(i => (i.id === prev.id ? { ...i, text: prev.text + cur.text } : i));
+      commit(list, prev.id, prev.text.length);
+    } else if (!['text', 'image'].includes(lineKind(cur))) setKind(id, 'text', 0);
+  };
+
+  const move = (id, step) => {
+    const to = open[open.findIndex(i => i.id === id) + step];
+    if (to) focusSoon(to.id, step < 0 ? to.text.length : 0);
   };
 
   const pick = (rowId, s) => {
@@ -503,7 +628,7 @@ export default function ChecklistEditor({
     focusSoon(target.id, target.text.length);
   };
 
-  const remove = (id) => patch(itemsRef.current.filter(i => i.id !== id));
+  const remove = (id) => commit(itemsRef.current.filter(i => i.id !== id));
 
   // A paste of several lines: pictures in it are uploaded first, then everything goes in where the paste was
   const pasteLines = async (id, lines) => {
@@ -548,22 +673,29 @@ export default function ChecklistEditor({
   };
 
   // An empty line of another kind than the one above turns into that kind first (an empty first line that is
-  // not an item, into an item); one like the line above is removed, and the cursor goes up to it
+  // not an item, into an item); one like the line above is removed, and the cursor goes up to it. In continuous
+  // text, an empty line that is not text becomes text first (as an empty checkbox leaves its list) and empty
+  // text is removed; the one text of a note stays, to write in.
   const backspaceEmpty = (id) => {
     const idx = open.findIndex(i => i.id === id);
     const kind = lineKind(open[idx]);
     const prev = open[idx - 1];
-    const back = prev ? lineKind(prev) : 'item';
-    if (kind !== back && back !== 'image') { setKind(id, back); return; }
-    remove(id);
-    if (prev) focusSoon(prev.id);
+    if (flow) {
+      if (kind !== 'text' && kind !== 'image') { setKind(id, 'text'); return; }
+      if (open.length === 1) return;
+    } else {
+      const back = prev ? lineKind(prev) : 'item';
+      if (kind !== back && back !== 'image') { setKind(id, back); return; }
+    }
+    const to = prev || open[idx + 1];
+    commit(itemsRef.current.filter(i => i.id !== id), to?.id, prev ? prev.text.length : 0);
   };
 
   const reorderOpen = (nextOpen) => patch([...nextOpen, ...done]);
 
   // Keep the line's text box focused while an add button is pressed, so the new line goes under it
   const keepFocus = { onPointerDown: (e) => e.preventDefault(), onMouseDown: (e) => e.preventDefault() };
-  const addButton = 'flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground';
+  const addButton = 'flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:pointer-events-none disabled:opacity-50';
   const shared = { t, noteId, online, currency, language };
 
   return (
@@ -580,8 +712,14 @@ export default function ChecklistEditor({
               readOnly={readOnly}
               onChange={replace}
               onRemove={() => remove(item.id)}
-              onEnter={() => insertAfter(item.id, nextKind(item.id))}
+              onEnter={(changed) => enter(item.id, changed)}
               onBackspaceEmpty={() => backspaceEmpty(item.id)}
+              flow={flow}
+              alone={open.length === 1}
+              hint={flow && open.length === 1 && isPlainText(item) ? placeholder : undefined}
+              onBackspaceStart={() => backspaceStart(item.id)}
+              onMove={(step) => move(item.id, step)}
+              onShortcut={(text, lineStart, caret, kind) => shortcut(item.id, text, lineStart, caret, kind)}
               onPasteLines={(lines) => pasteLines(item.id, lines)}
               onKind={(kind) => setKind(item.id, kind)}
               suggestions={focusedId === item.id ? offered : null}
@@ -594,15 +732,33 @@ export default function ChecklistEditor({
 
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-x-1">
-          <button type="button" {...keepFocus} onClick={() => addLine('item')} className={addButton}>
-            <Plus className="h-4 w-4" /> {t('ntAddItem')}
-          </button>
-          <button type="button" {...keepFocus} onClick={() => addLine('text')} className={addButton}>
-            <Pilcrow className="h-4 w-4" /> {t('ntAddText')}
-          </button>
-          <button type="button" {...keepFocus} onClick={() => addLine('title')} className={addButton}>
-            <Heading className="h-4 w-4" /> {t('ntAddTitle')}
-          </button>
+          {flow ? (
+            <>
+              <button type="button" {...keepFocus} onClick={() => addLine('title')} className={addButton}>
+                <Heading className="h-4 w-4" /> {t('ntAddTitle')}
+              </button>
+              {onAddImage && (
+                <button type="button" {...keepFocus} disabled={!canPicture} onClick={pickPicture} className={addButton}>
+                  <ImagePlus className="h-4 w-4" /> {online ? t('ntAddPicture') : t('ntNeedOnline')}
+                </button>
+              )}
+              <button type="button" {...keepFocus} onClick={() => addLine('item')} className={addButton}>
+                <SquareCheck className="h-4 w-4" /> {t('ntKindItem')}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" {...keepFocus} onClick={() => addLine('item')} className={addButton}>
+                <Plus className="h-4 w-4" /> {t('ntAddItem')}
+              </button>
+              <button type="button" {...keepFocus} onClick={() => addLine('text')} className={addButton}>
+                <Pilcrow className="h-4 w-4" /> {t('ntAddText')}
+              </button>
+              <button type="button" {...keepFocus} onClick={() => addLine('title')} className={addButton}>
+                <Heading className="h-4 w-4" /> {t('ntAddTitle')}
+              </button>
+            </>
+          )}
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button type="button" {...keepFocus} className={addButton}>
@@ -619,8 +775,8 @@ export default function ChecklistEditor({
               <DropdownMenuItem onSelect={() => addLine('text', { amount: 0, ...(currency ? { currency } : {}) })}>
                 <Coins className="me-2 h-4 w-4" /> {t('ntAddAmountLine')}
               </DropdownMenuItem>
-              {onAddImage && (
-                <DropdownMenuItem disabled={!canPicture} onSelect={() => pictureInput.current?.click()}>
+              {onAddImage && !flow && (
+                <DropdownMenuItem disabled={!canPicture} onSelect={pickPicture}>
                   <ImagePlus className="me-2 h-4 w-4" /> {online ? t('ntAddPicture') : t('ntNeedOnline')}
                 </DropdownMenuItem>
               )}

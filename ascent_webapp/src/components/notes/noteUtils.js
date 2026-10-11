@@ -60,6 +60,36 @@ export const isTicked = (item) => isTickable(item) && !!item.done;
 // Items, text and numbered lines can carry an amount, shown on the side and added up under a run of them
 export const canHaveAmount = (item) => ['item', 'text', 'number'].includes(lineKind(item));
 export const hasAmount = (item) => canHaveAmount(item) && typeof item.amount === 'number' && Number.isFinite(item.amount);
+// Text with nothing on its side: in continuous text it runs on, and text blocks next to each other are one text
+export const isPlainText = (item) => lineKind(item) === 'text' && !hasAmount(item);
+
+// A note is continuous text (plain, or with titles, pictures and boxes in it: a checklist with `flow`) or a list
+export const noteForm = (note) => (note?.type === 'checklist' && !note.flow ? 'checklist' : 'text');
+
+/**
+ * What a continuous-text note saves for its blocks: plain text while it is one block of text, its lines
+ * once it has more. Only what changed from `note` is returned.
+ */
+export function flowChanges(note, blocks) {
+  const only = !blocks.length ? { text: '' } : blocks.length === 1 && isPlainText(blocks[0]) ? blocks[0] : null;
+  if (only) return note.type === 'text' ? { content: only.text } : { type: 'text', flow: false, content: only.text, items: [] };
+  return note.type === 'text' ? { type: 'checklist', flow: true, content: '', items: blocks } : { items: blocks };
+}
+
+/** What changes when a note is made continuous text or a list. A list made continuous text keeps its lines. */
+export function formChanges(note, to) {
+  if (to === noteForm(note)) return null;
+  if (to === 'checklist') {
+    return note.type === 'checklist' ? { flow: false } : { type: 'checklist', flow: false, items: textToItems(note.content) };
+  }
+  const kept = (note.items || []).filter(i => i.text.trim() || lineKind(i) === 'image' || hasAmount(i));
+  return { flow: true, ...flowChanges({ ...note, type: 'checklist' }, kept) };
+}
+
+/** The blocks a continuous-text note is edited as: its lines, or its text as one block (`textId`). */
+export const flowBlocks = (note, textId) => (note.type === 'checklist' && note.items?.length
+  ? note.items
+  : [{ id: textId, kind: 'text', text: note.type === 'checklist' ? '' : note.content || '', done: false }]);
 
 const LOCALES = { he: 'he-IL', ru: 'ru-RU', en: 'en-US' };
 
@@ -192,25 +222,10 @@ export function parseLines(text) {
   return out;
 }
 
-/** Turn "a\nb" lines into checklist items, and back. */
+/** Turn "a\nb" lines into checklist items. */
 export function textToItems(text) {
   const lines = parseLines(text);
   return lines.length ? lines.map(line => ({ id: newItemId(), ...line })) : [blankItem()];
-}
-
-// Items keep their boxes in the text (☐ open, ☑ ticked), which textToItems reads back. A blank line goes
-// between an item and text after it, or the text would be read back as the item running on.
-export function itemsToText(items) {
-  const out = [];
-  let prev = null;
-  for (const i of items || []) {
-    if (!i.text) continue;
-    const kind = lineKind(i);
-    if (prev === 'item' && kind !== 'item') out.push('');
-    out.push(kind === 'item' ? `${i.done ? '☑' : '☐'} ${i.text}` : i.text);
-    prev = kind;
-  }
-  return out.join('\n');
 }
 
 export const isEmptyNote = (n) =>
@@ -501,7 +516,7 @@ export const NOTE_FILTERS = ['lists', 'images', 'links', 'reminders', 'files'];
 
 export function matchesFilter(note, filter) {
   if (!filter) return true;
-  if (filter === 'lists') return note.type === 'checklist';
+  if (filter === 'lists') return noteForm(note) === 'checklist';
   if (filter === 'images') return (note.attachments || []).some(a => isPreviewable(a.type));
   if (filter === 'files') return (note.attachments || []).some(a => !isPreviewable(a.type));
   if (filter === 'links') return extractLinks(note).length > 0;

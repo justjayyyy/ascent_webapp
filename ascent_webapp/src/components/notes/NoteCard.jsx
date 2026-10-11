@@ -68,8 +68,10 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   const editorPerson = lastEditor(note, people);
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
 
-  const openItems = (note.items || []).filter(i => !isTicked(i) && (i.text || ['item', 'image'].includes(lineKind(i)) || hasAmount(i)));
-  const doneCount = (note.items || []).filter(isTicked).length;
+  // Continuous text shows its ticked items in their place; a list counts them under it
+  const flow = !!note.flow;
+  const openItems = (note.items || []).filter(i => (flow || !isTicked(i)) && (i.text || ['item', 'image'].includes(lineKind(i)) || hasAmount(i)));
+  const doneCount = flow ? 0 : (note.items || []).filter(isTicked).length;
   const previewItems = openItems.slice(0, PREVIEW_ITEMS);
   const hiddenItems = openItems.length - previewItems.length;
   const numbers = lineNumbers(openItems);
@@ -212,13 +214,13 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                 line = (
                   <li key={item.id} dir={textDir(item.text)} className="flex items-start gap-2 text-sm leading-snug">
                     <Checkbox
-                      checked={false}
+                      checked={!!item.done}
                       disabled={!canEdit || trashed}
-                      onCheckedChange={() => toggleItem(item.id, true)}
+                      onCheckedChange={(v) => toggleItem(item.id, !!v)}
                       aria-label={item.text}
                       className="pointer-events-auto relative z-[2] mt-[1px] h-4 w-4 rounded-[5px]"
                     />
-                    <span className="min-w-0 break-words text-foreground/90 line-clamp-2">{highlight(item.text, query)}</span>
+                    <span className={cn('min-w-0 break-words text-foreground/90 line-clamp-2', item.done && 'text-muted-foreground line-through')}>{highlight(item.text, query)}</span>
                     {hasAmount(item) && <CardAmount item={item} currency={currency} language={language} />}
                   </li>
                 );

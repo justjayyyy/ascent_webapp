@@ -52,6 +52,12 @@ const noteSchema = new mongoose.Schema({
     default: 'text'
   },
   items: [itemSchema],
+  // A checklist note written as continuous text: its text lines run on with Enter, with titles, pictures,
+  // boxes and checkboxes placed in it. Without it the note is a list, where Enter makes the next line.
+  flow: {
+    type: Boolean,
+    default: false
+  },
   // Metadata only; the bytes are stored in NoteFile
   attachments: [attachmentSchema],
   reminders: [reminderSchema],

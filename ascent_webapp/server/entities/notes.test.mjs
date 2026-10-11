@@ -149,6 +149,16 @@ test('editing follows the notes permission; viewers can read but not change', as
   assert.equal(rows.find((n) => n.title === 'Food') !== undefined, true);
 });
 
+test('a list can be made continuous text and back; viewers cannot change it', async () => {
+  as(EDITOR);
+  assert.equal((await call('PUT', { id: shared.id }, { flow: true })).body.data.flow, true);
+  as(VIEWER);
+  assert.equal((await call('PUT', { id: shared.id }, { flow: false })).code, 403);
+  as(OWNER);
+  assert.equal((await call('PUT', { id: shared.id }, { flow: 'yes' })).body.data.flow, true);
+  assert.equal((await call('PUT', { id: shared.id }, { flow: false })).body.data.flow, false);
+});
+
 test('only people with edit permission create notes', async () => {
   as(VIEWER);
   assert.equal((await call('POST', {}, { title: 'x' })).code, 403);
