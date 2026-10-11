@@ -635,7 +635,7 @@ Dashboard → Notes → Settings, or "no access" text). States every page must b
 ### 2.11 Notes (`/Notes`) — open to every member (server filters by note access)
 - **Nav**: Notes, Shared, Reminders, Archive, Trash, Labels, Edit labels.
 - **Toolbar**: Search notes (`/`), Filter notes (colour, label), Grid/List view, Refresh, Keyboard shortcuts (`?`), Empty trash.
-- **Composer**: Take a note…, New checklist, New note with image, Title, Color, Labels, Show/Hide checkboxes, Close (Escape commits).
+- **Composer**: Take a note…, New checklist, New note with image, Title, Color, Labels, Note type (continuous text / list of lines), Close (Escape commits).
 - **Card**: Pin/Unpin, select, More → Archive, Share, Copy as text, Make a copy, Move to trash, Leave note, Restore, Delete forever; "From {name}", "View only", "Edited by…".
 - **Editor**: title/body, checklist editor (Enter adds, Backspace on empty removes, drag to reorder, completed group, Uncheck all, Delete checked items), suggestions, Reminder (date/time, Repeat), Attach file (Uploading…, Remove), dictation (Listening…), Undo/Redo (Ctrl+Z / Ctrl+Y), Ctrl+Enter close, Shift+8 toggle checklist, save status (Saving… / Saved / Offline — saved on this device), view-only banner, trash banner.
 - **Share dialog**: Everyone in the workspace, per person Can edit / Can view / No access, Invite pending, owner-only changes, Copy as text, Share via….

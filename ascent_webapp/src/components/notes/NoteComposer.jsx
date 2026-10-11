@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from '@/lib/motion';
-import { Camera, Image as ImageIcon, Images, ListChecks, Palette, Plus, Tag, Type } from 'lucide-react';
+import { Camera, Image as ImageIcon, Images, ListChecks, Palette, Plus, Tag } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
-import { AutoTextarea, ColorPicker, LabelEditor } from './NoteParts';
+import { AutoTextarea, ColorPicker, LabelEditor, NoteTypeMenu } from './NoteParts';
 import { blankItem, hasAmount, isEmptyNote, itemsToText, lineKind, newItemId, resolveColor, textToItems } from './noteUtils';
 import { readPaste } from './noteDocument';
 
@@ -237,13 +237,7 @@ export default function NoteComposer({
                   <LabelEditor labels={draft.tags} suggestions={labels} onChange={(tags) => patch({ tags })} t={t} />
                 </PopoverContent>
               </Popover>
-              <Button
-                variant="ghost" size="icon" onClick={toggleType}
-                aria-label={draft.type === 'checklist' ? t('ntHideCheckboxes') : t('ntShowCheckboxes')}
-                title={draft.type === 'checklist' ? t('ntHideCheckboxes') : t('ntShowCheckboxes')}
-              >
-                {draft.type === 'checklist' ? <Type /> : <ListChecks />}
-              </Button>
+              <NoteTypeMenu value={draft.type} onChange={toggleType} t={t} />
               <Button variant="ghost" onClick={commit} className="ms-auto">{t('ntClose')}</Button>
             </div>
           </motion.div>

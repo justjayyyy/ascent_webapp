@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, useReducedMotion } from '@/lib/motion';
 import {
-  Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, ListChecks, LogOut, MoreVertical,
-  Camera, ImagePlus, Images, Palette, Paperclip, Pin, Share2, Tag, Trash2, Type, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,
+  Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, LogOut, MoreVertical,
+  Camera, ImagePlus, Images, Palette, Paperclip, Pin, Share2, Tag, Trash2, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
-import { AutoTextarea, ColorPicker, LabelEditor, LinkChips, PersonDot } from './NoteParts';
+import { AutoTextarea, ColorPicker, LabelEditor, LinkChips, NoteTypeMenu, PersonDot } from './NoteParts';
 import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
 import { DictateButton, useDictation } from './useDictation';
@@ -453,13 +453,7 @@ export default function NoteEditor({
                     </PopoverContent>
                   </Popover>
 
-                  <Button
-                    variant="ghost" size="icon" className={ib} onClick={toggleType}
-                    aria-label={isChecklist ? t('ntHideCheckboxes') : t('ntShowCheckboxes')}
-                    title={isChecklist ? t('ntHideCheckboxes') : t('ntShowCheckboxes')}
-                  >
-                    {isChecklist ? <Type /> : <ListChecks />}
-                  </Button>
+                  <NoteTypeMenu value={draft.type} onChange={toggleType} t={t} className={ib} />
                 </>
               )}
 

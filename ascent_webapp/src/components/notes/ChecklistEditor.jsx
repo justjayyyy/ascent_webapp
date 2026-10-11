@@ -32,6 +32,8 @@ const KINDS = [
 ];
 // Lines that may run over several lines (Shift+Enter); the rest stay on one
 const MULTILINE = new Set(['text', 'number', 'callout']);
+// Kinds a run of lines is made of, which Enter keeps going
+const FLOWING = new Set(['item', 'text', 'number']);
 const withKind = (item, kind) => {
   const { kind: _old, ...rest } = item;
   const next = kind === 'item' ? rest : { ...rest, kind, done: false };
@@ -334,9 +336,7 @@ function Row({
             }
             if (e.key === 'Backspace' && item.text === '') {
               e.preventDefault();
-              // An empty title or text line turns back into an item first
-              if (kind !== 'item') onKind('item');
-              else onBackspaceEmpty();
+              onBackspaceEmpty();
             }
           }}
           placeholder={t(PLACEHOLDER[kind])}
@@ -454,6 +454,16 @@ export default function ChecklistEditor({
 
   const insertAfter = (id, kind) => insertLines(id, [blankItem(kind)]);
 
+  // Enter carries on the kind of line it was pressed on: text after text, items after items. A title, box or
+  // picture leads into the lines around it (the next one first), so a heading over a list goes on with the list.
+  const nextKind = (id) => {
+    const idx = open.findIndex(i => i.id === id);
+    const kind = lineKind(open[idx]);
+    if (FLOWING.has(kind)) return kind;
+    const around = [...open.slice(idx + 1), ...open.slice(0, idx).reverse()].map(lineKind).find(k => FLOWING.has(k));
+    return around || 'item';
+  };
+
   const addLine = (kind, extra = {}) => insertLines(focusedItem?.id, [{ ...blankItem(kind), ...extra }]);
 
   const addPicture = async (file) => {
@@ -537,10 +547,15 @@ export default function ChecklistEditor({
     }
   };
 
+  // An empty line of another kind than the one above turns into that kind first (an empty first line that is
+  // not an item, into an item); one like the line above is removed, and the cursor goes up to it
   const backspaceEmpty = (id) => {
     const idx = open.findIndex(i => i.id === id);
-    remove(id);
+    const kind = lineKind(open[idx]);
     const prev = open[idx - 1];
+    const back = prev ? lineKind(prev) : 'item';
+    if (kind !== back && back !== 'image') { setKind(id, back); return; }
+    remove(id);
     if (prev) focusSoon(prev.id);
   };
 
@@ -565,7 +580,7 @@ export default function ChecklistEditor({
               readOnly={readOnly}
               onChange={replace}
               onRemove={() => remove(item.id)}
-              onEnter={() => insertAfter(item.id, lineKind(item) === 'number' ? 'number' : undefined)}
+              onEnter={() => insertAfter(item.id, nextKind(item.id))}
               onBackspaceEmpty={() => backspaceEmpty(item.id)}
               onPasteLines={(lines) => pasteLines(item.id, lines)}
               onKind={(kind) => setKind(item.id, kind)}

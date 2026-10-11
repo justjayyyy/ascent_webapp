@@ -1,7 +1,11 @@
 import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ExternalLink, Plus } from 'lucide-react';
+import { Check, ExternalLink, ListChecks, Plus, Type } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { NOTE_COLORS, highlight, linkHost, resolveColor, textDir } from './noteUtils';
 
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
@@ -216,6 +220,40 @@ export function LabelEditor({ labels, suggestions, onChange, t, disabled }) {
 }
 
 /** Web links found in a note, as tappable chips (Keep shows them under the note). */
+const NOTE_TYPES = [
+  { type: 'text', icon: Type, label: 'ntTypeText', hint: 'ntTypeTextHint' },
+  { type: 'checklist', icon: ListChecks, label: 'ntTypeList', hint: 'ntTypeListHint' },
+];
+
+/** Picks what a note is: one continuous text, or a list of lines (checkboxes, text, titles…). */
+export function NoteTypeMenu({ value, onChange, t, className }) {
+  const current = NOTE_TYPES.find(n => n.type === value) || NOTE_TYPES[0];
+  const Icon = current.icon;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className={className} aria-label={`${t('ntNoteType')}: ${t(current.label)}`} title={t('ntNoteType')}>
+          <Icon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">{t('ntNoteType')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={current.type} onValueChange={(v) => { if (v !== current.type) onChange(v); }}>
+          {NOTE_TYPES.map(({ type, icon: ItemIcon, label, hint }) => (
+            <DropdownMenuRadioItem key={type} value={type} className="items-start py-2">
+              <ItemIcon className="me-2 mt-0.5 h-4 w-4 shrink-0" />
+              <span className="flex flex-col">
+                <span>{t(label)}</span>
+                <span className="text-xs text-muted-foreground">{t(hint)}</span>
+              </span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function LinkChips({ links, compact, className }) {
   if (!links?.length) return null;
   const shown = compact ? links.slice(0, 2) : links;
