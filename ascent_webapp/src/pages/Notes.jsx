@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from '@/lib/motion';
 import {
   Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, Plus, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
-  ListChecks, Image as ImageIcon, StickyNote as NoteIcon, FileUp,
+  ListChecks, Image as ImageIcon, StickyNote as NoteIcon, FileUp, ArrowDownUp, CalendarDays, Tag, AlignLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
@@ -33,16 +37,31 @@ import { noteToHtml } from '@/components/notes/noteDocument';
 import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { ascent } from '@/api/client';
 import {
-  NOTE_COLORS, NOTE_FILTERS, blankItem, distribute, fmt, lineKind, matchesFilter, newItemId, noteToText, resolveColor, searchableText, useColumnCount,
+  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, distribute, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
+  resolveColor, searchableText, sortNotes, useColumnCount,
 } from '@/components/notes/noteUtils';
 
 const VIEW_KEY = 'ascent_notes_view';
+const SORT_KEY = 'ascent_notes_sort';
+const GROUP_KEY = 'ascent_notes_group';
 const VIEWS = ['notes', 'shared', 'reminders', 'archive', 'trash'];
 const lower = (s) => s.toLowerCase();
 
 function readLayoutPref() {
   try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
 }
+
+function readPref(key, allowed) {
+  try {
+    const value = localStorage.getItem(key);
+    return allowed.includes(value) ? value : allowed[0];
+  } catch { return allowed[0]; }
+}
+
+function writePref(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* private mode */ }
+}
+
 
 const isWide = () => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 640px)').matches;
 const isTyping = () => {
@@ -73,6 +92,8 @@ function Notes() {
   const [colorFilter, setColorFilter] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [layout, setLayout] = useState(readLayoutPref);
+  const [sort, setSort] = useState(() => readPref(SORT_KEY, NOTE_SORTS));
+  const [group, setGroup] = useState(() => readPref(GROUP_KEY, NOTE_GROUPS));
   const [openId, setOpenId] = useState(null);
   const [freshId, setFreshId] = useState(null);
   const [shareId, setShareId] = useState(null);
@@ -146,8 +167,10 @@ function Notes() {
 
   const setLayoutPref = (value) => {
     setLayout(value);
-    try { localStorage.setItem(VIEW_KEY, value); } catch { /* private mode */ }
+    writePref(VIEW_KEY, value);
   };
+  const setSortPref = (value) => { setSort(value); writePref(SORT_KEY, value); };
+  const setGroupPref = (value) => { setGroup(value); writePref(GROUP_KEY, value); };
 
   const select = useCallback((key, name) => {
     const next = new URLSearchParams(params);
@@ -215,6 +238,8 @@ function Notes() {
 
   const filtering = !!filter || !!colorFilter;
   const searching = query.trim().length > 0 || filtering;
+  // The reminders list is in the order the reminders come, whatever the chosen sort
+  const byReminder = view === 'reminders' && !searching && !label;
 
   // While a note is open its card stays where it was, and moves up (or to the pinned ones) once it is closed.
   // A card that moves to another column is made again there, and the new one would take the open note's place
@@ -248,20 +273,22 @@ function Notes() {
     } else {
       list = visible.filter(n => !n.trashedAt && !n.isArchived);
     }
-    if (view === 'reminders' && !searching && !label) {
+    if (byReminder) {
       return [...list].sort((a, b) => new Date(a.reminder) - new Date(b.reminder));
     }
-    return [...list].sort((x, y) => {
-      const a = placeOf(x);
-      const b = placeOf(y);
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-      return new Date(b.updated_date) - new Date(a.updated_date);
-    });
-  }, [visible, view, label, query, searching, filter, colorFilter, placeOf]);
+    return sortNotes(list, sort, { language, placeOf });
+  }, [visible, view, label, query, searching, filter, colorFilter, placeOf, sort, language, byReminder]);
 
   const splitPins = !searching && view !== 'trash' && view !== 'archive' && view !== 'reminders';
   const pinned = splitPins ? shown.filter(n => placeOf(n).isPinned) : [];
   const others = splitPins ? shown.filter(n => !placeOf(n).isPinned) : shown;
+
+  // The notes below the pinned ones, in headed groups when the user groups them (reminders keep their own order)
+  const activeGroup = byReminder || (group === 'label' && label && !searching) ? 'none' : group;
+  const groups = useMemo(
+    () => groupNotes(others, activeGroup, { language, sort, placeOf, skipLabel: searching ? '' : label }),
+    [others, activeGroup, language, sort, placeOf, searching, label]
+  );
 
   // ---- selection ----
   const selecting = selected.size > 0;
@@ -505,6 +532,63 @@ function Notes() {
     );
   };
 
+  // A group's heading: "Today", "March 2025", a label, a colour, or the kind of note
+  const groupHeading = (g) => {
+    if (g.kind === 'date') {
+      const { bucket } = g;
+      if (bucket.year === undefined) return { icon: CalendarDays, text: t(`ntDate_${bucket.key}`) };
+      const text = new Date(bucket.year, bucket.month, 1).toLocaleDateString(language || 'en', {
+        month: 'long', year: bucket.year === new Date().getFullYear() ? undefined : 'numeric',
+      });
+      return { icon: CalendarDays, text };
+    }
+    if (g.kind === 'label') return { icon: Tag, text: g.label || t('ntNoLabel') };
+    if (g.kind === 'color') return { swatch: g.color, text: g.color === 'default' ? t('ntNoColor') : t(`ntColor_${g.color}`) };
+    if (g.kind === 'type') return { icon: g.type === 'checklist' ? ListChecks : AlignLeft, text: t(g.type === 'checklist' ? 'ntGroupLists' : 'ntGroupText') };
+    return null;
+  };
+
+  const sectionTitle = 'mb-2.5 flex items-center gap-1.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground';
+
+  const sortMenu = !byReminder && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost" size="icon"
+          aria-label={t('ntSortGroup')}
+          title={t('ntSortGroup')}
+          className={cn((sort !== 'updated' || group !== 'none') && 'text-primary')}
+        >
+          <ArrowDownUp />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">{t('ntSortBy')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={sort} onValueChange={setSortPref}>
+          {NOTE_SORTS.map(key => (
+            <DropdownMenuRadioItem key={key} value={key}>{t(`ntSort_${key}`)}</DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">{t('ntGroupBy')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={group} onValueChange={setGroupPref}>
+          {NOTE_GROUPS.map(key => (
+            <DropdownMenuRadioItem key={key} value={key}>{t(`ntGroup_${key}`)}</DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        {/* Phones: the grid and list buttons are left out of the header, so the choice is here */}
+        <div className="sm:hidden">
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">{t('ntLayout')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={layout} onValueChange={setLayoutPref}>
+            <DropdownMenuRadioItem value="grid">{t('ntGridView')}</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="list">{t('ntListView')}</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   const statusPill = !online ? (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-medium">
       <CloudOff className="h-3.5 w-3.5" />
@@ -569,7 +653,8 @@ function Notes() {
             >
               <RefreshCw className={cn(isFetching && 'animate-spin')} />
             </Button>
-            <div role="group" aria-label={t('ntLayout')} className="inline-flex rounded-xl border border-border/70 bg-card/60 p-0.5">
+            {sortMenu}
+            <div role="group" aria-label={t('ntLayout')} className={cn('rounded-xl border border-border/70 bg-card/60 p-0.5', byReminder ? 'inline-flex' : 'hidden sm:inline-flex')}>
               {[
                 { key: 'grid', icon: LayoutGrid, label: t('ntGridView') },
                 { key: 'list', icon: Rows3, label: t('ntListView') },
@@ -714,20 +799,37 @@ function Notes() {
                 <LayoutGroup>
                   {pinned.length > 0 && (
                     <section className="mb-6" aria-label={t('pinned')}>
-                      <h2 className="mb-2.5 flex items-center gap-1.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <h2 className={sectionTitle}>
                         <Pin className="h-3.5 w-3.5" /> {t('pinned')}
                       </h2>
                       {renderGrid(pinned)}
                     </section>
                   )}
-                  {others.length > 0 && (
+                  {others.length > 0 && groups[0]?.kind === 'none' && (
                     <section aria-label={pinned.length > 0 ? t('others') : heading}>
-                      {pinned.length > 0 && (
-                        <h2 className="mb-2.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('others')}</h2>
-                      )}
+                      {pinned.length > 0 && <h2 className={sectionTitle}>{t('others')}</h2>}
                       {renderGrid(others)}
                     </section>
                   )}
+                  {others.length > 0 && groups[0]?.kind !== 'none' && groups.map(g => {
+                    const head = groupHeading(g);
+                    return (
+                      <section key={g.key} className="mb-6 last:mb-0" aria-label={head.text}>
+                        <h2 className={sectionTitle}>
+                          {head.swatch ? (
+                            <span
+                              aria-hidden="true"
+                              data-note-color={head.swatch === 'default' ? undefined : head.swatch}
+                              className={cn('h-3 w-3 rounded-full border', head.swatch === 'default' ? 'border-border bg-card' : 'note-swatch border-transparent')}
+                            />
+                          ) : <head.icon className="h-3.5 w-3.5" />}
+                          <span className="truncate">{head.text}</span>
+                          <span className="tabular-nums opacity-70">{g.notes.length}</span>
+                        </h2>
+                        {renderGrid(g.notes)}
+                      </section>
+                    );
+                  })}
                 </LayoutGroup>
               )}
             </div>
