@@ -37,6 +37,14 @@ const reminderSchema = new mongoose.Schema({
   repeat: { type: String, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'], default: 'none' }
 }, { _id: false });
 
+// Where a note sits for one person: their folder for it and its place in their own order. Personal, like pins:
+// filing or dragging a shared note doesn't move it for anyone else
+const placeSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  folder: { type: String, default: '' },
+  position: { type: Number, default: undefined }
+}, { _id: false });
+
 const noteSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -63,6 +71,7 @@ const noteSchema = new mongoose.Schema({
   // Metadata only; the bytes are stored in NoteFile
   attachments: [attachmentSchema],
   reminders: [reminderSchema],
+  places: [placeSchema],
   // A palette key (see NOTE_COLORS on the client) or a legacy '#rrggbb' value
   color: {
     type: String,

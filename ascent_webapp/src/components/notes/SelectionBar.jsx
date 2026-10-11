@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from '@/lib/motion';
 import {
-  Archive, ArchiveRestore, CheckCheck, Copy, Palette, Pin, PinOff, Tag, Trash2, Undo2, X, XCircle,
+  Archive, ArchiveRestore, CheckCheck, Copy, FolderInput, Palette, Pin, PinOff, Tag, Trash2, Undo2, X, XCircle,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -105,6 +105,10 @@ export default function SelectionBar({ notes, labels, view, onClear, onSelectAll
                 </PopoverContent>
               </Popover>
             )}
+            <Button variant="ghost" size="icon" className={ib} aria-label={t('ntMoveToFolder')} title={t('ntMoveToFolder')}
+              onClick={() => actions.chooseFolder(notes.map(n => n.id), onClear)}>
+              <FolderInput />
+            </Button>
             <Button variant="ghost" size="icon" className={ib} aria-label={allArchived ? t('ntUnarchive') : t('ntArchive')} title={allArchived ? t('ntUnarchive') : t('ntArchive')}
               onClick={done(() => actions.archiveMany(notes.map(n => n.id), !allArchived))}>
               {allArchived ? <ArchiveRestore /> : <Archive />}

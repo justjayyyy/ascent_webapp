@@ -83,8 +83,9 @@ function present(note, user, member) {
   const access = accessFor(note, user, member);
   const pinned = (note.pinnedBy || []).some(id => sameId(id, uid)) ||
     (sameId(note.createdBy, uid) && !!note.isPinned);
-  const { pinnedBy, archivedBy, isPinned, reminders, ...rest } = note;
+  const { pinnedBy, archivedBy, isPinned, reminders, places, ...rest } = note;
   const mine = (reminders || []).find(r => sameId(r.userId, uid));
+  const place = (places || []).find(p => sameId(p.userId, uid));
   return {
     ...rest,
     id: note._id.toString(),
@@ -93,6 +94,8 @@ function present(note, user, member) {
     isArchived: (archivedBy || []).some(id => sameId(id, uid)),
     reminder: mine ? new Date(mine.at).toISOString() : null,
     reminderRepeat: mine?.repeat || 'none',
+    folder: place?.folder || '',
+    position: typeof place?.position === 'number' ? place.position : null,
     myAccess: access,
     collaborators: (note.collaborators || []).map(c => ({
       userId: c.userId.toString(), email: c.email, role: c.role
@@ -148,6 +151,21 @@ function cleanTags(tags) {
     if (out.length >= MAX_TAGS) break;
   }
   return out;
+}
+
+const cleanFolder = (f) => String(f ?? '').trim().slice(0, 40);
+
+/** The caller's folder and position from a request, merged over what they had; null when the request sets neither. */
+function placePatch(body, current) {
+  const wantsFolder = body.folder !== undefined;
+  const position = Number(body.position);
+  const wantsPosition = body.position === null || (body.position !== undefined && Number.isFinite(position));
+  if (!wantsFolder && !wantsPosition) return null;
+  const place = {
+    folder: wantsFolder ? cleanFolder(body.folder) : current?.folder || '',
+    position: wantsPosition ? (body.position === null ? undefined : position) : current?.position,
+  };
+  return Object.fromEntries(Object.entries(place).filter(([, v]) => v !== undefined && v !== ''));
 }
 
 const validColor = (c) => typeof c === 'string' && (/^[a-z]{2,12}$/.test(c) || /^#[0-9a-fA-F]{6}$/.test(c));
@@ -382,6 +400,7 @@ export default async function handler(req, res) {
 
         const data = contentPatch(body);
         const collaborators = buildCollaborators(body.collaborators, workspace, user) || [];
+        const place = placePatch(body);
         const note = await Note.create({
           ...(_id ? { _id } : {}),
           title: '',
@@ -390,6 +409,7 @@ export default async function handler(req, res) {
           isShared: body.isShared === undefined ? true : !!body.isShared,
           pinnedBy: body.isPinned ? [uid] : [],
           archivedBy: body.isArchived ? [uid] : [],
+          places: place && Object.keys(place).length ? [{ userId: uid, ...place }] : [],
           isPinned: !!body.isPinned,
           updatedByEmail: user.email,
           updatedBy: uid,
@@ -455,6 +475,17 @@ export default async function handler(req, res) {
           }
         }
 
+        // So are the caller's folder and place in their own order: their entry is replaced, like a reminder
+        const place = placePatch(body, (note.places || []).find(p => sameId(p.userId, uid)));
+        if (place) {
+          await Note.updateOne({ _id: id }, { $pull: { places: { userId: uid } } }, { timestamps: false });
+          if (Object.keys(place).length) update.$push = { ...(update.$push || {}), places: { userId: uid, ...place } };
+          else if (!Object.keys(set).length && !Object.keys(update).length) {
+            const cleared = await Note.findById(id).lean();
+            return success(res, present(cleared, user, member));
+          }
+        }
+
         // Sharing and trash belong to the creator
         if (wantsOwnerOnly) {
           if (body.isShared !== undefined) set.isShared = !!body.isShared;
@@ -511,7 +542,7 @@ export default async function handler(req, res) {
         if (access !== 'owner') {
           const isCollaborator = (note.collaborators || []).some(c => sameId(c.userId, uid));
           if (!isCollaborator) return error(res, 'Only the note owner can delete it', 403);
-          await Note.updateOne({ _id: id }, { $pull: { collaborators: { userId: uid }, pinnedBy: uid, archivedBy: uid } });
+          await Note.updateOne({ _id: id }, { $pull: { collaborators: { userId: uid }, places: { userId: uid }, pinnedBy: uid, archivedBy: uid } });
           return success(res, { left: true, id });
         }
 

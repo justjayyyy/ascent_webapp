@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Pencil, Tag, Trash2 } from 'lucide-react';
+import { Check, Folder, Pencil, Tag, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { fmt } from './noteUtils';
 
-function LabelRow({ label, count, onRename, onDelete, t }) {
+// The words for labels and for folders, which are edited the same way
+const KINDS = {
+  label: { icon: Tag, title: 'ntEditLabels', hint: 'ntEditLabelsHint', empty: 'ntNoLabels', rename: 'ntRenameLabel', remove: 'ntDeleteLabel' },
+  folder: { icon: Folder, title: 'ntEditFolders', hint: 'ntEditFoldersHint', empty: 'ntNoFolders', rename: 'ntRenameFolder', remove: 'ntDeleteFolder' },
+};
+
+function LabelRow({ label, count, onRename, onDelete, t, words }) {
+  const Icon = words.icon;
   const [text, setText] = useState(label);
   const [editing, setEditing] = useState(false);
   useEffect(() => { setText(label); }, [label]);
@@ -20,7 +27,7 @@ function LabelRow({ label, count, onRename, onDelete, t }) {
 
   return (
     <li className="flex items-center gap-1">
-      <span className="grid h-11 w-9 shrink-0 place-items-center text-muted-foreground"><Tag className="h-4 w-4" /></span>
+      <span className="grid h-11 w-9 shrink-0 place-items-center text-muted-foreground"><Icon className="h-4 w-4" /></span>
       {editing ? (
         <Input
           autoFocus
@@ -32,7 +39,7 @@ function LabelRow({ label, count, onRename, onDelete, t }) {
             if (e.key === 'Enter') { e.preventDefault(); commit(); }
             if (e.key === 'Escape') { e.stopPropagation(); setText(label); setEditing(false); }
           }}
-          aria-label={t('ntRenameLabel')}
+          aria-label={t(words.rename)}
           className="h-10 flex-1"
         />
       ) : (
@@ -49,7 +56,7 @@ function LabelRow({ label, count, onRename, onDelete, t }) {
         variant="ghost" size="icon"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => (editing ? commit() : setEditing(true))}
-        aria-label={editing ? t('ntDone') : t('ntRenameLabel')}
+        aria-label={editing ? t('ntDone') : t(words.rename)}
         className="h-11 w-11 shrink-0"
       >
         {editing ? <Check /> : <Pencil />}
@@ -57,7 +64,7 @@ function LabelRow({ label, count, onRename, onDelete, t }) {
       <Button
         variant="ghost" size="icon"
         onClick={() => onDelete(label)}
-        aria-label={`${t('ntDeleteLabel')}: ${label}`}
+        aria-label={`${t(words.remove)}: ${label}`}
         className={cn('h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive')}
       >
         <Trash2 />
@@ -66,21 +73,22 @@ function LabelRow({ label, count, onRename, onDelete, t }) {
   );
 }
 
-/** Rename or remove a label everywhere it is used, like Keep's "Edit labels". */
-export default function EditLabelsDialog({ open, onOpenChange, labels, onRename, onDelete, t }) {
+/** Rename or remove a label (or a folder) everywhere it is used, like Keep's "Edit labels". */
+export default function EditLabelsDialog({ open, onOpenChange, labels, onRename, onDelete, t, kind = 'label' }) {
+  const words = KINDS[kind];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-sm rounded-3xl p-4 sm:p-5">
         <DialogHeader>
-          <DialogTitle>{t('ntEditLabels')}</DialogTitle>
-          <DialogDescription>{t('ntEditLabelsHint')}</DialogDescription>
+          <DialogTitle>{t(words.title)}</DialogTitle>
+          <DialogDescription>{t(words.hint)}</DialogDescription>
         </DialogHeader>
         {labels.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">{t('ntNoLabels')}</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">{t(words.empty)}</p>
         ) : (
           <ul className="-mx-1 max-h-[55dvh] space-y-0.5 overflow-y-auto overscroll-contain">
             {labels.map(({ name, count }) => (
-              <LabelRow key={name} label={name} count={fmt(t('ntNotesCount'), { n: count })} onRename={onRename} onDelete={onDelete} t={t} />
+              <LabelRow key={name} label={name} count={fmt(t('ntNotesCount'), { n: count })} onRename={onRename} onDelete={onDelete} t={t} words={words} />
             ))}
           </ul>
         )}

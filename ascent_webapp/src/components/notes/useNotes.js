@@ -115,7 +115,7 @@ export function useNotes() {
     const now = new Date().toISOString();
     const note = {
       title: '', content: '', type: 'text', flow: false, items: [], color: 'default', tags: [],
-      isShared: false, collaborators: [], isPinned: false, isArchived: false,
+      isShared: false, collaborators: [], isPinned: false, isArchived: false, folder: '', position: null,
       ...data,
       id,
       trashedAt: null,
@@ -137,6 +137,7 @@ export function useNotes() {
         color: note.color, tags: note.tags, isShared: note.isShared,
         collaborators: note.collaborators.map(c => ({ userId: c.userId, role: c.role })),
         isPinned: note.isPinned, isArchived: note.isArchived,
+        ...(note.folder ? { folder: note.folder } : {}),
       },
     });
     return id;

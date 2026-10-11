@@ -541,13 +541,17 @@ export function matchesFilter(note, filter) {
 }
 
 // ---- organising the notes: how they are sorted, and the headed groups they are shown in ----
-export const NOTE_SORTS = ['updated', 'created', 'title'];
-export const NOTE_GROUPS = ['none', 'date', 'label', 'color', 'type'];
+// The first of each is the default
+export const NOTE_SORTS = ['updated', 'created', 'title', 'manual'];
+export const NOTE_GROUPS = ['folder', 'label', 'date', 'color', 'type', 'none'];
 
 const titleOf = (note) => (note.title?.trim() || noteToText(note, { withTitle: false }).trim()).split('\n')[0].trim();
 
+const hasPosition = (n) => typeof n.position === 'number' && Number.isFinite(n.position);
+
 /**
- * The notes in the chosen order: last edited or created first, or by title (notes with no words at all last).
+ * The notes in the chosen order: last edited or created first, by title (notes with no words at all last), or in
+ * the person's own order ('manual': by `position`; notes never placed, such as new ones, go first, newest on top).
  * `placeOf` gives the note's dates and pin as they are laid out (an open note keeps its place until it is closed).
  */
 export function sortNotes(notes, sort, { language, placeOf = (n) => n } = {}) {
@@ -558,6 +562,10 @@ export function sortNotes(notes, sort, { language, placeOf = (n) => n } = {}) {
     const a = placeOf(x);
     const b = placeOf(y);
     if (!!a.isPinned !== !!b.isPinned) return a.isPinned ? -1 : 1;
+    if (sort === 'manual') {
+      if (hasPosition(x) !== hasPosition(y)) return hasPosition(x) ? 1 : -1;
+      if (hasPosition(x) && x.position !== y.position) return x.position - y.position;
+    }
     if (sort === 'title') {
       const ta = titleOf(x), tb = titleOf(y);
       if (!ta !== !tb) return ta ? -1 : 1;
@@ -606,6 +614,9 @@ export function groupNotes(notes, group, { language, sort, now = new Date(), pla
       const p = placeOf(n);
       const bucket = dateBucket(sort === 'created' ? n.created_date : p.updated_date, now);
       add(`date-${bucket.key}`, () => ({ kind: 'date', bucket, rank: bucket.rank }), n);
+    } else if (group === 'folder') {
+      const folder = n.folder?.trim() || null;
+      add(folder ? `folder-${folder.toLowerCase()}` : 'folder-none', () => ({ kind: 'folder', folder }), n);
     } else if (group === 'label') {
       const tags = (n.tags || []).filter(tag => tag.toLowerCase() !== skip).sort(collator.compare);
       const tag = tags[0] || null;
@@ -621,8 +632,44 @@ export function groupNotes(notes, group, { language, sort, now = new Date(), pla
     }
   });
   const list = [...groups.values()];
-  if (group === 'label') {
-    return list.sort((a, b) => (!a.label !== !b.label ? (a.label ? -1 : 1) : collator.compare(a.label || '', b.label || '')));
+  if (group === 'label' || group === 'folder') {
+    const name = (g) => g.label ?? g.folder;
+    return list.sort((a, b) => (!name(a) !== !name(b) ? (name(a) ? -1 : 1) : collator.compare(name(a) || '', name(b) || '')));
   }
   return list.sort((a, b) => a.rank - b.rank);
+}
+
+const STEP = 1024;
+
+/**
+ * The positions to save when note `id` is dragged to `toIndex` in `list` (shown in the person's own order).
+ * Only the dragged note moves when its new neighbours are both placed; notes never placed above where it lands
+ * (the newest ones, at the top) are placed then too, so the order holds. Returns [[id, position], ...].
+ */
+export function reorderPositions(list, id, toIndex) {
+  const moving = list.find(n => n.id === id);
+  if (!moving) return [];
+  const rest = list.filter(n => n.id !== id);
+  const to = Math.max(0, Math.min(toIndex, rest.length));
+  const next = [...rest.slice(0, to), moving, ...rest.slice(to)];
+  // Everything from the top to the dragged note, and on to the last note still without a place, gets one
+  let last = to;
+  next.forEach((n, i) => { if (n !== moving && !hasPosition(n)) last = Math.max(last, i); });
+  const placedAfter = next.slice(last + 1).find(hasPosition);
+  const needsAll = next.slice(0, last + 1).some(n => n !== moving && !hasPosition(n));
+  if (!needsAll) {
+    const before = next[to - 1];
+    const after = next[to + 1];
+    let position;
+    if (before && after) position = (before.position + after.position) / 2;
+    else if (before) position = before.position + STEP;
+    else if (after) position = after.position - STEP;
+    else position = 0;
+    return [[id, position]];
+  }
+  const top = placedAfter ? placedAfter.position : (last + 1) * STEP;
+  return next.slice(0, last + 1)
+    .map((n, i) => [n, top - (last + 1 - i) * STEP])
+    .filter(([n, position]) => n === moving || n.position !== position)
+    .map(([n, position]) => [n.id, position]);
 }

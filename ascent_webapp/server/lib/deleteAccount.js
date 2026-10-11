@@ -55,8 +55,8 @@ export async function deleteAccount(user) {
     await Note.deleteMany({ _id: { $in: noteIds } });
   }
   await Note.updateMany(
-    { $or: [{ 'collaborators.userId': uid }, { 'reminders.userId': uid }, { pinnedBy: uid }, { archivedBy: uid }] },
-    { $pull: { collaborators: { userId: uid }, reminders: { userId: uid }, pinnedBy: uid, archivedBy: uid } }
+    { $or: [{ 'collaborators.userId': uid }, { 'reminders.userId': uid }, { 'places.userId': uid }, { pinnedBy: uid }, { archivedBy: uid }] },
+    { $pull: { collaborators: { userId: uid }, reminders: { userId: uid }, places: { userId: uid }, pinnedBy: uid, archivedBy: uid } }
   );
 
   await Promise.all([

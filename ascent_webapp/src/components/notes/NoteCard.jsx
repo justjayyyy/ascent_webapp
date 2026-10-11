@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useRef } from 'react';
 import { motion, useMotionValue, useTransform } from '@/lib/motion';
 import {
-  Archive, ArchiveRestore, BellRing, Check, CheckCircle2, Copy, LogOut, Paperclip, MoreVertical, Pin, PinOff, Repeat, Share2, Trash2, Undo2, Users,
+  Archive, ArchiveRestore, BellRing, Check, CheckCircle2, Copy, FolderInput, LogOut, Paperclip, MoreVertical, Pin, PinOff, Repeat, Share2, Trash2, Undo2, Users,
   XCircle,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -60,7 +60,9 @@ function Lined({ text, query }) {
   );
 }
 
-function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true, currency }) {
+function NoteCard({
+  note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true, currency, dragHandle,
+}) {
   const color = resolveColor(note.color);
   const isOwner = note.myAccess === 'owner';
   const canEdit = isOwner || note.myAccess === 'edit';
@@ -162,7 +164,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
       onPointerCancel={endPress}
       onContextMenu={(e) => { if (coarse) e.preventDefault(); }}
       className={cn(
-        'note-surface group relative overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
+        'note-surface group relative h-full overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
         'shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-16px_hsl(0_0%_0%/0.5)]',
         'transition-shadow hover:shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06),0_14px_36px_-14px_hsl(0_0%_0%/0.6)]',
         color === 'default' && 'border-border/60 bg-card/75 backdrop-blur-xl',
@@ -379,6 +381,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
             {note.isPinned ? <Pin className="h-4 w-4 fill-current" /> : <Pin className="h-4 w-4" />}
           </button>
         )}
+        {dragHandle}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -417,6 +420,9 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                 <DropdownMenuItem onSelect={() => actions.patch(note.id, { isArchived: !note.isArchived })}>
                   {note.isArchived ? <ArchiveRestore className="me-2 h-4 w-4" /> : <Archive className="me-2 h-4 w-4" />}
                   {note.isArchived ? t('ntUnarchive') : t('ntArchive')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => actions.chooseFolder([note.id])}>
+                  <FolderInput className="me-2 h-4 w-4" /> {t('ntMoveToFolder')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => actions.share(note.id)}>
                   <Share2 className="me-2 h-4 w-4" /> {t('ntShare')}

@@ -184,6 +184,28 @@ test('pinning and archiving are personal, even for view-only readers', async () 
   assert.equal(mine.isArchived, false);
 });
 
+test('folders and your own order are personal, even for view-only readers, and are not edits', async () => {
+  as(VIEWER);
+  const before = (await call('GET', { id: shared.id, _single: 'true' })).body.data.updated_date;
+  let r = await call('PUT', { id: shared.id }, { folder: '  Home stuff ', position: 3.5 });
+  assert.equal(r.code, 200);
+  assert.equal(r.body.data.folder, 'Home stuff');
+  assert.equal(r.body.data.position, 3.5);
+  assert.equal(String(r.body.data.updated_date), String(before));
+  // Changing one keeps the other; an empty folder takes the note out of it
+  r = await call('PUT', { id: shared.id }, { folder: '' });
+  assert.equal(r.body.data.folder, '');
+  assert.equal(r.body.data.position, 3.5);
+  r = await call('PUT', { id: shared.id }, { position: null });
+  assert.equal(r.body.data.position, null);
+  r = await call('PUT', { id: shared.id }, { folder: 'Trips' });
+  as(OWNER);
+  const mine = (await call('GET', { id: shared.id, _single: 'true' })).body.data;
+  assert.equal(mine.folder, '');
+  assert.equal(mine.position, null);
+  assert.equal(mine.places, undefined);
+});
+
 test('the note remembers who changed it last; personal changes are not edits', async () => {
   assert.equal(shared.updatedBy, OWNER);
   as(EDITOR);

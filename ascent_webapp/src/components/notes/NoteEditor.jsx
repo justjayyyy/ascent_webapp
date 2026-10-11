@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from '@/lib/motion';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellRing, Cloud, CloudOff, Copy, LogOut, MoreVertical,
   Camera, ImagePlus, Images, Palette, Paperclip, Pin, Share2, Tag, Trash2, Undo2, Redo2, XCircle, Loader2, Check, Send, SquareCheck, Eraser, Repeat, Sparkles,
+  FolderInput,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -555,6 +556,11 @@ export default function NoteEditor({
                   {!trashed && (
                     <DropdownMenuItem onSelect={() => setAskOpen(true)}>
                       <Sparkles className="me-2 h-4 w-4" /> {t('ntAskTitle')}
+                    </DropdownMenuItem>
+                  )}
+                  {!trashed && (
+                    <DropdownMenuItem onSelect={() => actions.chooseFolder([noteId])}>
+                      <FolderInput className="me-2 h-4 w-4" /> {t('ntMoveToFolder')}
                     </DropdownMenuItem>
                   )}
                   {canSend && (

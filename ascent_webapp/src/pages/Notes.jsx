@@ -3,8 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, MotionConfig } from '@/lib/motion';
 import {
   Archive, Bell, CloudOff, Keyboard, Lightbulb, Loader2, Pin, Plus, RefreshCw, Rows3, LayoutGrid, Search, SlidersHorizontal, Trash2, Users, X,
-  ListChecks, Image as ImageIcon, StickyNote as NoteIcon, FileUp, ArrowDownUp, CalendarDays, Tag, AlignLeft,
+  ListChecks, Image as ImageIcon, StickyNote as NoteIcon, FileUp, ArrowDownUp, CalendarDays, Tag, AlignLeft, Folder, GripVertical,
 } from 'lucide-react';
+import {
+  DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,6 +32,7 @@ import NotesNav from '@/components/notes/NotesNav';
 import ShareNoteDialog from '@/components/notes/ShareNoteDialog';
 import SelectionBar from '@/components/notes/SelectionBar';
 import EditLabelsDialog from '@/components/notes/EditLabelsDialog';
+import FolderDialog from '@/components/notes/FolderDialog';
 import SearchFilters from '@/components/notes/SearchFilters';
 import ShortcutsDialog from '@/components/notes/ShortcutsDialog';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
@@ -37,8 +43,8 @@ import { noteToHtml } from '@/components/notes/noteDocument';
 import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { ascent } from '@/api/client';
 import {
-  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, distribute, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
-  resolveColor, searchableText, sortNotes, useColumnCount,
+  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
+  reorderPositions, resolveColor, searchableText, sortNotes, useColumnCount,
 } from '@/components/notes/noteUtils';
 
 const VIEW_KEY = 'ascent_notes_view';
@@ -69,6 +75,40 @@ const isTyping = () => {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 };
 const canEditNote = (n) => n.myAccess === 'owner' || n.myAccess === 'edit';
+const sameName = (a, b) => !!a && !!b && lower(a) === lower(b);
+
+/**
+ * A card in your own order: it can be dragged by its handle (or moved with the keyboard: Space, the arrows, Space).
+ * `children` makes the card from the handle, or from null when it can't be moved.
+ */
+function SortableNote({ id, enabled, label, children }) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: !enabled });
+  // The handle stays the same element while the card is dragged, so the card itself doesn't redraw on every move
+  const handle = useMemo(() => (enabled ? (
+    <button
+      type="button"
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+      // Not the card's own long press (select) or swipe (archive)
+      onPointerDown={(e) => { listeners?.onPointerDown?.(e); e.stopPropagation(); }}
+      aria-label={label}
+      title={label}
+      className="pointer-events-auto flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-70 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  ) : null), [enabled, attributes, listeners, setActivatorNodeRef, label]);
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn('relative min-w-0', isDragging && 'z-20 opacity-90 [&>article]:shadow-2xl')}
+    >
+      {children(handle)}
+    </div>
+  );
+}
 
 function Notes() {
   const { user, t, language, isRTL } = useTheme();
@@ -86,6 +126,7 @@ function Notes() {
   const canCreate = hasPermission('editNotes');
   const view = VIEWS.includes(params.get('f')) ? params.get('f') : 'notes';
   const label = params.get('label') || '';
+  const folder = label ? '' : params.get('folder') || '';
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState(null);
@@ -102,6 +143,9 @@ function Notes() {
   const [selected, setSelected] = useState(() => new Set());
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [folderFor, setFolderFor] = useState(null); // { ids, done } while choosing a folder for notes
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [foldersOpen, setFoldersOpen] = useState(false);
   const searchRef = useRef(null);
   const gridRef = useRef(null);
 
@@ -115,12 +159,13 @@ function Notes() {
       type,
       items: type === 'checklist' ? [blankItem()] : [],
       tags: label ? [label] : [],
+      ...(folder ? { folder } : {}),
       ...extra,
     });
     setFreshId(id);
     setOpenId(id);
     return id;
-  }, [createNote, label]);
+  }, [createNote, label, folder]);
 
   const newImageNote = useCallback((files) => {
     const id = newNote('text');
@@ -176,7 +221,9 @@ function Notes() {
     const next = new URLSearchParams(params);
     next.delete('f');
     next.delete('label');
+    next.delete('folder');
     if (key === 'label') next.set('label', name);
+    else if (key === 'folder') next.set('folder', name);
     else if (key !== 'notes') next.set('f', key);
     setParams(next, { replace: false });
   }, [params, setParams]);
@@ -212,6 +259,20 @@ function Notes() {
   }, [visible, language]);
   const labelNames = useMemo(() => labelList.map(l => l.name), [labelList]);
 
+  // Your folders (a folder is there while a note is in it), and the one being looked at, even while it is empty
+  const folderList = useMemo(() => {
+    const map = new Map();
+    visible.filter(n => !n.trashedAt && n.folder).forEach(n => {
+      const key = lower(n.folder);
+      const entry = map.get(key) || { name: n.folder, count: 0 };
+      entry.count += 1;
+      map.set(key, entry);
+    });
+    if (folder && !map.has(lower(folder))) map.set(lower(folder), { name: folder, count: 0 });
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, language));
+  }, [visible, language, folder]);
+  const usesFolders = folderList.some(f => f.count > 0);
+
   // Everything already written on a checklist, newest notes first, offered while typing a new item
   const itemSuggestions = useMemo(() => {
     const seen = new Set();
@@ -239,7 +300,7 @@ function Notes() {
   const filtering = !!filter || !!colorFilter;
   const searching = query.trim().length > 0 || filtering;
   // The reminders list is in the order the reminders come, whatever the chosen sort
-  const byReminder = view === 'reminders' && !searching && !label;
+  const byReminder = view === 'reminders' && !searching && !label && !folder;
 
   // While a note is open its card stays where it was, and moves up (or to the pinned ones) once it is closed.
   // A card that moves to another column is made again there, and the new one would take the open note's place
@@ -262,6 +323,8 @@ function Notes() {
         && (!colorFilter || resolveColor(n.color) === colorFilter));
     } else if (label) {
       list = visible.filter(n => !n.trashedAt && (n.tags || []).some(tag => tag.toLowerCase() === label.toLowerCase()));
+    } else if (folder) {
+      list = visible.filter(n => !n.trashedAt && sameName(n.folder, folder));
     } else if (view === 'trash') {
       list = visible.filter(n => n.trashedAt);
     } else if (view === 'archive') {
@@ -277,18 +340,26 @@ function Notes() {
       return [...list].sort((a, b) => new Date(a.reminder) - new Date(b.reminder));
     }
     return sortNotes(list, sort, { language, placeOf });
-  }, [visible, view, label, query, searching, filter, colorFilter, placeOf, sort, language, byReminder]);
+  }, [visible, view, label, folder, query, searching, filter, colorFilter, placeOf, sort, language, byReminder]);
 
   const splitPins = !searching && view !== 'trash' && view !== 'archive' && view !== 'reminders';
   const pinned = splitPins ? shown.filter(n => placeOf(n).isPinned) : [];
   const others = splitPins ? shown.filter(n => !placeOf(n).isPinned) : shown;
 
-  // The notes below the pinned ones, in headed groups when the user groups them (reminders keep their own order)
-  const activeGroup = byReminder || (group === 'label' && label && !searching) ? 'none' : group;
+  // The notes below the pinned ones, in headed groups (reminders keep their own order). By folder until you have
+  // folders, or inside one, it is by label; inside a label, the other labels
+  const activeGroup = (() => {
+    if (byReminder) return 'none';
+    if (group === 'folder' && (!usesFolders || (folder && !searching))) return 'label';
+    return group;
+  })();
   const groups = useMemo(
     () => groupNotes(others, activeGroup, { language, sort, placeOf, skipLabel: searching ? '' : label }),
     [others, activeGroup, language, sort, placeOf, searching, label]
   );
+  // One group of notes with no label (or no folder) is no grouping at all
+  const grouped = !(groups.length === 1 && (groups[0].kind === 'none'
+    || (groups[0].kind === 'label' && !groups[0].label) || (groups[0].kind === 'folder' && !groups[0].folder)));
 
   // ---- selection ----
   const selecting = selected.size > 0;
@@ -308,7 +379,7 @@ function Notes() {
   const selectAll = useCallback(() => setSelected(new Set(shown.map(n => n.id))), [shown]);
 
   // A different list means a different selection
-  useEffect(() => { clearSelection(); }, [view, label, clearSelection]);
+  useEffect(() => { clearSelection(); }, [view, label, folder, clearSelection]);
   // Notes that left the list (archived, deleted elsewhere) drop out of the selection
   useEffect(() => {
     if (!selected.size) return;
@@ -357,6 +428,7 @@ function Notes() {
       removeMany: (ids, done) => setConfirm({ kind: 'deleteMany', ids, done }),
       discard: (id) => deleteNote(id),
       share: (id) => setShareId(id),
+      chooseFolder: (ids, done) => setFolderFor({ ids, done }),
       addFiles,
       addImage,
       removeFile,
@@ -426,6 +498,40 @@ function Notes() {
     });
   }, [notes, patchNote, label, select, t]);
 
+  // ---- folders: a note's folder is yours alone, so any note you can see can be filed ----
+  const moveToFolder = useCallback((ids, name) => {
+    const before = ids.map(id => [id, notes.find(n => n.id === id)?.folder || '']);
+    ids.forEach(id => patchNote(id, { folder: name }));
+    const message = name
+      ? (ids.length > 1 ? fmt(t('ntMovedManyToFolder'), { n: ids.length, folder: name }) : fmt(t('ntMovedToFolder'), { folder: name }))
+      : t('ntRemovedFromFolder');
+    toast(message, { action: { label: t('ntUndo'), onClick: () => before.forEach(([id, f]) => patchNote(id, { folder: f })) } });
+  }, [notes, patchNote, t]);
+
+  const renameFolder = useCallback((from, to) => {
+    notes.forEach(n => { if (sameName(n.folder, from)) patchNote(n.id, { folder: to }); });
+    if (sameName(folder, from)) select('folder', to);
+    toast.success(t('ntFolderRenamed'));
+  }, [notes, patchNote, folder, select, t]);
+
+  const deleteFolder = useCallback((name) => {
+    const ids = notes.filter(n => sameName(n.folder, name)).map(n => n.id);
+    ids.forEach(id => patchNote(id, { folder: '' }));
+    if (sameName(folder, name)) select('notes');
+    toast(fmt(t('ntFolderDeleted'), { folder: name }), {
+      action: { label: t('ntUndo'), onClick: () => ids.forEach(id => patchNote(id, { folder: name })) },
+    });
+  }, [notes, patchNote, folder, select, t]);
+
+  const folderNotes = folderFor ? notes.filter(n => folderFor.ids.includes(n.id)) : [];
+  const commonFolder = folderNotes.length && folderNotes.every(n => sameName(n.folder, folderNotes[0].folder)) ? folderNotes[0].folder || '' : '';
+
+  // ---- your own order: drag a card by its handle within its section ----
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   useReminders(notes, {
     t,
     onOpen: setOpenId,
@@ -434,9 +540,9 @@ function Notes() {
   });
 
   const onCreate = useCallback((data) => {
-    createNote(data);
+    createNote(folder ? { ...data, folder } : data);
     toast.success(t('noteCreated'));
-  }, [createNote, t]);
+  }, [createNote, t, folder]);
 
   const openNote = openId ? notes.find(n => n.id === openId) : null;
   const shareNote = shareId ? notes.find(n => n.id === shareId) : null;
@@ -446,7 +552,7 @@ function Notes() {
     if (openId && !isLoading && !openNote) { setOpenId(null); setFreshId(null); }
   }, [openId, openNote, isLoading]);
 
-  const showComposer = canCreate && !searching && (view === 'notes' || view === 'shared' || !!label);
+  const showComposer = canCreate && !searching && (view === 'notes' || view === 'shared' || !!label || !!folder);
 
   // ---- keyboard (Keep's shortcuts): c, l, /, ?, and actions on the selection ----
   const keys = useRef({});
@@ -489,12 +595,13 @@ function Notes() {
     return () => window.removeEventListener('keydown', onKey);
   }, [clearSelection, newNote]);
 
-  const heading = searching ? t('ntSearchResults') : label ? label : view === 'notes' ? t('notes')
+  const heading = searching ? t('ntSearchResults') : label ? label : folder ? folder : view === 'notes' ? t('notes')
     : view === 'shared' ? t('ntShared') : view === 'reminders' ? t('ntReminders') : view === 'archive' ? t('ntArchiveNav') : t('ntTrashNav');
 
   const emptyCopy = (() => {
     if (searching) return { icon: Search, title: t('ntNoResults'), hint: t('ntNoResultsHint') };
     if (label) return { icon: Lightbulb, title: t('ntEmptyLabel'), hint: '' };
+    if (folder) return { icon: Folder, title: t('ntEmptyFolder'), hint: canCreate ? t('ntEmptyFolderHint') : '' };
     if (view === 'shared') return { icon: Users, title: t('ntEmptyShared'), hint: t('ntEmptySharedHint') };
     if (view === 'reminders') return { icon: Bell, title: t('ntEmptyReminders'), hint: t('ntEmptyRemindersHint') };
     if (view === 'archive') return { icon: Archive, title: t('ntEmptyArchive'), hint: t('ntEmptyArchiveHint') };
@@ -502,15 +609,18 @@ function Notes() {
     return { icon: Lightbulb, title: t('ntEmptyNotes'), hint: canCreate ? t('ntEmptyNotesHint') : t('ntEmptyNotesReadOnly') };
   })();
 
-  const renderGrid = (list) => {
-    const cols = distribute(list, columnCount);
-    return (
-      <div className={cn('flex items-start gap-3', listView && 'mx-auto max-w-2xl')}>
-        {cols.map((col, i) => (
-          <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">
-            {col.map(n => (
+  // Cards in rows that read across, as tall as the tallest card in their row; in your own order, each can be dragged
+  const canDrag = sort === 'manual' && !byReminder && !selecting && view !== 'trash';
+  const renderGrid = (list) => (
+    <SortableContext items={list.map(n => n.id)} strategy={rectSortingStrategy}>
+      <div
+        className={cn('grid items-stretch gap-3', listView && 'mx-auto max-w-2xl')}
+        style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+      >
+        {list.map(n => (
+          <SortableNote key={n.id} id={n.id} enabled={canDrag} label={t('ntDragToReorder')}>
+            {(handle) => (
               <NoteCard
-                key={n.id}
                 note={n}
                 people={people}
                 query={query}
@@ -524,12 +634,23 @@ function Notes() {
                 onToggleSelect={toggleSelect}
                 online={online}
                 currency={currency}
+                dragHandle={handle}
               />
-            ))}
-          </div>
+            )}
+          </SortableNote>
         ))}
       </div>
-    );
+    </SortableContext>
+  );
+
+  // A card dropped in its own section takes its new place there; dropped in another section, it goes back
+  const sections = [pinned, ...(grouped ? groups.map(g => g.notes) : [others])];
+  const onDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const section = sections.find(list => list.some(n => n.id === active.id));
+    const to = section ? section.findIndex(n => n.id === over.id) : -1;
+    if (to < 0) return;
+    reorderPositions(section, active.id, to).forEach(([id, position]) => patchNote(id, { position }));
   };
 
   // A group's heading: "Today", "March 2025", a label, a colour, or the kind of note
@@ -543,6 +664,7 @@ function Notes() {
       return { icon: CalendarDays, text };
     }
     if (g.kind === 'label') return { icon: Tag, text: g.label || t('ntNoLabel') };
+    if (g.kind === 'folder') return { icon: Folder, text: g.folder || t('ntNoFolder') };
     if (g.kind === 'color') return { swatch: g.color, text: g.color === 'default' ? t('ntNoColor') : t(`ntColor_${g.color}`) };
     if (g.kind === 'type') return { icon: g.type === 'checklist' ? ListChecks : AlignLeft, text: t(g.type === 'checklist' ? 'ntGroupLists' : 'ntGroupText') };
     return null;
@@ -557,7 +679,7 @@ function Notes() {
           variant="ghost" size="icon"
           aria-label={t('ntSortGroup')}
           title={t('ntSortGroup')}
-          className={cn((sort !== 'updated' || group !== 'none') && 'text-primary')}
+          className={cn((sort !== NOTE_SORTS[0] || group !== NOTE_GROUPS[0]) && 'text-primary')}
         >
           <ArrowDownUp />
         </Button>
@@ -599,6 +721,13 @@ function Notes() {
       <Loader2 className="h-3.5 w-3.5 animate-spin" /> {fmt(t('ntSyncing'), { n: pending })}
     </span>
   ) : null;
+
+  const navProps = {
+    view, label, labels: labelList, folder, folders: folderList, counts, onSelect: select, t,
+    onEditLabels: () => setLabelsOpen(true),
+    onEditFolders: () => setFoldersOpen(true),
+    onNewFolder: () => setNewFolderOpen(true),
+  };
 
   const showFilters = filtersOpen || filtering;
   const clearSearch = () => { setQuery(''); setFilter(null); setColorFilter(null); setFiltersOpen(false); };
@@ -735,13 +864,13 @@ function Notes() {
         <div className="lg:flex lg:items-start lg:gap-8">
           {/* Side rail (large screens) */}
           <aside className="sticky top-6 hidden w-56 shrink-0 lg:block">
-            <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} onEditLabels={() => setLabelsOpen(true)} t={t} variant="rail" />
+            <NotesNav {...navProps} variant="rail" />
           </aside>
 
           <div className="min-w-0 flex-1 space-y-5">
             {!searching && (
               <div className="lg:hidden">
-                <NotesNav view={view} label={label} labels={labelList} counts={counts} onSelect={select} onEditLabels={() => setLabelsOpen(true)} t={t} variant="chips" />
+                <NotesNav {...navProps} variant="chips" />
               </div>
             )}
 
@@ -796,6 +925,7 @@ function Notes() {
                   {emptyCopy.hint && <p className="mt-1 text-sm text-muted-foreground">{emptyCopy.hint}</p>}
                 </div>
               ) : (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <LayoutGroup>
                   {pinned.length > 0 && (
                     <section className="mb-6" aria-label={t('pinned')}>
@@ -805,13 +935,13 @@ function Notes() {
                       {renderGrid(pinned)}
                     </section>
                   )}
-                  {others.length > 0 && groups[0]?.kind === 'none' && (
+                  {others.length > 0 && !grouped && (
                     <section aria-label={pinned.length > 0 ? t('others') : heading}>
                       {pinned.length > 0 && <h2 className={sectionTitle}>{t('others')}</h2>}
                       {renderGrid(others)}
                     </section>
                   )}
-                  {others.length > 0 && groups[0]?.kind !== 'none' && groups.map(g => {
+                  {others.length > 0 && grouped && groups.map(g => {
                     const head = groupHeading(g);
                     return (
                       <section key={g.key} className="mb-6 last:mb-0" aria-label={head.text}>
@@ -831,6 +961,7 @@ function Notes() {
                     );
                   })}
                 </LayoutGroup>
+                </DndContext>
               )}
             </div>
           </div>
@@ -916,6 +1047,35 @@ function Notes() {
           labels={labelList}
           onRename={renameLabel}
           onDelete={deleteLabel}
+          t={t}
+        />
+
+        <EditLabelsDialog
+          kind="folder"
+          open={foldersOpen}
+          onOpenChange={setFoldersOpen}
+          labels={folderList.filter(f => f.count > 0)}
+          onRename={renameFolder}
+          onDelete={deleteFolder}
+          t={t}
+        />
+
+        <FolderDialog
+          open={!!folderFor}
+          onOpenChange={(o) => { if (!o) setFolderFor(null); }}
+          folders={folderList.filter(f => f.count > 0)}
+          current={commonFolder}
+          count={folderFor?.ids.length || 1}
+          onPick={(name) => { moveToFolder(folderFor.ids, name); folderFor.done?.(); }}
+          t={t}
+        />
+
+        <FolderDialog
+          mode="new"
+          open={newFolderOpen}
+          onOpenChange={setNewFolderOpen}
+          folders={folderList}
+          onPick={(name) => select('folder', name)}
           t={t}
         />
 

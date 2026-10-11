@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, noteForm, distribute, formatBytes, nextOccurrence,
-  extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes,
+  extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes, reorderPositions,
 } from './noteUtils';
 
 const list = (items, extra = {}) => ({ type: 'checklist', items: items.map((text, i) => ({ id: `i${i}`, text, done: i === 0 })), ...extra });
@@ -230,5 +230,54 @@ describe('groupNotes', () => {
 
   test('leaves the notes as one group when not grouping', () => {
     expect(groupNotes([{ id: 'a' }], 'none')).toEqual([{ key: 'all', kind: 'none', notes: [{ id: 'a' }] }]);
+  });
+});
+
+describe('your own order', () => {
+  const ids = (list) => list.map(n => n.id).join('');
+  // Apply the positions a drag saves, then sort again, as the page does
+  const drag = (list, id, to) => {
+    const patches = Object.fromEntries(reorderPositions(list, id, to));
+    return { patches, list: sortNotes(list.map(n => (n.id in patches ? { ...n, position: patches[n.id] } : n)), 'manual') };
+  };
+
+  test('places notes by position, with notes never placed first, newest on top', () => {
+    const list = [
+      { id: 'a', position: 2, updated_date: '2026-01-01' },
+      { id: 'b', position: 1, updated_date: '2026-01-02' },
+      { id: 'c', updated_date: '2026-01-03' },
+      { id: 'd', updated_date: '2026-01-04' },
+    ];
+    expect(ids(sortNotes(list, 'manual'))).toBe('dcba');
+  });
+
+  test('a drag between placed notes moves only that note', () => {
+    const list = [{ id: 'a', position: 0 }, { id: 'b', position: 1024 }, { id: 'c', position: 2048 }];
+    const { patches, list: after } = drag(list, 'c', 1);
+    expect(Object.keys(patches)).toEqual(['c']);
+    expect(ids(after)).toBe('acb');
+    expect(ids(drag(list, 'a', 2).list)).toBe('bca');
+    expect(ids(drag(list, 'c', 0).list)).toBe('cab');
+  });
+
+  test('the first drag places the notes above where it lands, and the order holds', () => {
+    const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+    const { patches, list: after } = drag(list, 'a', 2);
+    expect(ids(after)).toBe('bcad');
+    expect(Object.keys(patches).sort()).toEqual(['a', 'b', 'c', 'd']);
+    // New notes on top of placed ones: dragging one down places only what it passes
+    const mixed = [{ id: 'n' }, { id: 'p', position: 0 }, { id: 'q', position: 1024 }];
+    const moved = drag(mixed, 'n', 1);
+    expect(ids(moved.list)).toBe('pnq');
+    expect(Object.keys(moved.patches)).toEqual(['n']);
+    expect(ids(drag(mixed, 'q', 0).list)).toBe('qnp');
+  });
+});
+
+describe('folders', () => {
+  test('group by folder by name, notes in no folder last', () => {
+    const notes = [{ id: 'a', folder: 'Work' }, { id: 'b' }, { id: 'c', folder: 'home' }, { id: 'd', folder: 'Work' }];
+    expect(groupNotes(notes, 'folder', {}).map(g => [g.folder, g.notes.map(n => n.id).join('')]))
+      .toEqual([['home', 'c'], ['Work', 'ad'], [null, 'b']]);
   });
 });
