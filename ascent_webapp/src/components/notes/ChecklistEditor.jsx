@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { AutoTextarea } from './NoteParts';
+import { RichTextarea } from './RichTextarea';
 import { LinePicture } from './NoteExtras';
 import {
   blankItem, canHaveAmount, fmt, formatAmount, hasAmount, highlight, isPlainText, isTickable, isTicked, lineKind, newItemId,
@@ -19,6 +20,7 @@ import {
 } from './noteUtils';
 import { amountTotals, lineNumbers, readPaste } from './noteDocument';
 import { pictureFromSrc } from './importDocument';
+import { joinRich, plainText, sliceRich } from './richText';
 
 const MAX_SUGGESTIONS = 5;
 
@@ -52,21 +54,22 @@ const PLACEHOLDER = { item: 'ntListItem', text: 'ntTextLine', title: 'ntTitleLin
  * on it is pointed to, and anything written on another checklist can be filled in.
  */
 export function suggestFor(item, items, elsewhere = []) {
-  const q = item.text.trim().toLowerCase();
+  const q = plainText(item.text).trim().toLowerCase();
   if (!q || !isTickable(item)) return [];
   const out = [];
   const here = new Set();
   for (const other of items) {
-    const text = other.text.trim();
+    const text = plainText(other.text).trim();
     if (other.id === item.id || !text || !isTickable(other)) continue;
     here.add(text.toLowerCase());
     if (text.toLowerCase().includes(q)) out.push({ kind: other.done ? 'restore' : 'duplicate', text, id: other.id });
   }
-  for (const text of elsewhere) {
-    const lower = text.trim().toLowerCase();
+  for (const written of elsewhere) {
+    const text = plainText(written).trim();
+    const lower = text.toLowerCase();
     if (!lower || lower === q || here.has(lower) || !lower.includes(q)) continue;
     here.add(lower);
-    out.push({ kind: 'fill', text: text.trim() });
+    out.push({ kind: 'fill', text });
   }
   // This list's own items first (ticked ones before ones still open), and what starts with the typed text
   const rank = (s) => (s.kind === 'fill' ? 4 : 0) + (s.text.toLowerCase().startsWith(q) ? 0 : 2) + (s.kind === 'duplicate' ? 1 : 0);
@@ -166,7 +169,7 @@ function AmountInput({ item, currency, language, readOnly, onChange, t, inputRef
       value={shown}
       readOnly={readOnly}
       placeholder={formatAmount(0, cur, language)}
-      aria-label={item.text ? `${t('ntAmount')}: ${item.text.split('\n')[0]}` : t('ntAmount')}
+      aria-label={item.text ? `${t('ntAmount')}: ${plainText(item.text).split('\n')[0]}` : t('ntAmount')}
       onFocus={() => { if (!readOnly) setTyping(item.amount ? String(item.amount) : ''); }}
       onBlur={() => setTyping(null)}
       onChange={(e) => {
@@ -340,6 +343,7 @@ function Row({
   }
 
   const multiline = MULTILINE.has(kind);
+  const plain = plainText(item.text);
   return (
     <Wrapper
       {...wrapperProps}
@@ -357,7 +361,7 @@ function Row({
             checked={item.done}
             disabled={readOnly}
             onCheckedChange={(v) => onChange({ ...item, done: !!v })}
-            aria-label={item.text || t('ntListItem')}
+            aria-label={plain || t('ntListItem')}
             className="mt-[7px] h-[18px] w-[18px] rounded-md"
           />
         )}
@@ -366,7 +370,7 @@ function Row({
             {number}.
           </span>
         )}
-        <AutoTextarea
+        <RichTextarea
           ref={registerRef}
           value={item.text}
           readOnly={readOnly}
@@ -374,15 +378,16 @@ function Row({
             let text = e.target.value;
             // Only text, numbered lines and boxes may run over several lines
             if (!multiline) text = text.replace(/\n/g, ' ');
+            const typed = plainText(text);
             // "# " at the start of an item makes it a title, like in most editors
-            if (kind === 'item' && /^#\s/.test(text) && !/^#\s/.test(item.text)) {
-              onChange(withKind({ ...item, text: text.slice(2) }, 'title'));
+            if (kind === 'item' && /^#\s/.test(typed) && !/^#\s/.test(plain)) {
+              onChange(withKind({ ...item, text: sliceRich(text, 2) }, 'title'));
               return;
             }
-            if (flow && kind === 'text' && onShortcut && text.length === item.text.length + 1) {
+            if (flow && kind === 'text' && onShortcut && typed.length === plain.length + 1) {
               const caret = e.target.selectionStart;
-              const lineStart = text.lastIndexOf('\n', caret - 1) + 1;
-              const to = SHORTCUTS[text.slice(lineStart, caret)];
+              const lineStart = typed.lastIndexOf('\n', caret - 1) + 1;
+              const to = SHORTCUTS[typed.slice(lineStart, caret)];
               if (to) { onShortcut(text, lineStart, caret, to); return; }
             }
             onChange({ ...item, text });
@@ -413,15 +418,15 @@ function Row({
             if (list.length && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setDismissed(item.text); return; }
             const el = e.currentTarget;
             const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
-            const atEnd = el.selectionStart === item.text.length;
+            const atEnd = el.selectionStart === plain.length;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               if (highlighted >= 0 && list[highlighted]) { e.preventDefault(); onPick(list[highlighted]); return; }
               // Continuous text goes on in the same text; a box too, until Enter on an empty last line leaves it
               if (flow && kind === 'text') return;
-              const leaveBox = flow && kind === 'callout' && atEnd && item.text.endsWith('\n');
+              const leaveBox = flow && kind === 'callout' && atEnd && plain.endsWith('\n');
               if (flow && kind === 'callout' && !leaveBox) return;
               e.preventDefault();
-              if (leaveBox) onEnter({ ...item, text: item.text.slice(0, -1) });
+              if (leaveBox) onEnter({ ...item, text: sliceRich(item.text, 0, plain.length - 1) });
               // An empty checkbox or numbered line ends the list, as in a document
               else if (flow && !item.text && (kind === 'item' || kind === 'number')) onKind('text');
               else onEnter();
@@ -432,7 +437,7 @@ function Row({
             if (e.key === 'Backspace' && atStart && onBackspaceStart) { e.preventDefault(); onBackspaceStart(); return; }
             // The arrows go on into the line above or below at the edges, as in one text
             if (onMove && e.key === 'ArrowUp' && atStart) { e.preventDefault(); onMove(-1); }
-            if (onMove && e.key === 'ArrowDown' && atEnd && el.selectionEnd === item.text.length) { e.preventDefault(); onMove(1); }
+            if (onMove && e.key === 'ArrowDown' && atEnd && el.selectionEnd === plain.length) { e.preventDefault(); onMove(1); }
           }}
           placeholder={hint || t(PLACEHOLDER[kind])}
           aria-label={hint || t(PLACEHOLDER[kind])}
@@ -456,7 +461,7 @@ function Row({
         {!readOnly && onKind && <KindMenu item={item} onChange={onKind} onAmount={toggleAmount} t={t} />}
         {removeButton}
       </div>
-      {list.length > 0 && <Suggestions list={list} highlighted={highlighted} query={item.text.trim()} onPick={onPick} t={t} />}
+      {list.length > 0 && <Suggestions list={list} highlighted={highlighted} query={plain.trim()} onPick={onPick} t={t} />}
       {total && <TotalRow totals={total} language={language} t={t} editable={!readOnly} />}
     </Wrapper>
   );
@@ -588,7 +593,7 @@ export default function ChecklistEditor({
       for (const line of list) {
         const prev = next[next.length - 1];
         if (prev && isPlainText(prev) && isPlainText(line) && prev.text && line.text) {
-          if (line.id === at.id) at = { id: prev.id, caret: prev.text.length + 1 + (at.caret ?? 0) };
+          if (line.id === at.id) at = { id: prev.id, caret: plainText(prev.text).length + 1 + (at.caret ?? 0) };
           next[next.length - 1] = { ...prev, text: `${prev.text}\n${line.text}` };
         } else next.push(line);
       }
@@ -620,9 +625,10 @@ export default function ChecklistEditor({
         focusLastOpen(fresh);
         return;
       }
-      const tail = cur.text.slice(at.caret).replace(/^\n/, '');
+      const plain = plainText(cur.text);
+      const tail = sliceRich(cur.text, at.caret + (plain[at.caret] === '\n' ? 1 : 0));
       if (tail) {
-        splitText(cur.id, cur.text.slice(0, at.caret).replace(/\n$/, ''), fresh, tail);
+        splitText(cur.id, sliceRich(cur.text, 0, at.caret - (plain[at.caret - 1] === '\n' ? 1 : 0)), fresh, tail);
         focusLastOpen(fresh);
         return;
       }
@@ -647,10 +653,9 @@ export default function ChecklistEditor({
 
   // "# " and the like at the start of a line of continuous text: that line becomes a title (or a checkbox…)
   const shortcut = (id, text, lineStart, caret, kind) => {
-    const rest = text.slice(caret);
-    const cut = rest.indexOf('\n');
-    const line = { ...blankItem(kind), text: cut < 0 ? rest : rest.slice(0, cut) };
-    splitText(id, text.slice(0, lineStart).replace(/\n$/, ''), [line], cut < 0 ? '' : rest.slice(cut + 1));
+    const cut = plainText(text).indexOf('\n', caret);
+    const line = { ...blankItem(kind), text: sliceRich(text, caret, cut < 0 ? undefined : cut) };
+    splitText(id, sliceRich(text, 0, Math.max(0, lineStart - 1)), [line], cut < 0 ? '' : sliceRich(text, cut + 1));
     focusSoon(line.id, 0);
   };
 
@@ -664,14 +669,14 @@ export default function ChecklistEditor({
     if (isPlainText(cur) && prev && isPlainText(prev)) {
       const list = itemsRef.current
         .filter(i => i.id !== id)
-        .map(i => (i.id === prev.id ? { ...i, text: prev.text + cur.text } : i));
-      commit(list, prev.id, prev.text.length);
+        .map(i => (i.id === prev.id ? { ...i, text: joinRich(prev.text, cur.text) } : i));
+      commit(list, prev.id, plainText(prev.text).length);
     } else if (!['text', 'image'].includes(lineKind(cur))) setKind(id, 'text', 0);
   };
 
   const move = (id, step) => {
     const to = open[open.findIndex(i => i.id === id) + step];
-    if (to) focusSoon(to.id, step < 0 ? to.text.length : 0);
+    if (to) focusSoon(to.id, step < 0 ? plainText(to.text).length : 0);
   };
 
   const pick = (rowId, s) => {
@@ -693,7 +698,7 @@ export default function ChecklistEditor({
     const at = list.slice(0, idx).filter(i => i.id !== s.id).length;
     next.splice(at, 0, s.kind === 'restore' ? { ...target, done: false } : target);
     patch(next);
-    focusSoon(target.id, target.text.length);
+    focusSoon(target.id, plainText(target.text).length);
   };
 
   const remove = (id) => commit(itemsRef.current.filter(i => i.id !== id));
@@ -756,7 +761,7 @@ export default function ChecklistEditor({
       if (kind !== back && back !== 'image') { setKind(id, back); return; }
     }
     const to = prev || open[idx + 1];
-    commit(itemsRef.current.filter(i => i.id !== id), to?.id, prev ? prev.text.length : 0);
+    commit(itemsRef.current.filter(i => i.id !== id), to?.id, prev ? plainText(prev.text).length : 0);
   };
 
   const reorderOpen = (nextOpen) => patch([...nextOpen, ...done]);

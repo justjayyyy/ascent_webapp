@@ -15,6 +15,7 @@ import {
   extractLinks, fmt, formatAmount, formatReminder, hasAmount, highlight, isOverdue, isPreviewable, isTicked, lastEditor, lineKind, resolveColor,
   textDir, timeAgo,
 } from './noteUtils';
+import { plainText, richNodes, sliceRich } from './richText';
 import { amountTotals, lineNumbers } from './noteDocument';
 
 const PREVIEW_ITEMS = 5;
@@ -43,13 +44,18 @@ const CardAmount = ({ item, currency, language }) => (
   </span>
 );
 
+// A line's text with its formatting, search matches marked
+const Rich = ({ text, query }) => richNodes(text, (piece) => highlight(piece, query));
+
 // A line with details under its first line (a numbered entry, an amount line): the name, then the small print
 function Lined({ text, query }) {
-  const [first, ...rest] = String(text || '').split('\n');
+  const cut = plainText(text).indexOf('\n');
+  const first = cut < 0 ? text : sliceRich(text, 0, cut);
+  const rest = cut < 0 ? '' : sliceRich(text, cut + 1).replace(/\n/g, ' ');
   return (
     <span className="min-w-0 break-words">
-      <span className="text-foreground/90">{highlight(first, query)}</span>
-      {rest.length > 0 && <span className="block text-xs leading-snug text-muted-foreground line-clamp-2">{highlight(rest.join(' '), query)}</span>}
+      <span className="text-foreground/90"><Rich text={first} query={query} /></span>
+      {rest && <span className="block text-xs leading-snug text-muted-foreground line-clamp-2"><Rich text={rest} query={query} /></span>}
     </span>
   );
 }
@@ -78,9 +84,13 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
   const hiddenItems = openItems.length - previewItems.length;
   const numbers = lineNumbers(openItems);
   const totals = amountTotals(openItems, currency);
-  const hasBody = note.type === 'checklist' ? (note.items || []).length > 0 : !!note.content?.trim();
-  const text = note.content?.trim() || '';
+  const plain = plainText(note.content);
+  const hasBody = note.type === 'checklist' ? (note.items || []).length > 0 : !!plain.trim();
+  const text = plain.trim();
   const longText = text.length > LONG_TEXT || text.split(/\r?\n/).length > 6;
+  // What the card shows of the text, with its formatting
+  const lead = plain.length - plain.trimStart().length;
+  const preview = text && sliceRich(note.content, lead, lead + Math.min(text.length, PREVIEW_CHARS));
 
   const placed = placedPictures(note);
   const photoCount = (note.attachments || []).filter(a => isPreviewable(a.type) && !placed.has(a.id)).length;
@@ -234,10 +244,10 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                       checked={!!item.done}
                       disabled={!canEdit || trashed}
                       onCheckedChange={(v) => toggleItem(item.id, !!v)}
-                      aria-label={item.text}
+                      aria-label={plainText(item.text)}
                       className="pointer-events-auto relative z-[2] mt-[1px] h-4 w-4 rounded-[5px]"
                     />
-                    <span className={cn('min-w-0 break-words text-foreground/90 line-clamp-2', item.done && 'text-muted-foreground line-through')}>{highlight(item.text, query)}</span>
+                    <span className={cn('min-w-0 break-words text-foreground/90 line-clamp-2', item.done && 'text-muted-foreground line-through')}><Rich text={item.text} query={query} /></span>
                     {hasAmount(item) && <CardAmount item={item} currency={currency} language={language} />}
                   </li>
                 );
@@ -262,7 +272,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                       kind === 'callout' && 'whitespace-pre-wrap rounded-lg border-s-[3px] border-foreground/25 bg-foreground/[0.06] px-2 py-1 text-sm leading-snug text-foreground/85 line-clamp-4'
                     )}
                   >
-                    {highlight(item.text, query)}
+                    <Rich text={item.text} query={query} />
                   </li>
                 );
               }
@@ -284,7 +294,7 @@ function NoteCard({ note, people, query, onOpen, actions, t, canCreate, language
                 longText ? 'line-clamp-5' : 'line-clamp-6'
               )}
             >
-              {highlight(text.slice(0, PREVIEW_CHARS), query)}
+              <Rich text={preview} query={query} />
             </p>
           )
         )}

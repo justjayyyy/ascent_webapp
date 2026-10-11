@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ChecklistEditor from './ChecklistEditor';
 import { AutoTextarea, ColorPicker, LabelEditor, NoteTypeMenu } from './NoteParts';
+import { FormatBar, FormatToggle, useFormatBar } from './RichTextarea';
 import {
   blankItem, flowBlocks, flowChanges, formChanges, hasAmount, isEmptyNote, newItemId, noteForm, resolveColor,
 } from './noteUtils';
@@ -22,6 +23,7 @@ export default function NoteComposer({
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => blank(defaultTag));
+  const [formatting, toggleFormatting] = useFormatBar();
   const rootRef = useRef(null);
   const bodyRef = useRef(null);
   const fileRef = useRef(null);
@@ -179,7 +181,7 @@ export default function NoteComposer({
               <AutoTextarea
                 value={draft.title}
                 onChange={(e) => patch({ title: e.target.value.replace(/\n/g, ' ') })}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.querySelector('textarea')?.focus(); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); bodyRef.current?.querySelector('[data-rich-line], textarea')?.focus(); } }}
                 placeholder={t('noteTitle')}
                 aria-label={t('noteTitle')}
                 maxLength={500}
@@ -222,6 +224,7 @@ export default function NoteComposer({
                 </div>
               )}
             </div>
+            {formatting && <FormatBar rootRef={bodyRef} t={t} onClose={toggleFormatting} className="border-t border-foreground/10 px-2 pt-1.5" />}
             <div className="flex items-center gap-1 border-t border-foreground/10 px-2 py-1.5">
               <Popover>
                 <PopoverTrigger asChild>
@@ -240,6 +243,7 @@ export default function NoteComposer({
                 </PopoverContent>
               </Popover>
               <NoteTypeMenu value={noteForm(draft)} onChange={setForm} t={t} />
+              <FormatToggle open={formatting} onToggle={toggleFormatting} t={t} />
               <Button variant="ghost" onClick={commit} className="ms-auto">{t('ntClose')}</Button>
             </div>
           </motion.div>

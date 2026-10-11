@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, createElement, Fragment } from 'react';
+import { isRich, plainText, sliceRich } from './richText';
 
 export const NOTE_COLORS = ['default', 'coral', 'amber', 'sun', 'sage', 'teal', 'sky', 'violet', 'rose', 'stone'];
 
@@ -82,7 +83,7 @@ export function formChanges(note, to) {
   if (to === 'checklist') {
     return note.type === 'checklist' ? { flow: false } : { type: 'checklist', flow: false, items: textToItems(note.content) };
   }
-  const kept = (note.items || []).filter(i => i.text.trim() || lineKind(i) === 'image' || hasAmount(i));
+  const kept = (note.items || []).filter(i => plainText(i.text).trim() || lineKind(i) === 'image' || hasAmount(i));
   return { flow: true, ...flowChanges({ ...note, type: 'checklist' }, kept) };
 }
 
@@ -127,7 +128,7 @@ export function parseAmount(raw) {
   return Number.isFinite(amount) ? { amount, currency } : null;
 }
 
-/** Plain text of a note, for search, copying and the share sheet. */
+/** Plain text of a note (its formatting left out), for search, copying and the share sheet. */
 export function noteToText(note, { withTitle = true } = {}) {
   const parts = [];
   if (withTitle && note.title) parts.push(note.title);
@@ -136,20 +137,21 @@ export function noteToText(note, { withTitle = true } = {}) {
     (note.items || []).forEach((it) => {
       const kind = lineKind(it);
       n = kind === 'number' ? n + 1 : 0;
-      if (!it.text || kind === 'image') return;
-      if (kind === 'item') parts.push(`${it.done ? '[x]' : '[ ]'} ${it.text}${amountText(it)}`);
-      else if (kind === 'number') parts.push(`${n}. ${it.text}${amountText(it)}`);
-      else parts.push(`${it.text}${amountText(it)}`);
+      const text = plainText(it.text);
+      if (!text || kind === 'image') return;
+      if (kind === 'item') parts.push(`${it.done ? '[x]' : '[ ]'} ${text}${amountText(it)}`);
+      else if (kind === 'number') parts.push(`${n}. ${text}${amountText(it)}`);
+      else parts.push(`${text}${amountText(it)}`);
     });
   } else if (note.content) {
-    parts.push(note.content);
+    parts.push(plainText(note.content));
   }
   return parts.join('\n');
 }
 
 export function searchableText(note) {
-  const items = note.type === 'checklist' ? (note.items || []).map(i => i.text).join(' ') : '';
-  return `${note.title || ''} ${note.content || ''} ${items} ${(note.tags || []).join(' ')}`.toLowerCase();
+  const items = note.type === 'checklist' ? (note.items || []).map(i => plainText(i.text)).join(' ') : '';
+  return `${note.title || ''} ${plainText(note.content)} ${items} ${(note.tags || []).join(' ')}`.toLowerCase();
 }
 
 // How a line of copied text says what it is: "# " a title, a box (ticked or not) or a bullet an item
@@ -170,6 +172,20 @@ function splitAmount(s) {
   return text ? { text, amount: money.amount, ...(money.currency ? { currency: money.currency } : {}) } : null;
 }
 
+// Lines of text, each keeping the formatting it has
+function splitLines(text) {
+  if (!isRich(text)) return text.split('\n');
+  const plain = plainText(text);
+  const out = [];
+  let from = 0;
+  for (let at = plain.indexOf('\n'); at >= 0; at = plain.indexOf('\n', from)) {
+    out.push(sliceRich(text, from, at));
+    from = at + 1;
+  }
+  out.push(sliceRich(text, from));
+  return out;
+}
+
 /**
  * Copied text as checklist lines. Where the text marks its tasks (boxes or bullets), the lines
  * without a mark are text between them and a wrapped line carries on the line above it; plain
@@ -180,7 +196,7 @@ function splitAmount(s) {
 export function parseLines(text) {
   const lines = [];
   let pending = null; // a box on a line of its own, as PDFs copy them, belongs to the next line
-  for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
+  for (const raw of splitLines(String(text || '').replace(/\r\n?/g, '\n'))) {
     let s = raw.trim();
     if (!s || RULE.test(s)) { lines.push(null); continue; }
     let mark = null;
@@ -230,7 +246,7 @@ export function textToItems(text) {
 
 export const isEmptyNote = (n) =>
   !n.title?.trim() &&
-  (n.type === 'checklist' ? !(n.items || []).some(i => i.text.trim() || i.kind === 'image' || hasAmount(i)) : !n.content?.trim());
+  (n.type === 'checklist' ? !(n.items || []).some(i => plainText(i.text).trim() || i.kind === 'image' || hasAmount(i)) : !plainText(n.content).trim());
 
 /** Rough height of a card, so short and tall notes balance across the masonry columns. */
 function estimateHeight(note, previewItems = 6) {
@@ -238,7 +254,7 @@ function estimateHeight(note, previewItems = 6) {
   if (note.type === 'checklist') {
     h += Math.min((note.items || []).length, previewItems) * 26 + 10;
   } else {
-    const text = note.content || '';
+    const text = plainText(note.content);
     const lines = Math.min(text.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 34)), 0), 10);
     h += lines * 21;
   }
@@ -316,7 +332,7 @@ const RTL_RANGES = span(0x0590, 0x08ff) + span(0xfb1d, 0xfdff) + span(0xfe70, 0x
 const RTL_LETTER = new RegExp(`[${RTL_RANGES}]`);
 const STRONG_LETTER = new RegExp(`[A-Za-z${span(0x00c0, 0x024f)}${span(0x0370, 0x04ff)}${RTL_RANGES}]`); // plus Latin, Greek, Cyrillic
 export function textDir(text) {
-  const first = String(text || '').match(STRONG_LETTER);
+  const first = plainText(text).match(STRONG_LETTER);
   if (!first) return undefined;
   return RTL_LETTER.test(first[0]) ? 'rtl' : 'ltr';
 }
@@ -491,7 +507,7 @@ const WWW_RE = /(^|\s)(www\.[^\s<>"'()]+[^\s<>"'().,;:!?])/gi;
 
 /** Web links in a note's text and list items, de-duplicated, in order. */
 export function extractLinks(note) {
-  const text = [note.title, note.content, ...(note.items || []).map(i => i.text)].filter(Boolean).join('\n');
+  const text = [note.title, note.content, ...(note.items || []).map(i => i.text)].filter(Boolean).map(plainText).join('\n');
   const found = [];
   (text.match(URL_RE) || []).forEach(u => found.push(u));
   let m;

@@ -1,6 +1,7 @@
 // A note as a document: totals under runs of amounts, pasting from web pages and documents (headings, tasks,
 // numbered lists, highlighted boxes, pictures, rows with amounts), and copying a note out the same way.
 import { formatAmount, hasAmount, lineKind, parseAmount, parseLines } from './noteUtils';
+import { richHtml } from './richText';
 
 /**
  * Where a run of two or more lines with amounts ends, the run's total in each currency it uses:
@@ -238,7 +239,6 @@ export function readPaste({ html, text }) {
 // ---- copying a note out ----
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const withBreaks = (s) => esc(s).replace(/\n/g, '<br>');
 
 /**
  * A note as HTML that keeps its shape when pasted into a document, an email or another note: titles,
@@ -249,7 +249,7 @@ export function noteToHtml(note, { images = {}, language, currency, totalLabel =
   const parts = [];
   if (note.title) parts.push(`<h1>${esc(note.title)}</h1>`);
   if (note.type !== 'checklist') {
-    if (note.content) parts.push(`<p>${withBreaks(note.content)}</p>`);
+    if (note.content) parts.push(`<p>${richHtml(note.content)}</p>`);
     return parts.join('\n');
   }
   const lines = note.items || [];
@@ -262,17 +262,17 @@ export function noteToHtml(note, { images = {}, language, currency, totalLabel =
   const closeList = () => { if (open) { parts.push(`</${open}>`); open = null; } };
   lines.forEach((it, i) => {
     const kind = lineKind(it);
-    if (kind === 'item') { listOf('ul'); parts.push(`<li>${it.done ? '☑' : '☐'} ${withBreaks(it.text)}${priced(it)}</li>`); }
-    else if (kind === 'number') { listOf('ol'); parts.push(`<li>${withBreaks(it.text)}${priced(it)}</li>`); }
+    if (kind === 'item') { listOf('ul'); parts.push(`<li>${it.done ? '☑' : '☐'} ${richHtml(it.text)}${priced(it)}</li>`); }
+    else if (kind === 'number') { listOf('ol'); parts.push(`<li>${richHtml(it.text)}${priced(it)}</li>`); }
     else {
       closeList();
-      if (kind === 'title') parts.push(`<h2>${esc(it.text)}</h2>`);
-      else if (kind === 'callout') parts.push(`<blockquote>${withBreaks(it.text)}</blockquote>`);
+      if (kind === 'title') parts.push(`<h2>${richHtml(it.text)}</h2>`);
+      else if (kind === 'callout') parts.push(`<blockquote>${richHtml(it.text)}</blockquote>`);
       else if (kind === 'image') {
         const src = images[it.fileId];
         const sized = it.width ? ` style="width:${Number(it.width)}%"` : '';
         if (src) parts.push(`<figure><img src="${esc(src)}" alt="${esc(it.text)}"${sized}>${it.text ? `<figcaption>${esc(it.text)}</figcaption>` : ''}</figure>`);
-      } else if (it.text || hasAmount(it)) parts.push(`<p>${withBreaks(it.text)}${priced(it)}</p>`);
+      } else if (it.text || hasAmount(it)) parts.push(`<p>${richHtml(it.text)}${priced(it)}</p>`);
     }
     if (totals.has(i)) {
       closeList();

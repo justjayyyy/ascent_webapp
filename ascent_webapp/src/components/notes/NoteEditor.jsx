@@ -16,6 +16,8 @@ import { AutoTextarea, ColorPicker, LabelEditor, LinkChips, NoteTypeMenu, Person
 import { AttachmentPanel, ReminderPicker } from './NoteExtras';
 import { askNotificationPermission } from './useReminders';
 import { DictateButton, useDictation } from './useDictation';
+import { FormatBar, FormatToggle, useFormatBar } from './RichTextarea';
+import { joinRich, plainText } from './richText';
 import {
   extractLinks, flowBlocks, flowChanges, fmt, formChanges, formatReminder, isEmptyNote, isOverdue, isPlainText, isTicked, lastEditor, lineKind,
   newItemId, noteForm, noteToText, resolveColor, timeAgo, blankItem,
@@ -60,6 +62,7 @@ export default function NoteEditor({
   const [, setHistoryTick] = useState(0);
   const [hasDirty, setHasDirty] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [formatting, toggleFormatting] = useFormatBar();
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const photosRef = useRef(null);
@@ -161,9 +164,9 @@ export default function NoteEditor({
         // Continuous text: on at the end of its last text, or as new text under whatever ends it
         const blocks = flowBlocks(d, textBlockId.current);
         const last = blocks[blocks.length - 1];
-        const sep = last.text && !/\s$/.test(last.text) ? ' ' : '';
+        const sep = last.text && !/\s$/.test(plainText(last.text)) ? ' ' : '';
         changeBlocks(isPlainText(last)
-          ? [...blocks.slice(0, -1), { ...last, text: last.text + sep + text }]
+          ? [...blocks.slice(0, -1), { ...last, text: joinRich(last.text, sep + text) }]
           : [...blocks, { ...blankItem('text'), text }]);
       }
     },
@@ -202,7 +205,7 @@ export default function NoteEditor({
   }
   // Into the text: its start, or with `end` its end (a click under it)
   const focusBody = (end) => {
-    const boxes = bodyRef.current?.querySelectorAll('textarea') || [];
+    const boxes = bodyRef.current?.querySelectorAll('[data-rich-line], textarea') || [];
     const box = end ? boxes[boxes.length - 1] : boxes[0];
     if (!box) return;
     box.focus();
@@ -283,6 +286,7 @@ export default function NoteEditor({
                   {status === 'saved' && <><Cloud className="h-3.5 w-3.5" /> {t('ntSaved')}</>}
                 </span>
               </div>
+              {canEdit && <FormatToggle open={formatting} onToggle={toggleFormatting} t={t} className={ib} />}
               {!trashed && (
                 <Button
                   variant="ghost" size="icon" className={ib}
@@ -436,6 +440,16 @@ export default function NoteEditor({
                 </span>
               </div>
             </div>
+
+            {canEdit && formatting && (
+              <FormatBar
+                rootRef={bodyRef}
+                t={t}
+                onClose={toggleFormatting}
+                buttonClassName={ib}
+                className="border-t border-foreground/10 px-2 pt-1.5 sm:px-3"
+              />
+            )}
 
             {/* Bottom toolbar */}
             <div className="flex items-center gap-1 border-t border-foreground/10 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-3 sm:pb-3">

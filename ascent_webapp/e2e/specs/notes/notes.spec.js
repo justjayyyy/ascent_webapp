@@ -45,7 +45,7 @@ test('a document pasted into a checklist keeps its titles, its text and its task
     data.setData('text/plain', text);
     el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   }, doc);
-  await expect(page.getByRole('textbox', { name: L('ntListItem') }).last()).toHaveValue('Charge the phones');
+  await expect(page.getByRole('textbox', { name: L('ntListItem') }).last()).toHaveText('Charge the phones');
   await page.keyboard.press('Escape');
 
   await expect.poll(async () => (await api.list('notes'))[0]?.items?.filter((i) => i.text).map((i) => [i.kind || (i.done ? 'done' : 'item'), i.text]))

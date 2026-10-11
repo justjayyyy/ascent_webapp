@@ -25,7 +25,16 @@ function Editor({ start, flow = false }) {
 
 const line = (id, text, kind) => ({ id, text, done: false, ...(kind ? { kind } : {}) });
 const kinds = () => seen.map(lineKind);
-const enterOn = (text) => fireEvent.keyDown(screen.getByDisplayValue(text), { key: 'Enter' });
+// The lines on screen whose text (without formatting) is `text`, or matches it
+const linesWith = (text) => {
+  const found = screen.getAllByRole('textbox').filter(el => (text instanceof RegExp ? text.test(el.value) : el.value === text));
+  if (!found.length) throw new Error(`No line with ${text}`);
+  return found;
+};
+const lineWith = (text) => linesWith(text)[0];
+const enterOn = (text) => fireEvent.keyDown(lineWith(text), { key: 'Enter' });
+// Typing that leaves the line holding `text`
+const typeInto = (el, text) => { el.textContent = text; fireEvent.input(el); };
 
 describe('Enter on a line', () => {
   test('text goes on as text, items as items, numbered lines as numbered lines', () => {
@@ -52,13 +61,13 @@ describe('Enter on a line', () => {
 describe('Backspace on an empty line', () => {
   test('one like the line above is removed at once', () => {
     render(<Editor start={[line('a', 'Some text', 'text'), line('b', '', 'text')]} />);
-    fireEvent.keyDown(screen.getAllByDisplayValue('')[0], { key: 'Backspace' });
+    fireEvent.keyDown(linesWith('')[0], { key: 'Backspace' });
     expect(kinds()).toEqual(['text']);
   });
 
   test('one of another kind becomes the kind above first', () => {
     render(<Editor start={[line('a', 'Some text', 'text'), line('b', '', 'number')]} />);
-    fireEvent.keyDown(screen.getAllByDisplayValue('')[0], { key: 'Backspace' });
+    fireEvent.keyDown(linesWith('')[0], { key: 'Backspace' });
     expect(kinds()).toEqual(['text', 'text']);
   });
 });
@@ -69,23 +78,23 @@ describe('continuous text', () => {
 
   test('Enter goes on in the same text', () => {
     render(<Editor flow start={[line('a', 'Dear diary', 'text')]} />);
-    expect(enterOn('Dear diary')).toBe(true); // not taken over: the text gets its new line
-    expect(texts()).toEqual([['text', 'Dear diary']]);
+    enterOn('Dear diary');
+    expect(texts()).toEqual([['text', 'Dear diary\n']]);
   });
 
   test('"# " or "1. " at the start of a line makes that line a title or a numbered line', () => {
     render(<Editor flow start={[line('a', 'Intro\n#', 'text')]} />);
-    fireEvent.change(screen.getByDisplayValue(/Intro/), { target: { value: 'Intro\n# ' } });
+    typeInto(lineWith(/Intro/), 'Intro\n# ');
     expect(texts()).toEqual([['text', 'Intro'], ['title', '']]);
-    fireEvent.change(screen.getByDisplayValue('Intro'), { target: { value: 'Intro\n1' } });
-    fireEvent.change(screen.getByDisplayValue(/Intro/), { target: { value: 'Intro\n1.' } });
-    fireEvent.change(screen.getByDisplayValue(/Intro/), { target: { value: 'Intro\n1. ' } });
+    typeInto(lineWith('Intro'), 'Intro\n1');
+    typeInto(lineWith(/Intro/), 'Intro\n1.');
+    typeInto(lineWith(/Intro/), 'Intro\n1. ');
     expect(texts()).toEqual([['text', 'Intro'], ['number', ''], ['title', '']]);
   });
 
   test('a title is put in where the cursor is, cutting the text there', () => {
     render(<Editor flow start={[line('a', 'Before\nAfter', 'text')]} />);
-    caretAt(screen.getByDisplayValue(/Before/), 7);
+    caretAt(lineWith(/Before/), 7);
     fireEvent.click(screen.getByRole('button', { name: /ntAddTitle/ }));
     expect(texts()).toEqual([['text', 'Before'], ['title', ''], ['text', 'After']]);
   });
@@ -93,20 +102,62 @@ describe('continuous text', () => {
   test('an empty checkbox leaves the list on Enter, and ticked ones stay in their place', () => {
     render(<Editor flow start={[line('a', 'Intro', 'text'), { ...line('b', 'Milk'), done: true }, line('c', '')]} />);
     expect(screen.queryByText(/ntCompletedCount/)).toBeNull();
-    fireEvent.keyDown(screen.getAllByDisplayValue('')[0], { key: 'Enter' });
+    fireEvent.keyDown(linesWith('')[0], { key: 'Enter' });
     expect(texts()).toEqual([['text', 'Intro'], ['item', 'Milk'], ['text', '']]);
   });
 
   test('Backspace at the start of a title makes it text again, one with the text above', () => {
     render(<Editor flow start={[line('a', 'Intro', 'text'), line('b', 'Shopping', 'title'), line('c', 'Milk and eggs', 'text')]} />);
-    fireEvent.keyDown(caretAt(screen.getByDisplayValue('Shopping'), 0), { key: 'Backspace' });
+    fireEvent.keyDown(caretAt(lineWith('Shopping'), 0), { key: 'Backspace' });
     expect(texts()).toEqual([['text', 'Intro\nShopping\nMilk and eggs']]);
   });
 
   test('Backspace at the start of text joins it to the text above', () => {
     render(<Editor flow start={[line('a', 'Dear ', 'text'), line('b', 'diary', 'text')]} />);
-    fireEvent.keyDown(caretAt(screen.getByDisplayValue('diary'), 0), { key: 'Backspace' });
+    fireEvent.keyDown(caretAt(lineWith('diary'), 0), { key: 'Backspace' });
     expect(texts()).toEqual([['text', 'Dear diary']]);
+  });
+});
+
+describe('formatting', () => {
+  const texts = () => seen.map(i => [lineKind(i), i.text]);
+  const caretAt = (el, from, to = from) => { act(() => el.focus()); el.setSelectionRange(from, to); return el; };
+
+  test('Ctrl+B makes the selection bold, and again plain', () => {
+    render(<Editor flow start={[line('a', 'Buy milk today', 'text')]} />);
+    const el = caretAt(lineWith('Buy milk today'), 4, 8);
+    fireEvent.keyDown(el, { key: 'b', ctrlKey: true });
+    expect(seen[0].text).toBe('Buy <b>milk</b> today');
+    expect(el.querySelector('strong')?.textContent).toBe('milk');
+    expect([el.selectionStart, el.selectionEnd]).toEqual([4, 8]);
+    fireEvent.keyDown(el, { key: 'b', ctrlKey: true });
+    expect(seen[0].text).toBe('Buy milk today');
+  });
+
+  test('italic, underline and strikethrough stack, and Ctrl+\\ takes them off', () => {
+    render(<Editor flow start={[line('a', 'word', 'text')]} />);
+    const el = caretAt(lineWith('word'), 0, 4);
+    fireEvent.keyDown(el, { key: 'i', ctrlKey: true });
+    fireEvent.keyDown(el, { key: 'u', metaKey: true });
+    fireEvent.keyDown(el, { key: 'X', ctrlKey: true, shiftKey: true });
+    expect(seen[0].text).toBe('<i><u><s>word</s></u></i>');
+    fireEvent.keyDown(el, { key: '\\', ctrlKey: true });
+    expect(seen[0].text).toBe('word');
+  });
+
+  test('a title put in the middle of formatted text keeps the formatting on both sides', () => {
+    render(<Editor flow start={[line('a', 'Before <b>bold\nstill</b> after', 'text')]} />);
+    caretAt(lineWith(/Before/), 12);
+    fireEvent.click(screen.getByRole('button', { name: /ntAddTitle/ }));
+    expect(texts()).toEqual([['text', 'Before <b>bold</b>'], ['title', ''], ['text', '<b>still</b> after']]);
+  });
+
+  test('typed text keeps the formatting it is typed into', () => {
+    render(<Editor flow start={[line('a', 'a <b>bold</b> word', 'text')]} />);
+    const el = lineWith('a bold word');
+    el.querySelector('strong').textContent = 'bolder';
+    fireEvent.input(el);
+    expect(seen[0].text).toBe('a <b>bolder</b> word');
   });
 });
 

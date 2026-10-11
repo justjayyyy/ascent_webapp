@@ -20,6 +20,11 @@ const GROUPS = [
     [['Ctrl', 'Shift', '8'], 'ntKeyToggleList'],
     [['Ctrl', 'Z'], 'ntKeyUndo'],
     [['Ctrl', 'Shift', 'Z'], 'ntKeyRedo'],
+    [['Ctrl', 'B'], 'ntBold'],
+    [['Ctrl', 'I'], 'ntItalic'],
+    [['Ctrl', 'U'], 'ntUnderline'],
+    [['Ctrl', 'Shift', 'X'], 'ntStrikethrough'],
+    [['Ctrl', '\\'], 'ntClearFormatting'],
   ] },
 ];
 
