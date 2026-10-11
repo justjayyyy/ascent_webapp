@@ -332,6 +332,7 @@ export default {
   ntGroup_folder: 'По папке',
   ntNoFolder: 'Без папки',
   ntDragToReorder: 'Перетащите, чтобы переместить',
+  ntNowMyOrder: 'Теперь в вашем порядке. Перетаскивайте заметки, чтобы их переставить.',
   ntFolders: 'Папки',
   ntNoFolders: 'Папок пока нет',
   ntNewFolder: 'Новая папка',

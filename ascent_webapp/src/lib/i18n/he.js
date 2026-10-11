@@ -332,6 +332,7 @@ export default {
   ntGroup_folder: 'תיקייה',
   ntNoFolder: 'ללא תיקייה',
   ntDragToReorder: 'גררו כדי להזיז',
+  ntNowMyOrder: 'עכשיו בסדר שלכם. גררו פתקים כדי להזיז אותם.',
   ntFolders: 'תיקיות',
   ntNoFolders: 'אין עדיין תיקיות',
   ntNewFolder: 'תיקייה חדשה',

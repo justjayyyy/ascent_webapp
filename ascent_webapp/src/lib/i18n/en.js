@@ -332,6 +332,7 @@ export default {
   ntGroup_folder: 'Folder',
   ntNoFolder: 'No folder',
   ntDragToReorder: 'Drag to move',
+  ntNowMyOrder: 'Now in your own order. Drag notes to move them.',
   ntFolders: 'Folders',
   ntNoFolders: 'No folders yet',
   ntNewFolder: 'New folder',

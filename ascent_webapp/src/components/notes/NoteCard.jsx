@@ -61,7 +61,7 @@ function Lined({ text, query }) {
 }
 
 function NoteCard({
-  note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true, currency, dragHandle,
+  note, people, query, onOpen, actions, t, canCreate, language, selected, selecting, onToggleSelect, online = true, currency, dragHandle, overlay, movable, moving,
 }) {
   const color = resolveColor(note.color);
   const isOwner = note.myAccess === 'owner';
@@ -111,10 +111,12 @@ function NoteCard({
   const dragged = useRef(false);
   const x = useMotionValue(0);
   const swipeOpacity = useTransform(x, [-220, -SWIPE, 0, SWIPE, 220], [0.2, 0.55, 1, 0.55, 0.2]);
-  const swipeable = coarse && !trashed && !selecting && !!actions.swipeArchive;
+  // Not while the card is being moved, so moving it doesn't swipe it away too
+  const swipeable = coarse && !trashed && !selecting && !overlay && !moving && !!actions.swipeArchive;
 
   const onPointerDown = (e) => {
-    if (e.pointerType !== 'touch' || !onToggleSelect) return;
+    // A card that can be moved is selected by the hold that starts a move, let go in place
+    if (e.pointerType !== 'touch' || !onToggleSelect || movable) return;
     const start = { x: e.clientX, y: e.clientY, fired: false };
     start.timer = setTimeout(() => {
       start.fired = true;
@@ -140,8 +142,9 @@ function NoteCard({
 
   return (
     <motion.article
-      layout="position"
-      layoutId={`note-${note.id}`}
+      // The copy that follows the pointer while a note is moved takes no part in the cards' layout animation
+      layout={overlay ? false : 'position'}
+      layoutId={overlay ? undefined : `note-${note.id}`}
       transition={{ type: 'spring', stiffness: 420, damping: 38 }}
       data-note-color={color === 'default' ? undefined : color}
       drag={swipeable ? 'x' : false}
@@ -151,7 +154,9 @@ function NoteCard({
       dragConstraints={{ left: 0, right: 0 }}
       onDragStart={() => { dragged.current = true; endPress(); }}
       onDragEnd={(_, info) => {
-        if (Math.abs(info.offset.x) > SWIPE || Math.abs(info.velocity.x) > 700) {
+        // A finger moving the note to another place is not a swipe (the swipe sees the same finger)
+        const movingNote = moving || !!document.documentElement.dataset.movingNote;
+        if (!movingNote && (Math.abs(info.offset.x) > SWIPE || Math.abs(info.velocity.x) > 700)) {
           if (navigator.vibrate) navigator.vibrate(10);
           actions.swipeArchive(note);
         }
@@ -164,7 +169,7 @@ function NoteCard({
       onPointerCancel={endPress}
       onContextMenu={(e) => { if (coarse) e.preventDefault(); }}
       className={cn(
-        'note-surface group relative h-full overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
+        'note-surface group relative overflow-hidden rounded-2xl border p-4 text-foreground [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none',
         'shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.05),0_8px_30px_-16px_hsl(0_0%_0%/0.5)]',
         'transition-shadow hover:shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06),0_14px_36px_-14px_hsl(0_0%_0%/0.6)]',
         color === 'default' && 'border-border/60 bg-card/75 backdrop-blur-xl',
@@ -203,14 +208,15 @@ function NoteCard({
         <CardPhotos note={note} online={online} />
         {/* Room for the pin and menu in the top corner: the title stops short of them, other text flows around them */}
         {!note.title && !photoCount && hasBody && (
-          <div aria-hidden className={cn('float-end -mt-2 h-8 w-14 [@media(pointer:coarse)]:h-10', !note.isPinned && '[@media(pointer:coarse)]:w-7')} />
+          <div aria-hidden className={cn('float-end -mt-2 h-8 [@media(pointer:coarse)]:h-10', dragHandle ? 'w-[5.5rem]' : 'w-14', !note.isPinned && '[@media(pointer:coarse)]:w-7')} />
         )}
         {(note.title || (!hasBody && !photoCount)) && (
           // The room for the buttons follows the page's direction, as they do; only the words follow their own
           // language (an English title in Hebrew would otherwise keep its room on the wrong side)
           <h3
             className={cn(
-              'pe-14 text-[15px] font-semibold leading-snug tracking-tight',
+              dragHandle ? 'pe-[5.5rem]' : 'pe-14',
+              'text-[15px] font-semibold leading-snug tracking-tight',
               // On touch there is only the menu, and the pin's mark beside it on a pinned note
               note.isPinned ? '[@media(pointer:coarse)]:pe-16' : '[@media(pointer:coarse)]:pe-6',
               !note.title && 'text-muted-foreground'

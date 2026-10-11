@@ -6,10 +6,9 @@ import {
   ListChecks, Image as ImageIcon, StickyNote as NoteIcon, FileUp, ArrowDownUp, CalendarDays, Tag, AlignLeft, Folder, GripVertical,
 } from 'lucide-react';
 import {
-  DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors,
+  DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, pointerWithin, rectIntersection, useDraggable, useDroppable,
+  useSensor, useSensors,
 } from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,7 +42,7 @@ import { noteToHtml } from '@/components/notes/noteDocument';
 import { useAssistStatus } from '@/hooks/useWorkspaceData';
 import { ascent } from '@/api/client';
 import {
-  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
+  NOTE_COLORS, NOTE_FILTERS, NOTE_GROUPS, NOTE_SORTS, blankItem, distribute, fmt, groupNotes, lineKind, matchesFilter, newItemId, noteToText,
   reorderPositions, resolveColor, searchableText, sortNotes, useColumnCount,
 } from '@/components/notes/noteUtils';
 
@@ -78,34 +77,42 @@ const canEditNote = (n) => n.myAccess === 'owner' || n.myAccess === 'edit';
 const sameName = (a, b) => !!a && !!b && lower(a) === lower(b);
 
 /**
- * A card in your own order: it can be dragged by its handle (or moved with the keyboard: Space, the arrows, Space).
- * `children` makes the card from the handle, or from null when it can't be moved.
+ * A card you can move: with a mouse, drag the card itself; on touch, press and hold it, then drag (held and let go
+ * where it is, it is selected, as a long press does); with the keyboard, focus its handle and press Space, the arrows,
+ * then Space. The card keeps its own size; the one it is dropped on is highlighted, and it takes that one's place.
+ * `children` makes the card from the handle (null when it can't be moved) and whether it is being moved.
  */
-function SortableNote({ id, enabled, label, children }) {
-  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: !enabled });
-  // The handle stays the same element while the card is dragged, so the card itself doesn't redraw on every move
+function MovableNote({ id, enabled, label, children }) {
+  const { setNodeRef: setDragRef, setActivatorNodeRef, attributes, listeners, isDragging } = useDraggable({ id, disabled: !enabled });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id, disabled: !enabled });
+  const setRef = useCallback((node) => { setDragRef(node); setDropRef(node); }, [setDragRef, setDropRef]);
+  // The handle stays the same element while a card is dragged, so the cards don't redraw on every move
   const handle = useMemo(() => (enabled ? (
     <button
       type="button"
       ref={setActivatorNodeRef}
       {...attributes}
-      {...listeners}
-      // Not the card's own long press (select) or swipe (archive)
-      onPointerDown={(e) => { listeners?.onPointerDown?.(e); e.stopPropagation(); }}
+      onKeyDown={listeners?.onKeyDown}
       aria-label={label}
       title={label}
-      className="pointer-events-auto flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing group-hover:opacity-100 [@media(hover:none)]:opacity-70 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+      className="pointer-events-auto flex h-8 w-8 cursor-grab items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing group-hover:opacity-100 [@media(pointer:coarse)]:hidden"
     >
       <GripVertical className="h-4 w-4" />
     </button>
   ) : null), [enabled, attributes, listeners, setActivatorNodeRef, label]);
   return (
     <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={cn('relative min-w-0', isDragging && 'z-20 opacity-90 [&>article]:shadow-2xl')}
+      ref={setRef}
+      onMouseDown={enabled ? listeners?.onMouseDown : undefined}
+      onTouchStart={enabled ? listeners?.onTouchStart : undefined}
+      className={cn(
+        'relative min-w-0 rounded-2xl transition-[opacity,box-shadow]',
+        enabled && 'select-none [touch-action:manipulation]',
+        isDragging && 'opacity-30',
+        isOver && !isDragging && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+      )}
     >
-      {children(handle)}
+      {children(handle, isDragging)}
     </div>
   );
 }
@@ -528,9 +535,14 @@ function Notes() {
 
   // ---- your own order: drag a card by its handle within its section ----
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // Held still a moment, as a long press; moving first scrolls the page or swipes the card
+    useSensor(TouchSensor, { activationConstraint: { delay: 350, tolerance: 8 } }),
+    useSensor(KeyboardSensor)
   );
+  const [dragId, setDragId] = useState(null);
+  // The click that ends a drag doesn't open the note
+  const draggedAt = useRef(0);
 
   useReminders(notes, {
     t,
@@ -609,48 +621,84 @@ function Notes() {
     return { icon: Lightbulb, title: t('ntEmptyNotes'), hint: canCreate ? t('ntEmptyNotesHint') : t('ntEmptyNotesReadOnly') };
   })();
 
-  // Cards in rows that read across, as tall as the tallest card in their row; in your own order, each can be dragged
-  const canDrag = sort === 'manual' && !byReminder && !selecting && view !== 'trash';
-  const renderGrid = (list) => (
-    <SortableContext items={list.map(n => n.id)} strategy={rectSortingStrategy}>
+  // Cards in columns, each as tall as its note; any of them can be moved to another's place
+  const canDrag = !byReminder && !selecting && !searching && view !== 'trash';
+  const renderGrid = (list) => {
+    const cols = distribute(list, columnCount);
+    return (
       <div
-        className={cn('grid items-stretch gap-3', listView && 'mx-auto max-w-2xl')}
-        style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+        className={cn('flex items-start gap-3', listView && 'mx-auto max-w-2xl')}
+        onClickCapture={(e) => { if (Date.now() - draggedAt.current < 300) { e.stopPropagation(); e.preventDefault(); } }}
       >
-        {list.map(n => (
-          <SortableNote key={n.id} id={n.id} enabled={canDrag} label={t('ntDragToReorder')}>
-            {(handle) => (
-              <NoteCard
-                note={n}
-                people={people}
-                query={query}
-                onOpen={setOpenId}
-                actions={actions}
-                t={t}
-                language={language}
-                canCreate={canCreate}
-                selected={selected.has(n.id)}
-                selecting={selecting}
-                onToggleSelect={toggleSelect}
-                online={online}
-                currency={currency}
-                dragHandle={handle}
-              />
-            )}
-          </SortableNote>
+        {cols.map((col, i) => (
+          <div key={i} className="flex min-w-0 flex-1 flex-col gap-3">
+            {col.map(n => (
+              <MovableNote key={n.id} id={n.id} enabled={canDrag} label={t('ntDragToReorder')}>
+                {(handle, moving) => (
+                  <NoteCard
+                    note={n}
+                    people={people}
+                    query={query}
+                    onOpen={setOpenId}
+                    actions={actions}
+                    t={t}
+                    language={language}
+                    canCreate={canCreate}
+                    selected={selected.has(n.id)}
+                    selecting={selecting}
+                    onToggleSelect={toggleSelect}
+                    online={online}
+                    currency={currency}
+                    dragHandle={handle}
+                    movable={canDrag}
+                    moving={moving}
+                  />
+                )}
+              </MovableNote>
+            ))}
+          </div>
         ))}
       </div>
-    </SortableContext>
-  );
+    );
+  };
 
-  // A card dropped in its own section takes its new place there; dropped in another section, it goes back
-  const sections = [pinned, ...(grouped ? groups.map(g => g.notes) : [others])];
-  const onDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return;
-    const section = sections.find(list => list.some(n => n.id === active.id));
-    const to = section ? section.findIndex(n => n.id === over.id) : -1;
-    if (to < 0) return;
-    reorderPositions(section, active.id, to).forEach(([id, position]) => patchNote(id, { position }));
+  // The sections on screen, top to bottom. A card dropped on another takes its place; across sections only between
+  // folders (it moves to that folder), otherwise it goes back
+  const sections = [
+    { key: 'pinned', notes: pinned },
+    ...(grouped ? groups.map(g => ({ key: g.key, notes: g.notes, folder: g.kind === 'folder' ? g.folder || '' : undefined })) : [{ key: 'all', notes: others }]),
+  ].filter(sec => sec.notes.length);
+  const dragNote = dragId ? shown.find(n => n.id === dragId) : null;
+
+  const onDragEnd = ({ active, over, activatorEvent, delta }) => {
+    delete document.documentElement.dataset.movingNote;
+    setDragId(null);
+    draggedAt.current = Date.now();
+    // On touch, held and let go in place is the long press that selects
+    if (activatorEvent?.type === 'touchstart' && Math.hypot(delta.x, delta.y) < 10) { toggleSelect(active.id); return; }
+    if (!over || over.id === active.id) return;
+    const from = sections.find(sec => sec.notes.some(n => n.id === active.id));
+    const into = sections.find(sec => sec.notes.some(n => n.id === over.id));
+    if (!from || !into) return;
+    const toFolder = from !== into && from.folder !== undefined && into.folder !== undefined;
+    if (from !== into && !toFolder) return;
+    const moving = from.notes.find(n => n.id === active.id);
+    const to = into.notes.findIndex(n => n.id === over.id);
+    if (toFolder) patchNote(active.id, { folder: into.folder });
+
+    if (sort === 'manual') {
+      const list = toFolder ? [...into.notes, moving] : into.notes;
+      reorderPositions(list, active.id, to).forEach(([id, position]) => patchNote(id, { position }));
+      return;
+    }
+    // The first move: the notes keep the order they are shown in, with this one in its new place, from now on
+    const order = sections.flatMap(sec => {
+      const rest = sec.notes.filter(n => n.id !== active.id);
+      return sec === into ? [...rest.slice(0, to), moving, ...rest.slice(to)] : rest;
+    });
+    order.forEach((n, i) => { if (n.position !== i * 1024) patchNote(n.id, { position: i * 1024 }); });
+    setSortPref('manual');
+    toast(t('ntNowMyOrder'));
   };
 
   // A group's heading: "Today", "March 2025", a label, a colour, or the kind of note
@@ -925,7 +973,17 @@ function Notes() {
                   {emptyCopy.hint && <p className="mt-1 text-sm text-muted-foreground">{emptyCopy.hint}</p>}
                 </div>
               ) : (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={(args) => { const hits = pointerWithin(args); return hits.length ? hits : rectIntersection(args); }}
+                  onDragStart={({ active, activatorEvent }) => {
+                    document.documentElement.dataset.movingNote = '1';
+                    setDragId(active.id);
+                    if (activatorEvent?.type === 'touchstart') navigator.vibrate?.(15);
+                  }}
+                  onDragEnd={onDragEnd}
+                  onDragCancel={() => { delete document.documentElement.dataset.movingNote; setDragId(null); }}
+                >
                 <LayoutGroup>
                   {pinned.length > 0 && (
                     <section className="mb-6" aria-label={t('pinned')}>
@@ -961,6 +1019,16 @@ function Notes() {
                     );
                   })}
                 </LayoutGroup>
+                <DragOverlay dropAnimation={null}>
+                  {dragNote && (
+                    <div className="cursor-grabbing rotate-1 rounded-2xl bg-background shadow-2xl">
+                      <NoteCard
+                        note={dragNote} people={people} query={query} onOpen={() => {}} actions={actions} t={t} language={language}
+                        canCreate={false} online={online} currency={currency} overlay
+                      />
+                    </div>
+                  )}
+                </DragOverlay>
                 </DndContext>
               )}
             </div>
