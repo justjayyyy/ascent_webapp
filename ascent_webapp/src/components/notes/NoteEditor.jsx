@@ -291,6 +291,11 @@ export default function NoteEditor({
               </div>
               {canEdit && <FormatToggle open={formatting} onToggle={toggleFormatting} t={t} className={ib} />}
               {!trashed && (
+                <Button variant="ghost" size="icon" className={ib} onClick={() => setAskOpen(true)} aria-label={t('ntAskTitle')} title={t('ntAskTitle')}>
+                  <Sparkles />
+                </Button>
+              )}
+              {!trashed && (
                 <Button
                   variant="ghost" size="icon" className={ib}
                   onClick={() => actions.patch(noteId, { isPinned: !note.isPinned })}
@@ -547,7 +552,7 @@ export default function NoteEditor({
                       <DropdownMenuSeparator />
                     </>
                   )}
-                  {assistant?.configured && !trashed && (
+                  {!trashed && (
                     <DropdownMenuItem onSelect={() => setAskOpen(true)}>
                       <Sparkles className="me-2 h-4 w-4" /> {t('ntAskTitle')}
                     </DropdownMenuItem>
@@ -600,18 +605,18 @@ export default function NoteEditor({
                 </Button>
               </div>
             </div>
-            {assistant?.configured && (
-              <AskNoteDialog
-                open={askOpen}
-                onOpenChange={setAskOpen}
-                note={{ ...note, ...draft }}
-                text={askOpen ? noteToText({ ...note, ...draft }, { withTitle: false }) : ''}
-                aiOff={!assistant.enabled}
-                isOwner={isWorkspaceOwner}
-                online={online}
-                t={t}
-              />
-            )}
+            <AskNoteDialog
+              open={askOpen}
+              onOpenChange={setAskOpen}
+              note={{ ...note, ...draft }}
+              text={askOpen ? noteToText({ ...note, ...draft }, { withTitle: false }) : ''}
+              // Not known yet (still loading): let the server's answer decide
+              notSetUp={!!assistant && !assistant.configured}
+              aiOff={!!assistant && !assistant.enabled}
+              isOwner={isWorkspaceOwner}
+              online={online}
+              t={t}
+            />
           </motion.div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

@@ -18,9 +18,9 @@ function errorKey(err) {
 /**
  * "Ask about this note": questions about the note in front of you, answered by the assistant from its text
  * as it stands (unsaved edits included). The conversation lasts while the note is open.
- * Without the assistant it says how to turn it on.
+ * Without the assistant it says how to turn it on (or that the server is not set up for it).
  */
-export default function AskNoteDialog({ open, onOpenChange, note, text, aiOff, isOwner, online, t }) {
+export default function AskNoteDialog({ open, onOpenChange, note, text, notSetUp, aiOff, isOwner, online, t }) {
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState([]); // [{ question, answer }]
   const [busy, setBusy] = useState(false);
@@ -70,7 +70,7 @@ export default function AskNoteDialog({ open, onOpenChange, note, text, aiOff, i
     }
   };
 
-  const off = aiOff || failed === 'off';
+  const off = notSetUp || aiOff || failed === 'off';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,7 +85,7 @@ export default function AskNoteDialog({ open, onOpenChange, note, text, aiOff, i
 
         {off ? (
           <>
-            <DialogDescription>{isOwner ? t('ntAskNeedsAssistantOwner') : t('ntAskNeedsAssistant')}</DialogDescription>
+            <DialogDescription>{notSetUp ? t('ntAskNotSetUp') : isOwner ? t('ntAskNeedsAssistantOwner') : t('ntAskNeedsAssistant')}</DialogDescription>
             <div className="flex justify-end">
               <Button variant="outline" onClick={() => onOpenChange(false)}>{t('ntDone')}</Button>
             </div>

@@ -212,6 +212,7 @@ export default {
   ntAskOffline: 'התחברו לאינטרנט כדי לשאול על הפתק',
   ntAskNeedsAssistant: 'שאלות על פתקים משתמשות בעוזר ה-AI. בקשו מבעלי סביבת העבודה להפעיל אותו בהגדרות.',
   ntAskNeedsAssistantOwner: 'שאלות על פתקים משתמשות בעוזר ה-AI. הפעילו אותו בהגדרות ונסו שוב.',
+  ntAskNotSetUp: 'שאלות על פתקים משתמשות בעוזר ה-AI, שעדיין לא הוגדר בשרת הזה (ANTHROPIC_API_KEY לא מוגדר).',
   ntTryAgain: 'לנסות שוב',
   ntItemSuggestions: 'הצעות',
   ntRestoreItem: 'החזר לרשימה',

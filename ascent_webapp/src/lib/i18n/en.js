@@ -212,6 +212,7 @@ export default {
   ntAskOffline: 'Connect to the internet to ask about this note',
   ntAskNeedsAssistant: 'Asking about notes uses the AI assistant. Ask the owner of this household to turn it on in Settings.',
   ntAskNeedsAssistantOwner: 'Asking about notes uses the AI assistant. Turn it on in Settings, then try again.',
+  ntAskNotSetUp: 'Asking about notes uses the AI assistant, which isn’t set up on this server yet (ANTHROPIC_API_KEY is not set).',
   ntTryAgain: 'Try again',
   ntItemSuggestions: 'Suggestions',
   ntRestoreItem: 'Bring back',

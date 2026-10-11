@@ -48,6 +48,10 @@ test('with the assistant off it says how to turn it on; offline it does not call
   expect(screen.queryByPlaceholderText('ntAskPlaceholder')).toBeNull();
   unmount();
 
+  const notSetUp = open({ notSetUp: true, aiOff: true, isOwner: true });
+  expect(screen.getByText('ntAskNotSetUp')).toBeTruthy();
+  notSetUp.unmount();
+
   const user = userEvent.setup();
   open({ online: false });
   await user.click(screen.getByRole('button', { name: 'ntAskSummarize' }));
