@@ -23,7 +23,8 @@ const PRICED_KINDS = [null, 'text', 'number']; // the lines that may carry an am
 const sameId = (a, b) => a && b && a.toString() === b.toString();
 
 // Reading documents into notes uses the assistant: a few pages per call, a limited number of calls per person
-const IMPORT_LIMIT = { windowMs: 60 * 60_000, max: 30 };
+// (enough for the longest document, 30 pages, read again a page at a time where its readings ran out of time)
+const IMPORT_LIMIT = { windowMs: 60 * 60_000, max: 60 };
 const importCalls = new Map();
 const PAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_IMPORT_CHARS = 4_200_000; // the pages' base64 together, under Vercel's 4.5 MB body limit

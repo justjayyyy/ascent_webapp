@@ -187,6 +187,24 @@ export function joinPages(answers) {
   return lines;
 }
 
+// A reading that ran out of time or met a server error is worth another go; not one refused or turned away
+const readAgain = (err) => err?.isNetworkError || err?.status >= 500;
+
+/**
+ * A batch of pages read, as its answers. A reading that fails for want of time is tried again a page at a
+ * time (half the copying per call), or once more for a single page; the page breaks are joined after.
+ */
+export async function readBatch(batch, read) {
+  try {
+    return [await read(batch)];
+  } catch (err) {
+    if (!readAgain(err)) throw err;
+    const answers = [];
+    for (const page of batch) answers.push(await read([page]));
+    return answers;
+  }
+}
+
 async function inBatches(tasks, limit, onDone) {
   const results = new Array(tasks.length);
   let next = 0;
@@ -214,10 +232,7 @@ export async function readDocument(files, { readPages, language, onProgress }) {
   const { pages, pictures, pageCount } = pdf ? await readPdf(pdf, onProgress) : await readPhotos(list.slice(0, MAX_IMPORT_PAGES), onProgress);
   if (!pages.length) throw new Error('empty');
 
-  const batches = [];
-  for (let i = 0; i < pages.length; i += PAGES_PER_CALL) batches.push(pages.slice(i, i + PAGES_PER_CALL));
-  onProgress?.({ stage: 'reading', done: 0, total: batches.length });
-  const answers = await inBatches(batches.map((batch) => async () => {
+  const read = async (batch) => {
     const onPages = new Set(batch.map((p) => p.page));
     return readPages({
       pages: await Promise.all(batch.map(async (p) => ({ data: await base64Of(p.blob), mediaType: 'image/jpeg' }))),
@@ -226,7 +241,13 @@ export async function readDocument(files, { readPages, language, onProgress }) {
       pageCount: pages.length,
       language,
     });
-  }), CALLS_AT_ONCE, (done) => onProgress?.({ stage: 'reading', done, total: batches.length }));
+  };
+  const batches = [];
+  for (let i = 0; i < pages.length; i += PAGES_PER_CALL) batches.push(pages.slice(i, i + PAGES_PER_CALL));
+  onProgress?.({ stage: 'reading', done: 0, total: batches.length });
+  // Each batch's answers: one, or one per page when the batch had to be read again a page at a time
+  const answers = (await inBatches(batches.map((batch) => () => readBatch(batch, read)), CALLS_AT_ONCE,
+    (done) => onProgress?.({ stage: 'reading', done, total: batches.length }))).flat();
 
   return {
     title: answers[0]?.title || null,
