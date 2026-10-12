@@ -10,6 +10,12 @@ describe('text direction', () => {
     expect(textDir('  12. - קניות')).toBe('rtl');
   });
 
+  test('unless the other way has two letters to one: a Hebrew line that starts with an English name', () => {
+    expect(textDir('DJ: לא ידוע מי ה-DJ שנסגר, אם יש חוזה')).toBe('rtl');
+    expect(textDir('iPlan: לשלוח את רשימת האורחים')).toBe('rtl');
+    expect(textDir('שלום: please call the venue tomorrow')).toBe('ltr');
+  });
+
   test('no letters yet follows the page', () => {
     expect(textDir('')).toBeUndefined();
     expect(textDir('123 !?')).toBeUndefined();

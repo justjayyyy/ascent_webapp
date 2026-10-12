@@ -502,6 +502,9 @@ export default function ChecklistEditor({
   const done = items.filter(folds);
   const numbers = useMemo(() => lineNumbers(open), [open]);
   const totals = useMemo(() => amountTotals(open, currency), [open, currency]);
+  // The lines run the way most of their text does, so a Hebrew note in an English app keeps its totals and
+  // lines without letters on its side; a line in the other language still runs its own way
+  const linesDir = textDir(open.map(i => plainText(i.text)).join('\n'));
   const canPicture = !!onAddImage && online && !readOnly;
 
   // The line being typed in, for suggestions and for where new lines go.
@@ -784,7 +787,7 @@ export default function ChecklistEditor({
 
   return (
     <div className="space-y-0.5">
-      <Reorder.Group axis="y" values={open} onReorder={reorderOpen} className="space-y-0.5">
+      <Reorder.Group axis="y" values={open} onReorder={reorderOpen} dir={linesDir} className="space-y-0.5">
         {open.map((item, i) => (
             <Row
               {...shared}

@@ -332,16 +332,21 @@ export function highlight(text, query) {
   return createElement(Fragment, null, ...out);
 }
 
-// The first letter decides which way a piece of text runs, so a Hebrew note reads right to left
-// in an English app and the other way round. No letters yet: follow the page.
+// Which way a piece of text runs, so a Hebrew note reads right to left in an English app and the other way
+// round: its first letter decides, unless the letters of the other way outnumber the rest two to one (a Hebrew
+// line that starts with "DJ:" or "iPlan" still runs right to left). No letters yet: follow the page.
 const span = (from, to) => `${String.fromCharCode(from)}-${String.fromCharCode(to)}`;
 const RTL_RANGES = span(0x0590, 0x08ff) + span(0xfb1d, 0xfdff) + span(0xfe70, 0xfefc); // Hebrew, Arabic and their forms
 const RTL_LETTER = new RegExp(`[${RTL_RANGES}]`);
-const STRONG_LETTER = new RegExp(`[A-Za-z${span(0x00c0, 0x024f)}${span(0x0370, 0x04ff)}${RTL_RANGES}]`); // plus Latin, Greek, Cyrillic
+const STRONG_LETTERS = new RegExp(`[A-Za-z${span(0x00c0, 0x024f)}${span(0x0370, 0x04ff)}${RTL_RANGES}]`, 'g'); // plus Latin, Greek, Cyrillic
 export function textDir(text) {
-  const first = plainText(text).match(STRONG_LETTER);
-  if (!first) return undefined;
-  return RTL_LETTER.test(first[0]) ? 'rtl' : 'ltr';
+  const letters = plainText(text).match(STRONG_LETTERS);
+  if (!letters) return undefined;
+  const rtl = letters.filter((c) => RTL_LETTER.test(c)).length;
+  const ltr = letters.length - rtl;
+  if (rtl >= 2 * ltr) return 'rtl';
+  if (ltr >= 2 * rtl) return 'ltr';
+  return RTL_LETTER.test(letters[0]) ? 'rtl' : 'ltr';
 }
 
 /** Who made the latest change to a note: a workspace person, a stand-in from the email, or nobody known. */
