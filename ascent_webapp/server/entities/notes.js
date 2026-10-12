@@ -230,7 +230,7 @@ export default async function handler(req, res) {
     const uid = user._id;
 
     // ---- reading a document: POST ?action=import { pages: [{ data, mediaType }], pictures, firstPage, pageCount } ----
-    // -> { title, lines }: the note's lines for these pages; the app creates the note and uploads the pictures
+    // -> { title, lines, continuesFromBefore, continuesAfter }: the note's lines for these pages; the app creates the note and uploads the pictures
     if (action === 'import') {
       if (req.method !== 'POST') return error(res, 'Method not allowed', 405);
       if (!canCreate) return error(res, 'You do not have permission to create notes', 403);

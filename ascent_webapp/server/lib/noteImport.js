@@ -26,11 +26,15 @@ const LineSchema = z.object({
 const DocumentSchema = z.object({
   title: z.string().nullable(),
   lines: z.array(LineSchema),
+  continuesFromBefore: z.boolean(),
+  continuesAfter: z.boolean(),
 });
 
 export const IMPORT_SYSTEM = `You copy documents into a notes app, faithfully, as the note's lines. You see the pages as images, in order.
 
 Copy, never summarise, translate or reword: every heading, sentence, task, number and name, in the document's own language and spelling. Hebrew and Arabic read right to left: write them in their natural order. Leave out page numbers, running headers and footers repeated on every page, and decoration.
+
+A paragraph, list entry or box that runs on from one page to the next is one line: join it across the page break (a word hyphenated across it is written whole).
 
 Each line has a kind:
 - title: a heading or section name, as printed (keep a section number such as "2." if it is part of the heading).
@@ -42,9 +46,18 @@ Each line has a kind:
 
 Amounts: when a list entry or a table row has a sum of money of its own (a price or cost column, an amount set apart beside the entry), set amount to that number and currency to its ISO 4217 code (₪, ש"ח -> ILS; $ -> USD; € -> EUR; £ -> GBP; ₽, руб -> RUB; null if none is shown), and leave it out of the text. Amounts inside sentences stay in the text with amount null. The app adds up a run of lines with amounts by itself, so leave out a total row that only adds up the amounts right above it; keep any other summary row (paid so far, balance) as a text line with its figures in the text.
 
-title: the document's main title when these pages start the document (it heads the note and is not repeated as a line), otherwise null. Set done false and amount, currency and picture null wherever they do not apply.`;
+title: the document's main title when these pages start the document (it heads the note and is not repeated as a line), otherwise null.
 
-/** One call: these pages -> { title, lines } in the app's line shape (see entities/notes.js). */
+Pages copied separately are put together by the app, so say where these pages cut a line in two:
+- continuesFromBefore: true when the first line carries on a paragraph, entry or box cut off at the end of the earlier pages (the page starts in the middle of a sentence); copy just the rest of it as the first line, of the same kind. false on the document's first page.
+- continuesAfter: true when the last line breaks off at the end of these pages in the middle of a sentence, to go on on the next page. false on the document's last page.
+
+Set done false and amount, currency and picture null wherever they do not apply.`;
+
+/**
+ * One call: these pages -> { title, lines, continuesFromBefore, continuesAfter } in the app's line shape (see
+ * entities/notes.js); the two flags say the first line goes on from the pages before, the last onto the next.
+ */
 export async function readDocumentPages({ pages, pictures = [], firstPage = 1, pageCount, language }) {
   const content = [];
   pages.forEach((page, i) => {
@@ -109,5 +122,5 @@ export function toNoteLines(result, pictureRefs = []) {
     lines.push(line);
   }
   const title = String(result?.title || '').trim().slice(0, 500) || null;
-  return { title, lines };
+  return { title, lines, continuesFromBefore: result?.continuesFromBefore === true, continuesAfter: result?.continuesAfter === true };
 }

@@ -154,6 +154,39 @@ async function readPhotos(files, onProgress) {
   return { pages, pictures: [], pageCount: files.length };
 }
 
+// Lines that can go on from one page to the next: text, boxes, numbered entries and tasks (no kind)
+const RUNS_ON = new Set([undefined, 'text', 'callout', 'number']);
+
+/** A line cut by a page break, put back together: a word hyphenated across it whole, otherwise a space between. */
+function runOn(head, tail) {
+  const a = head.text.trimEnd();
+  const b = tail.text.trimStart();
+  const text = /\p{L}-$/u.test(a) && /^\p{Ll}/u.test(b) ? `${a.slice(0, -1)}${b}` : `${a} ${b}`;
+  const amount = head.amount ?? tail.amount;
+  return { ...head, text, ...(amount !== undefined ? { amount, ...(head.currency || tail.currency ? { currency: head.currency || tail.currency } : {}) } : {}) };
+}
+
+/**
+ * The answers for each batch of pages, as the document's lines: a paragraph, entry or box that a batch's last
+ * page cut off is joined with its rest at the top of the next batch, when either reading saw it go on.
+ */
+export function joinPages(answers) {
+  const lines = [];
+  let cut = false;
+  for (const answer of answers) {
+    const next = answer?.lines || [];
+    const prev = lines[lines.length - 1];
+    const [first] = next;
+    if (prev && first && (cut || answer.continuesFromBefore) && prev.kind === first.kind && RUNS_ON.has(prev.kind)
+      && !(prev.amount !== undefined && first.amount !== undefined)) {
+      lines[lines.length - 1] = runOn(prev, first);
+      lines.push(...next.slice(1));
+    } else lines.push(...next);
+    if (next.length) cut = !!answer.continuesAfter;
+  }
+  return lines;
+}
+
 async function inBatches(tasks, limit, onDone) {
   const results = new Array(tasks.length);
   let next = 0;
@@ -197,7 +230,7 @@ export async function readDocument(files, { readPages, language, onProgress }) {
 
   return {
     title: answers[0]?.title || null,
-    lines: answers.flatMap((a) => a?.lines || []),
+    lines: joinPages(answers),
     pictures,
     pageCount,
     cut: pageCount > pages.length,

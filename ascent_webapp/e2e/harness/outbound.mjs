@@ -80,6 +80,8 @@ function anthropic({ ai = 'ok' }, url, init) {
         line({ kind: 'numbered', text: 'Hall', amount: 73440, currency: 'ILS' }),
         line({ kind: 'task', text: 'Book the hall' }),
       ],
+      continuesFromBefore: false,
+      continuesAfter: false,
     }));
   }
   return message(ASSISTANT_ANSWER);

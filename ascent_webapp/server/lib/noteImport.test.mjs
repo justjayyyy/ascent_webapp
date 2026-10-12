@@ -6,8 +6,9 @@ import { toNoteLines, IMPORT_SYSTEM } from './noteImport.js';
 const line = (over) => ({ kind: 'text', text: 'x', done: false, amount: null, currency: null, picture: null, ...over });
 
 test('each kind becomes the note line it stands for, with its amount only where a line may carry one', () => {
-  const { title, lines } = toNoteLines({
+  const { title, lines, ...rest } = toNoteLines({
     title: '  לפני החתונה  ',
+    continuesAfter: true,
     lines: [
       line({ kind: 'title', text: '1. ספקים' }),
       line({ kind: 'numbered', text: 'דיג׳יי\nשולם ₪0', amount: 8000, currency: 'ils' }),
@@ -19,6 +20,8 @@ test('each kind becomes the note line it stands for, with its amount only where 
     ],
   });
   assert.equal(title, 'לפני החתונה');
+  assert.equal(rest.continuesFromBefore, false);
+  assert.equal(rest.continuesAfter, true);
   assert.deepEqual(lines, [
     { text: '1. ספקים', done: false, kind: 'title' },
     { text: 'דיג׳יי\nשולם ₪0', done: false, kind: 'number', amount: 8000, currency: 'ILS' },
