@@ -184,9 +184,9 @@ function AmountInput({ item, currency, language, readOnly, onChange, t, inputRef
 }
 
 /** The sum under a run of lines with amounts. */
-function TotalRow({ totals, language, t, editable }) {
+function TotalRow({ totals, language, t, editable, flow }) {
   return (
-    <div className={cn('flex items-center justify-end gap-3 border-t border-dashed border-foreground/20 pb-1 pt-1.5 text-sm', editable ? 'pe-[4.5rem] [@media(hover:none)]:pe-[2.4rem]' : 'pe-0')}>
+    <div className={cn('flex items-center justify-end gap-3 border-t border-dashed border-foreground/20 pb-1 pt-1.5 text-sm', editable ? cn('pe-[4.5rem]', flow ? '[@media(hover:none)]:pe-0' : '[@media(hover:none)]:pe-[2.4rem]') : 'pe-0')}>
       <span className="text-muted-foreground">{t('ntTotal')}</span>
       <span className="min-w-[5.25rem] px-1.5 text-end font-semibold tabular-nums sm:min-w-[6.5rem]">
         {totals.map(s => formatAmount(s.amount, s.currency, language)).join(' + ')}
@@ -293,13 +293,17 @@ function Row({
       <GripVertical className="h-4 w-4" />
     </button>
   );
-  // Text in continuous text is deleted as text, not with a button that would take the whole block
+  // Text in continuous text is deleted as text, not with a button that would take the whole block. On a touch
+  // screen continuous text reads as a page: a line's button shows only while the line is being written in.
   const removeButton = !readOnly && !(flow && isPlainText(item)) && (
     <button
       type="button"
       aria-label={kind === 'image' ? t('ntRemovePicture') : t('ntDeleteItem')}
       onClick={onRemove}
-      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60"
+      className={cn(
+        'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-60',
+        flow && 'group-focus-within/row:opacity-100 [@media(hover:none)]:hidden [@media(hover:none)]:group-focus-within/row:flex'
+      )}
     >
       <X className="h-4 w-4" />
     </button>
@@ -462,7 +466,7 @@ function Row({
         {removeButton}
       </div>
       {list.length > 0 && <Suggestions list={list} highlighted={highlighted} query={plain.trim()} onPick={onPick} t={t} />}
-      {total && <TotalRow totals={total} language={language} t={t} editable={!readOnly} />}
+      {total && <TotalRow totals={total} language={language} t={t} editable={!readOnly} flow={flow} />}
     </Wrapper>
   );
 }
