@@ -1138,6 +1138,9 @@ export default {
   bdOutside: 'Потрачено вне бюджетов: {amount}',
   bdSetUpMonth: 'Задать бюджеты на {month}',
   bdOfLimit: 'из {amount}',
+  bdNoPayments: 'Здесь пока ничего не потрачено.',
+  bdPaymentsIn: 'Платежи: {category}',
+  bdUpcoming: 'Предстоит',
 
   // Period Selector
   year: 'Год',

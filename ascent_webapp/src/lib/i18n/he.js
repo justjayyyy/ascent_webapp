@@ -1138,6 +1138,9 @@ export default {
   bdOutside: 'הוצאות מחוץ לתקציבים: {amount}',
   bdSetUpMonth: 'הגדרת {month}',
   bdOfLimit: 'מתוך {amount}',
+  bdNoPayments: 'עוד לא הוצאתם כאן כלום.',
+  bdPaymentsIn: 'תשלומים ב{category}',
+  bdUpcoming: 'צפוי',
 
   // Period Selector
   year: 'שנה',

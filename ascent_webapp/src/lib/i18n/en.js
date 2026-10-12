@@ -1214,6 +1214,9 @@ export default {
   bdOutside: 'Spent outside your budgets: {amount}',
   bdSetUpMonth: 'Set up {month}',
   bdOfLimit: 'of {amount}',
+  bdNoPayments: 'Nothing spent here yet.',
+  bdPaymentsIn: 'Payments in {category}',
+  bdUpcoming: 'Upcoming',
 
   // Period Selector
   year: 'Year',

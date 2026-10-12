@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
-import { AlertCircle, CheckCircle, Settings2 } from 'lucide-react';
-import { motion } from '@/lib/motion';
+import React, { useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle, ChevronDown, Settings2 } from 'lucide-react';
+import { AnimatePresence, motion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { useTheme } from '../ThemeProvider';
 import { translateCategory } from '@/lib/translations';
@@ -23,12 +23,16 @@ export function periodMonths(selectedYear, selectedMonths = [], now = new Date()
   return Array.from({ length: last }, (_, i) => monthKey(year, i + 1));
 }
 
+const EASE = [0.22, 1, 0.36, 1];
+
 /**
  * Each budgeted category against what was spent in it. Over several months a category's limits add up, and
  * only spending in months it had a budget counts. Each says what is left of it, less what is still to come.
+ * Tapping one opens it on the payments it counts, newest first; tapping a payment opens it (`onOpen`).
  */
-function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [], onManage, canEdit = false }) {
+function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, selectedMonths = [], onManage, onOpen, canEdit = false }) {
   const { language, user, t } = useTheme();
+  const [openCategory, setOpenCategory] = useState(null);
   const userCurrency = user?.currency || 'ILS';
   const blur = !!user?.blurValues;
   const { amountOf, convert } = useMoney(userCurrency);
@@ -49,6 +53,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
     const today = localDay();
     const spent = {};
     const coming = {};
+    const payments = {};
     for (const tx of transactions) {
       if (!tx.date || tx.type !== 'Expense') continue;
       if (tx.status === 'pending' && tx.ingest?.flags?.includes('possibleDuplicate')) continue;
@@ -58,8 +63,9 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       const key = `${tx.category}|${month}`;
       const into = String(tx.date).slice(0, 10) > today ? coming : spent;
       into[key] = (into[key] || 0) + amountOf(tx);
+      (payments[key] ||= []).push(tx);
     }
-    return { spent, coming };
+    return { spent, coming, payments };
   }, [transactions, amountOf, months]);
 
   const { rows, outside } = useMemo(() => {
@@ -69,10 +75,11 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       for (const budget of budgetsForMonth(budgets, month)) {
         const key = `${budget.category}|${month}`;
         budgeted.add(key);
-        const row = byCategory.get(budget.category) || { id: budget.id, category: budget.category, limit: 0, spent: 0, coming: 0, threshold: 80 };
+        const row = byCategory.get(budget.category) || { id: budget.id, category: budget.category, limit: 0, spent: 0, coming: 0, threshold: 80, payments: [] };
         row.limit += convert(budget.monthlyLimit, budget.currency) ?? budget.monthlyLimit;
         row.spent += spending.spent[key] || 0;
         row.coming += spending.coming[key] || 0;
+        if (spending.payments[key]) row.payments.push(...spending.payments[key]);
         row.threshold = Number(budget.alertThreshold) || 80; // the latest month's
         byCategory.set(budget.category, row);
       }
@@ -85,6 +92,7 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
       const committed = row.limit > 0 ? ((row.spent + row.coming) / row.limit) * 100 : 0;
       return {
         ...row,
+        payments: row.payments.sort((a, b) => String(b.date).localeCompare(String(a.date))),
         remaining: row.limit - row.spent - row.coming,
         percentage,
         isOverBudget: percentage > 100,
@@ -122,6 +130,9 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
   // In the month under way: what is left of every budget, less what is still to come
   const totalLeft = totalLimit - totalSpent - rows.reduce((s, r) => s + r.coming, 0);
   const pct = (v, limit) => (limit > 0 ? Math.max(0, Math.min(100, (v / limit) * 100)) : 0);
+  const today = localDay();
+  const locale = language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US';
+  const shortDate = (d) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(new Date(`${String(d).slice(0, 10)}T12:00:00`));
 
   return (
     <section className="rounded-3xl bg-foreground/[0.04] p-4 sm:p-5">
@@ -143,58 +154,104 @@ function BudgetProgress({ budgets, transactions, formatCurrency, selectedYear, s
           </Button>
         )}
       </div>
-      <ul className="mt-3 space-y-4">
+      <ul className="mt-2 space-y-1">
         {rows.map((row) => {
           const tone = row.isOverBudget ? 'bg-danger' : row.isAtLimit ? 'bg-orange-500' : row.isNearLimit ? 'bg-yellow-500' : 'bg-success';
           const category = translateCategory(row.category, language);
+          const open = openCategory === row.category;
+          const panelId = `budget-payments-${row.category}`.replace(/\s+/g, '-');
           return (
             <li key={row.category}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
-                  <span className="truncate">{category}</span>
-                  {row.isOverBudget && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-danger" />}
-                  {row.isAtLimit && <CheckCircle aria-hidden className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />}
-                  {row.isNearLimit && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400" />}
+              <button type="button" onClick={() => setOpenCategory(open ? null : row.category)} aria-expanded={open} aria-controls={open ? panelId : undefined}
+                className="-mx-2 block w-[calc(100%+1rem)] rounded-2xl px-2 py-1.5 text-start transition-colors hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
+                    <span className="truncate">{category}</span>
+                    {row.isOverBudget && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-danger" />}
+                    {row.isAtLimit && <CheckCircle aria-hidden className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />}
+                    {row.isNearLimit && <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400" />}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className={cn('text-sm font-semibold tabular-nums', row.isOverBudget ? 'text-danger' : 'text-foreground')} dir="ltr">
+                      <BlurValue blur={blur}>{formatCurrency(row.spent, userCurrency)}</BlurValue>
+                    </span>
+                    <ChevronDown aria-hidden className={cn('h-4 w-4 self-center text-muted-foreground transition-transform duration-300', open && 'rotate-180')} />
+                  </span>
                 </span>
-                <span className={cn('shrink-0 text-sm font-semibold tabular-nums', row.isOverBudget ? 'text-danger' : 'text-foreground')} dir="ltr">
-                  <BlurValue blur={blur}>{formatCurrency(row.spent, userCurrency)}</BlurValue>
+                <span className="mt-2 block">
+                  <span className="block h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(row.percentage)} aria-valuemin={0} aria-valuemax={100}
+                    aria-label={t('a11yBudgetUsed').replace('{category}', category).replace('{percent}', Math.round(row.percentage))}>
+                    <span className="flex h-full">
+                      <motion.span className={cn('block h-full rounded-full', tone)} initial={{ width: 0 }} animate={{ width: `${pct(row.spent, row.limit)}%` }} transition={{ duration: 0.8, ease: EASE }} />
+                      {row.coming > 0 && (
+                        <motion.span className={cn('block h-full rounded-full opacity-35', tone)} initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(pct(row.coming, row.limit), 100 - pct(row.spent, row.limit))}%` }} transition={{ duration: 0.8, ease: EASE }} />
+                      )}
+                    </span>
+                  </span>
                 </span>
-              </div>
-              <div className="mt-2">
-                <div className="h-2 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-valuenow={Math.round(row.percentage)} aria-valuemin={0} aria-valuemax={100}
-                  aria-label={t('a11yBudgetUsed').replace('{category}', category).replace('{percent}', Math.round(row.percentage))}>
-                  <div className="flex h-full">
-                    <motion.div className={cn('h-full rounded-full', tone)} initial={{ width: 0 }} animate={{ width: `${pct(row.spent, row.limit)}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
-                    {row.coming > 0 && (
-                      <motion.div className={cn('h-full rounded-full opacity-35', tone)} initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(pct(row.coming, row.limit), 100 - pct(row.spent, row.limit))}%` }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} />
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span className="flex flex-wrap items-center gap-x-1.5">
-                  <span>
+                <span className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span className="flex flex-wrap items-center gap-x-1.5">
+                    <span>
+                      <BlurValue blur={blur}>
+                        {row.remaining > 0
+                          ? t('bdLeftOf', { left: formatCurrency(row.remaining, userCurrency), limit: formatCurrency(row.limit, userCurrency) })
+                          : t('bdOfLimit', { amount: formatCurrency(row.limit, userCurrency) })}
+                      </BlurValue>
+                    </span>
+                    {row.coming > 0 && <span><BlurValue blur={blur}>{t('bdComing', { amount: formatCurrency(row.coming, userCurrency) })}</BlurValue></span>}
+                  </span>
+                  <span className="text-end tabular-nums">
                     <BlurValue blur={blur}>
-                      {row.remaining > 0
-                        ? t('bdLeftOf', { left: formatCurrency(row.remaining, userCurrency), limit: formatCurrency(row.limit, userCurrency) })
-                        : t('bdOfLimit', { amount: formatCurrency(row.limit, userCurrency) })}
+                      {row.isOverBudget
+                        ? `${t('overBudgetBy')} ${formatCurrency(row.spent - row.limit, userCurrency)}`
+                        : row.isAtLimit
+                          ? t('reachedLimit')
+                          : row.isNearLimit
+                            ? t('approachingLimit')
+                            : `${row.percentage.toFixed(0)}%`}
                     </BlurValue>
                   </span>
-                  {row.coming > 0 && <span><BlurValue blur={blur}>{t('bdComing', { amount: formatCurrency(row.coming, userCurrency) })}</BlurValue></span>}
                 </span>
-                <span className="text-end tabular-nums">
-                  <BlurValue blur={blur}>
-                    {row.isOverBudget
-                      ? `${t('overBudgetBy')} ${formatCurrency(row.spent - row.limit, userCurrency)}`
-                      : row.isAtLimit
-                        ? t('reachedLimit')
-                        : row.isNearLimit
-                          ? t('approachingLimit')
-                          : `${row.percentage.toFixed(0)}%`}
-                  </BlurValue>
-                </span>
-              </div>
+              </button>
+              <AnimatePresence initial={false}>
+                {open && (
+                  <motion.div id={panelId} key="payments" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: EASE }} className="overflow-hidden">
+                    {row.payments.length === 0 ? (
+                      <p className="mt-2 rounded-2xl bg-foreground/[0.03] px-3 py-3 text-xs text-muted-foreground">{t('bdNoPayments')}</p>
+                    ) : (
+                      <ul className="mt-2 divide-y divide-border/30 rounded-2xl bg-foreground/[0.03] px-3" aria-label={t('bdPaymentsIn', { category })}>
+                        {row.payments.map((tx) => {
+                          const later = String(tx.date).slice(0, 10) > today;
+                          const content = (
+                            <>
+                              <span className="w-12 shrink-0 text-xs tabular-nums text-muted-foreground">{shortDate(tx.date)}</span>
+                              <span className="min-w-0 flex-1 truncate text-sm text-foreground/90" dir="auto">{tx.description || category}</span>
+                              {later && <span className="shrink-0 rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[0.6875rem] text-muted-foreground">{t('bdUpcoming')}</span>}
+                              <span className={cn('shrink-0 text-sm font-semibold tabular-nums', later ? 'text-muted-foreground' : 'text-foreground')} dir="ltr">
+                                <BlurValue blur={blur}>{formatCurrency(amountOf(tx), userCurrency)}</BlurValue>
+                              </span>
+                            </>
+                          );
+                          return (
+                            <li key={tx.id || `${tx.date}|${tx.description}|${tx.amount}`}>
+                              {onOpen ? (
+                                <button type="button" onClick={() => onOpen(tx)}
+                                  className="-mx-3 flex min-h-11 w-[calc(100%+1.5rem)] items-center gap-3 px-3 py-2 text-start transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                                  {content}
+                                </button>
+                              ) : (
+                                <div className="flex min-h-11 items-center gap-3 py-2">{content}</div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </li>
           );
         })}

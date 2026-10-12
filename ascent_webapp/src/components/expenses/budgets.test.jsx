@@ -145,6 +145,34 @@ describe('budget progress', () => {
     expect(screen.getByText('bdOutside $70')).toBeTruthy();
   });
 
+  test('tapping a budget opens it on the payments it counts, newest first, and a payment opens to edit', () => {
+    vi.setSystemTime(new Date(2026, 9, 4, 12));
+    const onOpen = vi.fn();
+    const later = { id: 'rent', ...tx(10, 300), date: '2026-10-25', description: 'Groceries delivery' };
+    render(<BudgetProgress selectedYear="2026" selectedMonths={['10']} formatCurrency={(v) => `$${v}`} onOpen={onOpen}
+      budgets={[{ id: 'oct', category: 'food', year: 2026, month: 10, monthlyLimit: 600 }]}
+      transactions={[
+        { id: 'a', ...tx(10, 40), date: '2026-10-01', description: 'Bakery' },
+        later,
+        { id: 'b', ...tx(10, 60), date: '2026-10-03', description: 'Market' },
+        { id: 'c', ...tx(10, 70), description: 'Cinema', category: 'fun' },
+        { id: 'd', ...tx(9, 80), description: 'Last month' },
+      ]} />);
+    const toggle = screen.getByRole('button', { expanded: false });
+    expect(screen.queryByRole('list', { name: 'bdPaymentsIn food' })).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const list = screen.getByRole('list', { name: 'bdPaymentsIn food' });
+    const names = within(list).getAllByRole('button').map((b) => b.textContent);
+    expect(names).toHaveLength(3);
+    expect(names[0]).toMatch(/Groceries delivery.*bdUpcoming/);
+    expect(names[1]).toMatch(/Market/);
+    expect(names[2]).toMatch(/Bakery/);
+    fireEvent.click(within(list).getByRole('button', { name: /Groceries delivery/ }));
+    expect(onOpen).toHaveBeenCalledWith(later);
+    vi.setSystemTime(new Date(2026, 11, 1, 12));
+  });
+
   test('the whole year means the year so far', () => {
     const at = new Date(2026, 9, 4);
     expect(periodMonths('2026', [], at)).toHaveLength(10);

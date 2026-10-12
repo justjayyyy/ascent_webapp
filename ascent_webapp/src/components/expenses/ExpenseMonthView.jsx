@@ -282,7 +282,7 @@ function ExpenseMonthView({
 
       {showBudget && (
         <div className="order-2">
-          <BudgetProgress budgets={budgets} transactions={transactions} formatCurrency={money} selectedYear={selectedYear} selectedMonths={selectedMonths} onManage={onManageBudgets} canEdit={canEditBudgets} />
+          <BudgetProgress budgets={budgets} transactions={transactions} formatCurrency={money} selectedYear={selectedYear} selectedMonths={selectedMonths} onManage={onManageBudgets} onOpen={onEdit} canEdit={canEditBudgets} />
         </div>
       )}
 
