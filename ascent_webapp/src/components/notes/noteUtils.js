@@ -64,6 +64,18 @@ export const hasAmount = (item) => canHaveAmount(item) && typeof item.amount ===
 // Text with nothing on its side: in continuous text it runs on, and text blocks next to each other are one text
 export const isPlainText = (item) => lineKind(item) === 'text' && !hasAmount(item);
 
+/** Lines with the text blocks that come together made one text, a line apart (as continuous text keeps them). */
+export function joinTextBlocks(lines) {
+  const out = [];
+  for (const line of lines) {
+    const prev = out[out.length - 1];
+    if (prev && isPlainText(prev) && isPlainText(line) && prev.text && line.text) {
+      out[out.length - 1] = { ...prev, text: `${prev.text}\n${line.text}` };
+    } else out.push(line);
+  }
+  return out;
+}
+
 // A note is continuous text (plain, or with titles, pictures and boxes in it: a checklist with `flow`) or a list
 export const noteForm = (note) => (note?.type === 'checklist' && !note.flow ? 'checklist' : 'text');
 
@@ -87,9 +99,9 @@ export function formChanges(note, to) {
   return { flow: true, ...flowChanges({ ...note, type: 'checklist' }, kept) };
 }
 
-/** The blocks a continuous-text note is edited as: its lines, or its text as one block (`textId`). */
+/** The blocks a continuous-text note is edited as: its lines (text that comes together as one), or its text as one block (`textId`). */
 export const flowBlocks = (note, textId) => (note.type === 'checklist' && note.items?.length
-  ? note.items
+  ? joinTextBlocks(note.items)
   : [{ id: textId, kind: 'text', text: note.type === 'checklist' ? '' : note.content || '', done: false }]);
 
 const LOCALES = { he: 'he-IL', ru: 'ru-RU', en: 'en-US' };

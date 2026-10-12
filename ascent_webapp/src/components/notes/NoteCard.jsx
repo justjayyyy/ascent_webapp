@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils';
 import { LinkChips, PeopleStack, PersonDot } from './NoteParts';
 import { CardPhotos, LinePicture, placedPictures, useNearView } from './NoteExtras';
 import {
-  extractLinks, fmt, formatAmount, formatReminder, hasAmount, highlight, isOverdue, isPreviewable, isTicked, lastEditor, lineKind, resolveColor,
-  textDir, timeAgo,
+  extractLinks, fmt, formatAmount, formatReminder, hasAmount, highlight, isOverdue, isPreviewable, isTicked, joinTextBlocks, lastEditor, lineKind,
+  resolveColor, textDir, timeAgo,
 } from './noteUtils';
 import { plainText, richNodes, sliceRich } from './richText';
 import { amountTotals, lineNumbers } from './noteDocument';
@@ -78,9 +78,9 @@ function NoteCard({
   const editorPerson = lastEditor(note, people);
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
 
-  // Continuous text shows its ticked items in their place; a list counts them under it
+  // Continuous text shows its ticked items in their place, and its text as one; a list counts them under it
   const flow = !!note.flow;
-  const openItems = (note.items || []).filter(i => (flow || !isTicked(i)) && (i.text || ['item', 'image'].includes(lineKind(i)) || hasAmount(i)));
+  const openItems = (flow ? joinTextBlocks(note.items || []) : note.items || []).filter(i => (flow || !isTicked(i)) && (i.text || ['item', 'image'].includes(lineKind(i)) || hasAmount(i)));
   const doneCount = flow ? 0 : (note.items || []).filter(isTicked).length;
   const previewItems = openItems.slice(0, PREVIEW_ITEMS);
   const hiddenItems = openItems.length - previewItems.length;

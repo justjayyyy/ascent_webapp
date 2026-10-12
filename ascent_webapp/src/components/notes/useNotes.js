@@ -5,7 +5,7 @@ import { ascent } from '@/api/client';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
 import { getNotesSync } from './notesSync';
-import { MAX_FILE_BYTES, MAX_FILES, fmt, newItemId, newNoteId, prepareUpload, useOnlineStatus } from './noteUtils';
+import { MAX_FILE_BYTES, MAX_FILES, fmt, joinTextBlocks, newItemId, newNoteId, prepareUpload, useOnlineStatus } from './noteUtils';
 import { isPdf, pictureFromSrc, readDocument } from './importDocument';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -239,8 +239,8 @@ export function useNotes() {
       if (fileId) fileIds.set(picture.ref, fileId);
       onProgress?.({ stage: 'pictures', done: i + 1, total: wanted.length });
     }
-    const items = doc.lines
-      .filter(l => l.kind !== 'image' || fileIds.has(l.picture))
+    // Its paragraphs run on as one text between the titles, boxes, lists and pictures, as continuous text does
+    const items = joinTextBlocks(doc.lines.filter(l => l.kind !== 'image' || fileIds.has(l.picture)))
       .map(({ picture, ...l }) => ({ ...l, id: newItemId(), ...(l.kind === 'image' ? { fileId: fileIds.get(picture) } : {}) }));
     patchNote(id, { items });
 
@@ -255,7 +255,7 @@ export function useNotes() {
    * uploaded into it and put back where they were, after whatever line came before them. Resolves to its id.
    */
   const createFromLines = useCallback(({ title = '', color, tags = [], lines, flow = false }) => {
-    const all = lines.map(l => ({ done: false, ...l, id: l.id || newItemId() }));
+    const all = (flow ? joinTextBlocks(lines) : lines).map(l => ({ done: false, ...l, id: l.id || newItemId() }));
     const waiting = all.filter(l => l.kind === 'image' && !l.fileId);
     const id = createNote({
       type: 'checklist', flow, title, tags, ...(color ? { color } : {}),

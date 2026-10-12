@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, noteForm, distribute, columnEndIndex, formatBytes, nextOccurrence,
+  noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, joinTextBlocks, noteForm, distribute, columnEndIndex, formatBytes, nextOccurrence,
   extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes, reorderPositions,
 } from './noteUtils';
 
@@ -33,6 +33,18 @@ describe('text and lists', () => {
     expect(flowChanges({ ...plain, ...doc }, [block])).toEqual({ type: 'text', flow: false, content: 'Dear diary', items: [] });
     // An empty document is typed into as one empty block of text
     expect(flowBlocks({ type: 'checklist', flow: true, items: [] }, 'b2')[0]).toMatchObject({ id: 'b2', kind: 'text', text: '' });
+  });
+
+  test('text blocks that come together are one text, in continuous text (an imported document\'s paragraphs)', () => {
+    const text = (id, t, extra = {}) => ({ id, kind: 'text', text: t, done: false, ...extra });
+    const title = { id: 't', kind: 'title', text: 'Terms', done: false };
+    const lines = [text('a', 'First paragraph.'), text('b', 'Second paragraph.'), title, text('c', 'Third.'), text('d', 'Fourth.'),
+      text('e', 'Fee', { amount: 50 }), text('f', 'Fifth.')];
+    expect(joinTextBlocks(lines)).toEqual([
+      text('a', 'First paragraph.\nSecond paragraph.'), title, text('c', 'Third.\nFourth.'), text('e', 'Fee', { amount: 50 }), text('f', 'Fifth.'),
+    ]);
+    // A note imported before this is shown, and edited, as one text too
+    expect(flowBlocks({ type: 'checklist', flow: true, items: lines.slice(0, 2) }, 'x')).toEqual([text('a', 'First paragraph.\nSecond paragraph.')]);
   });
 
   const shape = (lines) => lines.map(({ text, kind, done }) => [kind || (done ? 'done' : 'item'), text]);
