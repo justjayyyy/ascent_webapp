@@ -1477,6 +1477,7 @@ export default {
   ntUncheckAll: 'Uncheck all items',
   ntDeleteChecked: 'Delete checked items ({n})',
   ntEditedAt: 'Edited {time}',
+  ntCreatedAt: 'Created {time}',
   ntShortcuts: 'Keyboard shortcuts',
   ntShortcutsHint: 'Work through your notes without the mouse.',
   ntShortcutsGeneral: 'General',

@@ -21,7 +21,7 @@ import { DictateButton, useDictation } from './useDictation';
 import { FormatBar, FormatToggle, useFormatBar } from './RichTextarea';
 import { joinRich, plainText } from './richText';
 import {
-  extractLinks, flowBlocks, flowChanges, fmt, formChanges, formatReminder, isEmptyNote, isOverdue, isPlainText, isTicked, lastEditor, lineKind,
+  extractLinks, flowBlocks, flowChanges, fmt, formChanges, formatDateTime, formatReminder, isEmptyNote, isOverdue, isPlainText, isTicked, lastEditor, lineKind,
   newItemId, noteForm, noteToText, resolveColor, timeAgo, blankItem,
 } from './noteUtils';
 
@@ -439,13 +439,17 @@ export default function NoteEditor({
                     {note.reminderRepeat && note.reminderRepeat !== 'none' && <><Repeat className="h-3.5 w-3.5" /> {t(`ntRepeat_${note.reminderRepeat}`)}</>}
                   </span>
                 )}
-                <span className="ms-auto inline-flex items-center gap-1.5">
-                  {isShared && editor && !editor.isMe && <PersonDot person={editor} size={20} />}
-                  {isShared && editor && !editor.isMe
-                    ? fmt(t('ntEditedBy'), { name: editor.name, time: timeAgo(note.updated_date, language) })
-                    : isShared && editor
-                      ? fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })
-                      : fmt(t('ntEditedAt'), { time: timeAgo(note.updated_date, language) })}
+                {/* When it was made and last edited, in full; how long ago it was edited shows on hover */}
+                <span className="ms-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                  {note.created_date && <span>{fmt(t('ntCreatedAt'), { time: formatDateTime(note.created_date, language) })}</span>}
+                  <span className="inline-flex items-center gap-1.5" title={timeAgo(note.updated_date, language)}>
+                    {isShared && editor && !editor.isMe && <PersonDot person={editor} size={20} />}
+                    {isShared && editor && !editor.isMe
+                      ? fmt(t('ntEditedBy'), { name: editor.name, time: formatDateTime(note.updated_date, language) })
+                      : isShared && editor
+                        ? fmt(t('ntEditedByYou'), { time: formatDateTime(note.updated_date, language) })
+                        : fmt(t('ntEditedAt'), { time: formatDateTime(note.updated_date, language) })}
+                  </span>
                 </span>
               </div>
             </div>

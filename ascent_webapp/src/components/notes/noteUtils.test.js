@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   noteToText, searchableText, textToItems, parseLines, isEmptyNote, flowBlocks, flowChanges, joinTextBlocks, noteForm, distribute, columnEndIndex, formatBytes, nextOccurrence,
-  extractLinks, linkHost, matchesFilter, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes, reorderPositions,
+  extractLinks, linkHost, matchesFilter, formatDateTime, isPreviewable, toLocalInput, reminderPresets, fmt, base64ToBlob, sortNotes, groupNotes, reorderPositions,
 } from './noteUtils';
 
 const list = (items, extra = {}) => ({ type: 'checklist', items: items.map((text, i) => ({ id: `i${i}`, text, done: i === 0 })), ...extra });
@@ -33,6 +33,13 @@ describe('text and lists', () => {
     expect(flowChanges({ ...plain, ...doc }, [block])).toEqual({ type: 'text', flow: false, content: 'Dear diary', items: [] });
     // An empty document is typed into as one empty block of text
     expect(flowBlocks({ type: 'checklist', flow: true, items: [] }, 'b2')[0]).toMatchObject({ id: 'b2', kind: 'text', text: '' });
+  });
+
+  test('a note\'s created and edited dates are shown in full, in the reader\'s language', () => {
+    const shown = formatDateTime('2026-10-12T10:37:00', 'en');
+    for (const part of ['Oct', '12', '2026', '10:37']) expect(shown).toContain(part);
+    expect(formatDateTime('2026-10-12T10:37:00', 'he')).toContain('2026');
+    expect(formatDateTime('not a date', 'en')).toBe('');
   });
 
   test('text blocks that come together are one text, in continuous text (an imported document\'s paragraphs)', () => {

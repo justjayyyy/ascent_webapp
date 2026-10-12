@@ -370,6 +370,13 @@ export function timeAgo(date, language) {
   return d.toLocaleDateString(language || 'en', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 }
 
+/** A date and time in full, as a note's created and edited dates show: "12 Oct 2026, 10:37". */
+export function formatDateTime(date, language) {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(LOCALES[language] || language || 'en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export function useLatest(value) {
   const ref = useRef(value);
   ref.current = value;

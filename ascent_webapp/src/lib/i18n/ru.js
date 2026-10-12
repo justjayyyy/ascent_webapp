@@ -1401,6 +1401,7 @@ export default {
   ntUncheckAll: 'Снять все отметки',
   ntDeleteChecked: 'Удалить отмеченные ({n})',
   ntEditedAt: 'Изменено {time}',
+  ntCreatedAt: 'Создано {time}',
   ntShortcuts: 'Быстрые клавиши',
   ntShortcutsHint: 'Работайте с заметками без мыши.',
   ntShortcutsGeneral: 'Общие',

@@ -157,7 +157,7 @@ function KindMenu({ item, onChange, onAmount, t }) {
 }
 
 /** The amount on the side of a line: the number while you type it, written as money otherwise. */
-function AmountInput({ item, currency, language, readOnly, onChange, t, inputRef }) {
+function AmountInput({ item, currency, language, readOnly, onChange, t, inputRef, className }) {
   const [typing, setTyping] = useState(null);
   const cur = item.currency || currency;
   const shown = typing ?? (item.amount ? formatAmount(item.amount, cur, language) : '');
@@ -178,7 +178,7 @@ function AmountInput({ item, currency, language, readOnly, onChange, t, inputRef
         if (money) onChange(money.amount);
         else if (!e.target.value.trim()) onChange(0);
       }}
-      className="mt-0.5 h-8 w-[5.25rem] shrink-0 rounded-lg sm:w-[6.5rem] bg-transparent px-1.5 text-end text-sm font-medium tabular-nums outline-none placeholder:text-muted-foreground/50 focus:bg-foreground/[0.06] read-only:focus:bg-transparent"
+      className={cn('h-8 w-[5.25rem] shrink-0 rounded-lg sm:w-[6.5rem] bg-transparent px-1.5 text-end text-sm font-medium tabular-nums outline-none placeholder:text-muted-foreground/50 focus:bg-foreground/[0.06] read-only:focus:bg-transparent', className)}
     />
   );
 }
@@ -348,6 +348,85 @@ function Row({
 
   const multiline = MULTILINE.has(kind);
   const plain = plainText(item.text);
+  const textBox = (
+    <RichTextarea
+      ref={registerRef}
+      value={item.text}
+      readOnly={readOnly}
+      onChange={(e) => {
+        let text = e.target.value;
+        // Only text, numbered lines and boxes may run over several lines
+        if (!multiline) text = text.replace(/\n/g, ' ');
+        const typed = plainText(text);
+        // "# " at the start of an item makes it a title, like in most editors
+        if (kind === 'item' && /^#\s/.test(typed) && !/^#\s/.test(plain)) {
+          onChange(withKind({ ...item, text: sliceRich(text, 2) }, 'title'));
+          return;
+        }
+        if (flow && kind === 'text' && onShortcut && typed.length === plain.length + 1) {
+          const caret = e.target.selectionStart;
+          const lineStart = typed.lastIndexOf('\n', caret - 1) + 1;
+          const to = SHORTCUTS[typed.slice(lineStart, caret)];
+          if (to) { onShortcut(text, lineStart, caret, to); return; }
+        }
+        onChange({ ...item, text });
+      }}
+      onFocus={() => onFocusChange?.(true)}
+      onBlur={() => onFocusChange?.(false)}
+      onPaste={(e) => {
+        // Several lines, or a page or document, make one line each: items, titles, text, numbered lines,
+        // boxes, amounts and pictures where the copy has them. Multi-line kinds keep plain text as typed.
+        if (readOnly || !onPasteLines) return;
+        const html = e.clipboardData?.getData('text/html') || '';
+        const text = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('text') || '';
+        const lines = readPaste({ html, text: multiline ? '' : text });
+        if (!lines || (multiline && lines.every(l => lineKind(l) === 'text' && !('amount' in l)))) return;
+        e.preventDefault();
+        onPasteLines(lines);
+      }}
+      onKeyDown={(e) => {
+        if (readOnly) return;
+        if (list.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+          e.preventDefault();
+          // -1 is "nothing picked", so the arrows cycle through the list and back to the text
+          const n = list.length + 1;
+          const step = e.key === 'ArrowDown' ? 1 : -1;
+          setHighlighted(h => ((h + 1 + step + n) % n) - 1);
+          return;
+        }
+        if (list.length && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setDismissed(item.text); return; }
+        const el = e.currentTarget;
+        const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
+        const atEnd = el.selectionStart === plain.length;
+        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          if (highlighted >= 0 && list[highlighted]) { e.preventDefault(); onPick(list[highlighted]); return; }
+          // Continuous text goes on in the same text; a box too, until Enter on an empty last line leaves it
+          if (flow && kind === 'text') return;
+          const leaveBox = flow && kind === 'callout' && atEnd && plain.endsWith('\n');
+          if (flow && kind === 'callout' && !leaveBox) return;
+          e.preventDefault();
+          if (leaveBox) onEnter({ ...item, text: sliceRich(item.text, 0, plain.length - 1) });
+          // An empty checkbox or numbered line ends the list, as in a document
+          else if (flow && !item.text && (kind === 'item' || kind === 'number')) onKind('text');
+          else onEnter();
+          return;
+        }
+        if (e.key === 'Backspace' && item.text === '') { e.preventDefault(); onBackspaceEmpty(); return; }
+        if (!flow) return;
+        if (e.key === 'Backspace' && atStart && onBackspaceStart) { e.preventDefault(); onBackspaceStart(); return; }
+        // The arrows go on into the line above or below at the edges, as in one text
+        if (onMove && e.key === 'ArrowUp' && atStart) { e.preventDefault(); onMove(-1); }
+        if (onMove && e.key === 'ArrowDown' && atEnd && el.selectionEnd === plain.length) { e.preventDefault(); onMove(1); }
+      }}
+      placeholder={hint || t(PLACEHOLDER[kind])}
+      aria-label={hint || t(PLACEHOLDER[kind])}
+      className={cn(
+        'py-1',
+        kind === 'title' ? 'text-lg font-semibold leading-7 tracking-tight sm:text-base' : 'text-base leading-6 sm:text-sm',
+        kind === 'item' && item.done && 'text-muted-foreground line-through'
+      )}
+    />
+  );
   return (
     <Wrapper
       {...wrapperProps}
@@ -374,94 +453,22 @@ function Row({
             {number}.
           </span>
         )}
-        <RichTextarea
-          ref={registerRef}
-          value={item.text}
-          readOnly={readOnly}
-          onChange={(e) => {
-            let text = e.target.value;
-            // Only text, numbered lines and boxes may run over several lines
-            if (!multiline) text = text.replace(/\n/g, ' ');
-            const typed = plainText(text);
-            // "# " at the start of an item makes it a title, like in most editors
-            if (kind === 'item' && /^#\s/.test(typed) && !/^#\s/.test(plain)) {
-              onChange(withKind({ ...item, text: sliceRich(text, 2) }, 'title'));
-              return;
-            }
-            if (flow && kind === 'text' && onShortcut && typed.length === plain.length + 1) {
-              const caret = e.target.selectionStart;
-              const lineStart = typed.lastIndexOf('\n', caret - 1) + 1;
-              const to = SHORTCUTS[typed.slice(lineStart, caret)];
-              if (to) { onShortcut(text, lineStart, caret, to); return; }
-            }
-            onChange({ ...item, text });
-          }}
-          onFocus={() => onFocusChange?.(true)}
-          onBlur={() => onFocusChange?.(false)}
-          onPaste={(e) => {
-            // Several lines, or a page or document, make one line each: items, titles, text, numbered lines,
-            // boxes, amounts and pictures where the copy has them. Multi-line kinds keep plain text as typed.
-            if (readOnly || !onPasteLines) return;
-            const html = e.clipboardData?.getData('text/html') || '';
-            const text = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('text') || '';
-            const lines = readPaste({ html, text: multiline ? '' : text });
-            if (!lines || (multiline && lines.every(l => lineKind(l) === 'text' && !('amount' in l)))) return;
-            e.preventDefault();
-            onPasteLines(lines);
-          }}
-          onKeyDown={(e) => {
-            if (readOnly) return;
-            if (list.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-              e.preventDefault();
-              // -1 is "nothing picked", so the arrows cycle through the list and back to the text
-              const n = list.length + 1;
-              const step = e.key === 'ArrowDown' ? 1 : -1;
-              setHighlighted(h => ((h + 1 + step + n) % n) - 1);
-              return;
-            }
-            if (list.length && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setDismissed(item.text); return; }
-            const el = e.currentTarget;
-            const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
-            const atEnd = el.selectionStart === plain.length;
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              if (highlighted >= 0 && list[highlighted]) { e.preventDefault(); onPick(list[highlighted]); return; }
-              // Continuous text goes on in the same text; a box too, until Enter on an empty last line leaves it
-              if (flow && kind === 'text') return;
-              const leaveBox = flow && kind === 'callout' && atEnd && plain.endsWith('\n');
-              if (flow && kind === 'callout' && !leaveBox) return;
-              e.preventDefault();
-              if (leaveBox) onEnter({ ...item, text: sliceRich(item.text, 0, plain.length - 1) });
-              // An empty checkbox or numbered line ends the list, as in a document
-              else if (flow && !item.text && (kind === 'item' || kind === 'number')) onKind('text');
-              else onEnter();
-              return;
-            }
-            if (e.key === 'Backspace' && item.text === '') { e.preventDefault(); onBackspaceEmpty(); return; }
-            if (!flow) return;
-            if (e.key === 'Backspace' && atStart && onBackspaceStart) { e.preventDefault(); onBackspaceStart(); return; }
-            // The arrows go on into the line above or below at the edges, as in one text
-            if (onMove && e.key === 'ArrowUp' && atStart) { e.preventDefault(); onMove(-1); }
-            if (onMove && e.key === 'ArrowDown' && atEnd && el.selectionEnd === plain.length) { e.preventDefault(); onMove(1); }
-          }}
-          placeholder={hint || t(PLACEHOLDER[kind])}
-          aria-label={hint || t(PLACEHOLDER[kind])}
-          className={cn(
-            'py-1',
-            kind === 'title' ? 'text-lg font-semibold leading-7 tracking-tight sm:text-base' : 'text-base leading-6 sm:text-sm',
-            kind === 'item' && item.done && 'text-muted-foreground line-through'
-          )}
-        />
-        {hasAmount(item) && (
-          <AmountInput
-            item={item}
-            currency={currency}
-            language={language}
-            readOnly={readOnly}
-            onChange={(amount) => onChange({ ...item, amount })}
-            t={t}
-            inputRef={amountRef}
-          />
-        )}
+        {hasAmount(item) ? (
+          // The amount sits beside the first line (an entry's name); the lines under it have the whole width
+          <div className="min-w-0 flex-1">
+            <AmountInput
+              item={item}
+              currency={currency}
+              language={language}
+              readOnly={readOnly}
+              onChange={(amount) => onChange({ ...item, amount })}
+              t={t}
+              inputRef={amountRef}
+              className="float-end ms-1.5 mt-1 h-6"
+            />
+            {textBox}
+          </div>
+        ) : textBox}
         {!readOnly && onKind && <KindMenu item={item} onChange={onKind} onAmount={toggleAmount} t={t} />}
         {removeButton}
       </div>

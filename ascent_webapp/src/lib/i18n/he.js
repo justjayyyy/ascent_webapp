@@ -1401,6 +1401,7 @@ export default {
   ntUncheckAll: 'ביטול הסימון של כל הפריטים',
   ntDeleteChecked: 'מחיקת הפריטים המסומנים ({n})',
   ntEditedAt: 'נערך {time}',
+  ntCreatedAt: 'נוצר {time}',
   ntShortcuts: 'קיצורי מקלדת',
   ntShortcutsHint: 'לעבוד עם הפתקים בלי עכבר.',
   ntShortcutsGeneral: 'כללי',
