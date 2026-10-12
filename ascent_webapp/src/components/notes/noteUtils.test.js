@@ -40,6 +40,11 @@ describe('text and lists', () => {
     for (const part of ['Oct', '12', '2026', '10:37']) expect(shown).toContain(part);
     expect(formatDateTime('2026-10-12T10:37:00', 'he')).toContain('2026');
     expect(formatDateTime('not a date', 'en')).toBe('');
+    // On the cards: this year's dates without the year, a created date without its time
+    const thisYear = new Date().getFullYear();
+    expect(formatDateTime(`${thisYear}-03-04T09:05:00`, 'en', { short: true })).not.toContain(String(thisYear));
+    expect(formatDateTime('2020-03-04T09:05:00', 'en', { short: true })).toContain('2020');
+    expect(formatDateTime('2020-03-04T09:05:00', 'en', { short: true, time: false })).not.toContain('09:05');
   });
 
   test('text blocks that come together are one text, in continuous text (an imported document\'s paragraphs)', () => {

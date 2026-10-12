@@ -370,11 +370,17 @@ export function timeAgo(date, language) {
   return d.toLocaleDateString(language || 'en', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 }
 
-/** A date and time in full, as a note's created and edited dates show: "12 Oct 2026, 10:37". */
-export function formatDateTime(date, language) {
+/**
+ * A note's created or edited date: "12 Oct 2026, 10:37" in full. `short` (on the cards) leaves out this year,
+ * and `time: false` the time of day.
+ */
+export function formatDateTime(date, language, { short = false, time = true } = {}) {
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString(LOCALES[language] || language || 'en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const year = short && d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric';
+  return d.toLocaleString(LOCALES[language] || language || 'en-US', {
+    day: 'numeric', month: 'short', year, ...(time ? { hour: '2-digit', minute: '2-digit' } : {}),
+  });
 }
 
 export function useLatest(value) {

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { LinkChips, PeopleStack, PersonDot } from './NoteParts';
 import { CardPhotos, LinePicture, placedPictures, useNearView } from './NoteExtras';
 import {
-  extractLinks, fmt, formatAmount, formatReminder, hasAmount, highlight, isOverdue, isPreviewable, isTicked, joinTextBlocks, lastEditor, lineKind,
+  extractLinks, fmt, formatAmount, formatDateTime, formatReminder, hasAmount, highlight, isOverdue, isPreviewable, isTicked, joinTextBlocks, lastEditor, lineKind,
   resolveColor, textDir, timeAgo,
 } from './noteUtils';
 import { plainText, richNodes, sliceRich } from './richText';
@@ -76,6 +76,7 @@ function NoteCard({
   }, [note.createdBy, note.collaborators, people]);
 
   const editorPerson = lastEditor(note, people);
+  const edited = formatDateTime(note.updated_date, language, { short: true });
   const isShared = note.isShared || (note.collaborators || []).length > 0 || !isOwner;
 
   // Continuous text shows its ticked items in their place, and its text as one; a list counts them under it
@@ -338,30 +339,32 @@ function NoteCard({
           </div>
         )}
 
-        {/* Who it is shared with and who changed it last, on one line (wrapping when it is long) */}
-        {(isShared || involved.length > 0) && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-xs text-muted-foreground">
-            {involved.length > 0 ? <PeopleStack people={involved} max={3} size={24} /> : <Users className="h-3.5 w-3.5 shrink-0" />}
-            {!isOwner && (
-              <span className="truncate">
-                {fmt(t('ntFromName'), { name: people.byId[note.createdBy]?.name || '' })}
-              </span>
-            )}
-            {note.myAccess === 'view' && <span>· {t('ntViewOnly')}</span>}
-            {isShared && (
-              <span className="inline-flex min-w-0 items-center gap-1.5">
-                {editorPerson && !editorPerson.isMe && involved.length === 0 && <PersonDot person={editorPerson} size={16} />}
-                <span className="min-w-0 break-words">
-                  {editorPerson && !editorPerson.isMe
-                    ? fmt(t('ntEditedBy'), { name: editorPerson.name, time: timeAgo(note.updated_date, language) })
-                    : editorPerson
-                      ? fmt(t('ntEditedByYou'), { time: timeAgo(note.updated_date, language) })
-                      : fmt(t('ntEditedAt'), { time: timeAgo(note.updated_date, language) })}
-                </span>
-              </span>
-            )}
-          </div>
-        )}
+        {/* Who it is shared with, when it was made and when last edited (by whom, in a shared note), on one line
+            that wraps when it is long */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-xs text-muted-foreground">
+          {(isShared || involved.length > 0) && (
+            involved.length > 0 ? <PeopleStack people={involved} max={3} size={24} /> : <Users className="h-3.5 w-3.5 shrink-0" />
+          )}
+          {!isOwner && (
+            <span className="truncate">
+              {fmt(t('ntFromName'), { name: people.byId[note.createdBy]?.name || '' })}
+            </span>
+          )}
+          {note.myAccess === 'view' && <span>· {t('ntViewOnly')}</span>}
+          {note.created_date && (
+            <span>{fmt(t('ntCreatedAt'), { time: formatDateTime(note.created_date, language, { short: true, time: false }) })} ·</span>
+          )}
+          <span className="inline-flex min-w-0 items-center gap-1.5" title={timeAgo(note.updated_date, language)}>
+            {isShared && editorPerson && !editorPerson.isMe && involved.length === 0 && <PersonDot person={editorPerson} size={16} />}
+            <span className="min-w-0 break-words">
+              {isShared && editorPerson && !editorPerson.isMe
+                ? fmt(t('ntEditedBy'), { name: editorPerson.name, time: edited })
+                : isShared && editorPerson
+                  ? fmt(t('ntEditedByYou'), { time: edited })
+                  : fmt(t('ntEditedAt'), { time: edited })}
+            </span>
+          </span>
+        </div>
       </div>
 
       {/* Menu + pin: on hover / focus with a mouse, the pin in the corner; on touch the menu in the corner, always.
