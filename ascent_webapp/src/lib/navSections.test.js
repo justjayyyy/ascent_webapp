@@ -10,19 +10,22 @@ test('every page but Settings is in exactly one section, and has a name', () => 
   for (const page of pages) expect(PAGE_LABELS[page]).toBeTruthy();
 });
 
-test('expenses and income, the dashboard and its review, and plans, loans and savings share a section', () => {
+test('expenses and income are tabs, plans, loans and savings a sidebar group, and the review sits under the dashboard', () => {
   const all = visibleSections(() => true);
-  expect(all.map((s) => s.id)).toEqual(['overview', 'money', 'planning', 'notes', 'groceries', 'tasks']);
-  expect(all.find((s) => s.id === 'money').pages).toEqual(['Expenses', 'Income']);
-  expect(all.find((s) => s.id === 'planning').pages).toEqual(['Plans', 'Commitments', 'Savings']);
+  const byId = Object.fromEntries(all.map((s) => [s.id, s]));
+  expect(all.map((s) => s.id)).toEqual(['overview', 'money', 'longTerm', 'notes', 'groceries', 'tasks']);
+  expect(byId.money).toMatchObject({ layout: 'tabs', pages: ['Expenses', 'Income'] });
+  expect(byId.longTerm).toMatchObject({ layout: 'submenu', pages: ['Plans', 'Commitments', 'Savings'] });
+  expect(byId.overview.pages).toEqual(['Dashboard', 'Review']);
+  expect(byId.overview.layout).toBeUndefined();
 });
 
 test('a section keeps only the pages a member may open, and goes when there are none', () => {
   const noGoals = visibleSections(can('viewExpenses'));
-  expect(noGoals.find((s) => s.id === 'planning').pages).toEqual(['Plans', 'Commitments']);
+  expect(noGoals.find((s) => s.id === 'longTerm').pages).toEqual(['Plans', 'Commitments']);
 
   const goalsOnly = visibleSections(can('viewGoals'));
-  expect(goalsOnly.map((s) => s.id)).toEqual(['planning', 'notes', 'groceries', 'tasks']);
+  expect(goalsOnly.map((s) => s.id)).toEqual(['longTerm', 'notes', 'groceries', 'tasks']);
   expect(goalsOnly[0].pages).toEqual(['Savings']);
 
   expect(visibleSections(can()).map((s) => s.id)).toEqual(['notes', 'groceries', 'tasks']);

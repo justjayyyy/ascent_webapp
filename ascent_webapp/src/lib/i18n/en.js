@@ -106,7 +106,7 @@ export default {
   collapseSidebar: 'Collapse sidebar',
   expandSidebar: 'Expand sidebar',
   mainNavigation: 'Main navigation',
-  navPlanning: 'Planning',
+  navLongTerm: 'Long-term',
   navSectionPages: 'Pages in this section',
   calAgenda: 'Agenda',
   calUpNext: 'Up next',

@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ChevronsUpDown, ChevronLeft, Check, Moon, Sun, Eye, EyeOff,
+  ChevronsUpDown, ChevronLeft, ChevronDown, Check, Moon, Sun, Eye, EyeOff,
   Settings as SettingsIcon, LogOut, CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -60,6 +60,8 @@ function Avatar({ user, className }) {
 
 export default function AppSidebar({
   navigation,
+  openGroups = {},
+  onToggleGroup,
   currentPageName,
   collapsed: collapsedProp,
   onToggleCollapsed,
@@ -79,21 +81,28 @@ export default function AppSidebar({
 
   // Sliding active indicator: measure the active item and glide a highlight to it.
   const navRef = useRef(null);
+  const listRef = useRef(null);
   const itemRefs = useRef({});
   const [indicator, setIndicator] = useState(null);
   const placedOnce = useRef(false);
-  // A section's entry stays lit on every page of it, so moving between its tabs leaves the highlight put
-  const activeKey = calendarOpen ? '__calendar' : navigation.find((item) => item.pages.includes(currentPageName))?.id;
+  // A section's entry stays lit on every page of it, so moving between its tabs leaves the highlight put.
+  // In an open group the page itself is lit; a closed one (or the narrow rail) lights the group.
+  const groupOpen = (item) => !collapsed && !!openGroups[item.id];
+  const activeItem = navigation.find((item) => item.pages.includes(currentPageName));
+  const activeKey = calendarOpen ? '__calendar'
+    : activeItem && (activeItem.children && groupOpen(activeItem) ? currentPageName : activeItem.id);
 
   useLayoutEffect(() => {
     const measure = () => {
       const el = itemRefs.current[activeKey];
       if (!el) return setIndicator(null);
-      setIndicator({ top: el.offsetTop, height: el.offsetHeight });
+      setIndicator({ top: el.offsetTop, height: el.offsetHeight, left: el.offsetLeft, width: el.offsetWidth });
     };
     measure();
+    // The list changes height while a group opens or closes, moving the entries below it
     const ro = new ResizeObserver(measure);
     if (navRef.current) ro.observe(navRef.current);
+    if (listRef.current) ro.observe(listRef.current);
     return () => ro.disconnect();
   }, [activeKey, navigation.length, collapsed]);
 
@@ -216,14 +225,16 @@ export default function AppSidebar({
           <span
             aria-hidden="true"
             className={cn(
-              'pointer-events-none absolute inset-x-3 top-0 z-0 rounded-xl',
+              'pointer-events-none absolute top-0 z-0 rounded-xl',
               'bg-primary/[0.13] ring-1 ring-inset ring-primary/25',
               'shadow-[0_8px_24px_-12px_hsl(var(--glow)/0.7)]',
               'motion-reduce:transition-none',
-              placedOnce.current ? 'transition-[transform,height,opacity] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]' : '',
+              placedOnce.current ? 'transition-[transform,height,width,left,opacity] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]' : '',
             )}
             style={{
               height: indicator?.height ?? 0,
+              left: indicator?.left ?? 0,
+              width: indicator?.width ?? 0,
               transform: `translateY(${indicator?.top ?? 0}px)`,
               opacity: indicator ? 1 : 0,
             }}
@@ -231,11 +242,94 @@ export default function AppSidebar({
             <span className="absolute inset-y-2.5 start-0 w-[3px] rounded-e-full bg-primary shadow-[0_0_10px_hsl(var(--glow)/0.9)]" />
           </span>
 
-          <ul className="space-y-1">
+          <ul ref={listRef} className="space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon;
               if (!Icon) return null;
               const isActive = item.pages.includes(currentPageName) && !calendarOpen;
+              if (item.children) {
+                const open = groupOpen(item);
+                const lit = isActive && !open;
+                const panelId = `nav-group-${item.id}${mobile ? '-mobile' : ''}`;
+                const groupClass = cn(itemBase, lit ? 'text-foreground' : 'text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground');
+                const groupIcon = <Icon className={cn('h-5 w-5 shrink-0 transition-colors duration-200', lit ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} />;
+                return (
+                  <li key={item.id}>
+                    {collapsed ? (
+                      // The narrow rail has no room to open in place: the group's pages open beside it
+                      <DropdownMenu>
+                        <RailTip label={item.name} show side={tipSide}>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" ref={setItemRef(item.id)} aria-label={item.name} className={groupClass}>
+                              {groupIcon}
+                            </button>
+                          </DropdownMenuTrigger>
+                        </RailTip>
+                        <DropdownMenuContent side={tipSide} align="start" sideOffset={12} className="w-56 rounded-2xl bg-popover p-1.5">
+                          {item.children.map((child) => {
+                            const ChildIcon = child.icon;
+                            const here = child.page === currentPageName && !calendarOpen;
+                            return (
+                              <DropdownMenuItem key={child.page} asChild>
+                                <Link
+                                  to={createPageUrl(child.page)}
+                                  aria-current={here ? 'page' : undefined}
+                                  className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2', here && 'text-primary focus:text-primary')}
+                                >
+                                  <ChildIcon className={cn('h-4 w-4', here ? 'text-primary' : 'text-muted-foreground')} />
+                                  <span className="text-sm">{child.name}</span>
+                                </Link>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          ref={setItemRef(item.id)}
+                          onClick={() => onToggleGroup?.(item.id)}
+                          aria-expanded={open}
+                          aria-controls={panelId}
+                          className={groupClass}
+                        >
+                          {groupIcon}
+                          <Label collapsed={false} className="flex-1 text-start">{item.name}</Label>
+                          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 motion-reduce:transition-none', open && 'rotate-180')} />
+                        </button>
+                        {/* Opens and closes by animating the row height; closed, its links are out of reach */}
+                        <div
+                          id={panelId}
+                          className={cn('grid transition-[grid-template-rows] duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
+                          inert={open ? undefined : ''}
+                        >
+                          <ul className="min-h-0 space-y-1 overflow-hidden">
+                            {item.children.map((child, i) => {
+                              const ChildIcon = child.icon;
+                              const here = child.page === currentPageName && !calendarOpen;
+                              return (
+                                <li key={child.page} className={i === 0 ? 'pt-1' : undefined}>
+                                  <Link
+                                    ref={setItemRef(child.page)}
+                                    to={createPageUrl(child.page)}
+                                    aria-current={here ? 'page' : undefined}
+                                    onClick={onNavigate}
+                                    className={cn(itemBase, 'h-10 ps-11', here ? 'text-foreground' : 'text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground')}
+                                  >
+                                    <ChildIcon className={cn('h-[18px] w-[18px] shrink-0 transition-colors duration-200', here ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground')} />
+                                    <Label collapsed={false}>{child.name}</Label>
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                );
+              }
               return (
                 <li key={item.id}>
                   <RailTip label={item.name} show={collapsed} side={tipSide}>

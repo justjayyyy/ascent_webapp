@@ -7,15 +7,15 @@ import { useAuth } from '@/lib/AuthContext';
 import { PAGE_LABELS, visibleSections } from '@/lib/navSections';
 
 /**
- * The other pages of this page's section (Expenses and Income; the Dashboard and its review; Plans,
- * Loans and Savings), as a pill of tabs above the page title. The sidebar has one entry per section,
- * so these are the way between them. Nothing shows when the member may open only one of them.
+ * The pages of a tabbed section (Expenses and Income) as a pill of tabs above the page title. The
+ * sidebar has one entry for the section, so these are the way between them. Nothing shows when the
+ * member may open only one of them.
  */
 export default function SectionTabs({ page, className }) {
   const { t } = useTheme();
   const { hasPermission } = useAuth();
   const section = visibleSections(hasPermission).find((s) => s.pages.includes(page));
-  if (!section || section.pages.length < 2) return null;
+  if (section?.layout !== 'tabs' || section.pages.length < 2) return null;
 
   return (
     // A strip too wide for the phone scrolls on its own rather than widening the page

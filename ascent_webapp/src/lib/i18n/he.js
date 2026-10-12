@@ -106,7 +106,7 @@ export default {
   collapseSidebar: 'כווץ סרגל צד',
   expandSidebar: 'הרחב סרגל צד',
   mainNavigation: 'ניווט ראשי',
-  navPlanning: 'תכנון',
+  navLongTerm: 'לטווח ארוך',
   navSectionPages: 'עמודים בחלק הזה',
   calAgenda: 'סדר יום',
   calUpNext: 'הבא בתור',

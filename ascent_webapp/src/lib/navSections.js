@@ -1,11 +1,15 @@
 import { PAGE_PERMISSIONS } from './pageAccess';
 
-// The sidebar shows one entry per section; the pages of a section are tabs at the top of each of them.
+// One sidebar entry per section. How a section of several pages shows them (`layout`):
+//   'tabs'     a pill of tabs at the top of each of its pages (SectionTabs)
+//   'submenu'  a group in the sidebar that opens to list them
+//   (none)     the entry leads to the first page, and the others open from inside it
 // `label` is the section's translation key in the sidebar when it holds more than one page.
 export const NAV_SECTIONS = [
+  // The monthly review opens from its card on the Dashboard
   { id: 'overview', label: 'dashboard', pages: ['Dashboard', 'Review'] },
-  { id: 'money', label: 'transactions', pages: ['Expenses', 'Income'] },
-  { id: 'planning', label: 'navPlanning', pages: ['Plans', 'Commitments', 'Savings'] },
+  { id: 'money', label: 'transactions', layout: 'tabs', pages: ['Expenses', 'Income'] },
+  { id: 'longTerm', label: 'navLongTerm', layout: 'submenu', pages: ['Plans', 'Commitments', 'Savings'] },
   { id: 'notes', label: 'notes', pages: ['Notes'] },
   { id: 'groceries', label: 'grTitle', pages: ['Groceries'] },
   { id: 'tasks', label: 'tkNav', pages: ['Tasks'] },

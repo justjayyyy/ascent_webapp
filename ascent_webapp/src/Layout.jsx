@@ -34,7 +34,19 @@ const PAGE_ICONS = {
   Dashboard: PieChart, Review: BarChart3, Expenses: Receipt, Income: HandCoins, Plans: Milestone,
   Commitments: Landmark, Savings: PiggyBank, Notes: StickyNote, Groceries: ShoppingBasket, Tasks: ClipboardList,
 };
-const SECTION_ICONS = { overview: PieChart, money: ArrowLeftRight, planning: Milestone };
+const SECTION_ICONS = { overview: PieChart, money: ArrowLeftRight, longTerm: Milestone };
+
+// Which sidebar groups (a section shown as a submenu) are open, remembered on this device
+const NAV_GROUPS_KEY = 'ascent.navGroupsOpen';
+const readOpenGroups = () => {
+  try { return JSON.parse(localStorage.getItem(NAV_GROUPS_KEY)) || {}; } catch { return {}; }
+};
+const withGroup = (prev, id, open) => {
+  if (!!prev[id] === open) return prev;
+  const next = { ...prev, [id]: open };
+  try { localStorage.setItem(NAV_GROUPS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+  return next;
+};
 
 // Each tab keeps its own scroll position, like the tabs of a native app
 const scrollMemory = new Map();
@@ -192,8 +204,9 @@ function LayoutContent({ children, currentPageName }) {
     }
   }, [user, saveUserPrefs, refreshUser]);
 
-  // One sidebar entry per section; a section of several pages links to its first and the page
-  // tabs (SectionTabs) lead to the rest. A section left with one page a member may open goes by that page's name.
+  // One sidebar entry per section. A section of several pages links to its first, and its other pages
+  // are tabs on the page (SectionTabs), a submenu in the sidebar, or open from inside the first.
+  // A section left with one page a member may open goes by that page's name.
   const navigation = useMemo(() => visibleSections(hasPermission).map((section) => {
     const [first] = section.pages;
     const single = section.pages.length === 1;
@@ -203,8 +216,19 @@ function LayoutContent({ children, currentPageName }) {
       pages: section.pages,
       name: t(single ? PAGE_LABELS[first] : section.label),
       icon: (!single && SECTION_ICONS[section.id]) || PAGE_ICONS[first],
+      children: section.layout === 'submenu' && !single
+        ? section.pages.map((page) => ({ page, name: t(PAGE_LABELS[page]), icon: PAGE_ICONS[page] }))
+        : null,
     };
   }), [t, hasPermission]);
+
+  const [openGroups, setOpenGroups] = useState(readOpenGroups);
+  const toggleGroup = useCallback((id) => setOpenGroups((prev) => withGroup(prev, id, !prev[id])), []);
+  // Arriving on a page of a group opens it, so the page is there to see in the menu
+  useEffect(() => {
+    const group = navigation.find((item) => item.children && item.pages.includes(currentPageName));
+    if (group) setOpenGroups((prev) => withGroup(prev, group.id, true));
+  }, [currentPageName, navigation]);
 
   const pageTitle = PAGE_LABELS[currentPageName] ? t(PAGE_LABELS[currentPageName])
     : (currentPageName === 'Settings' ? t('settings') : 'Ascent');
@@ -252,6 +276,8 @@ function LayoutContent({ children, currentPageName }) {
       {/* Desktop Sidebar */}
       <AppSidebar
         navigation={navigation}
+        openGroups={openGroups}
+        onToggleGroup={toggleGroup}
         currentPageName={currentPageName}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebar}
@@ -283,6 +309,8 @@ function LayoutContent({ children, currentPageName }) {
         open={mobileMenuOpen}
         onNavigate={() => setMobileMenuOpen(false)}
         navigation={navigation}
+        openGroups={openGroups}
+        onToggleGroup={toggleGroup}
         currentPageName={currentPageName}
         onOpenCalendar={() => setCalendarOpen(true)}
         calendarOpen={calendarOpen}

@@ -1,7 +1,6 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
-import SectionTabs from '@/components/shell/SectionTabs';
-import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Loader2, Play, Sparkles, Trophy } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Loader2, Play, Sparkles } from 'lucide-react';
 import { motion } from '@/lib/motion';
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
 import BlurValue from '@/components/BlurValue';
@@ -12,10 +11,12 @@ import { useTransactions, useOldestTransactionDate } from '@/lib/offline/txOutbo
 import LoadFailed from '@/components/shell/LoadFailed';
 import { translateCategory } from '@/lib/translations';
 import { cn } from '@/lib/utils';
+import { createPageUrl } from '@/utils';
 import { COMPARISONS, buildMonthReview } from '@/lib/monthReview';
 import { spendDays } from '@/lib/noSpend';
 import RecapStories from '@/components/recap/RecapStories';
 import { DayHeat, Delta, Figure, Section, ShareBar, Sparkline } from '@/components/review/ReviewParts';
+import { reviewHighlights } from '@/components/review/reviewHighlights';
 
 const pad = (n) => String(n).padStart(2, '0');
 const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
@@ -163,20 +164,10 @@ function Review() {
   }, [tokens, review, blur, fmt, fmtCompact, compareLabel, month]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- highlights in words ----
-  const highlights = useMemo(() => {
-    const out = review.records.map((r) => ({
-      icon: Trophy,
-      tone: r.kind === 'highestSpend' || r.kind === 'categoryHigh' ? 'text-warning' : 'text-success',
-      text: t(`rvRecord_${r.kind}`, { n: r.months, category: r.category ? cat(r.category) : '' }),
-    }));
-    review.movers.up.slice(0, 2).forEach((m) => out.push({ tone: 'text-danger', text: t('rvMoverUp', { category: cat(m.category), amount: blur ? '••' : fmt(m.delta) }) }));
-    review.movers.down.slice(0, 2).forEach((m) => out.push({ tone: 'text-success', text: t('rvMoverDown', { category: cat(m.category), amount: blur ? '••' : fmt(-m.delta) }) }));
-    if (review.newMerchants.length) out.push({ tone: 'text-primary', text: t('rvNewPlaces', { n: review.newMerchants.length }) });
-    if (review.noSpend.counted > 0) out.push({ tone: 'text-success', text: t('rvNoSpendSummary', { n: review.noSpend.free, longest: review.noSpend.longest }) });
-    return out;
-  }, [review, t, blur, fmt]); // eslint-disable-line react-hooks/exhaustive-deps
+  const highlights = useMemo(() => reviewHighlights(review, { t, language, fmt, blur }), [review, t, language, fmt, blur]);
 
   const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
+  const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const topWeekday = review.weekdays.reduce((best, w) => (w.average > (best?.average || 0) ? w : best), null);
   const maxWeekday = Math.max(...review.weekdays.map((w) => w.average), 1);
@@ -186,7 +177,10 @@ function Review() {
     <div className="relative">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[460px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.18),transparent_70%)]" />
       <div className="mx-auto max-w-6xl space-y-4 p-3 pb-28 sm:p-4 md:space-y-5 md:p-8 md:pb-10">
-        <SectionTabs page="Review" />
+        {/* The review opens from its card on the Dashboard, and leads back to it */}
+        <Link to={createPageUrl('Dashboard')} className="-ms-1 inline-flex h-11 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:h-9">
+          <BackIcon className="h-4 w-4" aria-hidden />{t('dashboard')}
+        </Link>
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('rvTitle')}</h1>

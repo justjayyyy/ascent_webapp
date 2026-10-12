@@ -1,5 +1,4 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import SectionTabs from '@/components/shell/SectionTabs';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, LayoutGroup, motion } from '@/lib/motion';
@@ -296,7 +295,6 @@ function Commitments() {
             exit={{ opacity: 0, x: isRTL ? 16 : -16 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           >
-            <SectionTabs page="Commitments" className="mb-4" />
             <header className="mb-4 flex items-center justify-between gap-3 sm:mb-6">
               <div className="min-w-0">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">{t('commitments')}</h1>

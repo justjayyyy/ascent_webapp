@@ -50,9 +50,10 @@ test('an editor adds and changes money but does not manage people or cards @crit
 test('a member with notes only sees no money at all: no pages, no data @critical', async ({ member }) => {
   const notesOnly = await member('editor', { permissions: { viewNotes: true, editNotes: true } });
   await openApp(notesOnly.page, '/Notes');
-  for (const key of ['dashboard', 'transactions', 'navPlanning', 'expenses', 'income', 'plans', 'cmNavShort', 'svTitle']) {
+  for (const key of ['dashboard', 'transactions', 'expenses', 'income', 'plans', 'cmNavShort', 'svTitle']) {
     await expect(nav(notesOnly.page).getByRole('link', { name: L(key), exact: true })).toHaveCount(0);
   }
+  await expect(nav(notesOnly.page).getByRole('button', { name: L('navLongTerm') })).toHaveCount(0);
   // Asking for a money page by its address lands on the first page they may open
   await notesOnly.page.goto('/Expenses');
   await expect(notesOnly.page).toHaveURL(/\/Notes$/);
@@ -65,11 +66,10 @@ test('without the goals permission, Savings is hidden and its address leads to t
   const noGoals = await member('editor', { permissions: { viewExpenses: true, editExpenses: true, viewBudgets: true, viewNotes: true } });
   await openApp(noGoals.page, '/Dashboard');
   await expect(nav(noGoals.page).getByRole('link', { name: L('svTitle'), exact: true })).toHaveCount(0);
-  // Plans and Loans keep their tabs; Savings is not one of them
+  // The Long-term group keeps Plans and Loans; Savings is not in it
   await noGoals.page.goto('/Plans');
-  const tabs = noGoals.page.getByRole('navigation', { name: L('navSectionPages') });
-  await expect(tabs.getByRole('link', { name: L('cmNavShort'), exact: true })).toBeVisible();
-  await expect(tabs.getByRole('link', { name: L('svTitle'), exact: true })).toHaveCount(0);
+  await expect(nav(noGoals.page).getByRole('link', { name: L('cmNavShort'), exact: true })).toBeVisible();
+  await expect(nav(noGoals.page).getByRole('link', { name: L('svTitle'), exact: true })).toHaveCount(0);
   await noGoals.page.goto('/Savings');
   await expect(noGoals.page).toHaveURL(/\/Dashboard$/);
   expect((await noGoals.api.send('GET', '/entities/goals')).status()).toBe(403);

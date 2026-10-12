@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import SectionTabs from '@/components/shell/SectionTabs';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from '@/lib/motion';
 import NumberFlow from '@number-flow/react';
-import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank, BarChart3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
 import EChart, { useChartTokens, withAlpha } from '@/components/charts/EChart';
 import BlurValue from '@/components/BlurValue';
 import { useTheme } from '@/components/ThemeProvider';
@@ -34,6 +33,7 @@ import CheckinSheet from '@/components/checkin/CheckinSheet';
 import CheckinCard from '@/components/insights/CheckinCard';
 import { NoSpendCard, NoSpendInvite } from '@/components/insights/NoSpendCard';
 import TasksDueCard from '@/components/insights/TasksDueCard';
+import MonthReviewCard from '@/components/insights/MonthReviewCard';
 import { dueState } from '@/components/tasks/taskUtils';
 
 const NOSPEND_INVITE_KEY = 'ascent_nospend_invite_dismissed';
@@ -384,7 +384,6 @@ export default function Dashboard() {
 
       <div className="mx-auto max-w-7xl space-y-5 p-4 pb-28 md:p-8 md:pb-10">
         {loadFailed && <LoadFailed onRetry={() => retryTransactions()} retrying={retryingTransactions} />}
-        <SectionTabs page="Dashboard" />
         <motion.header className="flex flex-wrap items-end justify-between gap-4" variants={rise} initial="hidden" animate="show">
           <div>
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('dashboard')}</h1>
@@ -392,13 +391,6 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
           <RecapRingButton onOpen={() => openRecap(selectedMonth)} fresh={selectedRecapFresh && hasData} label={t('rcButton')} />
-          <Link
-            to={`${createPageUrl('Review')}?month=${selectedKey}`}
-            className="inline-flex h-11 items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-4 text-sm font-semibold backdrop-blur-xl transition hover:bg-foreground/10 active:scale-95"
-          >
-            <BarChart3 className="h-4 w-4 text-primary" aria-hidden />
-            <span className="max-sm:sr-only">{t('rvOpen')}</span>
-          </Link>
           <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/70 p-1 backdrop-blur-xl">
             <button type="button" aria-label={t('dashPrevMonth')} onClick={() => shiftMonth(-1)}
               className="grid h-11 w-11 place-items-center rounded-full transition hover:bg-foreground/10 active:scale-95 sm:h-9 sm:w-9">
@@ -484,6 +476,11 @@ export default function Dashboard() {
               kpis.savingsRate === null ? '—' : <NumberFlow value={kpis.savingsRate / 100} locales={locale} format={{ style: 'percent', maximumFractionDigits: 0 }} trend={0} />,
               PiggyBank, 'text-primary')}
           </div>
+
+          {/* The monthly review: the month against the last, what stood out, and the way into the full review */}
+          <Tile i={2} className="md:col-span-6">
+            <MonthReviewCard rows={normalized} month={selectedMonth} monthKey={selectedKey} t={t} language={language} isRTL={isRTL} loc={locale} fmt={fmtMoney} blur={blur} />
+          </Tile>
 
           {/* No-spend days, for those who turned them on */}
           {streak && (
