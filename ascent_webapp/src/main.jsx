@@ -9,6 +9,7 @@ import { registerSW } from 'virtual:pwa-register'
 import { startMonitoring } from '@/lib/monitoring'
 import { loadLanguage } from '@/lib/translations'
 import { likelyLanguage } from '@/lib/startLanguage'
+import { reloadForNewBuild } from '@/lib/staleBuild'
 
 startMonitoring();
 ensureStandaloneTopInset();
@@ -50,9 +51,23 @@ if (import.meta.env.PROD) {
 // Once the first screen is up, load every page's code in the background, so switching tabs in the
 // dock or between a section's pages never waits for a download or shows a skeleton
 const prefetchPages = () => {
-  import('./pages/Dashboard'); import('./pages/Review'); import('./pages/Expenses'); import('./pages/Income');
-  import('./pages/Plans'); import('./pages/Commitments'); import('./pages/Savings');
-  import('./pages/Notes'); import('./pages/Settings');
+  [
+    () => import('./pages/Dashboard'), () => import('./pages/Review'), () => import('./pages/Expenses'),
+    () => import('./pages/Income'), () => import('./pages/Plans'), () => import('./pages/Commitments'),
+    () => import('./pages/Savings'), () => import('./pages/Notes'), () => import('./pages/Settings'),
+  ].forEach((load) => load().catch(() => {})); // a page that fails here loads (or says so) when opened
 };
 if ('requestIdleCallback' in window) requestIdleCallback(prefetchPages, { timeout: 4000 });
 else setTimeout(prefetchPages, 2500);
+
+// Code that fails to download is usually from the release before the one now deployed. Load the page
+// again for the new one, but only once the app is in the background, never under someone's thumb (a
+// page that breaks on screen because of it reloads by itself, from the error boundary)
+let staleBuild = false;
+window.addEventListener('vite:preloadError', () => {
+  staleBuild = true;
+  if (document.visibilityState === 'hidden') reloadForNewBuild();
+});
+document.addEventListener('visibilitychange', () => {
+  if (staleBuild && document.visibilityState === 'hidden') reloadForNewBuild();
+});

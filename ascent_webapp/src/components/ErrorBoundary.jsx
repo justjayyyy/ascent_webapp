@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/components/ThemeProvider';
 import { reportError } from '@/lib/monitoring';
+import { isStaleBuildError, reloadForNewBuild } from '@/lib/staleBuild';
 
 /**
  * Catches a crash in the page below it and offers a way out. `resetKey` (the page name) clears the
@@ -16,6 +17,11 @@ class Boundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    // Code from before a new release that is no longer there: loading the page again brings the new one
+    if (isStaleBuildError(error) && reloadForNewBuild()) {
+      this.setState({ reloading: true });
+      return;
+    }
     this.setState({ componentStack: info?.componentStack || null });
     console.error('[ErrorBoundary]', error, info?.componentStack);
     reportError(error, { componentStack: info?.componentStack });
@@ -26,8 +32,9 @@ class Boundary extends React.Component {
   }
 
   render() {
-    const { error, componentStack } = this.state;
+    const { error, componentStack, reloading } = this.state;
     if (!error) return this.props.children;
+    if (reloading) return null;
     if (this.props.fallback) return this.props.fallback;
     const { t } = this.props;
     return (
