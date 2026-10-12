@@ -1,23 +1,38 @@
-// The sidebar on a computer: every page is one click away.
+// The sidebar on a computer: every page is one click away, in the sidebar or in its section's tabs.
 import { test, expect } from '../../fixtures.js';
 import { openApp } from '../../support/app.js';
 import { L } from '../../support/i18n.js';
 import { waitForPageReady } from '../../support/layout.js';
 
-// [translation key of the sidebar item, path]
-const PAGES = [
-  ['rvNav', 'Review'], ['expenses', 'Expenses'], ['income', 'Income'], ['plans', 'Plans'], ['cmNavShort', 'Commitments'],
-  ['svTitle', 'Savings'], ['notes', 'Notes'], ['grTitle', 'Groceries'], ['tkNav', 'Tasks'], ['dashboard', 'Dashboard'],
+// [translation key of the sidebar entry, its first page, [translation key of a tab, path]...]
+const SECTIONS = [
+  ['transactions', 'Expenses', [['income', 'Income'], ['expenses', 'Expenses']]],
+  ['navPlanning', 'Plans', [['cmNavShort', 'Commitments'], ['svTitle', 'Savings'], ['plans', 'Plans']]],
+  ['notes', 'Notes', []],
+  ['grTitle', 'Groceries', []],
+  ['tkNav', 'Tasks', []],
+  ['dashboard', 'Dashboard', [['rvNav', 'Review'], ['dashboard', 'Dashboard']]],
 ];
 
-test('every page opens from the sidebar @smoke @critical', async ({ page, owner: _owner }) => {
+test('every page opens from the sidebar or its section tabs @smoke @critical', async ({ page, owner: _owner }) => {
   await openApp(page, '/Dashboard');
   const nav = page.getByRole('navigation', { name: L('mainNavigation') });
-  for (const [key, path] of PAGES) {
-    await nav.getByRole('link', { name: L(key), exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/${path}$`));
+  const tabs = page.getByRole('navigation', { name: L('navSectionPages') });
+  for (const [key, first, pages] of SECTIONS) {
+    const entry = nav.getByRole('link', { name: L(key), exact: true });
+    await entry.click();
+    await expect(page).toHaveURL(new RegExp(`/${first}$`));
     await waitForPageReady(page);
     await expect(page.locator('main h1').first()).toBeVisible();
+    for (const [tab, path] of pages) {
+      await tabs.getByRole('link', { name: L(tab), exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/${path}$`));
+      await waitForPageReady(page);
+      await expect(page.locator('main h1').first()).toBeVisible();
+      await expect(tabs.getByRole('link', { name: L(tab), exact: true })).toHaveAttribute('aria-current', 'page');
+      // The section's entry in the sidebar stays the current one on each of its pages
+      await expect(entry).toHaveAttribute('aria-current', 'page');
+    }
   }
 });
 

@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
+import SectionTabs from '@/components/shell/SectionTabs';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Loader2, Play, Sparkles, Trophy } from 'lucide-react';
 import { motion } from '@/lib/motion';
@@ -185,6 +186,7 @@ function Review() {
     <div className="relative">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[460px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.18),transparent_70%)]" />
       <div className="mx-auto max-w-6xl space-y-4 p-3 pb-28 sm:p-4 md:space-y-5 md:p-8 md:pb-10">
+        <SectionTabs page="Review" />
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('rvTitle')}</h1>

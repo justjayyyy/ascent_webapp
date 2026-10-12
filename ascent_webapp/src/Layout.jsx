@@ -2,11 +2,12 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useR
 import { useNavigate } from 'react-router-dom';
 import { useCategories, usePlans } from '@/hooks/useWorkspaceData';
 import { motion, useReducedMotion } from '@/lib/motion';
-import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket, PiggyBank, BarChart3, ClipboardList } from 'lucide-react';
+import { PieChart, Receipt, StickyNote, HandCoins, Milestone, TrendingDown, Landmark, ShoppingBasket, PiggyBank, BarChart3, ClipboardList, ArrowLeftRight } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
 import { cn } from '@/lib/utils';
 import { useTheme } from './components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
+import { PAGE_LABELS, visibleSections } from '@/lib/navSections';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { useSignOut } from './hooks/useSignOut';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
@@ -28,6 +29,12 @@ import { useOutbox } from '@/lib/offline/txOutbox';
 const CalendarModal = lazy(() => import('@/components/GoogleCalendar/CalendarModal'));
 
 const SIDEBAR_KEY = 'ascent.sidebarCollapsed';
+
+const PAGE_ICONS = {
+  Dashboard: PieChart, Review: BarChart3, Expenses: Receipt, Income: HandCoins, Plans: Milestone,
+  Commitments: Landmark, Savings: PiggyBank, Notes: StickyNote, Groceries: ShoppingBasket, Tasks: ClipboardList,
+};
+const SECTION_ICONS = { overview: PieChart, money: ArrowLeftRight, planning: Milestone };
 
 // Each tab keeps its own scroll position, like the tabs of a native app
 const scrollMemory = new Map();
@@ -185,32 +192,22 @@ function LayoutContent({ children, currentPageName }) {
     }
   }, [user, saveUserPrefs, refreshUser]);
 
-  // const hasPermission = useCallback((permission) => {
-  //   // If no permissions object exists, user is owner and has all permissions
-  //   if (!permissions) return true;
-  //   // For shared users, check if the specific permission is granted
-  //   // Use optional chaining to safely access permissions
-  //   return permissions?.[permission] === true;
-  // }, [permissions]);
+  // One sidebar entry per section; a section of several pages links to its first and the page
+  // tabs (SectionTabs) lead to the rest. A section left with one page a member may open goes by that page's name.
+  const navigation = useMemo(() => visibleSections(hasPermission).map((section) => {
+    const [first] = section.pages;
+    const single = section.pages.length === 1;
+    return {
+      id: section.id,
+      page: first,
+      pages: section.pages,
+      name: t(single ? PAGE_LABELS[first] : section.label),
+      icon: (!single && SECTION_ICONS[section.id]) || PAGE_ICONS[first],
+    };
+  }), [t, hasPermission]);
 
-  const navigation = useMemo(() => [
-    { name: t('dashboard'), page: 'Dashboard', icon: PieChart, permission: 'viewExpenses' },
-    { name: t('rvNav'), page: 'Review', icon: BarChart3, permission: 'viewExpenses' },
-    { name: t('expenses'), page: 'Expenses', icon: Receipt, permission: 'viewExpenses' },
-    { name: t('income'), page: 'Income', icon: HandCoins, permission: 'viewExpenses' },
-    { name: t('plans'), page: 'Plans', icon: Milestone, permission: 'viewExpenses' },
-    { name: t('cmNavShort'), page: 'Commitments', icon: Landmark, permission: 'viewExpenses' },
-    { name: t('svTitle'), page: 'Savings', icon: PiggyBank, permission: 'viewGoals' },
-    // Open to every member: notes shared with someone need no workspace-wide notes permission
-    { name: t('notes'), page: 'Notes', icon: StickyNote },
-    { name: t('grTitle'), page: 'Groceries', icon: ShoppingBasket },
-    // Household chores with a date and a cost, open to every member like the shopping list
-    { name: t('tkNav'), page: 'Tasks', icon: ClipboardList },
-    // { name: t('settings'), page: 'Settings', icon: SettingsIcon, permission: 'viewSettings' },
-  ].filter(item => !item.permission || hasPermission(item.permission)), [t, hasPermission]);
-
-  const pageTitle = navigation.find((n) => n.page === currentPageName)?.name
-    || (currentPageName === 'Settings' ? t('settings') : 'Ascent');
+  const pageTitle = PAGE_LABELS[currentPageName] ? t(PAGE_LABELS[currentPageName])
+    : (currentPageName === 'Settings' ? t('settings') : 'Ascent');
 
   const canAddMoney = hasPermission('editExpenses');
   const canAddNotes = hasPermission('editNotes');

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import SectionTabs from '@/components/shell/SectionTabs';
 import { useSearchParams } from 'react-router-dom';
 import { ascent } from '@/api/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -237,6 +238,7 @@ function TransactionsPage({ kind }) {
           : "bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.16),transparent_70%)]"
       )} />
       <div className="max-w-7xl mx-auto flex flex-col md:block w-full">
+        <SectionTabs page={isIncome ? 'Income' : 'Expenses'} className="mb-3" />
         <header className="mb-2 flex flex-shrink-0 items-center justify-between gap-3 sm:mb-4">
           <div className="min-w-0">
             <h1 className={cn("text-3xl font-bold tracking-tight md:text-4xl", colors.textPrimary)}>{isIncome ? t('income') : t('expenses')}</h1>

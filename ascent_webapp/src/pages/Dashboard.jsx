@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import SectionTabs from '@/components/shell/SectionTabs';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from '@/lib/motion';
 import NumberFlow from '@number-flow/react';
@@ -383,6 +384,7 @@ export default function Dashboard() {
 
       <div className="mx-auto max-w-7xl space-y-5 p-4 pb-28 md:p-8 md:pb-10">
         {loadFailed && <LoadFailed onRetry={() => retryTransactions()} retrying={retryingTransactions} />}
+        <SectionTabs page="Dashboard" />
         <motion.header className="flex flex-wrap items-end justify-between gap-4" variants={rise} initial="hidden" animate="show">
           <div>
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{t('dashboard')}</h1>

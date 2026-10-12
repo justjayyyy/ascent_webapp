@@ -48,10 +48,11 @@ if (import.meta.env.PROD) {
 }
 
 // Once the first screen is up, load every page's code in the background, so switching tabs in the
-// dock never waits for a download or shows a skeleton
+// dock or between a section's pages never waits for a download or shows a skeleton
 const prefetchPages = () => {
-  import('./pages/Dashboard'); import('./pages/Expenses'); import('./pages/Income');
-  import('./pages/Plans'); import('./pages/Notes'); import('./pages/Settings');
+  import('./pages/Dashboard'); import('./pages/Review'); import('./pages/Expenses'); import('./pages/Income');
+  import('./pages/Plans'); import('./pages/Commitments'); import('./pages/Savings');
+  import('./pages/Notes'); import('./pages/Settings');
 };
 if ('requestIdleCallback' in window) requestIdleCallback(prefetchPages, { timeout: 4000 });
 else setTimeout(prefetchPages, 2500);

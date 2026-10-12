@@ -106,6 +106,8 @@ export default {
   collapseSidebar: 'Свернуть боковую панель',
   expandSidebar: 'Развернуть боковую панель',
   mainNavigation: 'Основная навигация',
+  navPlanning: 'Планирование',
+  navSectionPages: 'Страницы раздела',
   calAgenda: 'Повестка',
   calUpNext: 'Далее',
   calMoreCount: 'ещё {n}',

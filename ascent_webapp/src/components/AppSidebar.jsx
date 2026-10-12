@@ -82,7 +82,8 @@ export default function AppSidebar({
   const itemRefs = useRef({});
   const [indicator, setIndicator] = useState(null);
   const placedOnce = useRef(false);
-  const activeKey = calendarOpen ? '__calendar' : currentPageName;
+  // A section's entry stays lit on every page of it, so moving between its tabs leaves the highlight put
+  const activeKey = calendarOpen ? '__calendar' : navigation.find((item) => item.pages.includes(currentPageName))?.id;
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -234,12 +235,12 @@ export default function AppSidebar({
             {navigation.map((item) => {
               const Icon = item.icon;
               if (!Icon) return null;
-              const isActive = currentPageName === item.page && !calendarOpen;
+              const isActive = item.pages.includes(currentPageName) && !calendarOpen;
               return (
-                <li key={item.page}>
+                <li key={item.id}>
                   <RailTip label={item.name} show={collapsed} side={tipSide}>
                     <Link
-                      ref={setItemRef(item.page)}
+                      ref={setItemRef(item.id)}
                       to={createPageUrl(item.page)}
                       aria-current={isActive ? 'page' : undefined}
                       onClick={onNavigate}

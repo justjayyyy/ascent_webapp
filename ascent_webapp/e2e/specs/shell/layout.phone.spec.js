@@ -46,7 +46,7 @@ for (const language of ['en', 'he', 'ru']) {
 test('the menu moves between screens @smoke @critical', async ({ page, owner: _owner }) => {
   await openApp(page, '/Dashboard');
   const shell = new Shell(page);
-  for (const [key, path] of [['expenses', /\/Expenses/], ['notes', /\/Notes/], ['dashboard', /\/Dashboard/]]) {
+  for (const [key, path] of [['transactions', /\/Expenses/], ['notes', /\/Notes/], ['dashboard', /\/Dashboard/]]) {
     await shell.goByMenu(key);
     await expect(page).toHaveURL(path);
     await expect(shell.menuButton).toHaveAttribute('aria-expanded', 'false');

@@ -24,7 +24,7 @@ test('switching pages fast ends on the last page with its own data, and nothing 
   await api.create('plans', { name: 'Summer trip', kind: 'vacation', currency: 'USD' });
   await openApp(page, '/Dashboard');
   const nav = page.getByRole('navigation', { name: L('mainNavigation') });
-  for (const key of ['expenses', 'plans', 'notes', 'tkNav', 'plans']) await nav.getByRole('link', { name: L(key), exact: true }).click();
+  for (const key of ['transactions', 'navPlanning', 'notes', 'tkNav', 'navPlanning']) await nav.getByRole('link', { name: L(key), exact: true }).click();
   await expect(page).toHaveURL(/\/Plans$/);
   await expect(page.getByText('Summer trip').first()).toBeVisible();
   await expect(page.getByText('Coffee beans')).toHaveCount(0);
