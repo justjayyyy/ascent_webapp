@@ -22,6 +22,8 @@ export default defineConfig({
     }),
     VitePWA({
       registerType: 'autoUpdate',
+      // Preview deployments sit behind Vercel's login, and a manifest is fetched without cookies unless asked
+      useCredentials: true,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         id: '/',
