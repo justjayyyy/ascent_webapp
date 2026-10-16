@@ -13,6 +13,9 @@ import { useTheme } from '../ThemeProvider';
 import { Section, Group, Row, Disclosure } from './SettingsShell';
 import PushToggle from './PushToggle';
 
+// Why a request was turned away, in words that point at the step to fix
+const REASONS = new Set(['invalid_body', 'unsupported_version', 'amount_unreadable', 'amount_out_of_range', 'text_missing', 'declined', 'not_a_purchase', 'membership', 'replay']);
+
 function CopyField({ label, value, t, mono = true }) {
   const [done, setDone] = useState(false);
   const copy = async () => {
@@ -136,7 +139,9 @@ export default function ApplePaySection({ index }) {
                     {ev.summary?.merchant || t('apNoMerchant')}
                     {ev.summary?.amount != null && <span className="ms-2 tabular-nums text-muted-foreground" dir="ltr">{money(ev.summary.amount, ev.summary.currency)}</span>}
                   </p>
-                  <p className="text-xs text-muted-foreground">{t(`apOutcome_${ev.outcome}`)} · {when(ev.createdAt)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t(`apOutcome_${ev.outcome}`)}{REASONS.has(ev.reason) && ` · ${t(`apReason_${ev.reason}`)}`} · {when(ev.createdAt)}
+                  </p>
                 </li>
               ))}
             </ul>
