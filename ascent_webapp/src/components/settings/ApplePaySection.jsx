@@ -14,7 +14,7 @@ import { Section, Group, Row, Disclosure } from './SettingsShell';
 import PushToggle from './PushToggle';
 
 // Why a request was turned away, in words that point at the step to fix
-const REASONS = new Set(['invalid_body', 'unsupported_version', 'amount_unreadable', 'amount_out_of_range', 'text_missing', 'declined', 'not_a_purchase', 'membership', 'replay']);
+const REASONS = new Set(['no_payment_details', 'invalid_body', 'unsupported_version', 'amount_unreadable', 'amount_out_of_range', 'text_missing', 'declined', 'not_a_purchase', 'membership', 'replay']);
 
 function CopyField({ label, value, t, mono = true }) {
   const [done, setDone] = useState(false);
@@ -142,6 +142,9 @@ export default function ApplePaySection({ index }) {
                   <p className="text-xs text-muted-foreground">
                     {t(`apOutcome_${ev.outcome}`)}{REASONS.has(ev.reason) && ` · ${t(`apReason_${ev.reason}`)}`} · {when(ev.createdAt)}
                   </p>
+                  {ev.received?.amount && (
+                    <p className="text-xs text-muted-foreground">{t('apReceivedAmount')} <span dir="ltr" className="font-mono">{ev.received.amount}</span></p>
+                  )}
                 </li>
               ))}
             </ul>

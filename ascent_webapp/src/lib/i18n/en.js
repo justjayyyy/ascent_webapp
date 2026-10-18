@@ -420,6 +420,8 @@ export default {
   apOutcome_flagged: 'Added, may be a duplicate',
   apOutcome_rejected: 'Not added',
   apOutcome_forbidden: 'Not allowed',
+  apReason_no_payment_details: 'no payment details: this happens when it is run with ▶ in Shortcuts; pay with Apple Pay to try it',
+  apReceivedAmount: 'Amount received:',
   apReason_invalid_body: 'the Shortcut sent no JSON: set Request Body to JSON',
   apReason_unsupported_version: 'v should be the number 1',
   apReason_amount_unreadable: 'the amount could not be read: set amount to Shortcut Input, then Amount',

@@ -420,6 +420,8 @@ export default {
   apOutcome_flagged: 'Добавлено, возможно дубликат',
   apOutcome_rejected: 'Не добавлено',
   apOutcome_forbidden: 'Нет доступа',
+  apReason_no_payment_details: 'нет данных о платеже: так бывает при запуске кнопкой ▶ в «Командах»; чтобы проверить, заплатите через Apple Pay',
+  apReceivedAmount: 'Получена сумма:',
   apReason_invalid_body: 'команда не отправила JSON: в «Тело запроса» выберите JSON',
   apReason_unsupported_version: 'v должно быть числом 1',
   apReason_amount_unreadable: 'не удалось прочитать сумму: в amount выберите «Ввод команды», затем «Сумма»',

@@ -420,6 +420,8 @@ export default {
   apOutcome_flagged: 'נוסף, ייתכן שכפול',
   apOutcome_rejected: 'לא נוסף',
   apOutcome_forbidden: 'אין הרשאה',
+  apReason_no_payment_details: 'אין פרטי תשלום: כך קורה כשמריצים עם ▶ בקיצורים; כדי לבדוק, שלמו ב-Apple Pay',
+  apReceivedAmount: 'הסכום שהתקבל:',
   apReason_invalid_body: 'הקיצור לא שלח JSON: בגוף הבקשה בחרו JSON',
   apReason_unsupported_version: 'הערך של v צריך להיות המספר 1',
   apReason_amount_unreadable: 'לא הצלחנו לקרוא את הסכום: ב-amount בחרו קלט הקיצור, ואז סכום',

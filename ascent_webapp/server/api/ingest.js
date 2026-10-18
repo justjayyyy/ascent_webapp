@@ -29,7 +29,12 @@ const PARSERS = { wallet: parseWalletPayload, sms: parseSmsPayload };
 const RATE = { windowMs: 10 * 60_000, max: 60 };
 const CANDIDATE_FIELDS = 'amount currency occurredAt date status source cardId merchant merchantKey description ingest';
 
-const clip = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v).slice(0, 200) : undefined);
+// Anything else iOS sends (a dictionary for an amount, say) is kept as JSON, so its shape can be seen
+const clip = (v) => {
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v).slice(0, 200);
+  if (v && typeof v === 'object') { try { return JSON.stringify(v).slice(0, 200); } catch { return undefined; } }
+  return undefined;
+};
 const snapshot = (body) =>
   body && typeof body === 'object' && !Array.isArray(body)
     ? { merchant: clip(body.merchant), amount: clip(body.amount), card: clip(body.card), at: clip(body.at), text: clip(body.text) }

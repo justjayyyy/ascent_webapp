@@ -248,6 +248,10 @@ test('unusable payloads are rejected with a reason and never become events', () 
   assert.equal(reasons(payload({ amount: { $gt: 0 } })), 'amount_unreadable');
   assert.equal(reasons(payload({ amount: ['5'] })), 'amount_unreadable');
   assert.equal(reasons(payload({ amount: '₪5,000,000.00' })), 'amount_out_of_range');
+  // Run with ▶ in the Shortcuts editor: no tap, so nothing from Shortcut Input
+  assert.equal(reasons(payload({ amount: '', merchant: '', card: '' })), 'no_payment_details');
+  assert.equal(reasons(payload({ amount: undefined, merchant: undefined })), 'no_payment_details');
+  assert.equal(reasons(payload({ amount: '', merchant: 'Aroma' })), 'amount_unreadable');
   assert.equal(reasons(payload({ v: 2 })), 'unsupported_version');
   for (const body of [null, undefined, 'text', 5, []]) assert.equal(reasons(body), 'invalid_body');
 });

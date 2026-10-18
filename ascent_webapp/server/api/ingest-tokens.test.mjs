@@ -175,7 +175,18 @@ test('recent activity is mapped to a safe subset and scoped to me', async () => 
   );
   const r = await call('GET', { query: { activity: '1' } });
   assert.equal(r.body.data.length, 1);
-  assert.deepEqual(Object.keys(r.body.data[0]).sort(), ['createdAt', 'id', 'outcome', 'reason', 'source', 'summary', 'transactionId']);
+  assert.deepEqual(Object.keys(r.body.data[0]).sort(), ['createdAt', 'id', 'outcome', 'reason', 'received', 'source', 'summary', 'transactionId']);
+  assert.equal(r.body.data[0].received, null);
+  assert.ok(!JSON.stringify(r.body).includes('secret-ish'));
+});
+
+test('a turned-away request shows the amount and merchant the phone sent, never the card', async () => {
+  db.events.push({
+    _id: oid(), userId: ME._id, workspaceId: WS._id, source: 'wallet', outcome: 'rejected', reason: 'amount_unreadable', createdAt: new Date(),
+    payload: { merchant: 'Aroma', amount: '{"value":18}', card: 'secret-ish' }, tokenId: oid(),
+  });
+  const r = await call('GET', { query: { activity: '1' } });
+  assert.deepEqual(r.body.data[0].received, { amount: '{"value":18}', merchant: 'Aroma' });
   assert.ok(!JSON.stringify(r.body).includes('secret-ish'));
 });
 

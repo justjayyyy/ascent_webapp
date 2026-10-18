@@ -12,7 +12,7 @@ vi.mock('@/api/client', () => ({
     ingestTokens: {
       list: async () => [{ id: 't1', label: 'iPhone', prefix: 'asc_abcd', lastUsedAt: at }],
       activity: async () => [
-        { id: 'e1', outcome: 'rejected', reason: 'amount_unreadable', summary: null, createdAt: at },
+        { id: 'e1', outcome: 'rejected', reason: 'amount_unreadable', summary: null, received: { amount: '{"value":18}', merchant: 'Aroma' }, createdAt: at },
         { id: 'e2', outcome: 'created', reason: '', summary: { merchant: 'Aroma', amount: 18, currency: 'ILS' }, createdAt: at },
         { id: 'e3', outcome: 'duplicate', reason: 'cross_source', summary: { merchant: 'Aroma', amount: 18, currency: 'ILS' }, createdAt: at },
       ],
@@ -28,6 +28,9 @@ describe('Apple Pay activity', () => {
     expect(await screen.findByText('apLastUsed')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /apActivity/ }));
     expect(await screen.findByText(/^apOutcome_rejected · apReason_amount_unreadable · /)).toBeTruthy();
+    // What the phone sent as the amount, so a Shortcut sending the wrong thing shows it
+    expect(screen.getByText('{"value":18}')).toBeTruthy();
+    expect(screen.getAllByText('apReceivedAmount', { exact: false })).toHaveLength(1);
     expect(screen.getByText(/^apOutcome_created · [^a]/)).toBeTruthy();
     // Reasons that need no fixing are not spelled out
     expect(screen.getByText(/^apOutcome_duplicate · [^a]/)).toBeTruthy();

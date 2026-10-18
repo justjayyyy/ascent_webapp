@@ -15,6 +15,11 @@ export function parseWalletPayload(body, { userCurrency = 'USD', now = new Date(
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, reason: 'invalid_body' };
   if (body.v !== undefined && body.v !== 1 && body.v !== '1') return { ok: false, reason: 'unsupported_version' };
 
+  // Run from the Shortcuts editor (▶) there is no tap, so every field from Shortcut Input arrives empty
+  if (typeof body.amount !== 'number' && !asText(body.amount).trim() && !asText(body.merchant).trim()) {
+    return { ok: false, reason: 'no_payment_details' };
+  }
+
   const amount = parseAmount(typeof body.amount === 'number' ? body.amount : asText(body.amount), { userCurrency });
   if (!amount || amount.value <= 0) return { ok: false, reason: 'amount_unreadable' };
   if (amount.value > MAX_AMOUNT) return { ok: false, reason: 'amount_out_of_range' };
