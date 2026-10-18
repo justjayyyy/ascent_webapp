@@ -142,6 +142,9 @@ export default function ApplePaySection({ index }) {
                   <p className="text-xs text-muted-foreground">
                     {t(`apOutcome_${ev.outcome}`)}{REASONS.has(ev.reason) && ` · ${t(`apReason_${ev.reason}`)}`} · {when(ev.createdAt)}
                   </p>
+                  {ev.received?.error && (
+                    <p className="text-xs text-muted-foreground">{t('apReceivedError')} <span dir="ltr" className="font-mono">{ev.received.error}</span></p>
+                  )}
                   {ev.received?.amount && (
                     <p className="text-xs text-muted-foreground">{t('apReceivedAmount')} <span dir="ltr" className="font-mono">{ev.received.amount}</span></p>
                   )}

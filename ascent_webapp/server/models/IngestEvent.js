@@ -26,7 +26,7 @@ const ingestEventSchema = new mongoose.Schema({
   },
   outcome: {
     type: String,
-    enum: ['created', 'merged', 'duplicate', 'flagged', 'rejected', 'forbidden'],
+    enum: ['created', 'merged', 'duplicate', 'flagged', 'rejected', 'forbidden', 'failed'],
     required: true
   },
   reason: {

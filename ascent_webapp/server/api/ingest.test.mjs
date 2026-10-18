@@ -429,6 +429,22 @@ test('a manual entry for the same amount that day is flagged, never merged or dr
 
 /* --------------------------------------------------------- bad payloads */
 
+test('a tap that breaks after its key was accepted is recorded as failed, with the error', async () => {
+  models.Category.find = () => { throw new Error('categories exploded'); };
+  try {
+    const r = await call();
+    assert.equal(r.code, 500);
+    assert.equal(db.rows.length, 0);
+    assert.equal(pushed.length, 0);
+    assert.equal(db.events.length, 1);
+    assert.equal(db.events[0].outcome, 'failed');
+    assert.equal(db.events[0].payload.error, 'categories exploded');
+    assert.equal(db.events[0].payload.amount, '₪18.00');
+  } finally {
+    models.Category.find = () => chain(db.categories ?? []);
+  }
+});
+
 test('an unreadable amount is rejected with a reason, recorded, and creates nothing', async () => {
   const r = await call({ body: payload({ amount: 'free' }) });
   assert.equal(r.code, 422);

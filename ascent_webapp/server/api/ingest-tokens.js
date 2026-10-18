@@ -29,7 +29,9 @@ const publicEvent = (e) => ({
   reason: e.reason || '',
   summary: e.summary ?? null,
   // For a request that was turned away: the amount and merchant as the phone sent them (never the card)
-  received: e.outcome === 'rejected' && e.payload ? { amount: e.payload.amount ?? null, merchant: e.payload.merchant ?? null } : null,
+  received: (e.outcome === 'rejected' || e.outcome === 'failed') && e.payload
+    ? { amount: e.payload.amount ?? null, merchant: e.payload.merchant ?? null, ...(e.outcome === 'failed' ? { error: e.payload.error ?? null } : {}) }
+    : null,
   transactionId: e.transactionId ? String(e.transactionId) : null,
   createdAt: e.createdAt,
 });

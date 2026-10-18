@@ -52,10 +52,11 @@ export default async function handler(req, res) {
   const raw = tokenFromHeader(req.headers);
   if (!raw) return denied();
 
+  let token = null;
   try {
     await connectDB();
 
-    const token = await IngestToken.findOne({
+    token = await IngestToken.findOne({
       tokenHash: hashToken(raw),
       revokedAt: null,
       $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
@@ -224,6 +225,13 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error('[Ingest] failed:', err?.message);
+    // A request that got past its key and then broke is recorded too, with the error, so it shows in Settings
+    if (token) {
+      await IngestEvent.create({
+        tokenId: token._id, userId: token.userId, workspaceId: token.workspaceId, source: kind,
+        outcome: 'failed', reason: 'server_error', payload: { ...snapshot(req.body), error: clip(err?.message) },
+      }).catch((e) => console.error('[Ingest] could not record event:', e.message));
+    }
     return serverError(res, err);
   }
 }
