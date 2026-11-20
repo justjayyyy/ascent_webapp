@@ -2099,6 +2099,12 @@ export default {
   grAddedToOther: '{name}: добавлено в «Другое»',
   grAddedToGroceries: '{name}: добавлено в продукты',
   grShow: 'Показать',
+  grHowMuchToBuy: 'Сколько купить',
+  grLess: 'Меньше',
+  grMore: 'Больше',
+  grUnit: 'Единица',
+  grUnits: 'Штуки',
+  grUnitKg: 'кг',
   // shopping mode
   // after the shop
   grTryAnotherPhoto: 'Другое фото',

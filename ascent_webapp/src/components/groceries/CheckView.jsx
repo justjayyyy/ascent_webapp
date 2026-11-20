@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo, useRef, useState } from 'react';
 import { BellRing, Check, ListPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '@/components/ThemeProvider';
@@ -70,7 +70,15 @@ function CheckView({ list }) {
 
   // Said since the last check counts as checked in this one (or today, before there was one)
   const since = check.lastAt && !finished ? check.lastAt : null;
-  const rows = useMemo(() => kitchenItems(items, today, loc).map((row) => ({ ...row, checked: checkedSince(row.item, since, today) })), [items, today, loc, since]);
+  // The order is fixed when the check opens (emptiest first by the estimate): a level tapped changes the
+  // estimate, and rows moving under the finger made the next tap land on the wrong thing. New things go last.
+  const order = useRef(new Map());
+  const rows = useMemo(() => {
+    const fresh = kitchenItems(items, today, loc).map((row) => ({ ...row, checked: checkedSince(row.item, since, today) }));
+    const at = order.current;
+    fresh.forEach(({ item }) => { if (!at.has(item.id)) at.set(item.id, at.size); });
+    return fresh.sort((a, b) => at.get(a.item.id) - at.get(b.item.id));
+  }, [items, today, loc, since]);
   const done = rows.filter((r) => r.checked).length;
   const low = useMemo(() => runningLow(items, today), [items, today]);
 
@@ -143,7 +151,7 @@ function CheckView({ list }) {
               <ListPlus className="h-4 w-4" />{t('grAddLowToList', { n: low.length })}
             </button>
           )}
-          <button type="button" onClick={() => setFinished(false)} className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline">{t('grCheckAgain')}</button>
+          <button type="button" onClick={() => { order.current = new Map(); setFinished(false); }} className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline">{t('grCheckAgain')}</button>
         </section>
       ) : rows.length === 0 ? (
         <p className="rounded-3xl bg-foreground/[0.04] px-5 py-8 text-center text-sm text-muted-foreground">{t('grNothingAtHome')}</p>

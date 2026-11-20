@@ -234,3 +234,42 @@ test('an item moved to another shop in its details moves to the Other side @crit
   await page.getByRole('radio', { name: new RegExp(L('grSideOther')) }).click();
   await expect(page.getByRole('region', { name: new RegExp(L('grShop_hardware')) }).getByRole('button', { name: /^Hooks[,.]/ })).toBeVisible();
 });
+
+test('how much to buy, in units or kilos, set in an item’s details and taken along onto the list @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Tomatoes', onList: true, listedAt: new Date().toISOString() });
+  await api.create('groceries', { name: 'Eggs', onList: false, purchases: [bought('a', 3, 'Shufersal', 12)] });
+  await openApp(page, '/Groceries');
+  await page.getByRole('button', { name: /^Tomatoes[,.]/ }).click({ button: 'right' });
+  let sheet = page.getByRole('dialog');
+  await sheet.getByRole('radio', { name: L('grUnitKg') }).click();
+  await sheet.getByRole('button', { name: L('grMore') }).click();
+  await expect.poll(async () => (await api.list('groceries')).find((i) => i.name === 'Tomatoes').qty).toBe('1.5 kg');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: new RegExp(`^Tomatoes, 1\\.5 ${L('grUnitKg')}`) })).toBeVisible();
+
+  // Not on the list yet: the amount set goes onto it with Put on the list
+  await page.getByRole('button', { name: /^Eggs[,.]/ }).click({ button: 'right' });
+  sheet = page.getByRole('dialog');
+  for (let i = 0; i < 3; i++) await sheet.getByRole('button', { name: L('grMore') }).click();
+  await expect(sheet.getByRole('textbox', { name: L('grQty') })).toHaveValue('3');
+  await sheet.getByRole('button', { name: L('grPutOnList') }).click();
+  await expect.poll(async () => { const eggs = (await api.list('groceries')).find((i) => i.name === 'Eggs'); return [eggs.onList, eggs.qty]; }).toEqual([true, '3']);
+});
+
+test('in the kitchen check, the rows stay where they are while levels are set @critical', async ({ page, api }) => {
+  const at = new Date().toISOString();
+  for (const [name, level] of [['Rice', 'out'], ['Olive oil', 'half'], ['Salt', 'full']]) {
+    await api.create('groceries', { name, onList: false, level, levelAt: at, purchases: [bought('a', 40, 'Shufersal', 10), bought('b', 20, 'Shufersal', 10)] });
+  }
+  await openApp(page, '/Groceries?view=check');
+  const order = () => page.getByRole('group', { name: new RegExp(L('grHowMuchLeftOf', { name: '.+' })) }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+  await expect(page.getByRole('group', { name: L('grHowMuchLeftOf', { name: 'Salt' }) })).toBeVisible();
+  const before = await order();
+  expect(before[0]).toContain('Rice');
+  // Rice was the emptiest; said to be full now, it stays first instead of jumping to the end
+  await page.getByRole('group', { name: L('grHowMuchLeftOf', { name: 'Rice' }) }).getByRole('button', { name: L('grLevelFull') }).click();
+  await expect.poll(async () => (await api.list('groceries')).find((i) => i.name === 'Rice').level).toBe('full');
+  await page.getByRole('group', { name: L('grHowMuchLeftOf', { name: 'Olive oil' }) }).getByRole('button', { name: L('grLevelOut') }).click();
+  await expect.poll(async () => (await api.list('groceries')).find((i) => i.name === 'Olive oil').level).toBe('out');
+  expect(await order()).toEqual(before);
+});

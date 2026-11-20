@@ -37,7 +37,7 @@ export function useGroceryShell(list) {
         onClose={() => setOpenId(null)}
         onSave={list.save}
         onLevel={list.setLevel}
-        onList={(i) => list.putOnList(i)}
+        onList={(i, extra) => list.putOnList(i, extra)}
         onUnlist={list.takeOffList}
         onDelete={list.remove}
         onPrice={list.setPurchasePrice}

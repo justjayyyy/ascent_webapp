@@ -2,7 +2,7 @@ import { describe, expect, it, test } from 'vitest';
 import {
   basketEstimate, boughtChanges, checkedSince, findByName, findLoggedExpense, lineQty, groupByAisle, guessItem, isTracked, kitchenItems, knownStores,
   learnedInterval, offListChanges, parseEntries, priceMovers, priceStats, purchaseNear, purchasePriceChanges, receiptQty, runningLow, storeComparison, supplyOf,
-  receiptPurchases, isGroceryPayment, newItem, shopOfStore,
+  receiptPurchases, isGroceryPayment, newItem, shopOfStore, qtyAmount, qtyText, stepQty,
 } from './groceryUtils';
 
 const bought = (...dates) => dates.map((date, i) => ({ id: `p${i}`, date }));
@@ -386,5 +386,36 @@ describe('a supermarket payment', () => {
     expect(isGroceryPayment({ type: 'Expense', category: 'Restaurants', description: 'רמי לוי שיווק השקמה' }, categories)).toBe(true);
     expect(isGroceryPayment({ type: 'Expense', category: 'Restaurants', merchant: 'Aroma' }, categories)).toBe(false);
     expect(isGroceryPayment({ type: 'Income', category: 'Groceries' }, categories)).toBe(false);
+  });
+});
+
+describe('how much to buy', () => {
+  test('units or kilos, however they were typed', () => {
+    expect(qtyAmount('3')).toEqual({ n: 3, unit: 'unit' });
+    expect(qtyAmount('3 pcs')).toEqual({ n: 3, unit: 'unit' });
+    expect(qtyAmount('1.5kg')).toEqual({ n: 1.5, unit: 'kg' });
+    expect(qtyAmount('2 קילו')).toEqual({ n: 2, unit: 'kg' });
+    expect(qtyAmount('0,5 кг')).toEqual({ n: 0.5, unit: 'kg' });
+    expect(qtyAmount('1 ק״ג')).toEqual({ n: 1, unit: 'kg' });
+    expect(qtyAmount('2 packs')).toBeNull();
+    expect(qtyAmount('')).toBeNull();
+  });
+
+  test('stored as "3" or "1.5 kg", and nothing at zero', () => {
+    expect(qtyText(3)).toBe('3');
+    expect(qtyText(1.25, 'kg')).toBe('1.25 kg');
+    expect(qtyText(0, 'kg')).toBe('');
+  });
+
+  test('a unit or half a kilo at a time, and below the first step there is none', () => {
+    expect(stepQty('', 1)).toBe('1');
+    expect(stepQty('2', 1)).toBe('3');
+    expect(stepQty('1', -1)).toBe('');
+    expect(stepQty('1 kg', 1)).toBe('1.5 kg');
+    expect(stepQty('0.5 kg', -1)).toBe('');
+    // Off the half-kilo grid: to the next half kilo either way
+    expect(stepQty('1.2 kg', 1)).toBe('1.5 kg');
+    expect(stepQty('1.2 kg', -1)).toBe('1 kg');
+    expect(stepQty('', 1, 'kg')).toBe('0.5 kg');
   });
 });

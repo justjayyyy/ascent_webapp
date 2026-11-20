@@ -2117,6 +2117,12 @@ export default {
   grAddedToOther: '{name} added to Other',
   grAddedToGroceries: '{name} added to Groceries',
   grShow: 'Show',
+  grHowMuchToBuy: 'How much to buy',
+  grLess: 'Less',
+  grMore: 'More',
+  grUnit: 'Unit',
+  grUnits: 'Units',
+  grUnitKg: 'kg',
   // shopping mode
   // after the shop
   grTryAnotherPhoto: 'Try another photo',

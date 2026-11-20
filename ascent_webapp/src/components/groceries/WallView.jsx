@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { haptic } from '@/lib/haptics';
 import AddBar from './AddBar';
 import { ItemEmoji, TONE, daysAgo, leftLabel, localeOf, useWho } from './GroceryParts';
-import { SHOPS, isGrocery, isTracked, lastBought, normalizeName, parseEntries, supplyOf } from './groceryUtils';
+import { SHOPS, isGrocery, isTracked, lastBought, normalizeName, parseEntries, qtyAmount, supplyOf } from './groceryUtils';
 
 const HOLD_MS = 450;
 // A tapped tile stays where it is, ticked, until the taps stop for this long; then the ticked ones move
@@ -130,6 +130,12 @@ function useSettledTaps(list) {
 }
 
 const matches = (item, q) => !q || normalizeName(item.name).includes(q);
+
+/** An amount as the tile shows it: "3", "1.5 kg" in the app's language, or as it was typed. */
+const qtyLabel = (qty, t) => {
+  const amount = qtyAmount(qty);
+  return amount?.unit === 'kg' ? `${amount.n} ${t('grUnitKg')}` : qty;
+};
 
 /** Groceries | Other: which side of the Wall is showing, with how many are to buy on each. */
 function SideSwitch({ side, onChange, counts, t }) {
@@ -257,7 +263,7 @@ function WallView({ list, shell }) {
               <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {rows.map((item) => (
                   <Tile
-                    key={item.id} item={item} kind="buy" reduce={reduce} qty={item.qty} ticked={ticked[item.id] === 'bought'}
+                    key={item.id} item={item} kind="buy" reduce={reduce} qty={qtyLabel(item.qty, t)} ticked={ticked[item.id] === 'bought'}
                     label={ticked[item.id] ? t('grGotIt') : ''}
                     by={who.isShared ? who.of(item.listedBy)?.name : ''}
                     actionLabel={t('grTapToMarkBought')}
@@ -297,7 +303,7 @@ function WallView({ list, shell }) {
                 <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {shownBuy.map((item) => (
                     <Tile
-                      key={item.id} item={item} kind="buy" reduce={reduce} qty={item.qty} ticked={ticked[item.id] === 'bought'}
+                      key={item.id} item={item} kind="buy" reduce={reduce} qty={qtyLabel(item.qty, t)} ticked={ticked[item.id] === 'bought'}
                       label={ticked[item.id] ? t('grGotIt') : ''}
                       by={who.isShared ? who.of(item.listedBy)?.name : ''}
                       actionLabel={t('grTapToMarkBought')}

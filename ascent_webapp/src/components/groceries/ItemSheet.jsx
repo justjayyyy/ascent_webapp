@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, ListPlus, ListX, Trash2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ListPlus, ListX, Minus, Plus, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,74 @@ import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { haptic } from '@/lib/haptics';
-import { AISLES, LEVEL_VALUE, SHOPS, isTracked, knownStores, lastPrice, priceStats, supplyOf } from './groceryUtils';
+import { AISLES, LEVEL_VALUE, SHOPS, isTracked, knownStores, lastPrice, priceStats, qtyAmount, qtyText, stepQty, supplyOf } from './groceryUtils';
 import { useMoney } from '@/hooks/useWorkspaceData';
 import { Sparkline } from '@/components/review/ReviewParts';
 import { TONE, daysAgo, leftLabel, localeOf, money } from './GroceryParts';
 
 const LEVELS = ['full', 'half', 'low', 'out'];
+
+/**
+ * How much to buy: − and + (a unit, or half a kilo, at a time), the number to type, and Units or kg. An amount
+ * typed some other way ("2 packs") is kept as it is until the buttons are used.
+ */
+function AmountPicker({ qty, onChange, onBlur, t }) {
+  const amount = qtyAmount(qty);
+  const [unit, setUnit] = useState(amount?.unit || 'unit');
+  const [typed, setTyped] = useState(null);
+  const shown = typed ?? (amount ? String(amount.n) : qty);
+  const type = (value) => {
+    setTyped(value);
+    const n = Number(value.trim().replace(',', '.'));
+    onChange(value.trim() === '' ? '' : Number.isFinite(n) ? qtyText(n, unit) : value);
+  };
+  const pick = (next) => {
+    if (next === unit) return;
+    haptic('selection');
+    setUnit(next);
+    setTyped(null);
+    onChange(qtyText(amount?.n ?? 1, next), { now: true });
+  };
+  const step = (dir) => {
+    haptic('selection');
+    setTyped(null);
+    onChange(stepQty(amount ? qty : '', dir, unit), { now: true });
+  };
+  const button = 'grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground transition-[background-color,transform] hover:bg-foreground/10 active:scale-95';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center rounded-xl bg-foreground/[0.06]">
+        <button type="button" onClick={() => step(-1)} aria-label={t('grLess')} className={button}><Minus className="h-4 w-4" /></button>
+        <input
+          value={shown}
+          onChange={(e) => type(e.target.value)}
+          onBlur={() => { setTyped(null); onBlur(); }}
+          inputMode="decimal"
+          enterKeyHint="done"
+          maxLength={40}
+          placeholder={t('grQty')}
+          aria-label={t('grQty')}
+          className="h-11 min-w-0 flex-1 bg-transparent text-center text-base font-semibold tabular-nums text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground"
+        />
+        <button type="button" onClick={() => step(1)} aria-label={t('grMore')} className={button}><Plus className="h-4 w-4" /></button>
+      </div>
+      <div role="radiogroup" aria-label={t('grUnit')} className="grid shrink-0 grid-cols-2 gap-1 rounded-xl bg-foreground/[0.06] p-1">
+        {[['unit', t('grUnits')], ['kg', t('grUnitKg')]].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={unit === key}
+            onClick={() => pick(key)}
+            className={cn('h-9 rounded-lg px-3 text-sm font-semibold transition-colors', unit === key ? 'bg-popover text-foreground shadow-[0_2px_10px_-4px_hsl(0_0%_0%/0.5)]' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 const nearestLevel = (share) => LEVELS.reduce((best, l) => (Math.abs(LEVEL_VALUE[l] - share) < Math.abs(LEVEL_VALUE[best] - share) ? l : best), 'full');
 const statusOfLevel = (level) => (level === 'out' ? 'out' : level === 'low' ? 'low' : 'ok');
 
@@ -223,7 +285,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
 
   useEffect(() => {
     if (!open || !item) return;
-    const next = { name: item.name, emoji: item.emoji || '', aisle: item.aisle || 'other', shop: item.shop || '', qty: item.qty || '', note: item.note || '', staple: isTracked(item) };
+    const next = { id: item.id, name: item.name, emoji: item.emoji || '', aisle: item.aisle || 'other', shop: item.shop || '', qty: item.qty || '', note: item.note || '', staple: isTracked(item) };
     formRef.current = next;
     setForm(next);
   }, [open, item?.id]);
@@ -344,12 +406,15 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
 
         <PriceMemory item={item} items={items} onPrice={onPrice} t={t} loc={loc} user={user} />
 
-        {item.onList && (
-          <div className="grid grid-cols-[1fr_2fr] gap-2">
-            <Input value={form.qty} onChange={(e) => set({ qty: e.target.value })} onBlur={flush} placeholder={t('grQty')} aria-label={t('grQty')} maxLength={40} className="h-11 rounded-xl" />
+        {/* Set before putting it on the list too: Put on the list takes it along */}
+        <section aria-labelledby="gr-amount" className="space-y-2">
+          <h3 id="gr-amount" className="text-sm font-medium text-muted-foreground">{t('grHowMuchToBuy')}</h3>
+          {/* Keyed by the item the form is for, so the unit chosen for one item never carries over to the next */}
+          <AmountPicker key={form.id} qty={form.qty} onChange={(qty, opts) => set({ qty }, opts)} onBlur={flush} t={t} />
+          {item.onList && (
             <Input value={form.note} onChange={(e) => set({ note: e.target.value })} onBlur={flush} placeholder={t('grNote')} aria-label={t('grNote')} maxLength={300} className="h-11 rounded-xl" />
-          </div>
-        )}
+          )}
+        </section>
 
         <section>
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">{t('grWhereToBuy')}</h3>
@@ -412,7 +477,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
               <ListX className="me-2 h-4 w-4" />{t('grTakeOffList')}
             </Button>
           ) : (
-            <Button type="button" variant="secondary" onClick={() => { flush(); onList(itemRef.current); onClose(); }} className="h-11 flex-1 rounded-xl">
+            <Button type="button" variant="secondary" onClick={() => { flush(); onList(itemRef.current, formRef.current.qty ? { qty: formRef.current.qty.slice(0, 40) } : undefined); onClose(); }} className="h-11 flex-1 rounded-xl">
               <ListPlus className="me-2 h-4 w-4" />{t('grPutOnList')}
             </Button>
           )}

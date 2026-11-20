@@ -2099,6 +2099,12 @@ export default {
   grAddedToOther: '{name} נוסף ל"אחר"',
   grAddedToGroceries: '{name} נוסף למצרכים',
   grShow: 'הצג',
+  grHowMuchToBuy: 'כמה לקנות',
+  grLess: 'פחות',
+  grMore: 'יותר',
+  grUnit: 'יחידת מידה',
+  grUnits: 'יחידות',
+  grUnitKg: 'ק״ג',
   // shopping mode
   // after the shop
   grTryAnotherPhoto: 'לנסות תמונה אחרת',

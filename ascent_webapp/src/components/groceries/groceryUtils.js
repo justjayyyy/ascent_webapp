@@ -384,6 +384,40 @@ export function checkedSince(item, since, today = localDay()) {
   return after(item.levelAt) || (!!bought && bought >= (since ? dayOf(since) : today));
 }
 
+// ---- how much to buy: a number of units, or kilos ----
+
+const KG = /^(\d+(?:[.,]\d+)?)\s*(?:kg|kilo|kilos|ק["״]?ג|קג|קילו|кг)\.?$/iu;
+const UNITS = /^(\d+(?:[.,]\d+)?)\s*(?:x|×|pcs?|units?|יח'?|יחידות|шт\.?)?$/iu;
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * An amount on the list as { n, unit: 'unit' | 'kg' }: "3", "3 pcs", "1.5kg", "2 קילו". null when there is none,
+ * or it is something else ("2 packs", "a big one"), which stays as it was typed.
+ */
+export function qtyAmount(qty) {
+  const text = String(qty || '').trim();
+  const kg = text.match(KG);
+  if (kg) return { n: Number(kg[1].replace(',', '.')), unit: 'kg' };
+  const units = text.match(UNITS);
+  return units ? { n: Number(units[1].replace(',', '.')), unit: 'unit' } : null;
+}
+
+/** An amount as stored on the item: "3", "1.5 kg"; '' for none (zero or less). */
+export function qtyText(n, unit = 'unit') {
+  const value = round2(Number(n));
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return unit === 'kg' ? `${value} kg` : String(value);
+}
+
+/** One step up or down: a unit at a time, half a kilo at a time. Below the smallest step there is no amount. */
+export function stepQty(qty, dir, unit = qtyAmount(qty)?.unit || 'unit') {
+  const step = unit === 'kg' ? 0.5 : 1;
+  const n = qtyAmount(qty)?.n ?? 0;
+  // A kilo amount off the half-kilo grid (1.2 kg) goes to the next half kilo, not by a whole step
+  const next = dir > 0 ? Math.floor(round2(n / step)) * step + step : Math.ceil(round2(n / step)) * step - step;
+  return qtyText(next, unit);
+}
+
 /**
  * A new item from a name someone typed. `shop` is where it goes when the name does not say (typed on the Other
  * side of the Wall, say); a name that does ("milk", "acamol") goes where it belongs.
