@@ -22,13 +22,13 @@ const fakeRes = () => ({
 });
 const cookiesOf = (res) => [].concat(res.headers['Set-Cookie'] || []);
 
-test('the cookie is HttpOnly, Strict, scoped to the API and lasts as long as the token', () => {
+test('the cookie is HttpOnly, Lax, scoped to the API and lasts as long as the token', () => {
   const res = fakeRes();
   const token = signToken({ userId: 'u1', sid: 'live' });
   setSessionCookie({ headers: {} }, res, token, { env: { VERCEL: '1' } });
   const [cookie] = cookiesOf(res);
   assert.ok(cookie.startsWith(`ascent_session=${token}; Path=/api; `));
-  for (const part of ['HttpOnly', 'SameSite=Strict', 'Secure']) assert.ok(cookie.includes(part), part);
+  for (const part of ['HttpOnly', 'SameSite=Lax', 'Secure']) assert.ok(cookie.includes(part), part);
   const maxAge = Number(/Max-Age=(\d+)/.exec(cookie)[1]);
   assert.ok(maxAge > 6.9 * 86400 && maxAge <= 7 * 86400);
 });

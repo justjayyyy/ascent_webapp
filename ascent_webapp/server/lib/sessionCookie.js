@@ -1,6 +1,8 @@
 // The sign-in session lives in an HttpOnly cookie: page scripts cannot read it, so a script injected into
-// the page could not copy it out. SameSite=Strict keeps other sites from sending it, and the auth
-// middleware also refuses changes made with it from an origin that is not ours.
+// the page could not copy it out. SameSite=Lax keeps other sites' requests from carrying it (only a plain
+// link followed to /api would), and the auth middleware also refuses changes made with it from an origin
+// that is not ours. Not Strict: Safari withholds Strict cookies from an app opened from outside the site
+// (the home-screen icon, a notification, a link in another app), which signed people out on every launch.
 import jwt from 'jsonwebtoken';
 import { getTokenFromHeader } from './jwt.js';
 
@@ -13,7 +15,7 @@ const isSecure = (req, env = process.env) =>
   env.NODE_ENV === 'production' || env.VERCEL === '1' || req?.secure === true || req?.headers?.['x-forwarded-proto'] === 'https';
 
 function serialize(value, maxAge, secure) {
-  return [`${SESSION_COOKIE}=${value}`, `Path=${PATH}`, `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Strict', ...(secure ? ['Secure'] : [])].join('; ');
+  return [`${SESSION_COOKIE}=${value}`, `Path=${PATH}`, `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax', ...(secure ? ['Secure'] : [])].join('; ');
 }
 
 function append(res, cookie) {

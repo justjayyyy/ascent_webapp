@@ -433,7 +433,7 @@ export async function seedUser({ email, name = 'Dana Test', language = 'en', the
   const user = await createAccount({ email, password: PASSWORD, full_name: name, language, theme });
   const token = await issueSession(user, { userAgent: 'Playwright' });   // same JWT_SECRET as the API
   return { user, cookie: { name: 'ascent_session', value: token, domain: 'localhost', path: '/api',
-                           httpOnly: true, sameSite: 'Strict', secure: false } };
+                           httpOnly: true, sameSite: 'Lax', secure: false } };
 }
 ```
 
@@ -687,7 +687,7 @@ Existing tests are marked ✅ (keep), the rest are new.
 
 | ID | P | Scenario → Expected |
 | --- | --- | --- |
-| AUTH-H01 ✅ | P0 | Sign up (email → name → password) → lands off `/login`, welcome dialog, `ascent_session` cookie is `HttpOnly`, `SameSite=Strict`, `path=/api`; no token in `document.cookie` or `localStorage` |
+| AUTH-H01 ✅ | P0 | Sign up (email → name → password) → lands off `/login`, welcome dialog, `ascent_session` cookie is `HttpOnly`, `SameSite=Lax`, `path=/api`; no token in `document.cookie` or `localStorage` |
 | AUTH-H02 ✅ | P0 | Sign out from Settings → cookie removed, `/login` |
 | AUTH-H03 ✅ | P0 | Sign in with password → app opens, cookie present |
 | AUTH-H04 | P0 | Deep link while signed out (`/Plans`) → `/login?redirect=…` → after sign-in lands on `/Plans` |
@@ -1197,7 +1197,7 @@ Plus cross-workspace isolation (§3.20 SEC-N04/N05).
 
 | ID | P | Type | Scenario → Expected |
 | --- | --- | --- | --- |
-| SEC-H01 ✅ | P0 | Happy | Session cookie flags HttpOnly / SameSite=Strict / path=/api; nothing token-like in storage |
+| SEC-H01 ✅ | P0 | Happy | Session cookie flags HttpOnly / SameSite=Lax / path=/api; nothing token-like in storage |
 | SEC-N01 | P0 | Negative | **CSRF**: `POST /api/entities/transactions` with the victim's cookie and `Origin: https://evil.example` → 403 "Request from another site" |
 | SEC-N02 | P1 | Negative | No cookie → 401 "No token provided" on every entity route (data-driven over the 12 entities) |
 | SEC-N03 | P1 | Negative | Missing `x-workspace-id` → 400 "Workspace context required" |

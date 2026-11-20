@@ -25,7 +25,7 @@ export async function signIn(context, person, token = person.token) {
   const { origin, hostname } = new URL(test.info().project.use.baseURL);
   await context.addCookies([{
     name: SESSION_COOKIE, value: token, domain: hostname, path: '/api',
-    httpOnly: true, sameSite: 'Strict', secure: origin.startsWith('https:'),
+    httpOnly: true, sameSite: 'Lax', secure: origin.startsWith('https:'),
     expires: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
   }]);
   await context.addInitScript((workspaceId) => {

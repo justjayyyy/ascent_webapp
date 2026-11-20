@@ -22,7 +22,7 @@ test('sign up, sign out and sign back in @smoke @critical', async ({ page, conte
   const setCookie = await (await registered).headerValue('set-cookie');
   expect(setCookie).toMatch(/ascent_session=[^;]+;/);
   expect(setCookie).toMatch(/HttpOnly/i);
-  expect(setCookie).toMatch(/SameSite=Strict/i);
+  expect(setCookie).toMatch(/SameSite=Lax/i);
   expect(setCookie).toMatch(/Path=\/api/);
   expect(await sessionCookie(context)).toMatchObject({ httpOnly: true, path: '/api' });
   expect(await page.evaluate(() => document.cookie)).not.toContain('ascent_session');
