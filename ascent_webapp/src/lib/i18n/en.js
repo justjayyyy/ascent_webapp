@@ -1724,6 +1724,7 @@ export default {
   secAfterDesc: 'How long Ascent can sit in the background before it asks again',
   secAfterNow: 'At once',
   secAfterMin: '{n} min',
+  secAfterWeek: '1 week',
   secPasskeys: 'Passkeys',
   secPasskeysDesc: 'Sign in with Face ID or a fingerprint instead of a password, on any device that has one.',
   secAdd: 'Add',

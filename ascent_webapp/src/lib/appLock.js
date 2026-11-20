@@ -1,12 +1,15 @@
 // Face ID / fingerprint app lock: per-device settings and the unlock ceremonies.
 //
 // Settings live on the device (localStorage "ascent_lock", keyed by user id), because the lock is
-// about this phone: { enabled, after (seconds in the background before it locks), credentialIds }.
+// about this phone: { enabled, after (seconds in the background before it locks), afterChosen (the person
+// picked `after` in Settings, rather than having the default), credentialIds }.
 // credentialIds are the passkeys proven to work on this device, used to unlock without a connection.
 
 const KEY = 'ascent_lock';
 const UNLOCKED_KEY = 'ascent_unlocked_at';
 const SIGNED_OUT_KEY = 'ascent_signed_out';
+// When Face ID (or a sign-in) last confirmed the owner on this device; outlives closing the app
+const LAST_UNLOCK_KEY = 'ascent_last_unlock';
 
 /** Called after any sign-in or unlock, so this browsing session does not lock straight away. */
 export function markUnlocked() {
@@ -14,12 +17,24 @@ export function markUnlocked() {
     sessionStorage.setItem(UNLOCKED_KEY, String(Date.now()));
     sessionStorage.removeItem(SIGNED_OUT_KEY);
   } catch { /* storage unavailable */ }
+  try { localStorage.setItem(LAST_UNLOCK_KEY, String(Date.now())); } catch { /* storage unavailable */ }
 }
 export function unlockedThisSession() {
   try { return !!sessionStorage.getItem(UNLOCKED_KEY); } catch { return false; }
 }
-export const LOCK_AFTER_CHOICES = [0, 60, 300, 900];
-const DEFAULT_AFTER = 60;
+
+// "1 week": one Face ID covers the next seven days on this phone, closing the app and switching away included
+export const LOCK_AFTER_WEEK = 7 * 24 * 60 * 60;
+export const LOCK_AFTER_CHOICES = [0, 60, 300, 900, LOCK_AFTER_WEEK];
+const DEFAULT_AFTER = LOCK_AFTER_WEEK;
+
+/** With "1 week" chosen: is the last unlock on this device still within the week? */
+export function unlockStillCovers(after, now = Date.now()) {
+  if (after < LOCK_AFTER_WEEK) return false;
+  let at = 0;
+  try { at = Number(localStorage.getItem(LAST_UNLOCK_KEY)) || 0; } catch { /* storage unavailable */ }
+  return at > 0 && now - at < after * 1000;
+}
 
 function readAll() {
   try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; }
@@ -30,13 +45,15 @@ function writeAll(all) {
 
 export function getLockPrefs(userId) {
   const p = userId ? readAll()[userId] : null;
-  return { enabled: !!p?.enabled, after: LOCK_AFTER_CHOICES.includes(p?.after) ? p.after : DEFAULT_AFTER, credentialIds: p?.credentialIds || [] };
+  // An `after` nobody picked follows the default, so people already using the lock get "1 week" too
+  const chosen = !!p?.afterChosen && LOCK_AFTER_CHOICES.includes(p?.after);
+  return { enabled: !!p?.enabled, after: chosen ? p.after : DEFAULT_AFTER, afterChosen: chosen, credentialIds: p?.credentialIds || [] };
 }
 
 export function setLockPrefs(userId, patch) {
   if (!userId) return getLockPrefs(userId);
   const all = readAll();
-  const next = { ...getLockPrefs(userId), ...patch };
+  const next = { ...getLockPrefs(userId), ...patch, ...('after' in patch ? { afterChosen: true } : {}) };
   all[userId] = next;
   writeAll(all);
   window.dispatchEvent(new CustomEvent('ascent:lock-prefs', { detail: { userId } }));

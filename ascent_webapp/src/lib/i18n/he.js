@@ -1709,6 +1709,7 @@ export default {
   secAfterDesc: 'כמה זמן Ascent יכול להיות ברקע לפני שיבקש שוב',
   secAfterNow: 'מיד',
   secAfterMin: '{n} דק׳',
+  secAfterWeek: 'שבוע',
   secPasskeys: 'מפתחות גישה',
   secPasskeysDesc: 'התחברות עם Face ID או טביעת אצבע במקום סיסמה, בכל מכשיר שיש בו.',
   secAdd: 'הוספה',

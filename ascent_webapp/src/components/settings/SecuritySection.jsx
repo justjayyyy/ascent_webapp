@@ -10,7 +10,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { useAppLock } from '@/components/security/AppLock';
 import {
-  LOCK_AFTER_CHOICES, biometricName, deviceCanUseBiometrics, enableBiometricLock, getLockPrefs, rememberCredential, setLockPrefs,
+  LOCK_AFTER_CHOICES, LOCK_AFTER_WEEK, biometricName, deviceCanUseBiometrics, enableBiometricLock, getLockPrefs, rememberCredential, setLockPrefs,
 } from '@/lib/appLock';
 import { Section, Group, Row, Segmented } from './SettingsShell';
 
@@ -124,7 +124,7 @@ export default function SecuritySection({ index }) {
   };
 
   const date = (d) => (d ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d)) : '');
-  const afterLabel = (s) => (s === 0 ? t('secAfterNow') : t('secAfterMin').replace('{n}', s / 60));
+  const afterLabel = (s) => (s === 0 ? t('secAfterNow') : s === LOCK_AFTER_WEEK ? t('secAfterWeek') : t('secAfterMin').replace('{n}', s / 60));
 
   return (
     <Section id="security" index={index} icon={ShieldCheck} title={t('secTitle')} description={t('secDesc')}>

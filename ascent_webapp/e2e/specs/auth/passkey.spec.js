@@ -81,11 +81,12 @@ test('Face ID lock: turn it on, reopen the app, unlock with one tap @critical', 
   await lockSwitch.click();
   await expect(lockSwitch).toBeChecked();
 
-  // Opened fresh: locked. The automatic first try fails here (as it does on a phone that wants a tap)
+  // Opened fresh a week later (the default "1 week" covers the days before): locked. The automatic first
+  // try fails here (as it does on a phone that wants a tap)
   let optionsFetched = 0;
   page.on('response', (r) => { if (r.url().includes('action=login-options')) optionsFetched += 1; });
   await cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: false });
-  await page.evaluate(() => sessionStorage.clear());
+  await page.evaluate(() => { sessionStorage.clear(); localStorage.setItem('ascent_last_unlock', String(Date.now() - 8 * 24 * 3600 * 1000)); });
   await page.reload();
   const unlock = page.getByRole('button', { name: Lre('lockUnlockWith') });
   await expect(unlock).toBeVisible();

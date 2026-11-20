@@ -1709,6 +1709,7 @@ export default {
   secAfterDesc: 'Сколько Ascent может оставаться в фоне, прежде чем спросить снова',
   secAfterNow: 'Сразу',
   secAfterMin: '{n} мин',
+  secAfterWeek: '1 неделя',
   secPasskeys: 'Ключи доступа',
   secPasskeysDesc: 'Вход по Face ID или отпечатку вместо пароля на любом устройстве, где они есть.',
   secAdd: 'Добавить',

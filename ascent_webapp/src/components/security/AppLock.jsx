@@ -6,7 +6,7 @@ import AscentLogo from '@/components/AscentLogo';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/lib/AuthContext';
 import { ascent } from '@/api/client';
-import { getLockPrefs, rememberCredential, rememberPasskeyAccount, unlockOnDevice, biometricName, biometricKind, markUnlocked, unlockedThisSession } from '@/lib/appLock';
+import { getLockPrefs, rememberCredential, rememberPasskeyAccount, unlockOnDevice, biometricName, biometricKind, markUnlocked, unlockedThisSession, unlockStillCovers, LOCK_AFTER_WEEK } from '@/lib/appLock';
 import { isOnline, isNetworkError, useOnline } from '@/lib/offline/network';
 import { haptic } from '@/lib/haptics';
 
@@ -20,13 +20,15 @@ export const useAppLock = () => useContext(LockContext);
  * fresh, after it has been in the background for the chosen time, and after ten idle minutes, and the
  * money underneath stays blurred until Face ID / the fingerprint confirms it is the owner. It replaces
  * the sign-out after inactivity, so a quick check-in no longer means typing a password.
+ * With "1 week" (the default) one unlock covers seven days: opening, leaving and idling do not lock.
  */
 export function AppLockProvider({ children }) {
   const { user } = useAuth();
   const userId = user?.id || user?._id;
   const [prefs, setPrefs] = useState(() => getLockPrefs(userId));
   const enabled = !!userId && prefs.enabled;
-  const [locked, setLocked] = useState(() => enabled && !unlockedThisSession());
+  const weekly = prefs.after >= LOCK_AFTER_WEEK;
+  const [locked, setLocked] = useState(() => enabled && !unlockedThisSession() && !unlockStillCovers(prefs.after));
   const hiddenAt = useRef(null);
 
   useEffect(() => {
@@ -44,8 +46,8 @@ export function AppLockProvider({ children }) {
 
   // Opened fresh with the lock on: locked, also when the account arrives after this mounted
   useEffect(() => {
-    if (enabled && !unlockedThisSession()) setLocked(true);
-  }, [enabled]);
+    if (enabled && !unlockedThisSession() && !unlockStillCovers(prefs.after)) setLocked(true);
+  }, [enabled, prefs.after]);
 
   const lockNow = useCallback(() => { if (enabled) setLocked(true); }, [enabled]);
 
@@ -60,7 +62,8 @@ export function AppLockProvider({ children }) {
         root.setAttribute('data-privacy-curtain', '');
       } else {
         root.removeAttribute('data-privacy-curtain');
-        if (hiddenAt.current && Date.now() - hiddenAt.current >= prefs.after * 1000) setLocked(true);
+        const due = weekly ? !unlockStillCovers(prefs.after) : Date.now() - hiddenAt.current >= prefs.after * 1000;
+        if (hiddenAt.current && due) setLocked(true);
         hiddenAt.current = null;
       }
     };
@@ -69,11 +72,11 @@ export function AppLockProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisibility);
       root.removeAttribute('data-privacy-curtain');
     };
-  }, [enabled, prefs.after]);
+  }, [enabled, prefs.after, weekly]);
 
-  // Foreground: lock after ten idle minutes
+  // Foreground: lock after ten idle minutes (not with "1 week", where the unlock covers the whole week)
   useEffect(() => {
-    if (!enabled || locked) return undefined;
+    if (!enabled || locked || weekly) return undefined;
     let timer;
     let last = 0;
     const arm = () => {
@@ -90,7 +93,7 @@ export function AppLockProvider({ children }) {
       clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, arm));
     };
-  }, [enabled, locked]);
+  }, [enabled, locked, weekly]);
 
   // Nothing behind the lock can be reached with the keyboard or a screen reader
   useEffect(() => {

@@ -9,7 +9,7 @@ vi.mock('@/lib/haptics', () => ({ haptic: () => {} }));
 vi.mock('@/components/AscentLogo', () => ({ default: () => null }));
 
 const { AppLockProvider } = await import('./AppLock');
-const { setLockPrefs, markUnlocked } = await import('@/lib/appLock');
+const { setLockPrefs, markUnlocked, LOCK_AFTER_WEEK } = await import('@/lib/appLock');
 
 const app = () => (
   <AppLockProvider>
@@ -76,4 +76,62 @@ test('it locks after being in the background longer than chosen', () => {
   act(() => { document.dispatchEvent(new Event('visibilitychange')); });
   expect(screen.getByRole('dialog')).toBeTruthy();
   visibility.mockRestore();
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+// The app closed and opened again: this tab's memory is gone, the device's remains
+const relaunch = () => sessionStorage.clear();
+
+test('with "1 week" (the default), reopening the app within the week after an unlock does not lock', () => {
+  setLockPrefs('u1', { enabled: true });
+  vi.useFakeTimers({ toFake: ['Date'] });
+  markUnlocked();
+  relaunch();
+  vi.setSystemTime(Date.now() + 6 * DAY);
+  render(app());
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+test('with "1 week", the first opening after the week asks again', () => {
+  setLockPrefs('u1', { enabled: true });
+  vi.useFakeTimers({ toFake: ['Date'] });
+  markUnlocked();
+  relaunch();
+  vi.setSystemTime(Date.now() + 7 * DAY + 1000);
+  render(app());
+  expect(screen.getByRole('dialog')).toBeTruthy();
+});
+
+test('with "1 week", switching away and back within the week does not lock', () => {
+  setLockPrefs('u1', { enabled: true, after: LOCK_AFTER_WEEK });
+  markUnlocked();
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+  render(app());
+  const visibility = vi.spyOn(document, 'visibilityState', 'get');
+  visibility.mockReturnValue('hidden');
+  act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+  vi.setSystemTime(Date.now() + 2 * DAY);
+  visibility.mockReturnValue('visible');
+  act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+  act(() => { vi.advanceTimersByTime(15 * 60 * 1000); }); // nor after idling
+  expect(screen.queryByRole('dialog')).toBeNull();
+  visibility.mockRestore();
+});
+
+test('a lock set up before "1 week" existed, its time never picked, moves to the week', () => {
+  localStorage.setItem('ascent_lock', JSON.stringify({ u1: { enabled: true, after: 60, credentialIds: [] } }));
+  vi.useFakeTimers({ toFake: ['Date'] });
+  markUnlocked();
+  relaunch();
+  vi.setSystemTime(Date.now() + DAY);
+  render(app());
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+test('a time picked in Settings is kept: "1 min" still locks on reopening', () => {
+  setLockPrefs('u1', { enabled: true, after: 60 });
+  markUnlocked();
+  relaunch();
+  render(app());
+  expect(screen.getByRole('dialog')).toBeTruthy();
 });
