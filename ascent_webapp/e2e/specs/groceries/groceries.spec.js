@@ -1,4 +1,4 @@
-// Groceries: the shared list, adding several things at once, and a shopping trip.
+// Groceries: the shared list, adding several things at once, prices, the kitchen check and receipts.
 import { test, expect } from '../../fixtures.js';
 import { openApp } from '../../support/app.js';
 import { L } from '../../support/i18n.js';
@@ -28,25 +28,20 @@ test('typing several things at once adds each, with its quantity @critical', asy
 // A real image (1×1 PNG): the app draws the photo onto a canvas before sending it, so it has to decode
 const RECEIPT_PHOTO = { name: 'receipt.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') };
 
-test('after a shop, a receipt photo is read line by line, saved as the expense when asked to, and prices are kept for next time @critical', async ({ page, owner, api }) => {
+test('a scanned receipt is saved as the expense when asked to, and the price of one is kept for next time @critical', async ({ page, owner, api }) => {
   await api.call('PUT', `/workspaces?id=${owner.workspaceId}&action=settings`, { aiAssistant: true });
   await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
   await openApp(page, '/Groceries');
-  await page.getByRole('button', { name: L('grStartShopping') }).click();
-  const shopping = page.getByRole('dialog', { name: L('grShopping') });
-  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
-  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
-
-  const finish = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: L('grShopDone') }) });
-  await finish.locator('input[type=file]').setInputFiles(RECEIPT_PHOTO);
+  await page.getByRole('button', { name: L('grScanAReceipt') }).first().click();
+  const dialog = page.getByRole('dialog', { name: L('grFromReceiptTitle') });
+  await dialog.getByLabel(L('grChooseReceipt')).setInputFiles(RECEIPT_PHOTO);
   // What the assistant read (stubbed: Rami Levy, 87.40, two cartons of milk at 6.90)
-  await expect(finish.getByText('Rami Levy')).toBeVisible();
-  await expect(finish.getByText('87.40').or(finish.getByText('87.4'))).toBeVisible();
-  await expect(finish.getByText('2 × $6.90')).toBeVisible();
-  await expect(finish.getByText('$13.80')).toBeVisible();
+  await expect(dialog.getByText('Rami Levy')).toBeVisible();
+  await expect(dialog.getByText('$13.80')).toBeVisible();
+  await dialog.getByRole('button', { name: L('grAddFromReceipt', { n: 1 }) }).click();
   // Nothing in Expenses for it yet, so it asks
-  await expect(finish.getByText(L('grExpenseQ'))).toBeVisible();
-  await finish.getByRole('button', { name: L('grExpenseYes') }).click();
+  await expect(dialog.getByText(L('grExpenseQ'))).toBeVisible();
+  await dialog.getByRole('button', { name: L('grExpenseYes') }).click();
   await expect(page.getByLabel(new RegExp(`^${L('amount')}`))).toHaveValue('87.4');
   await page.getByRole('button', { name: L('addTransaction'), exact: true }).click();
 
@@ -60,45 +55,19 @@ test('a receipt whose payment Apple Pay already added says so, and no adds no se
   await api.create('transactions', expense({ amount: 87.4, description: 'RAMI LEVY 123', category: 'groceries' }));
   await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
   await openApp(page, '/Groceries');
-  await page.getByRole('button', { name: L('grStartShopping') }).click();
-  const shopping = page.getByRole('dialog', { name: L('grShopping') });
-  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
-  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
+  await page.getByRole('button', { name: L('grScanAReceipt') }).first().click();
+  const dialog = page.getByRole('dialog', { name: L('grFromReceiptTitle') });
+  await dialog.getByLabel(L('grChooseReceipt')).setInputFiles(RECEIPT_PHOTO);
+  await dialog.getByRole('button', { name: L('grAddFromReceipt', { n: 1 }) }).click();
+  await expect(dialog.getByText(/RAMI LEVY 123/)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: L('grExpenseAddAnyway') })).toBeVisible();
+  await dialog.getByRole('button', { name: L('grExpenseNo'), exact: true }).click();
 
-  const finish = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: L('grShopDone') }) });
-  await finish.locator('input[type=file]').setInputFiles(RECEIPT_PHOTO);
-  await expect(finish.getByText(/RAMI LEVY 123/)).toBeVisible();
-  await expect(finish.getByRole('button', { name: L('grExpenseAddAnyway') })).toBeVisible();
-  await finish.getByRole('button', { name: L('grExpenseNo'), exact: true }).click();
-
-  await expect(finish).toBeHidden();
+  await expect(dialog).toBeHidden();
   await expect(page.getByLabel(new RegExp(`^${L('amount')}`))).toHaveCount(0);
   expect((await api.list('transactions')).map((t) => t.description)).toEqual(['RAMI LEVY 123']);
   // The receipt is kept with its lines
   await expect.poll(async () => (await api.list('receipts'))[0]?.items).toEqual([{ text: 'Milk 3%', qty: 2, unit: null, unitPrice: 6.9, price: 13.8 }]);
-});
-
-test('a shopping trip: pick the shop, tick what goes in the cart, finish @smoke @critical', async ({ page, api }) => {
-  for (const name of ['Milk', 'Eggs', 'Coffee']) {
-    await api.create('groceries', { name, onList: true, listedAt: new Date().toISOString() });
-  }
-  await openApp(page, '/Groceries');
-  await page.getByRole('button', { name: L('grStartShopping') }).click();
-  const shopping = page.getByRole('dialog', { name: L('grShopping') });
-
-  // No shop seen before, so it is typed in
-  await shopping.getByRole('button', { name: L('grWhichShop') }).click();
-  const shop = shopping.getByRole('textbox', { name: L('grStoreName') });
-  await shop.fill('Rami Levy');
-  await shop.press('Enter');
-
-  for (const name of ['Milk', 'Eggs', 'Coffee']) await shopping.getByRole('checkbox', { name, exact: true }).click();
-  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 3 }) }).click();
-  await expect(page.getByRole('heading', { name: L('grShopDone') })).toBeVisible();
-  await page.getByRole('button', { name: L('grSkip') }).or(page.getByRole('button', { name: L('grDone'), exact: true })).first().click();
-
-  await expect.poll(async () => (await api.list('groceries')).map((i) => [i.name, i.onList, i.purchases?.at(-1)?.store]).sort())
-    .toEqual([['Coffee', false, 'Rami Levy'], ['Eggs', false, 'Rami Levy'], ['Milk', false, 'Rami Levy']]);
 });
 
 test('adding something already on the list does not add it twice @critical', async ({ page, api }) => {
@@ -111,23 +80,6 @@ test('adding something already on the list does not add it twice @critical', asy
   await add.press('Enter');
   await expect.poll(() => onList(api)).toEqual([['bread', ''], ['milk', '']]);
   expect((await api.list('groceries')).filter((i) => i.name.toLowerCase() === 'milk')).toHaveLength(1);
-});
-
-test('shopping together: what one puts in the cart shows on the other’s phone, by name @critical @multiuser', async ({ page, api, member }) => {
-  const sam = await member('editor', { name: 'Sam Partner' });
-  for (const name of ['Milk', 'Eggs']) await api.create('groceries', { name, onList: true, listedAt: new Date().toISOString() });
-  const shop = async (p) => {
-    await openApp(p, '/Groceries');
-    await p.getByRole('button', { name: L('grStartShopping') }).click();
-    return p.getByRole('dialog', { name: L('grShopping') });
-  };
-  const mine = await shop(page);
-  const samsCart = await shop(sam.page);
-
-  await samsCart.getByRole('checkbox', { name: 'Milk', exact: true }).click();
-  await expect(page.locator('[data-sonner-toast]').filter({ hasText: L('grPartnerGot', { name: 'Sam Partner', item: 'Milk' }) })).toBeVisible({ timeout: 15_000 });
-  await expect(mine.getByRole('checkbox', { name: 'Milk', exact: true })).toBeChecked();
-  await expect(mine.getByRole('checkbox', { name: 'Eggs', exact: true })).not.toBeChecked();
 });
 
 const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
@@ -202,14 +154,12 @@ test('an older receipt read again counts each line, and the price of one goes on
   await expect(page.getByRole('button', { name: L('rcptReadAllAgain') })).toHaveCount(0);
 });
 
-test('with the assistant off, the receipt step says an owner can turn it on @critical', async ({ page, api }) => {
+test('with the assistant off, Scan a receipt says an owner can turn it on @critical', async ({ page, api }) => {
   await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
   await openApp(page, '/Groceries');
-  await page.getByRole('button', { name: L('grStartShopping') }).click();
-  const shopping = page.getByRole('dialog', { name: L('grShopping') });
-  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
-  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
-  await expect(page.getByText(L('grScanNeedsAssistant'))).toBeVisible();
+  await page.getByRole('button', { name: L('grScanAReceipt') }).first().click();
+  const dialog = page.getByRole('dialog', { name: L('grFromReceiptTitle') });
+  await expect(dialog.getByText(L('grScanNeedsAssistant'))).toBeVisible();
 });
 
 test('on the Wall, things tapped one after another stay put while tapping, then are bought together with one undo @critical', async ({ page, api }) => {
@@ -239,4 +189,48 @@ test('an item’s details are saved as they are changed, with nothing to confirm
 
   await expect.poll(async () => (await api.list('groceries')).map((i) => [i.qty, i.aisle])).toEqual([['3', 'pantry']]);
   await expect(sheet).toBeVisible();
+});
+
+test('things from other shops go on the Other side by shop, and leave the list once bought @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  const add = page.getByRole('textbox', { name: L('grAddLabel') }).first();
+  await add.fill('acamol, drill bits');
+  await add.press('Enter');
+  // Typed on the Groceries side, they go to Other, and it says so
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: L('grAddedToOther', { name: 'acamol, drill bits' }) });
+  await toast.getByRole('button', { name: L('grShow') }).click();
+  await expect(page.getByRole('radio', { name: new RegExp(L('grSideOther')) })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('region', { name: new RegExp(L('grShop_pharmacy')) }).getByRole('button', { name: /^acamol[,.]/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: new RegExp(L('grShop_hardware')) }).getByRole('button', { name: /^drill bits[,.]/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Milk[,.]/ })).toHaveCount(0);
+
+  // A name that says nothing goes to the side it was typed on
+  await add.fill('gift wrap');
+  await add.press('Enter');
+  await expect(page.getByRole('region', { name: new RegExp(L('grShop_other')) }).getByRole('button', { name: /^gift wrap[,.]/ })).toBeVisible();
+
+  // Bought: off the list, kept under Bought before here, and not at home with the groceries
+  await page.getByRole('button', { name: /^acamol[,.]/ }).click();
+  await expect.poll(async () => (await api.list('groceries')).find((i) => i.name === 'acamol')?.onList).toBe(false);
+  await expect(page.getByRole('region', { name: new RegExp(L('grBoughtBefore')) }).getByRole('button', { name: /^acamol[,.]/ })).toBeVisible();
+  await page.getByRole('radio', { name: new RegExp(L('grSideGroceries')) }).click();
+  await expect(page.getByRole('button', { name: /^Milk[,.]/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^acamol[,.]/ })).toHaveCount(0);
+  expect((await api.list('groceries')).map((i) => [i.name, i.shop]).sort()).toEqual([['Milk', ''], ['acamol', 'pharmacy'], ['drill bits', 'hardware'], ['gift wrap', 'other']]);
+});
+
+test('an item moved to another shop in its details moves to the Other side @critical', async ({ page, api }) => {
+  await api.create('groceries', { name: 'Hooks', onList: true, listedAt: new Date().toISOString() });
+  await openApp(page, '/Groceries');
+  await page.getByRole('button', { name: /^Hooks[,.]/ }).click({ button: 'right' });
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('button', { name: L('grShop_hardware') }).click();
+  await expect.poll(async () => (await api.list('groceries'))[0].shop).toBe('hardware');
+  // Bought elsewhere, so how much is left and the aisle are not asked
+  await expect(sheet.getByRole('group', { name: L('grHowMuchLeft') })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('radio', { name: new RegExp(L('grSideOther')) }).click();
+  await expect(page.getByRole('region', { name: new RegExp(L('grShop_hardware')) }).getByRole('button', { name: /^Hooks[,.]/ })).toBeVisible();
 });

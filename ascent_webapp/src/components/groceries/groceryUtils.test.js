@@ -2,7 +2,7 @@ import { describe, expect, it, test } from 'vitest';
 import {
   basketEstimate, boughtChanges, checkedSince, findByName, findLoggedExpense, lineQty, groupByAisle, guessItem, isTracked, kitchenItems, knownStores,
   learnedInterval, offListChanges, parseEntries, priceMovers, priceStats, purchaseNear, purchasePriceChanges, receiptQty, runningLow, storeComparison, supplyOf,
-  receiptPurchases, isGroceryPayment,
+  receiptPurchases, isGroceryPayment, newItem, shopOfStore,
 } from './groceryUtils';
 
 const bought = (...dates) => dates.map((date, i) => ({ id: `p${i}`, date }));
@@ -37,8 +37,8 @@ describe('reading what was typed', () => {
 
 describe('guessing emoji and aisle', () => {
   test('by a whole word in any of the three languages', () => {
-    expect(guessItem('Whole milk 3%')).toEqual({ emoji: '🥛', aisle: 'dairy' });
-    expect(guessItem('החלב')).toEqual({ emoji: '🥛', aisle: 'dairy' });
+    expect(guessItem('Whole milk 3%')).toEqual({ emoji: '🥛', aisle: 'dairy', shop: '' });
+    expect(guessItem('החלב')).toEqual({ emoji: '🥛', aisle: 'dairy', shop: '' });
     expect(guessItem('Помидоры черри')).toMatchObject({ aisle: 'produce' });
     expect(guessItem('toilet paper')).toMatchObject({ aisle: 'household' });
     expect(guessItem('bananas')).toMatchObject({ aisle: 'produce' });
@@ -46,7 +46,51 @@ describe('guessing emoji and aisle', () => {
 
   test('not by part of a word', () => {
     expect(guessItem('Ricotta').aisle).not.toBe('pantry'); // not "rice"
-    expect(guessItem('something new')).toEqual({ emoji: '', aisle: 'other' });
+    expect(guessItem('something new')).toEqual({ emoji: '', aisle: 'other', shop: null });
+  });
+});
+
+describe('things bought outside the supermarket', () => {
+  test('the name says which shop, in any of the three languages', () => {
+    expect(guessItem('Acamol').shop).toBe('pharmacy');
+    expect(guessItem('אקמול פוקוס')).toMatchObject({ shop: 'pharmacy', emoji: '💊' });
+    expect(guessItem('пластырь')).toMatchObject({ shop: 'pharmacy' });
+    expect(guessItem('Drill bits 6mm')).toMatchObject({ shop: 'hardware' });
+    expect(guessItem('דיבלים')).toMatchObject({ shop: 'hardware' });
+    expect(guessItem('лампочка E27')).toMatchObject({ shop: 'home' });
+    expect(guessItem('light bulbs').shop).toBe('home');
+  });
+
+  test('the shop is looked at first, so sunscreen is not a supermarket cream', () => {
+    expect(guessItem('קרם הגנה')).toMatchObject({ shop: 'pharmacy' });
+    expect(guessItem('shampoo')).toMatchObject({ shop: '', aisle: 'personal' });
+    // Paper towels are the supermarket's; bath towels are not
+    expect(guessItem('מגבות נייר')).toMatchObject({ shop: '', aisle: 'household' });
+  });
+
+  test('a name that says nothing goes to the side it was typed on', () => {
+    expect(newItem('Something new', { shop: 'other' }).shop).toBe('other');
+    expect(newItem('Something new').shop).toBe('');
+    // A name that says is not moved by where it was typed
+    expect(newItem('milk', { shop: 'other' }).shop).toBe('');
+    expect(newItem('acamol').shop).toBe('pharmacy');
+  });
+
+  test('none of it is running low or in the kitchen check: they are one-offs', () => {
+    const drops = { id: 'd', name: 'Eye drops', shop: 'pharmacy', onList: false, level: 'out', purchases: bought('2026-01-01', '2026-01-08') };
+    const rice = { id: 'r', name: 'Rice', shop: '', onList: false, level: 'out', purchases: bought('2026-01-01', '2026-01-08') };
+    expect(runningLow([drops, rice], '2026-02-01').map((l) => l.item.id)).toEqual(['r']);
+    expect(kitchenItems([drops, rice], '2026-02-01').map((l) => l.item.id)).toEqual(['r']);
+  });
+
+  test('new things on a pharmacy or hardware receipt are that shop\'s', () => {
+    expect(shopOfStore('SUPER-PHARM Dizengoff')).toBe('pharmacy');
+    expect(shopOfStore('סופר-פארם')).toBe('pharmacy');
+    expect(shopOfStore('Home Center Ramat Gan')).toBe('hardware');
+    expect(shopOfStore('IKEA Netanya')).toBe('home');
+    expect(shopOfStore('Shufersal Deal')).toBe('');
+    const { creates } = receiptPurchases([], [{ text: 'Panthenol 30g', name: 'Panthenol', price: 30 }], { store: 'Super-Pharm' });
+    expect(creates[0].shop).toBe('pharmacy');
   });
 
   test('finding the household\'s own item ignores case and plurals', () => {

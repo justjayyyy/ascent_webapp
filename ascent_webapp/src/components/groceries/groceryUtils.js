@@ -21,6 +21,37 @@ export const AISLES = [
 const AISLE_ORDER = Object.fromEntries(AISLES.map((a, i) => [a.key, i]));
 export const aisleEmoji = (key) => AISLES.find((a) => a.key === key)?.emoji || '🛒';
 
+/**
+ * Where something that is not groceries is bought: these are on the Other side of the Wall, one-offs that
+ * leave the list once bought instead of being tracked at home. An item with no shop ('') is groceries.
+ */
+export const SHOPS = [
+  { key: 'pharmacy', emoji: '💊' },
+  { key: 'home', emoji: '🏠' },
+  { key: 'hardware', emoji: '🔧' },
+  { key: 'other', emoji: '🛍️' },
+];
+export const isGrocery = (item) => !item?.shop;
+export const shopEmoji = (key) => SHOPS.find((s) => s.key === key)?.emoji || '🛍️';
+
+// Things bought outside the supermarket, in English, Hebrew and Russian: [emoji, shop, ...words]. Looked at
+// before the groceries, so "sunscreen" (קרם הגנה) is the pharmacy's and not a cream from the supermarket.
+const SHOP_CATALOG = [
+  ['💊', 'pharmacy', 'acamol', 'אקמול', 'акамол', 'advil', 'אדוויל', 'адвил', 'nurofen', 'נורופן', 'нурофен', 'optalgin', 'אופטלגין', 'paracetamol', 'парацетамол', 'ibuprofen', 'איבופרופן', 'ибупрофен', 'medicine', 'medicines', 'תרופה', 'תרופות', 'лекарство', 'лекарства', 'pills', 'כדורים', 'таблетки', 'prescription', 'מרשם', 'рецепт', 'syrup', 'סירופ', 'сироп', 'drops', 'טיפות', 'капли', 'antibiotics', 'אנטיביוטיקה', 'антибиотик'],
+  ['🩹', 'pharmacy', 'plasters', 'plaster', 'band-aid', 'band aid', 'bandaid', 'bandage', 'פלסטר', 'פלסטרים', 'תחבושת', 'пластырь', 'бинт'],
+  ['🌡️', 'pharmacy', 'thermometer', 'מדחום', 'градусник', 'термометр'],
+  ['🧴', 'pharmacy', 'sunscreen', 'קרם הגנה', 'солнцезащитный крем'],
+  ['💊', 'pharmacy', 'vitamins', 'vitamin', 'ויטמינים', 'ויטמין', 'витамины', 'витамин', 'omega', 'אומגה', 'омега'],
+  ['👓', 'pharmacy', 'contact lenses', 'lens solution', 'עדשות מגע', 'תמיסת עדשות', 'линзы'],
+  ['🔩', 'hardware', 'screws', 'screw', 'ברגים', 'בורג', 'шурупы', 'винты', 'nails', 'מסמרים', 'гвозди', 'wall plugs', 'dowels', 'דיבלים', 'дюбели', 'bolts', 'אומים', 'болты'],
+  ['🔧', 'hardware', 'drill', 'drill bits', 'מקדחה', 'מקדחים', 'מקדח', 'дрель', 'сверла', 'сверло', 'hammer', 'פטיש', 'молоток', 'screwdriver', 'מברג', 'отвертка', 'отвёртка', 'pliers', 'פלאייר', 'плоскогубцы', 'wrench', 'מפתח שוודי', 'tools', 'כלי עבודה', 'инструменты', 'saw', 'מסור', 'пила'],
+  ['🎨', 'hardware', 'paint', 'צבע לקיר', 'краска', 'paint brush', 'מברשת צבע', 'paint roller', 'רולר', 'валик', 'silicone', 'סיליקון', 'силикон', 'glue', 'דבק', 'клей', 'sandpaper', 'נייר לטש', 'наждачка', 'duct tape', 'דבק בד', 'изолента'],
+  ['💡', 'home', 'light bulb', 'light bulbs', 'bulb', 'bulbs', 'נורה', 'נורות', 'лампочка', 'лампочки', 'batteries', 'battery', 'סוללות', 'סוללה', 'батарейки', 'батарейка'],
+  ['🔌', 'home', 'extension cord', 'power strip', 'מפצל', 'כבל מאריך', 'удлинитель', 'charger', 'מטען', 'зарядка', 'cable', 'כבל', 'кабель', 'adapter', 'מתאם', 'переходник'],
+  ['🛏️', 'home', 'sheets', 'bedding', 'מצעים', 'постельное', 'pillow', 'כרית', 'подушка', 'blanket', 'שמיכה', 'одеяло', 'towels', 'towel', 'מגבות', 'מגבת', 'полотенца', 'полотенце', 'curtain', 'curtains', 'וילון', 'וילונות', 'шторы'],
+  ['🪴', 'home', 'hangers', 'קולבים', 'вешалки', 'candles', 'נרות', 'свечи', 'vase', 'אגרטל', 'ваза', 'frame', 'מסגרת', 'рамка', 'lamp', 'מנורה', 'лампа', 'plant pot', 'עציץ', 'горшок', 'mop', 'מגב', 'швабра', 'broom', 'מטאטא', 'веник'],
+];
+
 // Everyday things in English, Hebrew and Russian: [emoji, aisle, ...words]. A new item takes the emoji and
 // aisle of the first word it contains; after that it keeps whatever the household chose.
 const CATALOG = [
@@ -97,18 +128,40 @@ const variants = (w) => {
   return out;
 };
 
-/** The emoji and aisle a new item probably has, from its name: { emoji, aisle }. */
+// Both catalogs, the shops' first, with their words compared as names are
+const GUESSES = [
+  ...SHOP_CATALOG.map(([emoji, shop, ...terms]) => ({ emoji, aisle: 'other', shop, terms: terms.map(normalizeName) })),
+  ...CATALOG.map(([emoji, aisle, ...terms]) => ({ emoji, aisle, shop: '', terms: terms.map(normalizeName) })),
+];
+
+/**
+ * The emoji, aisle and shop a new item probably has, from its name: { emoji, aisle, shop }. `shop` is '' for
+ * groceries, a shop's key for things bought elsewhere, and null when the name says neither.
+ */
 export function guessItem(name) {
   const norm = normalizeName(name);
   const own = new Set(words(name).flatMap(variants));
-  for (const [emoji, aisle, ...terms] of CATALOG) {
-    for (const term of terms) {
-      const t = normalizeName(term);
-      // Several words ("toilet paper") match as a phrase; one word must be a whole word of the name
-      if (t.includes(' ') ? norm.includes(t) : own.has(t)) return { emoji, aisle };
+  // Several words ("toilet paper") match as a phrase, and a phrase wins over one word ("paper towels" are
+  // the supermarket's, though towels are not); one word must be a whole word of the name
+  for (const phrase of [true, false]) {
+    for (const { emoji, aisle, shop, terms } of GUESSES) {
+      if (terms.some((t) => t.includes(' ') === phrase && (phrase ? norm.includes(t) : own.has(t)))) return { emoji, aisle, shop };
     }
   }
-  return { emoji: '', aisle: 'other' };
+  return { emoji: '', aisle: 'other', shop: null };
+}
+
+// Shops whose receipts are not the supermarket's: what is new on them is bought there too
+const STORE_SHOPS = [
+  ['pharmacy', /super.?pharm|סופר.?פארם|pharm|פארם|בית מרקחת|аптек/i],
+  ['hardware', /home.?center|הום.?סנטר|\bace\b|אייס|טמבור|hardware|строймаркет|леруа/i],
+  ['home', /ikea|איקאה|икеа|fox.?home|פוקס.?הום|max.?stock|מקס.?סטוק/i],
+];
+
+/** The shop a receipt's store is, when it is not a supermarket: 'pharmacy', 'hardware', 'home' or ''. */
+export function shopOfStore(store) {
+  const name = String(store || '');
+  return STORE_SHOPS.find(([, re]) => re.test(name))?.[0] || '';
 }
 
 // "2", "1.5kg", "x3", "500 g", "2 יח'", "3 шт"
@@ -236,7 +289,7 @@ export function supplyOf(item, today = localDay()) {
 export function runningLow(items, today = localDay()) {
   return items
     // Said to be low or out by hand (in the kitchen check, say) counts even before it is tracked
-    .filter((i) => !i.onList && (isTracked(i) || i.level === 'low' || i.level === 'out'))
+    .filter((i) => isGrocery(i) && !i.onList && (isTracked(i) || i.level === 'low' || i.level === 'out'))
     .map((item) => ({ item, supply: supplyOf(item, today) }))
     .filter(({ supply }) => supply.status === 'low' || supply.status === 'out')
     .sort((a, b) => (a.supply.share ?? 0) - (b.supply.share ?? 0));
@@ -315,7 +368,7 @@ export function lastPrice(item) {
  */
 export function kitchenItems(items, today = localDay(), loc) {
   return items
-    .filter((i) => !i.onList)
+    .filter((i) => isGrocery(i) && !i.onList)
     .map((item) => ({ item, supply: supplyOf(item, today) }))
     .sort((a, b) => (a.supply.share ?? 2) - (b.supply.share ?? 2) || a.item.name.localeCompare(b.item.name, loc));
 }
@@ -331,13 +384,17 @@ export function checkedSince(item, since, today = localDay()) {
   return after(item.levelAt) || (!!bought && bought >= (since ? dayOf(since) : today));
 }
 
-/** A new item from a name someone typed. */
-export function newItem(name, { qty = '', by = '', onList = true } = {}) {
-  const { emoji, aisle } = guessItem(name);
+/**
+ * A new item from a name someone typed. `shop` is where it goes when the name does not say (typed on the Other
+ * side of the Wall, say); a name that does ("milk", "acamol") goes where it belongs.
+ */
+export function newItem(name, { qty = '', by = '', onList = true, shop = '' } = {}) {
+  const guess = guessItem(name);
   return {
     name: name.trim().slice(0, 120),
-    emoji,
-    aisle,
+    emoji: guess.emoji,
+    aisle: guess.aisle,
+    shop: guess.shop ?? shop,
     staple: null,
     ...(onList ? listChanges({ qty, by }) : { onList: false }),
     purchases: [],
@@ -581,7 +638,7 @@ export function receiptPurchases(items, lines, { date = localDay(), currency = n
     if (!target) {
       const fresh = creates.find((c) => normalizeName(c.name) === normalizeName(name));
       if (fresh) { kinds[i] = 'new'; return; } // the same thing on two lines: one item, one purchase
-      const row = newItem(name.slice(0, 120), { onList: false });
+      const row = newItem(name.slice(0, 120), { onList: false, shop: shopOfStore(store) });
       if (line.aisle && AISLE_ORDER[line.aisle] !== undefined) {
         row.aisle = line.aisle;
         if (!row.emoji) row.emoji = aisleEmoji(line.aisle);

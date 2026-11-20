@@ -129,7 +129,7 @@ Done so far:
 | Permissions | `specs/household/permissions.spec.js` | §3.4 matrix: viewer, editor, notes-only, no-goals; UI hidden and API refused |
 | Members | `specs/household/members.spec.js` | WS-H05 (live), H07, H08, H09, WS-N01, N02, N07, N08, N10, TX-N08 |
 | Assistant | `specs/dashboard/assistant.spec.js` | AI-H01, H02, H04, AI-N01, N03, overloaded, declined |
-| Groceries | `specs/groceries/groceries.spec.js` | AI-H06 / GR-H06: receipt photo read, saved as the expense, prices kept |
+| Groceries | `specs/groceries/groceries.spec.js` | AI-H06: a scanned receipt read, saved as the expense, prices kept |
 | Review | `specs/review/review.spec.js` | RV-H01, H02, RV-N01, RC-H01, RC-H02 (the card downloaded, with the month's figures), RC-E01 (blurred: the card handed to the share sheet holds percentages only; read from what is drawn on the canvas) |
 | Account security | `specs/account/security.spec.js` | AUTH-H11 (reset ends other sessions), N09, H12, H14, N05 (lockout), N15 (open redirect), E01 (session replaced, told why), E02 (expired) |
 | Google | `specs/auth/google.spec.js` | AUTH-H07, H08, N11 (wrong audience, unverified email) |
@@ -156,7 +156,7 @@ Done so far:
 | Tasks | `specs/tasks/tasks.spec.js` | TK-H03 (no cost: done in one tap; tapping it in Done reopens), N01 (a title is needed), N02 (a viewer ticks it off, cannot log the expense, nor through the API), N03 (an outsider as assignee: 400), E01 ("3 days late", "Today"). TK-H04 as built: deleting asks to confirm (no Undo) |
 | Account edges | `specs/account/account-edges.spec.js` | ACC-H05 (blur on: no money figure on Dashboard, Expenses, Income, Review, Plans), N02 (invalid currency, theme, flag, language: 400, nothing changes), E01 (an owner deletes the account: a member keeps the household and owns it; the next is too late) |
 | Categories | `specs/money/categories-budgets.spec.js` | CAT-N01: no name, no adding; a default typed as shown ("Food & Dining", any case) and a second "dog FOOD" from another phone are refused |
-| Groceries | `specs/groceries/groceries.spec.js` | GR-N01 ("milk" and "MILK" when Milk is on the list: one row), H08 (shopping together: the partner's pick shows, "Sam Partner got the Milk") |
+| Groceries | `specs/groceries/groceries.spec.js` | GR-N01 ("milk" and "MILK" when Milk is on the list: one row) |
 | Check-in | `specs/dashboard/checkin.spec.js` | CHK-H02 (charged twice: delete the copy, or keep both confirmed), H03 (nothing to look at: straight to the week) |
 | Forms | `specs/shell/forms.spec.js` | PL-N01 (an "Other" plan needs a name; an end before the start is stopped, by the browser or the app), LN-N01 (amount and next payment date), SV-N01 (an "Other" goal needs a name; 0 is not an amount). Other kinds take their kind's name |
 | Lifecycle | `specs/shell/lifecycle.spec.js` | LN-H06/H07 and PL-H05 (paid off or done, reopened, deleted: recorded expenses stay), SV-H05 (open-ended goal), RV-H03 (a running month, "so far"), ACC-H06 (no-spend days on the Dashboard), CAT-H03 (Hebrew default categories) |
@@ -164,13 +164,13 @@ Done so far:
 | Extras | `specs/shell/extras.spec.js` | NAV-H05 (Ctrl+B folds the sidebar, remembered, not while typing), LN-H04 (pay it off faster: sooner by, interest saved), SV-H06 (entry deleted, Undo) |
 | Insights | `specs/review/insights.spec.js` | RV-H04 (a new place marked, who paid), PL-H07 (plan costs on Expenses), PL-E02 (overdue), PL-N03 (a paid cost stays paid), LN-H08 (a purchase in parts on Loans, "1 of 3 paid") |
 | Notes features | `specs/notes/features.spec.js` | NT-H06 (two selected, archived together; Escape clears), H10 (a reminder due while closed goes off on opening, once; a later one does not), H11 (a file attached), H12 (search; grid/list remembered), H13 ("?" opens the shortcuts), H15 (a label filters; renamed on every note) |
-| Groceries more | `specs/groceries/groceries.spec.js` | GR-H05 (kitchen check to "checked"), H07 (list costed, cheapest shop named), H09 ("~n days left"), N02 (receipts with the assistant off) |
+| Groceries more | `specs/groceries/groceries.spec.js` | GR-H05 (kitchen check to "checked"), H07 (list costed, cheapest shop named), H09 ("~n days left"), N02 (receipts with the assistant off), H10 and H11 (the Other side: other shops, by shop, moved from the item sheet) |
 | Theme, assistant | `specs/account/settings.spec.js`, `specs/dashboard/assistant.spec.js` | ACC-H04 (a palette and light apply at once and stay), AI-H03 ("Edit first" opens the form filled in) |
 | Notes offline | `specs/offline/notes-offline.spec.js` | NT-E02 (one written, one edited offline: both synced), NT-N02 (a file offline: needs the connection), NT-H14 (copied as text, Chromium) |
 | P2 edges | `specs/money/edges.spec.js`, `specs/shell/edges.spec.js`, `specs/shell/more-edges.spec.js` | TK-E02, GR-E01, LN-E03 (two at once, both kept), TX-E10 (100 in 3 sums exactly), BUD-E02, ING-E02 (other currencies), AUTH-E08, E09, ACC-E03, WS-N12 (20 members), TX-E11, NAV-E02, CHK-N01 (a server error queues the delete), AI-N06, AUTH-E11, E13, RC-E04, ACC-E02, NT-H16, NT-N05 (dictation, blocked microphone), NT-E07, GR-E02, LN-E01, RV-N02, RC-E02, OFF-E07 (storage refused: works online) |
 | Limits | `specs/security/limits.spec.js` | ING-N06 (61st purchase in 10 min: 429, retry after 600 s), AI-N05 (41st question in an hour: 429), AI-E02 (receipt too big or not a photo), NT-N06, NT-E04 (100,000 characters, 30 labels), CAT-E01, BUD-E01, SV-E02 |
 | Last edges | `specs/shell/last-edges.spec.js` | GR-H04 (hold a tile, set Low), AUTH-E10 (connection drops on sign-up: one account after retrying), AUTH-E07 (two tabs sign in at once), CHK-E01 (a partner sorts a payment out meanwhile) |
-| Final edges | `specs/shell/final-edges.spec.js` | SV-E01 (goal date passed, goal over its target), PL-E05 (no date, euros, 200 costs), DSH-E02 (overspent month in Hebrew), GR-N03 (trip finished with no total), LN-E02 (loan already being paid off). EXP-E02 (BOM) was already covered in `account/data.spec.js` |
+| Final edges | `specs/shell/final-edges.spec.js` | SV-E01 (goal date passed, goal over its target), PL-E05 (no date, euros, 200 costs), DSH-E02 (overspent month in Hebrew), LN-E02 (loan already being paid off). EXP-E02 (BOM) was already covered in `account/data.spec.js` |
 | Invitation edges | `specs/household/invitation-edges.spec.js` | WS-E02 (accept with no connection, again later), WS-E03 (same invitation in two tabs: accepted in one, accepted or declined in the other) |
 | WebKit | `desktop-webkit`, `phone-webkit` projects | the whole suite, in CI on every push to main (not required yet) |
 
@@ -646,8 +646,7 @@ Dashboard → Notes → Settings, or "no access" text). States every page must b
 - **Views**: List (to buy, running low), Wall (tiles: tap = bought, hold = details/fill level), Kitchen check (Is {name} running out? Out / Low / Have it), Prices (list cost estimate, cheapest shop, shops compared, prices that moved, month by month).
 - **Add bar**: "Add: milk, 2 eggs, bread…" (multi-item parse), Bought before suggestions, Add "{name}".
 - **Item sheet**: Name, Emoji, How many, Note, Aisle, How much is left, Usually lasts, Track how long it lasts, Price history (Cheapest, "Usually {amount} less at {store}"), Put on / Take off the list, Delete item.
-- **Shopping mode**: Which shop?, tick items into the cart, cart ≈ total, live "{name} got the {item}", Close shopping, Done · n bought.
-- **Finish trip**: Scan the receipt (photo → AI read: Total, Store, Date), Save expense, Try another photo, Skip; AI off → "an owner can turn on the AI assistant".
+- **Scan a receipt**: photo or PDF → AI read (Total, Store, Date, each line on the list, new or known) → Add from the receipt → add the shop as an expense?, Try another photo; AI off → "an owner can turn on the AI assistant".
 - **States**: empty starter ("Start with what you buy every week"), "Shared with {names}", nothing low.
 
 ### 2.13 Settings (`/Settings`) — sections gate themselves
@@ -937,7 +936,7 @@ Plus cross-workspace isolation (§3.20 SEC-N04/N05).
 | AI-H03 | P1 | Happy | "Edit first" opens the transaction dialog prefilled |
 | AI-H04 | P1 | Happy | Question "how much on food vs last month" → answer text, disclaimer "Answers come from Claude by Anthropic…" |
 | AI-H05 | P1 | Happy | Category suggestion via AI when merchant rules don't know the merchant |
-| AI-H06 | P1 | Happy | Groceries Finish trip: receipt photo (`setInputFiles`) → Total/Store/Date read → Save expense → items priced "{n} of {total} items priced" |
+| AI-H06 | P1 | Happy | Groceries Scan a receipt: receipt photo (`setInputFiles`) → Total/Store/Date read → Add from the receipt → Save expense → each item's price kept |
 | AI-N01 | P1 | Negative | AI off → bar hidden; forced `POST /api/assist` → 403 `ai_disabled` |
 | AI-N02 | P1 | Negative | Server without `ANTHROPIC_API_KEY` → Settings "Not available on this server yet"; toggle disabled; API 503 `ai_not_configured` |
 | AI-N03 | P1 | Negative | Editor/viewer sees the toggle read-only |
@@ -1094,13 +1093,12 @@ Plus cross-workspace isolation (§3.20 SEC-N04/N05).
 | GR-H03 | P1 | Happy | Tap item → bought ("In the cart"/"Bought {when}"); Bought before suggestions on next add |
 | GR-H04 | P1 | Happy | Wall view: tap tile = bought; **hold** tile → item sheet; set "How much is left" Low → appears in running low |
 | GR-H05 | P1 | Happy | Kitchen check: Out / Low / Have it for each → "Kitchen checked", "Next to run out: {name}, {when}" |
-| GR-H06 | P0 | Happy | Start shopping → Which shop? "Rami Levy" → tick items → cart ≈ total → Done → Finish trip → Skip or Save expense |
 | GR-H07 | P1 | Happy | Item sheet: add price 7.90 at shop A and 6.50 at shop B → Cheapest B, "Usually 1.40 less at B"; Prices view "Your list will cost about"; Shops compared |
-| GR-H08 | P1 | Happy | **Live shared shopping**: partner in shopping mode ticks milk → owner sees "{name} got the milk" |
 | GR-H09 | P1 | Happy | Usually lasts (after 2 purchases) → "~{n} days left" estimates |
+| GR-H10 | P1 | Happy | Groceries or Other: "acamol, drill bits" typed on Groceries → "added to Other" → Show → under Pharmacy and Hardware; a name that says nothing goes to the side it was typed on; bought → Bought before, not At home |
+| GR-H11 | P1 | Happy | Item sheet "Where to buy" → Hardware moves it to the Other side; no level, aisle or tracking for it |
 | GR-N01 | P1 | Negative | Empty add → nothing added; duplicate "milk" → "Already on the list" behaviour, no duplicate row |
-| GR-N02 | P1 | Negative | Receipt scan with AI off → "an owner can turn on the AI assistant" → manual amount path works |
-| GR-N03 | P2 | Negative | Finish trip "Enter the amount" when saving without total |
+| GR-N02 | P1 | Negative | Receipt scan with AI off → "an owner can turn on the AI assistant" |
 | GR-E01 | P2 | Edge | Both members tick the same item at once → bought once; purchase history per-entry (`?list=purchases`) keeps both trips |
 | GR-E02 | P2 | Edge | Hebrew item names, emoji, 300 items; quantity parsing "2kg tomatoes", "תפוחים 3" |
 | GR-E03 | P2 | Edge | Long-press vs scroll on touch: scrolling the wall doesn't trigger hold |
@@ -1232,7 +1230,7 @@ These string features together the way a real household does. Each is one test w
 | J-01 | **New household**: sign up (UI) → welcome → set currency & language → add 2 cards → add budget → add 5 expenses + salary → Dashboard safe-to-spend correct → invite partner → partner signs up via email link → partner adds an expense → owner sees it live → owner signs out |
 | J-02 | **Big purchase month**: buy a sofa in 12 payments → Big purchases card → Dashboard excludes it from everyday → Review shows it under Fixed → delete payment 12 only → schedule updates |
 | J-03 | **Trip**: create Vacation plan → add costs → pay flights from the plan → expense appears in Expenses linked to plan → Dashboard "already planned" → mark plan done |
-| J-04 | **Phone shopping trip** (phone project, offline mid-way): open Groceries → start shopping → go offline in the shop → tick 8 items → back online → finish trip → receipt → expense saved → prices learned |
+| J-04 | **Phone shopping trip** (phone project, offline mid-way): open Groceries → go offline in the shop → tap 8 items off the Wall → back online → scan the receipt → expense saved → prices learned |
 | J-05 | **Weekly check-in after Apple Pay week**: 6 ingests via API (one duplicate of a manual entry) → Dashboard "Payments to look at: 6" → resolve all, delete the duplicate → "Done for this week" |
 | J-06 | **Month close**: clock at day 1 of next month → recap ready → watch → share with blur → Review compares with last month |
 | J-07 | **Account lifecycle**: sign up → add passkey → turn on Face ID lock → sign out others → reset password via email → delete account → cannot sign in |

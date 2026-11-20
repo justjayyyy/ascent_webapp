@@ -56,20 +56,17 @@ test.describe('without the service worker', () => {
   });
 });
 
-test('a photo that is not a receipt says so, and the amount can still be typed in @critical', async ({ page, owner, api, stubs }) => {
+test('a photo that is not a receipt says so, and another can be tried @critical', async ({ page, owner, api, stubs }) => {
   await api.call('PUT', `/workspaces?id=${owner.workspaceId}&action=settings`, { aiAssistant: true });
   await stubs.set({ ai: 'not-a-receipt' });
   await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
   await openApp(page, '/Groceries');
-  await page.getByRole('button', { name: L('grStartShopping') }).click();
-  const shopping = page.getByRole('dialog', { name: L('grShopping') });
-  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
-  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
-  const finish = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: L('grShopDone') }) });
+  await page.getByRole('button', { name: L('grScanAReceipt') }).first().click();
+  const dialog = page.getByRole('dialog', { name: L('grFromReceiptTitle') });
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-  await finish.locator('input[type=file]').setInputFiles({ name: 'cat.png', mimeType: 'image/png', buffer: png });
-  await expect(finish.getByText(L('grReceiptUnreadable'))).toBeVisible();
-  await expect(finish.getByRole('button', { name: L('grTryAnotherPhoto') })).toBeVisible();
+  await dialog.getByLabel(L('grChooseReceipt')).setInputFiles({ name: 'cat.png', mimeType: 'image/png', buffer: png });
+  await expect(dialog.getByText(L('grReceiptUnreadable'))).toBeVisible();
+  await expect(dialog.getByRole('button', { name: L('grTryAnotherPhoto') })).toBeVisible();
 });
 
 test('a double-clicked Sign in signs in once @critical', async ({ page }) => {

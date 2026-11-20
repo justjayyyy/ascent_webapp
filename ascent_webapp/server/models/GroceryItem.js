@@ -4,6 +4,8 @@ import { addDedupeKey } from './dedupe.js';
 
 export const AISLES = ['produce', 'dairy', 'bakery', 'meat', 'pantry', 'frozen', 'drinks', 'snacks', 'household', 'personal', 'baby', 'pets', 'other'];
 export const LEVELS = ['full', 'half', 'low', 'out'];
+// Where it is bought, for the things that are not groceries: '' is the supermarket
+export const SHOPS = ['', 'pharmacy', 'home', 'hardware', 'other'];
 
 // One time it was bought. The gaps between these are how the app learns how long it lasts.
 const purchaseSchema = new mongoose.Schema({
@@ -23,6 +25,7 @@ const groceryItemSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 120 },
   emoji: { type: String, default: '', maxlength: 16 },
   aisle: { type: String, enum: AISLES, default: 'other' },
+  shop: { type: String, enum: SHOPS, default: '' },
   // Supply tracked in the pantry: true / false when someone chose, null = automatically once bought twice
   staple: { type: Boolean, default: null },
 

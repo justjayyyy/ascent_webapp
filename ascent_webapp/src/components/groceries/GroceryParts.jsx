@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHousehold } from '@/hooks/useHousehold';
-import { aisleEmoji, lineQty } from './groceryUtils';
+import { aisleEmoji, lineQty, shopEmoji } from './groceryUtils';
 
 export const localeOf = (language) => (language === 'he' ? 'he-IL' : language === 'ru' ? 'ru-RU' : 'en-US');
 
@@ -16,7 +16,7 @@ export const TONE = {
 
 /** The item's picture: its emoji, or its aisle's. */
 export function ItemEmoji({ item, className }) {
-  return <span aria-hidden className={cn('leading-none', className)}>{item.emoji || aisleEmoji(item.aisle)}</span>;
+  return <span aria-hidden className={cn('leading-none', className)}>{item.emoji || (item.shop ? shopEmoji(item.shop) : aisleEmoji(item.aisle))}</span>;
 }
 
 /** Household members by email, with a fallback for people who have left. */

@@ -9,7 +9,7 @@ import { useListWrites } from '@/lib/offline/listWrites';
 import { localDay } from '@/lib/localDay';
 import { haptic } from '@/lib/haptics';
 import {
-  boughtChanges, cleanStore, findByName, purchaseNear, receiptQty, receiptPurchases, groupByAisle, isTracked, levelChanges, listChanges, newItem, offListChanges, parseEntries, purchasePriceChanges, runningLow,
+  boughtChanges, cleanStore, findByName, purchaseNear, receiptQty, receiptPurchases, groupByAisle, isGrocery, isTracked, levelChanges, listChanges, newItem, offListChanges, parseEntries, purchasePriceChanges, runningLow,
 } from './groceryUtils';
 
 export function useGroceryList() {
@@ -27,16 +27,20 @@ export function useGroceryList() {
     return {
       today,
       onList,
-      toBuy: onList.filter((i) => !i.inCart),
-      inCart: onList.filter((i) => i.inCart),
-      atHome: items.filter((i) => !i.onList && (isTracked(i) || (i.purchases || []).length > 0)),
+      // The Wall's two sides: groceries, and what is bought elsewhere (the pharmacy, the hardware shop)
+      groceriesToBuy: onList.filter(isGrocery),
+      othersToBuy: onList.filter((i) => !isGrocery(i)),
+      atHome: items.filter((i) => isGrocery(i) && !i.onList && (isTracked(i) || (i.purchases || []).length > 0)),
       low: runningLow(items, today),
       groups: groupByAisle(onList),
     };
   }, [items]);
 
-  /** "milk, 2 eggs, bread": known items go on the list, new names become items. Returns what was added. */
-  const addText = useCallback(async (text) => {
+  /**
+   * "milk, 2 eggs, bread": known items go on the list, new names become items. `shop` is where a new name goes
+   * when it does not say itself (typed on the Other side, say). Returns what was added.
+   */
+  const addText = useCallback(async (text, { shop = '' } = {}) => {
     const entries = parseEntries(text);
     const added = [];
     for (const { name, qty } of entries) {
@@ -46,7 +50,7 @@ export function useGroceryList() {
         if (!known.onList || qty) update(known, listChanges({ qty: qty || known.qty || '', by: me }));
         added.push(known);
       } else {
-        const row = newItem(name, { qty, by: me });
+        const row = newItem(name, { qty, by: me, shop });
         added.push(row);
         api.create(row).catch(failed);
       }
@@ -71,23 +75,12 @@ export function useGroceryList() {
     toast(t('grRemovedFromList', { name: item.name }), { action: { label: t('ntUndo'), onClick: () => update(item, before) } });
   }, [update, t]);
 
-  const toggleCart = useCallback((item) => {
-    haptic(item.inCart ? 'selection' : 'light');
-    return update(item, { inCart: !item.inCart, cartBy: item.inCart ? '' : me });
-  }, [update, me]);
-
   const setLevel = useCallback((item, level) => {
     haptic('selection');
     return update(item, levelChanges(level, me));
   }, [update, me]);
 
-  /** Bought today: each item off the list with a purchase recorded. `prices`: { [itemId]: price }. */
-  const markBought = useCallback(async (list, { prices = {}, currency = null, date = localDay(), store = '' } = {}) => {
-    haptic('success');
-    await Promise.all(list.map((item) => update(item, boughtChanges(item, { date, by: me, price: prices[item.id] ?? null, currency, store }))));
-  }, [update, me]);
-
-  /** Things bought outside a shopping trip (tapped off the list at home), with one undo for all of them. */
+  /** Things tapped off the list as bought, with one undo for all of them. */
   const boughtMany = useCallback((list) => {
     if (!list.length) return;
     haptic('light');
@@ -100,24 +93,6 @@ export function useGroceryList() {
     toast(message, { action: { label: t('ntUndo'), onClick: () => befores.forEach(([item, before]) => update(item, before)) } });
   }, [update, me, t]);
   const boughtOne = useCallback((item) => boughtMany([item]), [boughtMany]);
-
-  /**
-   * Prices read from a receipt after the shop: written onto that day's purchase of each item, with the
-   * shop's name and how many were bought (`qtys`: { [itemId]: '3' }) where the purchase does not have them yet.
-   */
-  const addPrices = useCallback((list, prices, { currency = null, date, store = '', qtys = {} }) => Promise.all(list
-    .filter((item) => typeof prices[item.id] === 'number' || store || qtys[item.id])
-    .map((item) => {
-      const purchases = [...(item.purchases || [])];
-      const at = purchases.map((p) => p.date).lastIndexOf(date);
-      if (at < 0) return null;
-      const price = typeof prices[item.id] === 'number' ? { price: prices[item.id], currency } : {};
-      const shop = store && !purchases[at].store ? { store: cleanStore(store) } : {};
-      const qty = qtys[item.id] && !purchases[at].qty ? { qty: String(qtys[item.id]).slice(0, 40) } : {};
-      if (!Object.keys(price).length && !Object.keys(shop).length && !Object.keys(qty).length) return null;
-      purchases[at] = { ...purchases[at], ...price, ...shop, ...qty };
-      return update(item, { purchases });
-    })), [update]);
 
   /**
    * A receipt read (again): each line matched to an item puts the price of one and how many onto that
@@ -178,5 +153,5 @@ export function useGroceryList() {
     });
   }, [api, failed, t]);
 
-  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, toggleCart, setLevel, markBought, boughtOne, boughtMany, addPrices, applyReceipt, recordReceipt, setPurchasePrice, save, remove };
+  return { items, isLoading, me, ...derived, addText, putOnList, takeOffList, setLevel, boughtOne, boughtMany, applyReceipt, recordReceipt, setPurchasePrice, save, remove };
 }

@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { haptic } from '@/lib/haptics';
-import { AISLES, LEVEL_VALUE, isTracked, knownStores, lastPrice, priceStats, supplyOf } from './groceryUtils';
+import { AISLES, LEVEL_VALUE, SHOPS, isTracked, knownStores, lastPrice, priceStats, supplyOf } from './groceryUtils';
 import { useMoney } from '@/hooks/useWorkspaceData';
 import { Sparkline } from '@/components/review/ReviewParts';
 import { TONE, daysAgo, leftLabel, localeOf, money } from './GroceryParts';
@@ -223,7 +223,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
 
   useEffect(() => {
     if (!open || !item) return;
-    const next = { name: item.name, emoji: item.emoji || '', aisle: item.aisle || 'other', qty: item.qty || '', note: item.note || '', staple: isTracked(item) };
+    const next = { name: item.name, emoji: item.emoji || '', aisle: item.aisle || 'other', shop: item.shop || '', qty: item.qty || '', note: item.note || '', staple: isTracked(item) };
     formRef.current = next;
     setForm(next);
   }, [open, item?.id]);
@@ -239,6 +239,7 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
     if (f.name.trim() && f.name.trim() !== current.name) changes.name = f.name.trim().slice(0, 120);
     if (f.emoji !== (current.emoji || '')) changes.emoji = [...f.emoji].slice(0, 2).join('');
     if (f.aisle !== current.aisle) changes.aisle = f.aisle;
+    if (f.shop !== (current.shop || '')) changes.shop = f.shop;
     if (current.onList && f.qty !== (current.qty || '')) changes.qty = f.qty.slice(0, 40);
     if (current.onList && f.note !== (current.note || '')) changes.note = f.note.slice(0, 300);
     if (f.staple !== isTracked(current)) changes.staple = f.staple;
@@ -253,6 +254,8 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
   const last = lastPrice(item);
   const lastInMine = last && last.currency && last.currency !== currency ? convert(last.price, last.currency) : null;
   const times = new Set((item.purchases || []).map((p) => p.date)).size;
+  // Bought outside the supermarket: a one-off, so how much is left, the aisle and tracking do not apply
+  const grocery = !form.shop;
   const set = (changes, { now = false } = {}) => {
     formRef.current = { ...formRef.current, ...changes };
     setForm(formRef.current);
@@ -295,34 +298,38 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
           </div>
         </DialogHeader>
 
-        <section className="mt-1">
-          <LevelVessel item={{ ...item, emoji: form.emoji }} supply={supply} onLevel={(level) => onLevel(item, level)} t={t} />
-          <div role="group" aria-label={t('grHowMuchLeft')} className="mt-4 grid grid-cols-4 gap-1.5">
-            {LEVELS.map((level) => {
-              const on = supply.manual && item.level === level;
-              return (
-                <button
-                  key={level}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => onLevel(item, level)}
-                  className={cn(
-                    'h-10 rounded-xl text-sm font-semibold transition-colors',
-                    on ? cn(TONE[statusOfLevel(level)].fill, TONE[statusOfLevel(level)].text, 'ring-1 ring-current') : 'bg-foreground/[0.06] text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {t(`grLevel${level[0].toUpperCase()}${level.slice(1)}`)}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        {grocery && (
+          <section className="mt-1">
+            <LevelVessel item={{ ...item, emoji: form.emoji }} supply={supply} onLevel={(level) => onLevel(item, level)} t={t} />
+            <div role="group" aria-label={t('grHowMuchLeft')} className="mt-4 grid grid-cols-4 gap-1.5">
+              {LEVELS.map((level) => {
+                const on = supply.manual && item.level === level;
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => onLevel(item, level)}
+                    className={cn(
+                      'h-10 rounded-xl text-sm font-semibold transition-colors',
+                      on ? cn(TONE[statusOfLevel(level)].fill, TONE[statusOfLevel(level)].text, 'ring-1 ring-current') : 'bg-foreground/[0.06] text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {t(`grLevel${level[0].toUpperCase()}${level.slice(1)}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
-        <dl className="grid grid-cols-3 gap-2">
-          <div className="rounded-2xl bg-foreground/[0.04] p-3">
-            <dt className="text-xs text-muted-foreground">{t('grUsuallyLasts')}</dt>
-            <dd className="mt-0.5 text-base font-bold tabular-nums tracking-tight text-foreground">{supply.interval ? t('grDays', { n: supply.interval }) : '—'}</dd>
-          </div>
+        <dl className={cn('grid gap-2', grocery ? 'grid-cols-3' : 'grid-cols-2')}>
+          {grocery && (
+            <div className="rounded-2xl bg-foreground/[0.04] p-3">
+              <dt className="text-xs text-muted-foreground">{t('grUsuallyLasts')}</dt>
+              <dd className="mt-0.5 text-base font-bold tabular-nums tracking-tight text-foreground">{supply.interval ? t('grDays', { n: supply.interval }) : '—'}</dd>
+            </div>
+          )}
           <div className="rounded-2xl bg-foreground/[0.04] p-3">
             <dt className="text-xs text-muted-foreground">{t('grTimesBought')}</dt>
             <dd className="mt-0.5 text-base font-bold tabular-nums tracking-tight text-foreground">{times}</dd>
@@ -345,32 +352,56 @@ export default function ItemSheet({ item, open, onClose, onSave, onLevel, onList
         )}
 
         <section>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">{t('grAisle')}</h3>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">{t('grWhereToBuy')}</h3>
           <div className="-mx-1 flex flex-wrap gap-1.5 px-1">
-            {AISLES.map((a) => (
+            {[{ key: '', emoji: '🛒' }, ...SHOPS].map((shop) => (
               <button
-                key={a.key}
+                key={shop.key || 'groceries'}
                 type="button"
-                aria-pressed={form.aisle === a.key}
-                onClick={() => set({ aisle: a.key }, { now: true })}
+                aria-pressed={form.shop === shop.key}
+                onClick={() => set({ shop: shop.key }, { now: true })}
                 className={cn(
                   'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors',
-                  form.aisle === a.key ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/10'
+                  form.shop === shop.key ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/10'
                 )}
               >
-                <span aria-hidden>{a.emoji}</span>{t(`grAisle_${a.key}`)}
+                <span aria-hidden>{shop.emoji}</span>{t(`grShop_${shop.key || 'groceries'}`)}
               </button>
             ))}
           </div>
         </section>
 
-        <label className="flex items-center justify-between gap-4 rounded-2xl bg-foreground/[0.04] p-3.5">
-          <span>
-            <span className="block text-sm font-semibold text-foreground">{t('grTrackSupply')}</span>
-            <span className="block text-xs text-muted-foreground">{t('grTrackSupplyHint')}</span>
-          </span>
-          <Switch checked={form.staple} onCheckedChange={(v) => set({ staple: v }, { now: true })} />
-        </label>
+        {grocery && (
+          <section>
+            <h3 className="mb-2 text-sm font-medium text-muted-foreground">{t('grAisle')}</h3>
+            <div className="-mx-1 flex flex-wrap gap-1.5 px-1">
+              {AISLES.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  aria-pressed={form.aisle === a.key}
+                  onClick={() => set({ aisle: a.key }, { now: true })}
+                  className={cn(
+                    'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors',
+                    form.aisle === a.key ? 'bg-primary text-primary-foreground' : 'bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/10'
+                  )}
+                >
+                  <span aria-hidden>{a.emoji}</span>{t(`grAisle_${a.key}`)}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {grocery && (
+          <label className="flex items-center justify-between gap-4 rounded-2xl bg-foreground/[0.04] p-3.5">
+            <span>
+              <span className="block text-sm font-semibold text-foreground">{t('grTrackSupply')}</span>
+              <span className="block text-xs text-muted-foreground">{t('grTrackSupplyHint')}</span>
+            </span>
+            <Switch checked={form.staple} onCheckedChange={(v) => set({ staple: v }, { now: true })} />
+          </label>
+        )}
 
         <div className="flex items-center gap-2 pt-1">
           <Button type="button" variant="ghost" size="icon" onClick={() => { clearTimeout(timer.current); timer.current = null; onDelete(item); onClose(); }} aria-label={t('grDelete')} className="h-11 w-11 shrink-0 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive">

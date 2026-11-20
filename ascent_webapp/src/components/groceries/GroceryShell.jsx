@@ -1,27 +1,20 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Plus, ScanLine, ShoppingCart } from 'lucide-react';
+import { Plus, ScanLine } from 'lucide-react';
 import { usePageCreateAction } from '@/components/shell/QuickActions';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { useHousehold } from '@/hooks/useHousehold';
-import { localDay } from '@/lib/localDay';
-import { cn } from '@/lib/utils';
 import { guessItem, parseEntries } from './groceryUtils';
 import ItemSheet from './ItemSheet';
-import ShoppingMode from './ShoppingMode';
-import FinishTrip from './FinishTrip';
 import ScanReceipt from './ScanReceipt';
 
 /**
- * What every Groceries layout shares: the item sheet, shopping mode and the finish after it, a receipt
- * scanned on its own, and the dock's + jumping to the add field (held: add, or scan a receipt). Pages lay
- * out the list; this holds the overlays.
+ * What every Groceries layout shares: the item sheet, a scanned receipt, and the dock's + jumping to the add
+ * field (held: add, or scan a receipt). Pages lay out the list; this holds the overlays.
  */
 export function useGroceryShell(list) {
   const { t } = useTheme();
   const [openId, setOpenId] = useState(null);
-  const [shopping, setShopping] = useState(false);
-  const [trip, setTrip] = useState(null); // { items, date }
   const [scanning, setScanning] = useState(false);
   const addRef = useRef(null);
 
@@ -33,13 +26,6 @@ export function useGroceryShell(list) {
     { id: 'add', label: t('grAddLabel'), icon: Plus, run: focusAdd },
     { id: 'receipt', label: t('grScanAReceipt'), icon: ScanLine, run: () => setScanning(true) },
   ]);
-
-  const finish = useCallback(async (cart, { store = '' } = {}) => {
-    const date = localDay();
-    setShopping(false);
-    setTrip({ items: cart, date, store });
-    await list.markBought(cart, { date, store });
-  }, [list]);
 
   const item = openId ? list.items.find((i) => i.id === openId) : null;
 
@@ -57,20 +43,17 @@ export function useGroceryShell(list) {
         onPrice={list.setPurchasePrice}
         items={list.items}
       />
-      <ShoppingMode open={shopping} list={list} onClose={() => setShopping(false)} onDone={finish} />
-      <FinishTrip trip={trip} list={list} onClose={() => setTrip(null)} />
       <ScanReceipt open={scanning} onClose={() => setScanning(false)} />
     </>
   );
 
-  return { openItem: (i) => setOpenId(i.id), startShopping: () => setShopping(true), scanReceipt: () => setScanning(true), addRef, overlays };
+  return { openItem: (i) => setOpenId(i.id), scanReceipt: () => setScanning(true), addRef, overlays };
 }
 
 /**
- * The page title, the household's faces, a view switch (`toggle`), Scan a receipt (`onScan`), and Start
- * shopping on wider screens.
+ * The page title, the household's faces, a view switch (`toggle`) and Scan a receipt (`onScan`).
  */
-export function GroceryHeader({ title, subtitle, count, onShop, onScan, toggle }) {
+export function GroceryHeader({ title, subtitle, onScan, toggle }) {
   const { t } = useTheme();
   const { members, isShared } = useHousehold();
   return (
@@ -95,12 +78,6 @@ export function GroceryHeader({ title, subtitle, count, onShop, onScan, toggle }
         {onScan && (
           <Button variant="secondary" onClick={onScan} aria-label={t('grScanAReceipt')} className="h-10 rounded-full px-3 sm:px-4">
             <ScanLine className="h-4 w-4 sm:me-2" /><span className="hidden sm:inline">{t('grScanAReceipt')}</span>
-          </Button>
-        )}
-        {count > 0 && onShop && (
-          <Button onClick={onShop} className="hidden h-10 rounded-full px-5 md:inline-flex">
-            <ShoppingCart className="me-2 h-4 w-4" />{t('grStartShopping')}
-            <span className="ms-2 rounded-full bg-primary-foreground/15 px-2 text-xs tabular-nums">{count}</span>
           </Button>
         )}
       </div>
@@ -129,24 +106,5 @@ export function GroceriesEmpty({ onAddText }) {
         ))}
       </div>
     </section>
-  );
-}
-
-/** The floating "Start shopping" pill above the dock on phones (wider screens show it in the header). */
-export function StartShopping({ count, onClick, className }) {
-  const { t } = useTheme();
-  if (!count) return null;
-  return (
-    <div className={cn('pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+96px)] z-20 flex justify-center md:hidden', className)}>
-      <button
-        type="button"
-        onClick={onClick}
-        className="pointer-events-auto inline-flex h-[52px] items-center gap-2.5 rounded-full bg-primary pe-5 ps-4 text-[15px] font-bold text-primary-foreground shadow-[0_6px_20px_-6px_hsl(var(--glow)/0.55)] transition-transform active:scale-[0.97]"
-      >
-        <ShoppingCart className="h-5 w-5" strokeWidth={2.4} />
-        {t('grStartShopping')}
-        <span className="rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[13px] tabular-nums">{count}</span>
-      </button>
-    </div>
   );
 }

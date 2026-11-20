@@ -6,7 +6,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { haptic } from '@/lib/haptics';
 import { useGroceryList } from '@/components/groceries/useGroceryList';
-import { GroceriesEmpty, GroceryHeader, StartShopping, useGroceryShell } from '@/components/groceries/GroceryShell';
+import { GroceriesEmpty, GroceryHeader, useGroceryShell } from '@/components/groceries/GroceryShell';
 import AddBar from '@/components/groceries/AddBar';
 import WallView from '@/components/groceries/WallView';
 import CheckView from '@/components/groceries/CheckView';
@@ -103,13 +103,11 @@ function Groceries() {
   const showsPanel = !isLoading && !empty;
 
   return (
-    <div className="relative mx-auto flex w-full max-w-5xl flex-col p-3 pb-40 sm:p-4 sm:pb-24 md:p-8">
+    <div className="relative mx-auto flex w-full max-w-5xl flex-col p-3 pb-28 sm:p-4 sm:pb-24 md:p-8">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--glow)/0.14),transparent_70%)]" />
       <GroceryHeader
         title={t('grTitle')}
         subtitle={subtitle}
-        count={onList.length}
-        onShop={shell.startShopping}
         onScan={shell.scanReceipt}
         // The tabs point at the panel only while it is there (not while loading or on the empty list)
         toggle={<ViewSwitch view={view} onChange={setView} t={t} reduce={reduce} controls={showsPanel ? 'gr-view' : undefined} />}
@@ -153,7 +151,6 @@ function Groceries() {
         </AnimatePresence>
       )}
 
-      {view !== 'check' && <StartShopping count={onList.length} onClick={shell.startShopping} />}
       {shell.overlays}
     </div>
   );

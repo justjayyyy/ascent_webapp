@@ -1,6 +1,5 @@
-// The last browser-testable P2 rows (SV-E01, PL-E05, DSH-E02, GR-N03): a goal whose date has passed or that holds
-// more than its target, a plan with no date in another currency and with 200 costs, an overspent month in Hebrew,
-// and a shopping trip finished without a total.
+// The last browser-testable P2 rows (SV-E01, PL-E05, DSH-E02): a goal whose date has passed or that holds more
+// than its target, a plan with no date in another currency and with 200 costs, and an overspent month in Hebrew.
 import { test, expect } from '../../fixtures.js';
 import { openApp } from '../../support/app.js';
 import { day, expense, income } from '../../support/factories.js';
@@ -50,21 +49,6 @@ test('an overspent month reads "over by" in Hebrew, with the amount kept left to
   await expect(line).toBeVisible();
   await expect(line).toContainText('600');
   await expectNoBrokenNumbers(page);
-});
-
-test('finishing a trip with no total typed does not save an expense @critical', async ({ page, api }) => {
-  await api.create('groceries', { name: 'Milk', onList: true, listedAt: new Date().toISOString() });
-  await openApp(page, '/Groceries');
-  await page.getByRole('button', { name: L('grStartShopping') }).click();
-  const shopping = page.getByRole('dialog', { name: L('grShopping') });
-  await shopping.getByRole('checkbox', { name: 'Milk', exact: true }).click();
-  await shopping.getByRole('button', { name: L('grDoneShopping', { n: 1 }) }).click();
-  const finish = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: L('grShopDone') }) });
-  await finish.getByRole('button', { name: L('grEnterAmount') }).click();
-  const form = page.getByRole('dialog').last();
-  await form.getByRole('button', { name: L('addTransaction'), exact: true }).click();
-  await expect(form).toBeVisible();
-  expect(await api.list('transactions')).toEqual([]);
 });
 
 test('a loan already being paid off starts from today’s balance and the next payment @critical', async ({ page, api }) => {
